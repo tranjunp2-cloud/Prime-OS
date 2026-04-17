@@ -114,16 +114,8 @@ function AreaSection({
   node: PrimeNavNode;
   activeIds: Set<string>;
 }) {
-  const Icon = node.icon;
-  const isActive = activeIds.has(node.id);
-
   return (
     <section aria-label={node.label} className="space-y-1.5">
-      <div className={cn('hidden items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider md:flex', isActive ? 'text-primary' : 'text-muted-foreground')}>
-        {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
-        <span className="truncate">{node.label}</span>
-      </div>
-
       <SidebarFolder node={node} activeIds={activeIds} />
     </section>
   );

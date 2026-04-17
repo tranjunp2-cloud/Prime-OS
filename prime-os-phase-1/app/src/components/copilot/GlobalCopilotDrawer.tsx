@@ -34,7 +34,7 @@ export function GlobalCopilotDrawer({
         className="flex w-full flex-col p-0 sm:w-[480px]"
       >
         <SheetHeader className="sr-only">
-          <SheetTitle>ECH Assistant</SheetTitle>
+          <SheetTitle>Prime AI</SheetTitle>
           <SheetDescription>{context.description}</SheetDescription>
         </SheetHeader>
         <GlobalCopilotSurface

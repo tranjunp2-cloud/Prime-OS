@@ -122,6 +122,64 @@ function buildActions(actions: GlobalCopilotAction[]) {
   return actions.map((action) => ({ emphasis: 'secondary', ...action }));
 }
 
+function toSentence(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function summarizeActionLine(response: CopilotResponse, context: CopilotContextSummary) {
+  if (response.actions?.length) {
+    return response.actions.slice(0, 2).map((action) => action.label).join(' · ');
+  }
+
+  if (response.followUpPrompts?.length) {
+    return response.followUpPrompts.slice(0, 2).map((prompt) => prompt.label).join(' · ');
+  }
+
+  return `Tiếp tục trong ${context.title}`;
+}
+
+function summarizeRecommendationLine(response: CopilotResponse, context: CopilotContextSummary) {
+  switch (response.intent) {
+    case 'navigate':
+      return `Mở đúng module hoặc queue liên quan trong ${context.title} để xử lý nhanh hơn`;
+    case 'write_draft':
+      return `Dùng draft an toàn trước, rồi mới xác nhận thực thi trong ${context.title}`;
+    case 'clarify':
+      return `Chốt một hướng cụ thể để mình giảm mơ hồ và trả lời sát hơn với ${context.title}`;
+    default:
+      if (response.entityRef?.label) {
+        return `Đọc kỹ context của ${response.entityRef.label} rồi quyết định bước xử lý tiếp theo`;
+      }
+      return `Dùng phần context hiện tại của ${context.title} để chọn next best action phù hợp`;
+  }
+}
+
+function formatStructuredCopilotContent(response: CopilotResponse, context: CopilotContextSummary) {
+  const insight = response.content.trim();
+  const recommendation = summarizeRecommendationLine(response, context);
+  const action = summarizeActionLine(response, context);
+
+  return [
+    '**Insight**',
+    toSentence(insight),
+    '',
+    '**Recommendation**',
+    toSentence(recommendation),
+    '',
+    '**Action**',
+    toSentence(action),
+  ].join('\n');
+}
+
+function finalizeCopilotResponse(response: CopilotResponse, context: CopilotContextSummary) {
+  return {
+    ...response,
+    content: formatStructuredCopilotContent(response, context),
+  };
+}
+
 function takePrompts(prompts: CopilotQuickPrompt[], count = 3) {
   return prompts.slice(0, count);
 }
@@ -543,15 +601,15 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
 
   return {
     domain: 'dashboard',
-    title: 'Control Tower',
-    description: 'Theo dõi nhanh vận hành, fulfillment và các exception chính.',
-    insight: 'Bạn có thể hỏi về order, product, warehouse hoặc nhờ mình mở nhanh đúng màn hình.',
+    title: 'Seller Growth',
+    description: 'Tư vấn nhóm khách hàng, sản phẩm, KOL/livestream và kênh tiếp thị phù hợp để tăng bán hàng.',
+    insight: 'Prime AI có thể gợi ý khách hàng mục tiêu, thông điệp, kênh triển khai và next best campaign.',
     citations: ['Current route: dashboard'],
     quickPrompts: [
-      { label: 'Bạn giúp gì?', prompt: 'Bạn đang giúp được mình những gì?' },
-      { label: 'Mở Orders', prompt: 'Mở lại orders' },
-      { label: 'Mở Products', prompt: 'Mở lại products' },
-      { label: 'Mở Warehouses', prompt: 'Mở lại warehouses' },
+      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
+      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
+      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
+      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
     ],
   };
 }
@@ -1362,9 +1420,192 @@ function buildWarehouseDetailAnswer(warehouse: Warehouse) {
   };
 }
 
+function buildSellerGrowthAudienceResponse(): CopilotResponse {
+  return {
+    domain: 'dashboard',
+    intent: 'read',
+    citations: ['Mock intelligence layer: persona fit from social, CRM, and campaign signals'],
+    followUpPrompts: [
+      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
+      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
+      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+    ],
+    actions: buildActions([
+      { type: 'copy', label: 'Copy audience brief', description: 'Dùng brief này cho seller team', value: 'Segment A: Creator commerce buyers 24-32 / Segment B: Repeat refill buyers 28-40 / Segment C: B2B office replenishment managers 30-45' },
+      { type: 'copy', label: 'Copy key message', description: 'Dùng làm định hướng thông điệp', value: 'Bundle convenience, refill value, trust proof, MOQ clarity, service follow-up' },
+    ]),
+    content: [
+      'Prime AI đang ưu tiên 3 nhóm khách hàng cho seller này.',
+      '',
+      '**1. Creator Commerce Buyers**',
+      '- Hồ sơ: 24-32 tuổi, mua theo cảm hứng nhưng cần trust signal mạnh.',
+      '- Nơi xuất hiện: TikTok livestream, creator clip, social save/share.',
+      '- Trigger mua hàng: xem demo nhanh, thấy bundle tiện hơn mua lẻ, có creator proof rõ.',
+      '- KPI mock: CTR 2.8%, add-to-cart rate 9.4%, conversion window 24-48h.',
+      '',
+      '**2. Repeat / Refill Buyers**',
+      '- Hồ sơ: đã từng mua hoặc từng tương tác nhiều lần với cùng nhóm sản phẩm.',
+      '- Nơi xuất hiện: email reopen, chat follow-up, revisit vào refill/bundle pages.',
+      '- Trigger mua hàng: nhắc đúng thời điểm, lợi ích tiết kiệm, combo/refill rõ ràng.',
+      '- KPI mock: reopen rate 31%, repeat conversion 12.6%, CAC thấp hơn broad audience 27%.',
+      '',
+      '**3. B2B Replenishment Accounts**',
+      '- Hồ sơ: buyer doanh nghiệp, office/admin procurement hoặc đối tác mua định kỳ.',
+      '- Nơi xuất hiện: quote-page dwell, RFQ intent, LinkedIn matched audience, sales chat.',
+      '- Trigger mua hàng: MOQ rõ, giá trị gói mua số lượng, SLA và fulfillment đáng tin.',
+      '- KPI mock: RFQ submit rate 8.7%, quote-to-order 21%, AOV cao gấp 3.2x nhóm retail.',
+      '',
+      'Tín hiệu mạnh nhất hiện tại đang đến từ livestream comments, save/share trên creator content, revisit vào refill pages, và các phiên quote intent lặp lại.',
+    ].join('\n'),
+  };
+}
+
+function buildSellerGrowthCampaignResponse(): CopilotResponse {
+  return {
+    domain: 'dashboard',
+    intent: 'read',
+    citations: ['Mock campaign planning: social demand + CRM segment + conversion path'],
+    followUpPrompts: [
+      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
+      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
+      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+    ],
+    actions: buildActions([
+      { type: 'copy', label: 'Copy campaign brief', description: 'Dùng làm brief nội bộ', value: '72h refill bundle sprint / creator-led demo / retarget engaged viewers / chat follow-up for high intent users' },
+      { type: 'copy', label: 'Copy offer idea', description: 'Dùng làm thông điệp ưu đãi', value: 'Buy smarter with bundle value, refill convenience, and limited-time incentive' },
+    ]),
+    content: [
+      'Chiến dịch mock phù hợp nhất là **72-hour Bundle & Refill Sprint**.',
+      '',
+      '**Mục tiêu**',
+      '- Tăng đơn hàng ngắn hạn từ nhóm khách đã có ý định mua.',
+      '- Giảm lãng phí media vào nhóm lạnh chưa có trust signal.',
+      '',
+      '**Cấu trúc chiến dịch**',
+      '- Giai đoạn 1: Creator clip / livestream hook để tạo lực hút ban đầu.',
+      '- Giai đoạn 2: Retarget người đã xem trên 50%, đã save, hoặc đã click nhưng chưa mua.',
+      '- Giai đoạn 3: Email + chat follow-up cho nhóm có dấu hiệu refill hoặc quote intent.',
+      '',
+      '**Thông điệp chính**',
+      '- Bundle tiết kiệm hơn mua lẻ.',
+      '- Refill tiện hơn cho nhu cầu mua lại.',
+      '- Có proof từ creator hoặc customer use-case thật.',
+      '',
+      '**Phân bổ mock budget**',
+      '- 40% creator/livestream traffic.',
+      '- 35% retargeting conversion.',
+      '- 15% CRM/email/chat activation.',
+      '- 10% test angle mới hoặc lookalike audience.',
+      '',
+      '**KPI mock kỳ vọng**',
+      '- +18% lift đơn hàng trong 7 ngày.',
+      '- +22% add-to-cart từ nhóm đã xem creator content.',
+      '- -19% wasted spend nhờ loại bớt audience không còn phù hợp.',
+    ].join('\n'),
+  };
+}
+
+function buildSellerGrowthChannelResponse(): CopilotResponse {
+  return {
+    domain: 'dashboard',
+    intent: 'read',
+    citations: ['Mock channel orchestration: paid + owned + chat-assisted commerce'],
+    followUpPrompts: [
+      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
+      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
+      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+    ],
+    actions: buildActions([
+      { type: 'copy', label: 'Copy channel mix', description: 'Dùng làm media direction', value: 'TikTok livestream / creator clips -> Meta or platform retargeting -> Email / LINE / Zalo -> Sales chat for high intent users' },
+      { type: 'copy', label: 'Copy rollout', description: 'Dùng làm sequencing plan', value: 'Awareness proof -> engagement retargeting -> CRM push -> chat conversion assist' },
+    ]),
+    content: [
+      'Prime AI đề xuất chạy theo **channel sequence**, không phải chọn một kênh đơn lẻ.',
+      '',
+      '**Kênh 1. Demand trigger**',
+      '- TikTok livestream / creator short-form content.',
+      '- Mục đích: tạo trust và nhu cầu ban đầu.',
+      '- KPI mock: video completion 34%, comment rate 6.2%, click-out 2.8%.',
+      '',
+      '**Kênh 2. Conversion retargeting**',
+      '- Retargeting trên social / marketplace / website audiences.',
+      '- Mục đích: bám lại người đã tương tác nhưng chưa chốt đơn.',
+      '- KPI mock: CPA thấp hơn broad targeting 24%, ROAS tăng 17%.',
+      '',
+      '**Kênh 3. CRM / owned channels**',
+      '- Email, LINE, Zalo, WhatsApp hoặc chat platform.',
+      '- Mục đích: kích hoạt nhóm có intent cao, refill buyers, hoặc khách vừa bỏ giỏ.',
+      '- KPI mock: open rate 38%, reply rate 14%, assisted conversion 9%.',
+      '',
+      '**Kênh 4. Sales / quote assist**',
+      '- Sales chat, quote follow-up, B2B outbound nhẹ.',
+      '- Mục đích: chốt nhóm account có AOV cao.',
+      '- KPI mock: quote-to-order 21%, average basket tăng 3.2x retail.',
+    ].join('\n'),
+  };
+}
+
+function buildSellerGrowthKolResponse(): CopilotResponse {
+  return {
+    domain: 'dashboard',
+    intent: 'read',
+    citations: ['Mock creator intelligence: host fit + offer timing + social proof'],
+    followUpPrompts: [
+      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
+      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
+      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
+    ],
+    actions: buildActions([
+      { type: 'copy', label: 'Copy livestream angle', description: 'Dùng làm creator brief', value: 'Problem-solution demo + trust proof + short-time bundle close' },
+      { type: 'copy', label: 'Copy host script', description: 'Dùng làm opening hook', value: 'Open with pain point, demo real use, show bundle value, close with urgency' },
+    ]),
+    content: [
+      'Nếu dùng KOL hoặc livestream, Prime AI đang ưu tiên format **problem-solution demo + trust proof + bundle close**.',
+      '',
+      '**Host fit mock**',
+      '- Ưu tiên micro hoặc mid creator có tỷ lệ bình luận thật cao hơn là chỉ nhìn tổng reach.',
+      '- Chỉ số mock nên theo: comment velocity > 4.5%, save/share rate > 3.2%, click-to-cart > 2.1%.',
+      '',
+      '**Flow livestream đề xuất**',
+      '- 0-30 giây: nêu vấn đề người mua đang gặp.',
+      '- 30-90 giây: demo cách sản phẩm giải quyết vấn đề.',
+      '- 90-150 giây: chứng minh trust bằng review, use-case, hoặc social proof.',
+      '- 150 giây trở đi: chốt bằng bundle/refill incentive và CTA ngắn hạn.',
+      '',
+      '**Offer mock phù hợp**',
+      '- Bundle ưu đãi trong 90 phút đầu livestream.',
+      '- Refill bonus cho khách từng mua hoặc từng tương tác.',
+      '- DM/chat follow-up cho người comment nhưng chưa mua.',
+      '',
+      '**KPI mock kỳ vọng**',
+      '- +26% add-to-cart trong khung livestream.',
+      '- +14% follow-up conversion từ nhóm đã comment.',
+      '- +11% repeat purchase nếu nối thêm CRM reminder sau live 24 giờ.',
+    ].join('\n'),
+  };
+}
+
 export function resolveContextualResponse(message: string, pathname: string): CopilotResponse | null {
   const normalized = normalizeText(message);
   const context = resolveCopilotContext(pathname);
+
+  if (pathname === '/dashboard' || context.title === 'Seller Growth') {
+    if (hasAnyKeyword(normalized, ['nhom khach', 'khach hang phu hop', 'doi tuong phu hop', 'audience', 'customer fit', 'target khach'])) {
+      return buildSellerGrowthAudienceResponse();
+    }
+
+    if (hasAnyKeyword(normalized, ['chien dich', 'campaign', 'tiep thi tot nhat', 'marketing tot nhat', 'ban hang tot hon'])) {
+      return buildSellerGrowthCampaignResponse();
+    }
+
+    if (hasAnyKeyword(normalized, ['kenh nao', 'kenh nen chay', 'channel', 'email', 'chat', 'mxh', 'social'])) {
+      return buildSellerGrowthChannelResponse();
+    }
+
+    if (hasAnyKeyword(normalized, ['kol', 'livestream', 'live stream', 'creator'])) {
+      return buildSellerGrowthKolResponse();
+    }
+  }
 
   if (hasAnyKeyword(normalized, ['trang nay', 'page nay', 'screen nay', 'route nay', 'dung de lam gi', 'lam gi o day'])) {
     return buildRouteOverview(context);
@@ -1436,7 +1677,7 @@ export function resolveContextualResponse(message: string, pathname: string): Co
 }
 
 export function buildWelcomeMessage(context: CopilotContextSummary): CopilotResponse {
-  return {
+  return finalizeCopilotResponse({
     domain: context.domain,
     intent: 'read',
     citations: [],
@@ -1445,15 +1686,12 @@ export function buildWelcomeMessage(context: CopilotContextSummary): CopilotResp
       confidenceBucket: 'high',
     }),
     followUpPrompts: takePrompts(context.quickPrompts),
-    content: [
-      'Mình sẵn sàng rồi.',
-      'Bạn có thể hỏi về dữ liệu đang thấy, nhờ mình mở đúng màn hình, hoặc chuẩn bị một draft an toàn.',
-    ].filter(Boolean).join('\n'),
-  };
+    content: `Mình đang đọc context của ${context.title} để tư vấn khách hàng phù hợp, chiến dịch nên chạy và kênh tiếp thị phù hợp cho seller.`,
+  }, context);
 }
 
 export function buildFallbackResponse(context: CopilotContextSummary): CopilotResponse {
-  return {
+  return finalizeCopilotResponse({
     domain: context.domain,
     intent: 'clarify',
     citations: [],
@@ -1472,11 +1710,8 @@ export function buildFallbackResponse(context: CopilotContextSummary): CopilotRe
         value: prompt.prompt,
       })),
     ),
-    content: [
-      'Mình chưa đủ chắc để trả lời ngay mà không đoán sai.',
-      `Nếu bạn muốn, mình có thể tiếp tục theo **${context.title}** ở một trong các hướng gợi ý bên dưới.`,
-    ].filter(Boolean).join('\n'),
-  };
+    content: `Mình chưa đủ chắc để trả lời ngay mà không đoán sai trong ${context.title}.`,
+  }, context);
 }
 
 export function resolveCopilotResponse(
@@ -1514,7 +1749,7 @@ export function resolveCopilotResponse(
 
   if (!candidates.length) {
     if (normalized.length <= 16 || hasAnyKeyword(normalized, ['giup minh', 'xem ho', 'check ho'])) {
-      return buildClarifyResponse(context);
+      return finalizeCopilotResponse(buildClarifyResponse(context), context);
     }
 
     return buildFallbackResponse(context);
@@ -1529,13 +1764,13 @@ export function resolveCopilotResponse(
     && top.score - runnerUp.score <= 6
     && top.key !== runnerUp.key
   ) {
-    return buildClarifyResponse(context, [
+    return finalizeCopilotResponse(buildClarifyResponse(context, [
       { label: 'Giải thích trang', prompt: 'Trang này dùng để làm gì?' },
       ...takePrompts(top.response.followUpPrompts ?? context.quickPrompts, 2),
-    ]);
+    ]), context);
   }
 
-  return {
+  return finalizeCopilotResponse({
     ...top.response,
     debug: {
       ...(top.response.debug ?? createDebugMeta({
@@ -1546,5 +1781,5 @@ export function resolveCopilotResponse(
       confidenceBucket: scoreToConfidenceBucket(top.score),
       usedConversationMemory: top.key === 'conversation-entity',
     },
-  };
+  }, context);
 }
