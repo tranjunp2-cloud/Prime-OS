@@ -145,6 +145,35 @@ export interface PrimeForecast {
   suggestedAction: string;
 }
 
+export interface PrimeSocialStream {
+  id: string;
+  source: string;
+  ingestionMode: 'api' | 'crawler' | 'partner-feed';
+  eventVolume: number;
+  freshnessMinutes: number;
+  audienceSignal: string;
+  status: 'healthy' | 'watch' | 'lagging';
+}
+
+export interface PrimeInsightModel {
+  id: string;
+  name: string;
+  objective: string;
+  inputSignal: string;
+  outputSignal: string;
+  confidence: number;
+  retrainCadence: string;
+}
+
+export interface PrimeActivationPlay {
+  id: string;
+  trigger: string;
+  audience: string;
+  channelMix: string[];
+  nextBestAction: string;
+  projectedLift: number;
+}
+
 export interface PrimeDemoFlow {
   id: string;
   name: string;
@@ -174,6 +203,9 @@ export interface PrimeSnapshot {
   alerts: PrimeAlert[];
   recommendations: PrimeRecommendation[];
   forecasts: PrimeForecast[];
+  socialStreams: PrimeSocialStream[];
+  insightModels: PrimeInsightModel[];
+  activationPlays: PrimeActivationPlay[];
   demoFlows: PrimeDemoFlow[];
   metrics: {
     revenue: number;
@@ -557,6 +589,117 @@ function buildForecasts(products: Product[], campaigns: PrimeCampaign[]): PrimeF
   });
 }
 
+function buildSocialStreams(campaigns: PrimeCampaign[], vocInsights: PrimeVocInsight[]): PrimeSocialStream[] {
+  const totalCampaignTraffic = campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
+
+  return [
+    {
+      id: 'stream_tiktok_live',
+      source: 'TikTok / livestream comments',
+      ingestionMode: 'crawler',
+      eventVolume: Math.round(totalCampaignTraffic * 0.22),
+      freshnessMinutes: 3,
+      audienceSignal: 'Comment burst around bundle discount and host trust cues.',
+      status: 'healthy',
+    },
+    {
+      id: 'stream_instagram_reels',
+      source: 'Instagram / creator reels',
+      ingestionMode: 'api',
+      eventVolume: Math.round(totalCampaignTraffic * 0.16),
+      freshnessMinutes: 8,
+      audienceSignal: 'Save and share rate strongest for office setup and productivity proof.',
+      status: 'healthy',
+    },
+    {
+      id: 'stream_youtube_reviews',
+      source: 'YouTube / review transcripts',
+      ingestionMode: 'crawler',
+      eventVolume: 1480 + vocInsights.length * 120,
+      freshnessMinutes: 22,
+      audienceSignal: 'Long-form reviews mention packaging quality and refill convenience.',
+      status: 'watch',
+    },
+    {
+      id: 'stream_chat_commerce',
+      source: 'Mail / LINE / Zalo / chat commerce',
+      ingestionMode: 'partner-feed',
+      eventVolume: 920 + campaigns.length * 80,
+      freshnessMinutes: 6,
+      audienceSignal: 'High reply intent from repeat buyers after refill reminder and staff follow-up.',
+      status: 'healthy',
+    },
+  ];
+}
+
+function buildInsightModels(campaigns: PrimeCampaign[], forecasts: PrimeForecast[]): PrimeInsightModel[] {
+  const topCampaign = campaigns[0];
+  const highRiskForecast = forecasts.find((forecast) => forecast.risk === 'high') || forecasts[0];
+
+  return [
+    {
+      id: 'model_persona_graph',
+      name: 'Audience Persona Graph',
+      objective: 'Cluster buyer intent from social profile, content interaction, and order evidence.',
+      inputSignal: 'Clicks, comments, saves, RFQ intent, order lifecycle',
+      outputSignal: 'Segment tags for creator commerce, refill buyers, and B2B replenishment',
+      confidence: 84,
+      retrainCadence: 'Nightly feature refresh + weekly model retrain',
+    },
+    {
+      id: 'model_kol_livestream',
+      name: 'KOL Livestream Conversion Propensity',
+      objective: 'Predict which host-script-offer combination will trigger add-to-cart or RFQ intent.',
+      inputSignal: `Livestream hook, comment speed, host trust signal, ${topCampaign?.channel || 'campaign'} attribution`,
+      outputSignal: 'Recommended host angle, discount window, and SKU bundle priority',
+      confidence: 79,
+      retrainCadence: 'Per campaign flight + after major livestream events',
+    },
+    {
+      id: 'model_stock_marketing',
+      name: 'Demand-to-Stock Pressure Model',
+      objective: 'Prevent marketing from scaling SKUs that inventory cannot support.',
+      inputSignal: `${highRiskForecast?.skuCode || 'SKU'} ATS, demand spikes, campaign velocity`,
+      outputSignal: 'Throttle / expand promotion recommendation',
+      confidence: 88,
+      retrainCadence: 'Hourly scoring on streaming demand features',
+    },
+  ];
+}
+
+function buildActivationPlays(customers: PrimeCustomer[], campaigns: PrimeCampaign[], vocInsights: PrimeVocInsight[]): PrimeActivationPlay[] {
+  const creatorCustomer = customers.find((customer) => customer.segment.includes('Creator')) || customers[0];
+  const b2bCustomer = customers.find((customer) => customer.segment.includes('B2B')) || customers[1] || customers[0];
+  const voc = vocInsights[0];
+
+  return [
+    {
+      id: 'play_kol_refill',
+      trigger: 'Livestream comment spike around refill convenience + bundle price acceptance',
+      audience: creatorCustomer?.segment || 'Creator commerce',
+      channelMix: ['TikTok DM', 'Email follow-up', 'Retargeting audience refresh'],
+      nextBestAction: 'Push refill bundle recommendation with creator-proof clip and limited incentive window.',
+      projectedLift: 18,
+    },
+    {
+      id: 'play_b2b_quote',
+      trigger: 'Repeated office procurement visits with quote-page dwell and service inquiry',
+      audience: b2bCustomer?.segment || 'B2B replenishment',
+      channelMix: ['Email', 'Sales chat queue', 'LinkedIn matched audience'],
+      nextBestAction: 'Send quote-ready product set with MOQ explanation and fast RFQ CTA.',
+      projectedLift: 14,
+    },
+    {
+      id: 'play_voc_recovery',
+      trigger: voc?.summary || 'Negative signal detected in service/social layer',
+      audience: 'At-risk recent buyers',
+      channelMix: ['LINE / Zalo', 'Customer care mail', 'Suppression from hard conversion ads'],
+      nextBestAction: 'Route service-led recovery message first, then reintroduce offer after trust signal improves.',
+      projectedLift: 11,
+    },
+  ];
+}
+
 function buildRecommendations(forecasts: PrimeForecast[], tickets: PrimeTicket[], campaigns: PrimeCampaign[]): PrimeRecommendation[] {
   const riskyForecast = forecasts.find((forecast) => forecast.risk === 'high') || forecasts[0];
   const urgentTicket = tickets.find((ticket) => ticket.priority === 'high') || tickets[0];
@@ -684,6 +827,9 @@ export function getPrimeSnapshot(): PrimeSnapshot {
   const tickets = buildTickets(customers, orders);
   const vocInsights = buildVocInsights(products, customers, campaigns, tickets);
   const forecasts = buildForecasts(products, campaigns);
+  const socialStreams = buildSocialStreams(campaigns, vocInsights);
+  const insightModels = buildInsightModels(campaigns, forecasts);
+  const activationPlays = buildActivationPlays(customers, campaigns, vocInsights);
   const recommendations = buildRecommendations(forecasts, tickets, campaigns);
   const alerts = buildAlerts(forecasts, tickets, recommendations);
   const fulfillmentJobs = getFulfillmentJobs();
@@ -714,6 +860,9 @@ export function getPrimeSnapshot(): PrimeSnapshot {
     alerts,
     recommendations,
     forecasts,
+    socialStreams,
+    insightModels,
+    activationPlays,
     demoFlows: buildDemoFlows(),
     metrics: {
       revenue: currency(sumOrderRevenue(orders)),

@@ -30,6 +30,9 @@ import {
   PRIME_TOWER_CONFIGS,
   getPrimeSnapshot,
   getSkuLabel,
+  type PrimeActivationPlay,
+  type PrimeInsightModel,
+  type PrimeSocialStream,
   type PrimeTowerId,
 } from '@/lib/prime/prime-data';
 
@@ -50,6 +53,114 @@ function statusTone(status: string) {
   if (['active', 'qualified', 'converted', 'resolved', 'positive', 'low'].includes(status)) return 'text-emerald-600 dark:text-emerald-300';
   if (['high', 'open', 'negative'].includes(status)) return 'text-rose-600 dark:text-rose-300';
   return 'text-amber-600 dark:text-amber-300';
+}
+
+function streamTone(status: PrimeSocialStream['status']) {
+  if (status === 'healthy') return 'text-emerald-600 dark:text-emerald-300';
+  if (status === 'lagging') return 'text-rose-600 dark:text-rose-300';
+  return 'text-amber-600 dark:text-amber-300';
+}
+
+function activationBadgeTone(lift: number) {
+  if (lift >= 16) return 'default';
+  if (lift >= 12) return 'secondary';
+  return 'outline';
+}
+
+function SocialDataPipeline({ streams }: { streams: PrimeSocialStream[] }) {
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader>
+        <CardTitle>Big Data ingestion lane</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table variant="embedded">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Source</TableHead>
+              <TableHead>Mode</TableHead>
+              <TableHead className="text-right">Events / day</TableHead>
+              <TableHead className="text-right">Freshness</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {streams.map((stream) => (
+              <TableRow key={stream.id}>
+                <TableCell className="font-medium">
+                  <div className="flex flex-col">
+                    <span>{stream.source}</span>
+                    <span className="text-xs text-muted-foreground">{stream.audienceSignal}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="uppercase text-xs tracking-wide text-muted-foreground">{stream.ingestionMode}</TableCell>
+                <TableCell className="text-right">{stream.eventVolume.toLocaleString()}</TableCell>
+                <TableCell className="text-right">{stream.freshnessMinutes}m</TableCell>
+                <TableCell className={streamTone(stream.status)}>{stream.status}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ModelInsightBoard({ models }: { models: PrimeInsightModel[] }) {
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader>
+        <CardTitle>ML / DL insight models</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {models.map((model) => (
+          <div key={model.id} className="rounded-lg border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{model.name}</span>
+              <Badge variant="outline">{model.confidence}% confidence</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{model.objective}</p>
+            <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+              <div>
+                <span className="font-medium text-foreground">Input:</span> {model.inputSignal}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Output:</span> {model.outputSignal}
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-primary">Retrain: {model.retrainCadence}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivationBoard({ plays }: { plays: PrimeActivationPlay[] }) {
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader>
+        <CardTitle>Recommended activation plays</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {plays.map((play) => (
+          <div key={play.id} className="rounded-lg border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{play.audience}</span>
+              <Badge variant={activationBadgeTone(play.projectedLift)}>+{play.projectedLift}% projected lift</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">Trigger: {play.trigger}</p>
+            <p className="mt-2 text-sm text-primary">{play.nextBestAction}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {play.channelMix.map((channel) => (
+                <Badge key={`${play.id}-${channel}`} variant="outline">{channel}</Badge>
+              ))}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
 
 function TowerFloorMap({ floors }: { floors: string[] }) {
@@ -304,6 +415,77 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
 function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
 
+  if (towerId === 'analytics') {
+    const totalSocialSignals = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Social events" value={totalSocialSignals.toLocaleString()} meta="Daily signals from API, crawler, and partner feeds." icon={<RadioTower className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Behavior clusters" value={snapshot.insightModels.length} meta="Mock ML / DL models producing actionable segments." icon={<Bot className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Activation plays" value={snapshot.activationPlays.length} meta="PrimeOS-ready recommendations for outreach and campaign actions." icon={<Megaphone className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Linked VOC" value={snapshot.vocInsights.length} meta="Signals linked back to product, customer, and campaign context." icon={<ScanSearch className="size-5" />} tone="warning" />
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <SocialDataPipeline streams={snapshot.socialStreams} />
+          <ModelInsightBoard models={snapshot.insightModels} />
+        </div>
+
+        <ActivationBoard plays={snapshot.activationPlays} />
+      </div>
+    );
+  }
+
+  if (towerId === 'attribution') {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Tracked creator flows" value={snapshot.campaigns.length} meta="Campaigns tied to SKUs, RFQs, and orders." icon={<ArrowRight className="size-5" />} tone="info" />
+          <SummaryMetricCard label="KOL signal sources" value={snapshot.socialStreams.filter((stream) => stream.source.toLowerCase().includes('tiktok') || stream.source.toLowerCase().includes('instagram')).length} meta="Streams that inform creator and livestream performance." icon={<RadioTower className="size-5" />} tone="success" />
+          <SummaryMetricCard label="RFQ proof" value={snapshot.rfqs.length} meta="Attribution path extends beyond click to assisted commerce evidence." icon={<ClipboardList className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="ML-linked actions" value={snapshot.activationPlays.length} meta="Attribution feeds next-best-action, not only reporting." icon={<Bot className="size-5" />} tone="purple" />
+        </div>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Attribution chain from social signal to conversion</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Campaign</TableHead>
+                  <TableHead>Primary signal</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">RFQs</TableHead>
+                  <TableHead className="text-right">Orders</TableHead>
+                  <TableHead>PrimeOS recommendation</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {snapshot.campaigns.map((campaign, index) => (
+                  <TableRow key={campaign.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{campaign.name}</span>
+                        <span className="text-xs text-muted-foreground">{campaign.channel}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{snapshot.socialStreams[index % snapshot.socialStreams.length]?.source || 'Social stream'}</TableCell>
+                    <TableCell className="text-right">{campaign.leads}</TableCell>
+                    <TableCell className="text-right">{campaign.rfqs}</TableCell>
+                    <TableCell className="text-right">{campaign.orders}</TableCell>
+                    <TableCell className="text-sm text-primary">{snapshot.activationPlays[index % snapshot.activationPlays.length]?.nextBestAction || 'Review operator suggestion'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (towerId === 'forecasting') {
     return (
       <div className="space-y-4">
@@ -341,91 +523,118 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
 
   if (towerId === 'voc') {
     return (
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <CardTitle>Social listening and VOC insights</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 lg:grid-cols-2">
-          {snapshot.vocInsights.map((insight) => (
-            <div key={insight.id} className="rounded-lg border bg-muted/20 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Badge variant="outline">{insight.source}</Badge>
-                <span className={statusTone(insight.sentiment)}>{insight.sentiment}</span>
-              </div>
-              <p className="mt-3 text-sm">{insight.summary}</p>
-              <p className="mt-2 text-xs text-primary">{insight.action}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Listening streams" value={snapshot.socialStreams.length} meta="Crawl/API feeds from social, review, and chat surfaces." icon={<ScanSearch className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Negative signals" value={snapshot.vocInsights.filter((insight) => insight.sentiment === 'negative').length} meta="Root-cause signals that can affect campaign or service flows." icon={<BellRing className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="KOL relevance" value={snapshot.activationPlays.filter((play) => play.trigger.toLowerCase().includes('livestream') || play.trigger.toLowerCase().includes('creator')).length} meta="Signals usable for creator and livestream planning." icon={<Megaphone className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Response lanes" value="Mail + Chat" meta="Insight can be activated through outreach, CRM, and media suppression." icon={<HeartHandshake className="size-5" />} tone="purple" />
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+          <SocialDataPipeline streams={snapshot.socialStreams} />
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Social listening and VOC insights</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 lg:grid-cols-2">
+              {snapshot.vocInsights.map((insight) => (
+                <div key={insight.id} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Badge variant="outline">{insight.source}</Badge>
+                    <span className={statusTone(insight.sentiment)}>{insight.sentiment}</span>
+                  </div>
+                  <p className="mt-3 text-sm">{insight.summary}</p>
+                  <p className="mt-2 text-xs text-primary">{insight.action}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     );
   }
 
   if (towerId === 'alerts') {
     return (
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <CardTitle>Automation and alert center</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {snapshot.alerts.map((alert) => (
-            <div key={alert.id} className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{alert.area}</Badge>
-                  <span className={statusTone(alert.severity)}>{alert.severity} severity</span>
+      <div className="space-y-4">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Automation and alert center</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {snapshot.alerts.map((alert) => (
+              <div key={alert.id} className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{alert.area}</Badge>
+                    <span className={statusTone(alert.severity)}>{alert.severity} severity</span>
+                  </div>
+                  <p className="mt-1 font-medium">{alert.title}</p>
+                  <p className="text-sm text-muted-foreground">Linked entity: {alert.linkedEntity}</p>
                 </div>
-                <p className="mt-1 font-medium">{alert.title}</p>
-                <p className="text-sm text-muted-foreground">Linked entity: {alert.linkedEntity}</p>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/intelligence/ai-operator">Open recommendation</Link>
+                </Button>
               </div>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/intelligence/ai-operator">Open recommendation</Link>
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+        <ActivationBoard plays={snapshot.activationPlays} />
+      </div>
     );
   }
 
   if (towerId === 'ai-operator') {
     return (
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Live context reader</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {[
-              `COS products: ${snapshot.products.length}`,
-              `OMS orders: ${snapshot.orders.length}`,
-              `Inventory positions: ${snapshot.inventoryPositions.length}`,
-              `Fulfillment jobs: ${snapshot.fulfillmentJobsCount}`,
-              `Customer tickets: ${snapshot.tickets.length}`,
-              `Campaigns and RFQs: ${snapshot.campaigns.length} / ${snapshot.rfqs.length}`,
-            ].map((line) => (
-              <div key={line} className="rounded-lg border bg-muted/20 p-3">{line}</div>
-            ))}
-          </CardContent>
-        </Card>
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Context sources" value={snapshot.socialStreams.length + 4} meta="Social, campaign, OMS, CRM, inventory, and service are fused into one operator view." icon={<Bot className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Decision queue" value={snapshot.recommendations.length} meta="Action cards generated from joined system context." icon={<ClipboardList className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Suggested activations" value={snapshot.activationPlays.length} meta="Marketing and retention actions ready for operator review." icon={<Megaphone className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Linked alerts" value={snapshot.alerts.length} meta="Execution risks routed back into operator context." icon={<BellRing className="size-5" />} tone="warning" />
+        </div>
 
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Decision queue</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {snapshot.recommendations.map((recommendation) => (
-              <div key={recommendation.id} className="rounded-lg border bg-muted/20 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{recommendation.target}</span>
-                  <Badge variant="outline">{recommendation.confidence}% confidence</Badge>
+        <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Live context reader</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {[
+                `COS products: ${snapshot.products.length}`,
+                `OMS orders: ${snapshot.orders.length}`,
+                `Inventory positions: ${snapshot.inventoryPositions.length}`,
+                `Fulfillment jobs: ${snapshot.fulfillmentJobsCount}`,
+                `Social streams: ${snapshot.socialStreams.length}`,
+                `Insight models: ${snapshot.insightModels.length}`,
+                `Campaigns and RFQs: ${snapshot.campaigns.length} / ${snapshot.rfqs.length}`,
+              ].map((line) => (
+                <div key={line} className="rounded-lg border bg-muted/20 p-3">{line}</div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Decision queue</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {snapshot.recommendations.map((recommendation) => (
+                <div key={recommendation.id} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{recommendation.target}</span>
+                    <Badge variant="outline">{recommendation.confidence}% confidence</Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{recommendation.reasoning}</p>
+                  <p className="mt-2 text-sm text-primary">{recommendation.action}</p>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{recommendation.reasoning}</p>
-                <p className="mt-2 text-sm text-primary">{recommendation.action}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        <ActivationBoard plays={snapshot.activationPlays} />
       </div>
     );
   }

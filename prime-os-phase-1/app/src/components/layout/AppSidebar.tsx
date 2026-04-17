@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { BrainCircuit, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,59 @@ function SidebarLink({
   );
 }
 
+function SidebarFolder({
+  node,
+  activeIds,
+}: {
+  node: PrimeNavNode;
+  activeIds: Set<string>;
+}) {
+  const Icon = node.icon;
+  const isActive = activeIds.has(node.id);
+  const [open, setOpen] = useState(isActive);
+
+  useEffect(() => {
+    if (isActive) {
+      setOpen(true);
+    }
+  }, [isActive]);
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className={cn(
+          'group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/70 md:pl-3 md:pr-2',
+          isActive
+            ? 'bg-muted/70 text-foreground ring-1 ring-primary/15'
+            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+        )}
+      >
+        {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
+        <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
+        {node.badge ? (
+          <span className="hidden rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary md:inline">
+            {node.badge}
+          </span>
+        ) : null}
+        <ChevronRight className={cn('hidden size-3.5 shrink-0 transition-transform md:block', open && 'rotate-90', isActive ? 'text-primary' : 'text-muted-foreground')} />
+      </button>
+
+      {open ? (
+        <div className={cn('ml-5 hidden space-y-1 border-l pl-2 md:block', isActive ? 'border-primary/35' : 'border-border/70')}>
+          {node.children?.map((child) => (
+            child.children?.length
+              ? <SidebarFolder key={child.id} node={child} activeIds={activeIds} />
+              : <SidebarLink key={child.id} node={child} activeIds={activeIds} isLeaf />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AreaSection({
   node,
   activeIds,
@@ -65,40 +119,12 @@ function AreaSection({
 
   return (
     <section aria-label={node.label} className="space-y-1.5">
-      <div
-        className={cn(
-          'hidden items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider md:flex',
-          isActive ? 'text-primary' : 'text-muted-foreground'
-        )}
-      >
+      <div className={cn('hidden items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider md:flex', isActive ? 'text-primary' : 'text-muted-foreground')}>
         {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
         <span className="truncate">{node.label}</span>
       </div>
 
-      <div className="space-y-1">
-        {node.children?.map((child) => {
-          const childActive = activeIds.has(child.id);
-
-          return (
-            <div key={child.id} className="space-y-1">
-              <SidebarLink node={child} activeIds={activeIds} isLeaf={!child.children?.length} />
-
-              {child.children?.length ? (
-                <div
-                  className={cn(
-                    'ml-5 hidden space-y-1 border-l pl-2 md:block',
-                    childActive ? 'border-primary/35' : 'border-border/70'
-                  )}
-                >
-                  {child.children.map((grandChild) => (
-                    <SidebarLink key={grandChild.id} node={grandChild} activeIds={activeIds} isLeaf />
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      <SidebarFolder node={node} activeIds={activeIds} />
     </section>
   );
 }
