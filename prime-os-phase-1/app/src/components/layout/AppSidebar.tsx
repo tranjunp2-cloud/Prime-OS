@@ -1,166 +1,153 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  BarChart3,
-  BellRing,
-  Bot,
-  BrainCircuit,
-  ClipboardList,
-  Gauge,
-  HeartHandshake,
-  LayoutDashboard,
-  Megaphone,
-  MessageSquareText,
-  Package,
-  RadioTower,
-  Route,
-  Boxes,
-  ShoppingCart,
-  Truck,
-  ScanSearch,
-  Shield,
-  Store,
-  Target,
-  UserRoundCheck,
-  Workflow,
-} from 'lucide-react';
+import { BrainCircuit, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  getPrimeNavPath,
+  getPrimeNodeHref,
+  primeNavigation,
+  type PrimeNavNode,
+} from '@/lib/prime/prime-navigation';
 import { ThemeModeSwitcher } from '@/components/system/ThemeModeSwitcher';
 import { LanguageToggle } from '@/components/common/LanguageToggle';
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-  tone?: string;
+function SidebarLink({
+  node,
+  activeIds,
+  isLeaf = false,
+}: {
+  node: PrimeNavNode;
+  activeIds: Set<string>;
+  isLeaf?: boolean;
+}) {
+  const Icon = node.icon;
+  const isActive = activeIds.has(node.id);
+  const href = getPrimeNodeHref(node);
+
+  return (
+    <NavLink
+      to={href}
+      aria-label={node.label}
+      aria-current={isActive && isLeaf ? 'page' : undefined}
+      title={node.label}
+      className={cn(
+        'group flex min-h-11 items-center gap-2.5 rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/70',
+        isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
+        isActive
+          ? isLeaf
+            ? 'bg-primary/10 text-primary ring-1 ring-primary/25'
+            : 'bg-muted/70 text-foreground'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+      )}
+    >
+      {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
+      <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
+      {node.badge ? (
+        <span className="hidden rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary md:inline">
+          {node.badge}
+        </span>
+      ) : null}
+      {node.children?.length ? (
+        <ChevronRight className={cn('hidden size-3.5 shrink-0 text-muted-foreground transition-transform md:block', isActive && 'rotate-90 text-primary')} />
+      ) : null}
+    </NavLink>
+  );
 }
 
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
+function AreaSection({
+  node,
+  activeIds,
+}: {
+  node: PrimeNavNode;
+  activeIds: Set<string>;
+}) {
+  const Icon = node.icon;
+  const isActive = activeIds.has(node.id);
 
-const navigationGroups: NavGroup[] = [
-  {
-    label: 'Prime OS',
-    items: [
-      { label: 'Overview', href: '/overview', icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: 'Demand Area',
-    items: [
-      { label: 'Acquisition', href: '/demand/acquisition', icon: RadioTower },
-      { label: 'Campaign', href: '/demand/campaign', icon: Megaphone },
-      { label: 'Content & Social', href: '/demand/content-social', icon: MessageSquareText },
-      { label: 'Lead Capture', href: '/demand/lead-capture', icon: UserRoundCheck },
-      { label: 'Retargeting', href: '/demand/retargeting', icon: Target },
-    ],
-  },
-  {
-    label: 'Customer Area',
-    items: [
-      { label: 'CRM Compact', href: '/customer/crm-compact', icon: HeartHandshake },
-      { label: 'Service', href: '/customer/service', icon: ClipboardList },
-    ],
-  },
-  {
-    label: 'Ecom Area',
-    items: [
-      { label: 'Commerce Surface', href: '/ecom/commerce-surface', icon: Store },
-      { label: 'Product Master', href: '/ecom/cos/product-master', icon: Package, tone: 'COS' },
-      { label: 'Inventory Brain', href: '/ecom/cos/inventory-brain', icon: Boxes, tone: 'COS' },
-      { label: 'OMS', href: '/ecom/cos/oms', icon: ShoppingCart, tone: 'COS' },
-      { label: 'Fulfillment', href: '/ecom/cos/fulfillment', icon: Truck, tone: 'COS' },
-      { label: 'Policy & Rule', href: '/ecom/cos/policy-rule', icon: Shield, tone: 'COS' },
-      { label: 'Event & Audit', href: '/ecom/cos/event-audit', icon: Workflow, tone: 'COS' },
-    ],
-  },
-  {
-    label: 'Intelligence Area',
-    items: [
-      { label: 'Analytics', href: '/intelligence/analytics', icon: BarChart3 },
-      { label: 'Attribution', href: '/intelligence/attribution', icon: Route },
-      { label: 'Forecasting', href: '/intelligence/forecasting', icon: Gauge },
-      { label: 'AI Operator', href: '/intelligence/ai-operator', icon: Bot },
-      { label: 'Social Listening & VOC', href: '/intelligence/voc', icon: ScanSearch },
-      { label: 'Automation & Alerts', href: '/intelligence/alerts', icon: BellRing },
-    ],
-  },
-];
+  return (
+    <section aria-label={node.label} className="space-y-1.5">
+      <div
+        className={cn(
+          'hidden items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider md:flex',
+          isActive ? 'text-primary' : 'text-muted-foreground'
+        )}
+      >
+        {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+        <span className="truncate">{node.label}</span>
+      </div>
+
+      <div className="space-y-1">
+        {node.children?.map((child) => {
+          const childActive = activeIds.has(child.id);
+
+          return (
+            <div key={child.id} className="space-y-1">
+              <SidebarLink node={child} activeIds={activeIds} isLeaf={!child.children?.length} />
+
+              {child.children?.length ? (
+                <div
+                  className={cn(
+                    'ml-5 hidden space-y-1 border-l pl-2 md:block',
+                    childActive ? 'border-primary/35' : 'border-border/70'
+                  )}
+                >
+                  {child.children.map((grandChild) => (
+                    <SidebarLink key={grandChild.id} node={grandChild} activeIds={activeIds} isLeaf />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 export function AppSidebar() {
   const location = useLocation();
-  const activeGroup = navigationGroups.find((group) => (
-    group.items.some((item) => location.pathname.startsWith(item.href))
-  ));
-  const activeItem = activeGroup?.items.find((item) => location.pathname.startsWith(item.href));
+  const activePath = getPrimeNavPath(location.pathname);
+  const activeIds = new Set(activePath.map((node) => node.id));
+  const contextLabel = activePath.length
+    ? activePath.map((node) => node.label).join(' / ')
+    : 'Unified workspace';
+  const [overviewNode, ...areaNodes] = primeNavigation;
 
   return (
-    <aside className="flex h-full w-[76px] shrink-0 flex-col border-r bg-card md:w-[292px]">
+    <aside className="flex h-full w-[76px] shrink-0 flex-col border-r bg-card md:w-[316px]">
       <div className="flex h-14 items-center justify-center border-b px-3 md:justify-start md:px-4">
         <img
           src="/brand-logo.svg"
           alt="Prime OS logo"
           className="h-7 w-auto shrink-0"
         />
-        <div className="hidden flex-col md:flex">
-          <span className="text-sm font-semibold leading-none">Prime OS Phase 1</span>
-          <span className="mt-0.5 text-[10px] leading-none text-muted-foreground">COS-first commerce operating system</span>
+        <div className="hidden min-w-0 flex-col md:flex">
+          <span className="truncate text-sm font-semibold leading-none">Prime OS Phase 1</span>
+          <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">COS-first commerce operating system</span>
         </div>
       </div>
 
       <div className="hidden border-b px-3 py-2 md:block md:px-4">
-        <div className="rounded-xl border border-border/60 bg-muted/30 px-2.5 py-2 text-center md:text-left">
+        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-left">
           <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Current context</p>
-          <p className="mt-1 text-xs font-medium text-foreground md:text-sm">
-            {activeItem ? activeItem.label : activeGroup ? activeGroup.label : 'Unified workspace'}
+          <p className="mt-1 text-sm font-medium leading-snug text-foreground">
+            {contextLabel}
           </p>
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3" aria-label="Primary navigation">
         <div className="space-y-4 px-3">
-          {navigationGroups.map((group) => (
-            <div key={group.label}>
-              <p className="mb-1.5 hidden px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:block">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const isActive = location.pathname.startsWith(item.href);
-                  const Icon = item.icon;
-                  const label = item.label;
-                  return (
-                    <NavLink
-                      key={item.href}
-                      to={item.href}
-                      aria-label={label}
-                      aria-current={isActive ? 'page' : undefined}
-                      title={label}
-                      className={cn(
-                        'flex items-center justify-center gap-2.5 rounded-xl px-2 py-2 text-sm font-medium transition-colors md:justify-start',
-                        isActive
-                          ? 'bg-primary/10 text-primary ring-1 ring-primary/25 md:border-l-2 md:border-primary md:ring-0'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      )}
-                    >
-                      <Icon className="size-4 shrink-0" />
-                      <span className="hidden min-w-0 flex-1 truncate md:inline">{label}</span>
-                      {item.tone ? (
-                        <span className="hidden rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-primary md:inline">
-                          {item.tone}
-                        </span>
-                      ) : null}
-                    </NavLink>
-                  );
-                })}
-              </div>
-            </div>
+          <div>
+            <SidebarLink node={overviewNode} activeIds={activeIds} isLeaf />
+          </div>
+
+          {areaNodes.map((node) => (
+            <AreaSection key={node.id} node={node} activeIds={activeIds} />
           ))}
         </div>
       </nav>
 
-      <div className="border-t p-3 space-y-3">
+      <div className="space-y-3 border-t p-3">
         <div className="hidden md:flex md:justify-center">
           <ThemeModeSwitcher compact />
         </div>
@@ -172,8 +159,7 @@ export function AppSidebar() {
           aria-label="AI Operator"
           title="AI Operator"
           className={cn(
-            'flex items-center justify-center gap-2.5 rounded-xl px-2 py-2 text-sm font-medium transition-colors md:justify-start',
-            'border border-primary/20 bg-primary/10 text-primary hover:bg-primary/15'
+            'flex min-h-11 items-center justify-center gap-2.5 rounded-lg border border-primary/20 bg-primary/10 px-2 py-2 text-sm font-medium text-primary outline-none transition-colors hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-primary/70 md:justify-start'
           )}
         >
           <BrainCircuit className="size-4 shrink-0" />

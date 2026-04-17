@@ -1,0 +1,189 @@
+import type { LucideIcon } from 'lucide-react';
+import {
+  BarChart3,
+  BellRing,
+  Bot,
+  Boxes,
+  ClipboardList,
+  Gauge,
+  HeartHandshake,
+  LayoutDashboard,
+  Megaphone,
+  MessageSquareText,
+  Package,
+  RadioTower,
+  Route,
+  ScanSearch,
+  Shield,
+  ShoppingCart,
+  Store,
+  Target,
+  Truck,
+  UserRoundCheck,
+  Workflow,
+} from 'lucide-react';
+
+export type PrimeNavKind = 'overview' | 'area' | 'tower' | 'floor';
+
+export interface PrimeNavNode {
+  id: string;
+  label: string;
+  kind: PrimeNavKind;
+  href?: string;
+  matchPaths?: string[];
+  icon?: LucideIcon;
+  badge?: string;
+  children?: PrimeNavNode[];
+}
+
+export const primeNavigation: PrimeNavNode[] = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    kind: 'overview',
+    href: '/overview',
+    icon: LayoutDashboard,
+  },
+  {
+    id: 'demand',
+    label: 'Demand',
+    kind: 'area',
+    icon: RadioTower,
+    children: [
+      { id: 'acquisition', label: 'Acquisition', kind: 'tower', href: '/demand/acquisition', icon: RadioTower },
+      { id: 'campaign', label: 'Campaign', kind: 'tower', href: '/demand/campaign', icon: Megaphone },
+      { id: 'content-social', label: 'Content & Social', kind: 'tower', href: '/demand/content-social', icon: MessageSquareText },
+      { id: 'lead-capture', label: 'Lead Capture', kind: 'tower', href: '/demand/lead-capture', icon: UserRoundCheck },
+      { id: 'retargeting', label: 'Retargeting', kind: 'tower', href: '/demand/retargeting', icon: Target },
+    ],
+  },
+  {
+    id: 'customer',
+    label: 'Customer',
+    kind: 'area',
+    icon: HeartHandshake,
+    children: [
+      { id: 'crm-compact', label: 'CRM Compact', kind: 'tower', href: '/customer/crm-compact', icon: HeartHandshake },
+      { id: 'service', label: 'Service', kind: 'tower', href: '/customer/service', icon: ClipboardList },
+    ],
+  },
+  {
+    id: 'ecom',
+    label: 'Ecom',
+    kind: 'area',
+    icon: Store,
+    children: [
+      { id: 'commerce-surface', label: 'Commerce Surface', kind: 'tower', href: '/ecom/commerce-surface', icon: Store },
+      {
+        id: 'cos',
+        label: 'COS',
+        kind: 'tower',
+        href: '/ecom/cos/product-master',
+        matchPaths: ['/ecom/cos'],
+        icon: Boxes,
+        badge: 'core',
+        children: [
+          {
+            id: 'product-master',
+            label: 'Product Master',
+            kind: 'floor',
+            href: '/ecom/cos/product-master',
+            matchPaths: ['/ecom/cos/product-master', '/ecom/cos/listings'],
+            icon: Package,
+          },
+          {
+            id: 'inventory-brain',
+            label: 'Inventory Brain',
+            kind: 'floor',
+            href: '/ecom/cos/inventory-brain',
+            matchPaths: ['/ecom/cos/inventory-brain', '/ecom/cos/warehouses'],
+            icon: Boxes,
+          },
+          { id: 'oms', label: 'OMS', kind: 'floor', href: '/ecom/cos/oms', icon: ShoppingCart },
+          {
+            id: 'fulfillment',
+            label: 'Fulfillment',
+            kind: 'floor',
+            href: '/ecom/cos/fulfillment',
+            matchPaths: ['/ecom/cos/fulfillment', '/ecom/cos/returns'],
+            icon: Truck,
+          },
+          { id: 'policy-rule', label: 'Policy & Rule', kind: 'floor', href: '/ecom/cos/policy-rule', icon: Shield },
+          { id: 'event-audit', label: 'Event & Audit', kind: 'floor', href: '/ecom/cos/event-audit', icon: Workflow },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'intelligence',
+    label: 'Intelligence',
+    kind: 'area',
+    icon: BarChart3,
+    children: [
+      { id: 'analytics', label: 'Analytics', kind: 'tower', href: '/intelligence/analytics', icon: BarChart3 },
+      { id: 'attribution', label: 'Attribution', kind: 'tower', href: '/intelligence/attribution', icon: Route },
+      { id: 'forecasting', label: 'Forecasting & Optimization', kind: 'tower', href: '/intelligence/forecasting', icon: Gauge },
+      { id: 'ai-operator', label: 'AI Operator', kind: 'tower', href: '/intelligence/ai-operator', icon: Bot },
+      { id: 'voc', label: 'Social Listening & VOC', kind: 'tower', href: '/intelligence/voc', icon: ScanSearch },
+      { id: 'alerts', label: 'Automation & Alerts', kind: 'tower', href: '/intelligence/alerts', icon: BellRing },
+    ],
+  },
+];
+
+const routeMatches = (pathname: string, href: string) => (
+  pathname === href || pathname.startsWith(`${href}/`)
+);
+
+const nodeMatchCandidates = (node: PrimeNavNode) => (
+  [node.href, ...(node.matchPaths || [])].filter(Boolean) as string[]
+);
+
+const nodeMatches = (pathname: string, node: PrimeNavNode) => {
+  const candidates = nodeMatchCandidates(node);
+  return candidates.some((candidate) => routeMatches(pathname, candidate));
+};
+
+const nodeMatchScore = (pathname: string, node: PrimeNavNode) => {
+  const matchedCandidates = nodeMatchCandidates(node).filter((candidate) => routeMatches(pathname, candidate));
+  return Math.max(...matchedCandidates.map((candidate) => candidate.length), 0);
+};
+
+export function getPrimeNavPath(pathname: string, nodes = primeNavigation) {
+  const matches: PrimeNavNode[][] = [];
+
+  const walk = (items: PrimeNavNode[], parents: PrimeNavNode[]) => {
+    items.forEach((node) => {
+      const path = [...parents, node];
+
+      if (nodeMatches(pathname, node)) {
+        matches.push(path);
+      }
+
+      if (node.children?.length) {
+        walk(node.children, path);
+      }
+    });
+  };
+
+  walk(nodes, []);
+
+  return matches.sort((a, b) => {
+    const scoreDelta = nodeMatchScore(pathname, b[b.length - 1]) - nodeMatchScore(pathname, a[a.length - 1]);
+
+    if (scoreDelta !== 0) {
+      return scoreDelta;
+    }
+
+    return b.length - a.length;
+  })[0] || [];
+}
+
+export function getPrimeNodeHref(node: PrimeNavNode): string {
+  if (node.href) {
+    return node.href;
+  }
+
+  const firstChild = node.children?.[0];
+
+  return firstChild ? getPrimeNodeHref(firstChild) : '/overview';
+}
