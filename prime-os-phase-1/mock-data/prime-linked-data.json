@@ -1,0 +1,90 @@
+{
+  "sourceOfTruth": "/Users/admin/Desktop/SME_ECH/SME_ECH_V1.0/frontend",
+  "runtimeAdapter": "app/src/lib/prime/prime-data.ts",
+  "principle": "COS mock data is the backbone; generated Prime entities must link back to COS product, SKU, order, inventory, fulfillment, return, or event context.",
+  "relationships": {
+    "productSkuInventoryShipment": "product.id -> sku.id -> inventory_position.sku_id -> order_item.sku -> fulfillment_job.order_id -> shipment.job_id",
+    "customerOrderTicketTimeline": "customer.id -> order.customer_email/order.id -> ticket.orderId/rmaId -> customer.timeline",
+    "campaignLeadRfqOrder": "campaign.id -> lead.campaignId -> rfq.leadId -> rfq.orderId -> order.id",
+    "vocContext": "voc.productId + voc.customerId + voc.campaignId + service ticket context",
+    "alertContext": "alert.linkedEntity + alert.recommendationId -> inventory/order/service/campaign/forecast",
+    "aiRecommendationContext": "recommendation.target points to real SKU, service ticket, or campaign context"
+  },
+  "sampleEntities": {
+    "products": [
+      {
+        "id": "prod_001",
+        "skuIds": ["sku_001a", "sku_001b", "sku_001c"],
+        "role": "COS Product Master anchor for acquisition, RFQ, forecast, and VOC"
+      },
+      {
+        "id": "prod_002",
+        "skuIds": ["sku_002a", "sku_002b", "sku_002c"],
+        "role": "Second product anchor for campaign and inventory risk comparison"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "cmp_1_prod_001",
+        "productId": "prod_001",
+        "skuId": "sku_001a",
+        "feeds": ["lead_1_1", "lead_1_2"]
+      }
+    ],
+    "leads": [
+      {
+        "id": "lead_1_1",
+        "campaignId": "cmp_1_prod_001",
+        "customerId": "cust_prime_lead_1",
+        "productId": "prod_001",
+        "skuId": "sku_001a",
+        "next": "rfq_001"
+      }
+    ],
+    "rfqs": [
+      {
+        "id": "rfq_001",
+        "leadId": "lead_1_1",
+        "skuId": "sku_001a",
+        "orderId": "runtime:converted-cos-order-id",
+        "handoff": "OMS Orchestration Floor"
+      }
+    ],
+    "customers": [
+      {
+        "id": "runtime:customer-from-order-email",
+        "source": "COS order.customer_email",
+        "timelineSources": ["order.lifecycle_stage", "order_event.message", "service_ticket.subject"]
+      }
+    ],
+    "tickets": [
+      {
+        "id": "case_runtime_return",
+        "source": "COS return item / RMA",
+        "links": ["customerId", "orderId", "rmaId"]
+      }
+    ],
+    "forecasts": [
+      {
+        "id": "forecast_prod_001",
+        "skuId": "sku_001a",
+        "source": "getTotalATS(skuId) + campaign demand",
+        "outputs": ["suggestedAction", "risk"]
+      }
+    ],
+    "recommendations": [
+      {
+        "id": "rec_inventory_001",
+        "target": "SKU risk or service ticket",
+        "usedBy": "alert_inventory_001"
+      }
+    ],
+    "alerts": [
+      {
+        "id": "alert_inventory_001",
+        "linkedEntity": "forecast.skuId",
+        "recommendationId": "rec_inventory_001"
+      }
+    ]
+  }
+}

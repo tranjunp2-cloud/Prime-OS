@@ -1,0 +1,24 @@
+{
+  "date": "2026-04-17",
+  "url": "http://127.0.0.1:5191/ecom/cos/fulfillment",
+  "healthScore": 92,
+  "issues": [
+    {
+      "id": "ISSUE-001",
+      "title": "Fulfillment route crashed without AuthProvider",
+      "severity": "high",
+      "category": "functional",
+      "status": "fixed"
+    }
+  ],
+  "categoryScores": {
+    "console": 90,
+    "links": 100,
+    "visual": 95,
+    "functional": 100,
+    "ux": 90,
+    "performance": 85,
+    "content": 95,
+    "accessibility": 90
+  }
+}

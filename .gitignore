@@ -1,0 +1,18 @@
+.DS_Store
+node_modules/
+dist/
+build/
+coverage/
+test-results/
+.vite/
+.env
+.env.*
+!.env.example
+
+# Local QA evidence can be regenerated; keep markdown/json reports only.
+.gstack/qa-reports/screenshots/
+
+# OS/editor noise
+*.log
+.idea/
+.vscode/

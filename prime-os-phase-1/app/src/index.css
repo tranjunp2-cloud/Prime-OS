@@ -1,0 +1,404 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 23% 98%;
+    --foreground: 224 28% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 28% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 28% 12%;
+
+    --primary: 229 86% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 24% 94%;
+    --secondary-foreground: 224 28% 16%;
+
+    --muted: 220 22% 94%;
+    --muted-foreground: 223 12% 40%;
+
+    --accent: 219 25% 92%;
+    --accent-foreground: 224 28% 16%;
+
+    --destructive: 0 72% 54%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 148 63% 43%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 52%;
+    --warning-foreground: 0 0% 12%;
+
+    --amazon: 35 100% 50%;
+    --shopee: 17 100% 55%;
+    --rakuten: 350 75% 50%;
+
+    --border: 221 16% 84%;
+    --input: 221 16% 84%;
+    --ring: 229 86% 62%;
+    --ring-accent: 199 94% 62%;
+
+    --radius: 0.875rem;
+
+    --surface-stage: 222 42% 96%;
+    --surface-sidebar: 0 0% 100%;
+    --surface-toolbar: 0 0% 100%;
+    --surface-workspace: 0 0% 100%;
+    --surface-data: 0 0% 100%;
+    --surface-map: 214 48% 94%;
+    --surface-control: 0 0% 100%;
+    --surface-overlay: 0 0% 100%;
+    --surface-selected: 229 86% 96%;
+    --surface-hover: 220 32% 95%;
+    --surface-glass: 0 0% 100%;
+    --overlay-scrim: 223 40% 8%;
+
+    --border-divider: 220 18% 84%;
+    --border-highlight: 0 0% 100%;
+    --border-active: 229 86% 62%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 223 22% 22%;
+    --sidebar-primary: 229 86% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 223 24% 94%;
+    --sidebar-accent-foreground: 223 22% 18%;
+    --sidebar-border: 220 18% 84%;
+    --sidebar-ring: 229 86% 62%;
+
+    --chart-1: 229 86% 62%;
+    --chart-2: 148 63% 43%;
+    --chart-3: 35 100% 50%;
+    --chart-4: 17 100% 55%;
+    --chart-5: 350 75% 50%;
+
+    --map-background: 216 57% 10%;
+    --map-land: 214 43% 24%;
+    --map-border: 211 34% 48%;
+    --map-focused: 239 76% 67%;
+    --map-hover: 209 55% 38%;
+  }
+
+  .dark {
+    --background: 223 45% 6%;
+    --foreground: 214 40% 96%;
+
+    --card: 224 31% 10%;
+    --card-foreground: 214 40% 96%;
+
+    --popover: 224 31% 10%;
+    --popover-foreground: 214 40% 96%;
+
+    --primary: 232 92% 66%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 25% 15%;
+    --secondary-foreground: 214 40% 96%;
+
+    --muted: 220 26% 15%;
+    --muted-foreground: 217 16% 68%;
+
+    --accent: 221 24% 17%;
+    --accent-foreground: 214 40% 96%;
+
+    --destructive: 0 66% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 148 60% 44%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 52%;
+    --warning-foreground: 0 0% 8%;
+
+    --amazon: 35 100% 50%;
+    --shopee: 17 100% 55%;
+    --rakuten: 350 75% 50%;
+
+    --border: 221 25% 18%;
+    --input: 221 25% 18%;
+    --ring: 232 92% 66%;
+    --ring-accent: 191 92% 60%;
+
+    --surface-stage: 224 50% 4.5%;
+    --surface-sidebar: 222 34% 9%;
+    --surface-toolbar: 223 31% 11%;
+    --surface-workspace: 223 30% 8%;
+    --surface-data: 222 28% 10%;
+    --surface-map: 220 58% 8%;
+    --surface-control: 223 25% 12%;
+    --surface-overlay: 223 26% 11%;
+    --surface-selected: 229 68% 17%;
+    --surface-hover: 221 28% 15%;
+    --surface-glass: 223 27% 12%;
+    --overlay-scrim: 223 40% 5%;
+
+    --border-divider: 219 22% 18%;
+    --border-highlight: 0 0% 100%;
+    --border-active: 232 92% 66%;
+
+    --sidebar-background: 222 34% 9%;
+    --sidebar-foreground: 217 18% 74%;
+    --sidebar-primary: 232 92% 66%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 221 28% 14%;
+    --sidebar-accent-foreground: 214 40% 96%;
+    --sidebar-border: 219 22% 17%;
+    --sidebar-ring: 232 92% 66%;
+
+    --chart-1: 232 92% 66%;
+    --chart-2: 148 60% 44%;
+    --chart-3: 35 100% 50%;
+    --chart-4: 17 100% 55%;
+    --chart-5: 350 75% 50%;
+
+    --map-background: 219 63% 6%;
+    --map-land: 213 61% 13%;
+    --map-border: 209 48% 23%;
+    --map-focused: 243 75% 59%;
+    --map-hover: 212 56% 27%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.12), transparent 26%),
+      radial-gradient(circle at top right, hsl(var(--ring-accent) / 0.08), transparent 20%),
+      linear-gradient(180deg, hsl(var(--surface-stage)) 0%, hsl(var(--background)) 100%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.32);
+    color: hsl(var(--foreground));
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-divider) / 0.9);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.36);
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: hsl(var(--foreground));
+  }
+
+  input[type="search"],
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="url"],
+  input[type="tel"],
+  textarea {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input::-webkit-search-decoration,
+  input::-webkit-search-cancel-button,
+  input::-webkit-search-results-button,
+  input::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    -webkit-text-fill-color: hsl(var(--foreground));
+    box-shadow: 0 0 0 1000px hsl(var(--surface-control) / 0.94) inset;
+    -webkit-box-shadow: 0 0 0 1000px hsl(var(--surface-control) / 0.94) inset;
+    caret-color: hsl(var(--foreground));
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex="0"]:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 0.875rem;
+  }
+}
+
+/* V2-03: Button press feedback — scale 97% on press, 150ms ease-out */
+@layer base {
+  button:not(:disabled) {
+    transition: background-color 150ms ease-out, color 150ms ease-out,
+      border-color 150ms ease-out, opacity 150ms ease-out,
+      transform 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+@layer components {
+  .surface-glass {
+    @apply border;
+    border-color: hsl(var(--border-divider) / 0.7);
+    background-color: hsl(var(--surface-glass) / 0.72);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 18px 50px hsl(var(--overlay-scrim) / 0.18), inset 0 1px 0 hsl(var(--border-highlight) / 0.06);
+  }
+
+  .surface-toolbar {
+    @apply border;
+    border-color: hsl(var(--border-divider) / 0.7);
+    background-color: hsl(var(--surface-toolbar) / 0.84);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 12px 30px hsl(var(--overlay-scrim) / 0.12), inset 0 1px 0 hsl(var(--border-highlight) / 0.05);
+  }
+
+  .surface-solid {
+    @apply border;
+    border-color: hsl(var(--border-divider) / 0.8);
+    background-color: hsl(var(--surface-data) / 0.94);
+    box-shadow: 0 10px 24px hsl(var(--overlay-scrim) / 0.1), inset 0 1px 0 hsl(var(--border-highlight) / 0.03);
+  }
+
+  .surface-workspace {
+    @apply border;
+    border-color: hsl(var(--border-divider) / 0.8);
+    background-color: hsl(var(--surface-workspace) / 0.88);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 28px 80px hsl(var(--overlay-scrim) / 0.28), inset 0 1px 0 hsl(var(--border-highlight) / 0.04);
+  }
+
+  .control-surface {
+    @apply border;
+    border-color: hsl(var(--border-divider) / 0.8);
+    background-color: hsl(var(--surface-control) / 0.82);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+
+  .hairline-highlight {
+    box-shadow: inset 0 1px 0 hsl(var(--border-highlight) / 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  /* Always-visible scrollbar — prevents hidden-scrollbar UX pain */
+  .scrollbar-visible {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-divider) / 0.9) transparent;
+  }
+  .scrollbar-visible::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-visible::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-visible::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-divider) / 0.7);
+    border-radius: 9999px;
+  }
+  .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.36);
+  }
+  .scrollbar-visible::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .text-amazon {
+    color: hsl(var(--amazon));
+  }
+  .bg-amazon {
+    background-color: hsl(var(--amazon));
+  }
+  .border-amazon {
+    border-color: hsl(var(--amazon));
+  }
+
+  .text-shopee {
+    color: hsl(var(--shopee));
+  }
+  .bg-shopee {
+    background-color: hsl(var(--shopee));
+  }
+  .border-shopee {
+    border-color: hsl(var(--shopee));
+  }
+
+  .text-rakuten {
+    color: hsl(var(--rakuten));
+  }
+  .bg-rakuten {
+    background-color: hsl(var(--rakuten));
+  }
+  .border-rakuten {
+    border-color: hsl(var(--rakuten));
+  }
+
+  .text-success {
+    color: hsl(var(--success));
+  }
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
+  .border-success {
+    border-color: hsl(var(--success));
+  }
+
+  .text-warning {
+    color: hsl(var(--warning));
+  }
+  .bg-warning {
+    background-color: hsl(var(--warning));
+  }
+  .border-warning {
+    border-color: hsl(var(--warning));
+  }
+}
