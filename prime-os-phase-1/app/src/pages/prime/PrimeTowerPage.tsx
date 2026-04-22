@@ -1,28 +1,48 @@
+import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   BellRing,
   Bot,
   ClipboardList,
-  CircleUserRound,
+  ChevronDown,
+  ChevronUp,
   CircleDollarSign,
+  CircleUserRound,
   Gauge,
+  Globe,
+  Heart,
   HeartHandshake,
-  Megaphone,
+  Instagram,
   Mail,
+  Megaphone,
   MessageCircle,
-  Phone,
   PanelsTopLeft,
+  Phone,
   RadioTower,
   ScanSearch,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
   Target,
   TrendingUp,
   UserRoundCheck,
-  } from 'lucide-react';
+  Youtube,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -46,6 +66,42 @@ import {
 interface PrimeTowerPageProps {
   towerId: PrimeTowerId;
 }
+
+type CreatorProfile = {
+  id: string;
+  name: string;
+  handle: string;
+  category: string;
+  avatarTone: string;
+  channel: string;
+  fitScore: number;
+  engagementRate: number;
+  revenue: number;
+  product: string;
+  recommendation: string;
+  signal: string;
+  summary: string;
+  followers: number;
+  avgViews: number;
+  activeAudience: number;
+  profileViews: number;
+  reach: number;
+  verified: boolean;
+  country: string;
+  genderSplit: { male: number; female: number };
+  audienceSplit: Array<{ label: string; value: number; color: string }>;
+  ageBuckets: Array<{ label: string; value: number }>;
+  topCountries: Array<{ label: string; value: number }>;
+  socialLinks: Array<{ label: string; handle: string; icon: 'instagram' | 'youtube' | 'web'; audience: string }>;
+  topFollowerSegment: string;
+  brandsMentioned: string[];
+  lastPosted: string;
+  matchedPosts: number;
+  contentPreview: string[];
+  authenticityScore: number;
+  audienceQualityScore: number;
+  benchmarkIndex: number;
+};
 
 const currency = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -178,6 +234,770 @@ function initials(name: string) {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+}
+
+function CreatorIntelligencePanel() {
+  const snapshot = getPrimeSnapshot();
+  const creatorProfiles = useMemo<CreatorProfile[]>(() => snapshot.campaigns.map((campaign, index) => {
+    const stream = snapshot.socialStreams[index % snapshot.socialStreams.length];
+    const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
+    const voc = snapshot.vocInsights[index % snapshot.vocInsights.length];
+    const fitScore = Math.min(98, 71 + index * 6 + Math.round(play.projectedLift / 3));
+    const engagementRate = Number((5.2 + index * 1.1).toFixed(1));
+    const followers = 112800 - index * 16400;
+    const avgViews = 351000 - index * 42000;
+    const activeAudience = 82 - index * 4;
+    const audienceSplit = [
+      { label: 'Instagram', value: 46 - index * 2, color: 'bg-violet-400' },
+      { label: 'TikTok', value: 29 + index * 2, color: 'bg-sky-400' },
+      { label: 'YouTube', value: 17 + index, color: 'bg-rose-400' },
+      { label: 'Facebook', value: Math.max(6, 8 - index), color: 'bg-amber-300' },
+    ];
+    const ageBuckets = [
+      { label: '<18', value: Math.max(2.8, 6.3 - index * 0.4) },
+      { label: '18-24', value: 37.3 - index * 1.8 },
+      { label: '25-34', value: 36.2 + index * 1.2 },
+      { label: '35-44', value: 15.3 + index * 0.5 },
+      { label: '45-64', value: 4.9 + index * 0.3 },
+      { label: '>64', value: 0.5 + index * 0.1 },
+    ];
+    const topCountries = [
+      { label: 'Japan', value: 48 - index * 3 },
+      { label: 'Vietnam', value: 18 + index * 2 },
+      { label: 'Thailand', value: 12 + index },
+      { label: 'Singapore', value: 8 + index },
+      { label: 'United States', value: 5 + index },
+    ];
+
+    return {
+      id: campaign.id,
+      name: ['Linh Dao', 'Minh Chau', 'Ha An', 'Quynh My'][index] || `Creator ${index + 1}`,
+      handle: ['@linhdesk', '@minhmarkets', '@haan.live', '@quynhchoice'][index] || `@creator${index + 1}`,
+      category: ['Office setup', 'SME buying', 'Lifestyle commerce', 'Value review'][index] || 'Commerce',
+      avatarTone: ['from-fuchsia-500/20 to-violet-500/20', 'from-sky-500/20 to-cyan-500/20', 'from-amber-500/20 to-orange-500/20', 'from-emerald-500/20 to-teal-500/20'][index] || 'from-primary/20 to-primary/10',
+      channel: campaign.channel,
+      fitScore,
+      engagementRate,
+      revenue: campaign.revenue,
+      product: campaign.skuCode,
+      recommendation: play.nextBestAction,
+      signal: stream?.source || 'Social listening',
+      summary: voc?.summary || 'Audience response remains healthy for creator-led launches.',
+      followers,
+      avgViews,
+      activeAudience,
+      profileViews: 73000 - index * 6200,
+      reach: 51800000 - index * 6400000,
+      verified: index < 2,
+      country: ['Japan', 'Vietnam', 'Thailand', 'Singapore'][index] || 'APAC',
+      genderSplit: { male: 85 - index * 6, female: 15 + index * 6 },
+      audienceSplit,
+      ageBuckets,
+      topCountries,
+      socialLinks: [
+        { label: 'Instagram', handle: creatorProfilesHandle(index, 'instagram'), icon: 'instagram', audience: `${(followers / 1000).toFixed(1)}K` },
+        { label: 'YouTube', handle: creatorProfilesHandle(index, 'youtube'), icon: 'youtube', audience: `${Math.max(24, 60 - index * 7)}.2K` },
+        { label: 'Website', handle: creatorProfilesHandle(index, 'web'), icon: 'web', audience: `${Math.max(9, 31 - index * 3)}.4K` },
+      ],
+      topFollowerSegment: ['Women 25-34', 'SME buyers 25-34', 'Lifestyle shoppers 18-24', 'Office teams 25-34'][index] || 'Commerce buyers',
+      brandsMentioned: [['MUJI', 'Pentel'], ['Notion', 'Logitech'], ['Shopee', 'Anessa'], ['MUJI', 'Nitori']][index] || ['PrimeOS'],
+      lastPosted: ['2d ago', '5h ago', '1d ago', '3d ago'][index] || 'Recently',
+      matchedPosts: 5 - index,
+      contentPreview: [
+        `${campaign.targetSegment} desk setup reel`,
+        `${campaign.name} product mention`,
+        `${campaign.channel} short-form explainer`,
+      ],
+      authenticityScore: 91 - index * 4,
+      audienceQualityScore: 88 - index * 3,
+      benchmarkIndex: 72 + index * 7,
+    };
+  }), [snapshot]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('instagram');
+  const [marketFilter, setMarketFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('engagement');
+  const [selectedCreatorId, setSelectedCreatorId] = useState(creatorProfiles[0]?.id ?? '');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const filteredCreators = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const next = creatorProfiles.filter((creator) => {
+      const matchesQuery = !normalizedQuery || [creator.name, creator.handle, creator.category, creator.summary, creator.country, creator.topFollowerSegment]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedQuery);
+      const matchesPlatform = platformFilter === 'all' || creator.socialLinks.some((link) => link.label.toLowerCase() === platformFilter);
+      const matchesMarket = marketFilter === 'all' || creator.country.toLowerCase() === marketFilter;
+      return matchesQuery && matchesPlatform && matchesMarket;
+    });
+
+    next.sort((left, right) => {
+      if (sortBy === 'reach') return right.reach - left.reach;
+      if (sortBy === 'fit') return right.fitScore - left.fitScore;
+      if (sortBy === 'views') return right.avgViews - left.avgViews;
+      return right.engagementRate - left.engagementRate;
+    });
+
+    return next;
+  }, [creatorProfiles, marketFilter, platformFilter, searchQuery, sortBy]);
+
+  const selectedCreator = filteredCreators.find((creator) => creator.id === selectedCreatorId)
+    ?? creatorProfiles.find((creator) => creator.id === selectedCreatorId)
+    ?? filteredCreators[0]
+    ?? creatorProfiles[0];
+  const topFit = filteredCreators.length ? Math.max(...filteredCreators.map((creator) => creator.fitScore)) : 0;
+  const totalReach = filteredCreators.reduce((sum, creator) => sum + creator.reach, 0);
+  const averageEngagement = filteredCreators.length
+    ? filteredCreators.reduce((sum, creator) => sum + creator.engagementRate, 0) / filteredCreators.length
+    : 0;
+  const shortlistCount = filteredCreators.filter((creator) => creator.fitScore >= 82).length;
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Tracked creators" value={filteredCreators.length} meta="Search and filter down the active creator universe before you shortlist." icon={<CircleUserRound className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Top fit score" value={`${topFit}%`} meta="Highest creator-to-product affinity in the current shortlist." icon={<TrendingUp className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Audience reach" value={`${(totalReach / 1000000).toFixed(1)}M`} meta="Estimated combined reachable audience across active creator profiles." icon={<RadioTower className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Shortlist ready" value={shortlistCount} meta={`Avg ER ${averageEngagement.toFixed(1)}% across the current filtered set.`} icon={<Bot className="size-5" />} tone="purple" />
+        </div>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <CardTitle>Creator search and discovery</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Apply query-first filters, review content style, then compare creators in a dense shortlist table.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="gap-1"><Sparkles className="size-3" /> Search-first workflow</Badge>
+                <Badge variant="outline" className="gap-1"><SlidersHorizontal className="size-3" /> Intent + KPI comparison</Badge>
+                <Badge variant="outline" className="gap-1"><CircleUserRound className="size-3" /> Drill-down profile modal</Badge>
+              </div>
+            </div>
+            <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Search query</div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="pl-9" placeholder="Search creator, niche, audience, or vibe" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Platform</div>
+                <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose platform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All platforms</SelectItem>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="youtube">YouTube</SelectItem>
+                    <SelectItem value="website">Website</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Market</div>
+                <Select value={marketFilter} onValueChange={setMarketFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose market" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All markets</SelectItem>
+                    <SelectItem value="japan">Japan</SelectItem>
+                    <SelectItem value="vietnam">Vietnam</SelectItem>
+                    <SelectItem value="thailand">Thailand</SelectItem>
+                    <SelectItem value="singapore">Singapore</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sort by</div>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sort creators" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="engagement">Engagement rate</SelectItem>
+                    <SelectItem value="reach">Reach</SelectItem>
+                    <SelectItem value="fit">Fit score</SelectItem>
+                    <SelectItem value="views">Views</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <div className="rounded-2xl border bg-background p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Filter logic</div>
+                    <div className="text-xs text-muted-foreground">Query-builder framing inspired by creator intelligence tools.</div>
+                  </div>
+                  <Badge variant="outline">{filteredCreators.length} matches</Badge>
+                </div>
+                <div className="mt-4 space-y-2 text-sm">
+                  <div className="rounded-xl border bg-muted/20 px-4 py-3"><span className="text-muted-foreground">Where</span> engagement rate is above <span className="font-medium">5.0%</span> and fit score is above <span className="font-medium">80%</span></div>
+                  <div className="rounded-xl border bg-muted/20 px-4 py-3"><span className="text-muted-foreground">And</span> platform focus is <span className="font-medium capitalize">{platformFilter === 'all' ? 'multi-platform' : platformFilter}</span> in <span className="font-medium capitalize">{marketFilter === 'all' ? 'all active markets' : marketFilter}</span></div>
+                  <div className="rounded-xl border bg-muted/20 px-4 py-3"><span className="text-muted-foreground">Content where</span> style signals match <span className="font-medium">brand-safe commerce storytelling</span> and audience skews toward <span className="font-medium">{selectedCreator?.topFollowerSegment || 'high-intent shoppers'}</span></div>
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-background p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Visual review strip</div>
+                    <div className="text-xs text-muted-foreground">Preview the content feel before opening the full profile.</div>
+                  </div>
+                  {selectedCreator ? <Badge>{selectedCreator.matchedPosts} matched posts</Badge> : null}
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {(selectedCreator?.contentPreview || []).map((preview: string, index: number) => (
+                    <div key={`${selectedCreator?.id || 'preview'}-${preview}`} className="overflow-hidden rounded-2xl border bg-muted/20">
+                      <div className={`h-28 bg-gradient-to-br ${selectedCreator?.avatarTone || 'from-primary/20 to-primary/10'}`} />
+                      <div className="space-y-1 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Post {index + 1}</div>
+                        <div className="text-sm font-medium leading-5">{preview}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Influencer</TableHead>
+                  <TableHead className="text-right">Reach</TableHead>
+                  <TableHead className="text-right">Engagements</TableHead>
+                  <TableHead className="text-right">ER</TableHead>
+                  <TableHead className="text-right">Fit</TableHead>
+                  <TableHead>Social links</TableHead>
+                  <TableHead>Context / Bio</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCreators.map((creator) => {
+                  const estimatedEngagements = Math.round(creator.followers * (creator.engagementRate / 100));
+                  return (
+                    <TableRow key={creator.id} className={selectedCreator?.id === creator.id ? 'bg-primary/5' : ''}>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          className="flex items-center gap-3 text-left"
+                          onClick={() => {
+                            setSelectedCreatorId(creator.id);
+                            setIsDialogOpen(true);
+                          }}
+                        >
+                          <div className={`flex size-12 items-center justify-center rounded-2xl border bg-gradient-to-br ${creator.avatarTone} text-sm font-semibold text-foreground shadow-sm`}>
+                            {initials(creator.name)}
+                          </div>
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold text-foreground">{creator.name}</span>
+                              {creator.verified ? <Badge variant="outline" className="h-5 px-1.5 text-[10px]">verified</Badge> : null}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{creator.handle}</div>
+                            <div className="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
+                              <span>{creator.category}</span>
+                              <span>·</span>
+                              <span>{creator.country}</span>
+                              <span>·</span>
+                              <span>{creator.topFollowerSegment}</span>
+                            </div>
+                          </div>
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-right">{(creator.reach / 1000000).toFixed(1)}M</TableCell>
+                      <TableCell className="text-right">{(estimatedEngagements / 1000).toFixed(1)}K</TableCell>
+                      <TableCell className="text-right">{creator.engagementRate.toFixed(2)}%</TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center gap-2 rounded-full border bg-background px-2.5 py-1 text-xs font-semibold">
+                          <span className={`size-2 rounded-full ${creator.fitScore >= 85 ? 'bg-emerald-500' : creator.fitScore >= 78 ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                          {creator.fitScore}%
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {creator.socialLinks.map((link) => (
+                            <Badge key={`${creator.id}-${link.label}`} variant="outline" className="gap-1.5 rounded-full px-2.5 py-1 text-[11px]">
+                              {socialIcon(link.icon)}
+                              {link.audience}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[320px]">
+                        <div className="space-y-2">
+                          <p className="line-clamp-2 text-sm text-muted-foreground">{creator.summary}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                            <Badge variant="outline" className="rounded-full">{creator.matchedPosts} matched posts</Badge>
+                            <span>Brands: {creator.brandsMentioned.join(', ')}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setSelectedCreatorId(creator.id);
+                          setIsDialogOpen(true);
+                        }}>
+                          Open profile
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Selected creator snapshot</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {selectedCreator ? (
+                <>
+                  <div className="flex flex-col gap-4 rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 md:flex-row md:items-start md:justify-between shadow-sm">
+                    <div className="flex items-start gap-4">
+                      <div className={`flex size-20 items-center justify-center rounded-3xl border bg-gradient-to-br ${selectedCreator.avatarTone} text-lg font-semibold shadow-sm`}>
+                        {initials(selectedCreator.name)}
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-2xl font-semibold">{selectedCreator.name}</h3>
+                          {selectedCreator.verified ? <Badge variant="outline">verified</Badge> : null}
+                          <Badge variant="outline">{selectedCreator.category}</Badge>
+                          <Badge variant="outline">{selectedCreator.channel}</Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">{selectedCreator.summary}</p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline"><Globe className="mr-1 size-3" />{selectedCreator.country}</Badge>
+                          <Badge variant="outline"><Heart className="mr-1 size-3" />Fit {selectedCreator.fitScore}%</Badge>
+                          <Badge variant="outline">Authenticity {selectedCreator.authenticityScore}%</Badge>
+                          <Badge variant="outline">Audience quality {selectedCreator.audienceQualityScore}%</Badge>
+                          <Badge variant="outline">Primary SKU {selectedCreator.product}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 text-sm md:text-right">
+                      <span className="font-medium">{(selectedCreator.followers / 1000).toFixed(1)}K followers</span>
+                      <span className="text-muted-foreground">{selectedCreator.engagementRate.toFixed(1)}% engagement rate</span>
+                      <span className="text-muted-foreground">{currency.format(selectedCreator.revenue)} revenue influenced</span>
+                      <span className="text-muted-foreground">Top segment: {selectedCreator.topFollowerSegment}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-5">
+                    <MetricPill label="Connections" value={`${(selectedCreator.followers / 1000).toFixed(1)}K`} />
+                    <MetricPill label="Profile reach" value={`${(selectedCreator.reach / 1000000).toFixed(1)}M`} />
+                    <MetricPill label="Active audience" value={`${selectedCreator.activeAudience}%`} />
+                    <MetricPill label="Matched posts" value={String(selectedCreator.matchedPosts)} />
+                    <MetricPill label="Authenticity" value={`${selectedCreator.authenticityScore}%`} />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+                    <AudienceDonutCard creator={selectedCreator} />
+                    <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="text-base">Audience engagement benchmark</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <DistributionCurveCard creator={selectedCreator} />
+                        <p className="text-sm text-muted-foreground">Signal source: {selectedCreator.signal}</p>
+                        <div className="rounded-lg border bg-background p-3 text-sm text-primary">{selectedCreator.recommendation}</div>
+                        <Button className="w-full" onClick={() => setIsDialogOpen(true)}>Open full audience profile</Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Shortlist and compare queue</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {filteredCreators.map((creator, index) => (
+                <div key={`shortlist-${creator.id}`} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">#{index + 1} {creator.name}</span>
+                    <Badge>{creator.fitScore}% fit</Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{creator.handle} · {creator.category} · {creator.channel}</p>
+                  <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><TrendingUp className="size-3" />{creator.engagementRate.toFixed(1)}% ER</span>
+                    <span>{(creator.reach / 1000000).toFixed(1)}M reach</span>
+                    <span>{currency.format(creator.revenue)}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {creator.brandsMentioned.map((brand: string) => <Badge key={`${creator.id}-${brand}`} variant="outline">{brand}</Badge>)}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {selectedCreator ? (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-6xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedCreator.name}</DialogTitle>
+              <DialogDescription>Creator profile, channel footprint, audience analytics, and activation guidance.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
+                <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex gap-4">
+                      <div className={`flex size-28 items-center justify-center rounded-3xl border bg-gradient-to-br ${selectedCreator.avatarTone} text-2xl font-semibold shadow-sm`}>
+                        {initials(selectedCreator.name)}
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-3xl font-semibold">{selectedCreator.name}</h3>
+                          {selectedCreator.verified ? <Badge variant="outline">verified</Badge> : null}
+                          <Badge variant="outline">{selectedCreator.handle}</Badge>
+                          <Badge variant="outline">{selectedCreator.category}</Badge>
+                        </div>
+                        <p className="max-w-2xl text-sm text-muted-foreground">{selectedCreator.summary}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">{selectedCreator.country}</Badge>
+                          <Badge variant="outline">{selectedCreator.channel}</Badge>
+                          <Badge variant="outline">Authenticity {selectedCreator.authenticityScore}%</Badge>
+                          <Badge variant="outline">Audience quality {selectedCreator.audienceQualityScore}%</Badge>
+                          <Badge variant="outline">Primary SKU {selectedCreator.product}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Button>+ Add to shortlist</Button>
+                  </div>
+                </div>
+                <AudienceDonutCard creator={selectedCreator} compact={false} />
+              </div>
+
+              <Tabs defaultValue="audience" className="space-y-4">
+                <TabsList className="h-auto flex-wrap gap-2 bg-transparent p-0">
+                  <TabsTrigger value="content">Recent posts</TabsTrigger>
+                  <TabsTrigger value="audience">Audience</TabsTrigger>
+                  <TabsTrigger value="metrics">Key metrics</TabsTrigger>
+                  <TabsTrigger value="similar">Similar creators</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="content" className="space-y-4">
+                  <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {selectedCreator.contentPreview.map((preview: string, index: number) => (
+                        <div key={`${selectedCreator.id}-content-${preview}`} className="overflow-hidden rounded-3xl border bg-background shadow-sm">
+                          <div className={`h-40 bg-gradient-to-br ${selectedCreator.avatarTone}`} />
+                          <div className="space-y-2 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Matched post {index + 1}</div>
+                              <Badge variant="outline" className="rounded-full text-[10px]">{selectedCreator.lastPosted}</Badge>
+                            </div>
+                            <div className="text-sm font-medium">{preview}</div>
+                            <div className="text-xs text-muted-foreground">Brand-safe commerce content with strong visual clarity for product-led campaigns.</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Card className="rounded-lg border">
+                      <CardHeader>
+                        <CardTitle className="text-base">Content fit summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 text-sm">
+                        <div className="rounded-xl border bg-muted/20 p-3">
+                          <div className="font-medium">Top follower segment</div>
+                          <div className="mt-1 text-muted-foreground">{selectedCreator.topFollowerSegment}</div>
+                        </div>
+                        <div className="rounded-xl border bg-muted/20 p-3">
+                          <div className="font-medium">Top brands mentioned</div>
+                          <div className="mt-1 text-muted-foreground">{selectedCreator.brandsMentioned.join(', ')}</div>
+                        </div>
+                        <div className="rounded-xl border bg-muted/20 p-3">
+                          <div className="font-medium">Posting cadence</div>
+                          <div className="mt-1 text-muted-foreground">Last posted {selectedCreator.lastPosted}. {selectedCreator.matchedPosts} posts align with this campaign query.</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="audience" className="space-y-4">
+                  <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_1fr]">
+                    <GenderCard creator={selectedCreator} />
+                    <AgeDistributionCard creator={selectedCreator} />
+                    <TopCountriesCard creator={selectedCreator} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="metrics" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricPill label="Connections" value={`${(selectedCreator.followers / 1000).toFixed(1)}K`} />
+                    <MetricPill label="Avg views" value={`${(selectedCreator.avgViews / 1000).toFixed(0)}K`} />
+                    <MetricPill label="Revenue" value={currency.format(selectedCreator.revenue)} />
+                    <MetricPill label="Active audience" value={`${selectedCreator.activeAudience}%`} />
+                  </div>
+                  <Card className="rounded-lg border">
+                    <CardHeader>
+                      <CardTitle className="text-base">Connected accounts</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {selectedCreator.socialLinks.map((link) => (
+                        <div key={`${selectedCreator.id}-${link.label}-detail`} className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex size-9 items-center justify-center rounded-lg border bg-background">{socialIcon(link.icon)}</span>
+                            <div>
+                              <div className="font-medium">{link.handle}</div>
+                              <div className="text-xs text-muted-foreground">{link.label}</div>
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium">{link.audience}</div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="similar" className="space-y-3">
+                  {filteredCreators.filter((creator) => creator.id !== selectedCreator.id).map((creator) => (
+                    <div key={`similar-${creator.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 p-4">
+                      <div>
+                        <div className="font-medium">{creator.name}</div>
+                        <div className="text-sm text-muted-foreground">{creator.category} · {creator.handle} · {creator.country}</div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline">Fit {creator.fitScore}%</Badge>
+                        <Badge variant="outline">ER {creator.engagementRate.toFixed(1)}%</Badge>
+                        <Button variant="outline" size="sm" onClick={() => setSelectedCreatorId(creator.id)}>Switch</Button>
+                      </div>
+                    </div>
+                  ))}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
+function creatorProfilesHandle(index: number, channel: 'instagram' | 'youtube' | 'web') {
+  const handles = {
+    instagram: ['linhdesk', 'minhmarkets', 'haan.live', 'quynhchoice'],
+    youtube: ['LinhDeskTV', 'MinhMarkets', 'HaAnReview', 'QuynhChoice'],
+    web: ['linhdesk.media', 'minhmarkets.studio', 'haanlive.co', 'quynhchoice.co'],
+  };
+
+  return handles[channel][index] || `${channel}-creator-${index + 1}`;
+}
+
+function socialIcon(icon: 'instagram' | 'youtube' | 'web') {
+  if (icon === 'instagram') return <Instagram className="size-3.5" />;
+  if (icon === 'youtube') return <Youtube className="size-3.5" />;
+  return <Globe className="size-3.5" />;
+}
+
+function MetricPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-muted/20 px-4 py-3">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function DistributionCurveCard({ creator }: { creator: CreatorProfile }) {
+  return (
+    <div className="space-y-3 rounded-2xl border bg-background p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Distribution curve</div>
+          <div className="text-sm font-medium">Creator position vs platform benchmark</div>
+        </div>
+        <Badge variant="outline">Index {creator.benchmarkIndex}</Badge>
+      </div>
+      <div className="relative pt-5">
+        <div className="h-2 rounded-full bg-gradient-to-r from-rose-200 via-amber-200 to-emerald-300" />
+        <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <span>Low</span>
+          <span>Median</span>
+          <span>High</span>
+        </div>
+        <div className="absolute left-0 right-0 top-0 h-6" style={{ left: `${Math.min(92, Math.max(8, creator.benchmarkIndex))}%` }}>
+          <div className="flex -translate-x-1/2 flex-col items-center">
+            <div className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-semibold shadow-sm">{creator.engagementRate.toFixed(1)}% ER</div>
+            <div className="size-2 rounded-full bg-foreground" />
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
+        <div>Authenticity score: <span className="font-semibold text-foreground">{creator.authenticityScore}%</span></div>
+        <div>Audience quality: <span className="font-semibold text-foreground">{creator.audienceQualityScore}%</span></div>
+      </div>
+    </div>
+  );
+}
+
+function AudienceDonutCard({ creator, compact = true }: { creator: CreatorProfile; compact?: boolean }) {
+  const total = creator.audienceSplit.reduce((sum, item) => sum + item.value, 0);
+  let currentAngle = 0;
+  const segments = creator.audienceSplit.map((item) => {
+    const angle = (item.value / total) * 360;
+    const startAngle = currentAngle;
+    currentAngle += angle;
+    return { ...item, startAngle, angle };
+  });
+
+  const conicGradient = segments
+    .map((s) => `${segmentsColor(s.color)} ${s.startAngle}deg ${s.startAngle + s.angle}deg`)
+    .join(', ');
+
+  return (
+    <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Audience connections</CardTitle>
+      </CardHeader>
+      <CardContent className={compact ? 'space-y-6' : 'grid gap-6 md:grid-cols-[200px_1fr] md:items-center'}>
+        <div className="relative mx-auto flex size-40 items-center justify-center rounded-full border-4 border-background shadow-inner">
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: `conic-gradient(${conicGradient})`,
+              maskImage: 'radial-gradient(circle, transparent 62%, black 63%)',
+              WebkitMaskImage: 'radial-gradient(circle, transparent 62%, black 63%)',
+            }}
+          />
+          <div className="relative text-center">
+            <div className="text-2xl font-bold">{(creator.followers / 1000).toFixed(1)}K</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">total</div>
+          </div>
+        </div>
+        <div className="grid gap-2">
+          {creator.audienceSplit.map((item) => (
+            <div key={`${creator.id}-${item.label}`} className="flex items-center justify-between gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <span className={`size-2.5 rounded-full ${item.color}`} />
+                <span className="font-medium text-muted-foreground">{item.label}</span>
+              </div>
+              <span className="font-bold">{item.value}%</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function segmentsColor(colorClass: string) {
+  if (colorClass.includes('fuchsia')) return '#d946ef';
+  if (colorClass.includes('violet')) return '#8b5cf6';
+  if (colorClass.includes('sky')) return '#0ea5e9';
+  if (colorClass.includes('rose')) return '#f43f5e';
+  if (colorClass.includes('amber')) return '#f59e0b';
+  if (colorClass.includes('emerald')) return '#10b981';
+  return '#94a3b8';
+}
+
+function GenderCard({ creator }: { creator: CreatorProfile }) {
+  return (
+    <Card className="rounded-2xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+          Gender
+          <Badge variant="outline" className="font-mono text-[10px]">{creator.genderSplit.male > creator.genderSplit.female ? 'Male skew' : 'Female skew'}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6 pt-4">
+        <div className="flex h-10 w-full overflow-hidden rounded-xl border bg-muted/20">
+          <div className="flex items-center justify-center bg-sky-400 font-bold text-white transition-all duration-500" style={{ width: `${creator.genderSplit.male}%` }}>
+            {creator.genderSplit.male > 20 && `${creator.genderSplit.male.toFixed(0)}%`}
+          </div>
+          <div className="flex items-center justify-center bg-rose-400 font-bold text-white transition-all duration-500" style={{ width: `${creator.genderSplit.female}%` }}>
+            {creator.genderSplit.female > 20 && `${creator.genderSplit.female.toFixed(0)}%`}
+          </div>
+        </div>
+        <div className="flex justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <div className="size-3 rounded-full bg-sky-400" />
+            <span className="text-muted-foreground">Male</span>
+            <span className="font-bold">{creator.genderSplit.male.toFixed(1)}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold">{creator.genderSplit.female.toFixed(1)}%</span>
+            <span className="text-muted-foreground">Female</span>
+            <div className="size-3 rounded-full bg-rose-400" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AgeDistributionCard({ creator }: { creator: CreatorProfile }) {
+  return (
+    <Card className="rounded-2xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Age Distribution</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-4">
+        {creator.ageBuckets.map((bucket) => (
+          <div key={`${creator.id}-${bucket.label}`} className="group space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors">{bucket.label}</span>
+              <span className="font-bold">{bucket.value.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted/30">
+              <div 
+                className="h-full bg-sky-400 transition-all duration-700 ease-out" 
+                style={{ width: `${bucket.value}%` }} 
+              />
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopCountriesCard({ creator }: { creator: CreatorProfile }) {
+  return (
+    <Card className="rounded-2xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Top Countries</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-4">
+        {creator.topCountries.map((country, index: number) => (
+          <div key={`${creator.id}-${country.label}`} className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-sky-400/40" />
+                <span className="font-medium text-muted-foreground">{country.label}</span>
+              </div>
+              <span className="font-bold">{country.value.toFixed(1)}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
+              <div 
+                className={`h-full transition-all duration-700 ease-out ${index === 0 ? 'bg-sky-500' : 'bg-sky-400/60'}`}
+                style={{ width: `${country.value}%` }} 
+              />
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
 
 function channelTone(channel: string) {
@@ -347,10 +1167,15 @@ function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
               <CardTitle>Execution handoff into COS</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              {snapshot.campaigns.slice(0, 4).map((campaign) => (
+              {snapshot.campaigns.slice(0, 4).map((campaign, index) => (
                 <div key={`handoff-${campaign.id}`} className="rounded-lg border bg-muted/20 p-3">
                   <p className="font-medium">{campaign.skuCode}</p>
-                  <p className="mt-2 text-muted-foreground">Campaign is live against COS product, listing, and order context.</p>
+                  <p className="mt-2 text-muted-foreground">{[
+                    `Live traffic is flowing into this SKU from ${campaign.channel}. ${campaign.leads} leads captured so far.`,
+                    `This SKU has ${campaign.rfqs} open RFQs waiting for follow-up in Lead & Response Capture.`,
+                    `${campaign.orders} orders traced back to this campaign. Fulfillment team can verify via OMS.`,
+                    `Revenue proof: ${currency.format(campaign.revenue)} attributed to this product through demand execution.`,
+                  ][index] || `Campaign is active against ${campaign.skuCode} with ${campaign.traffic.toLocaleString()} traffic.`}</p>
                 </div>
               ))}
             </CardContent>
@@ -364,10 +1189,10 @@ function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
     return (
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Creator briefs" value={snapshot.campaigns.length} meta="Execution queue for creators, posts, and livestream tasks." icon={<MessageCircle className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Creator briefs" value={snapshot.campaigns.length} meta="One brief per active campaign with SKU and channel context." icon={<MessageCircle className="size-5" />} tone="info" />
           <SummaryMetricCard label="Publishing queue" value={snapshot.socialStreams.length} meta="Content tasks scheduled across social and marketplace surfaces." icon={<RadioTower className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Assets pending" value="6" meta="Creative and post approvals still in creator ops workflow." icon={<ClipboardList className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Livestream slots" value="3" meta="Reserved activation windows for creator-led launches." icon={<Bot className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Assets pending" value={Math.max(1, snapshot.campaigns.length + 2)} meta="Creative and post approvals still in creator ops workflow." icon={<ClipboardList className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Livestream slots" value={Math.max(1, Math.min(snapshot.campaigns.length, 4))} meta="Reserved activation windows for creator-led launches." icon={<Bot className="size-5" />} tone="purple" />
         </div>
 
         <Card className="rounded-lg border">
@@ -454,10 +1279,10 @@ function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
     return (
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Retarget pools" value="6" meta="Audience sets ready for remarketing and recall." icon={<Target className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Outreach sequences" value="4" meta="Active follow-up plays across owned and paid channels." icon={<Mail className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Promo pushes" value="3" meta="Offer pushes scheduled for recovery and reactivation." icon={<Megaphone className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Suppression rules" value="5" meta="Guardrails prevent duplicate or conflicting follow-up." icon={<BellRing className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Retarget pools" value={snapshot.customers.length} meta="Audience sets built from customer lifecycle and campaign response." icon={<Target className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Outreach sequences" value={snapshot.activationPlays.length} meta="Active follow-up plays across owned and paid channels." icon={<Mail className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Promo pushes" value={snapshot.campaigns.filter((c) => c.status === 'active').length} meta="Offer pushes scheduled for recovery and reactivation." icon={<Megaphone className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Suppression rules" value={snapshot.activationPlays.length + 2} meta="Guardrails prevent duplicate or conflicting follow-up." icon={<BellRing className="size-5" />} tone="purple" />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
@@ -654,23 +1479,52 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
 
         <Card className="rounded-lg border">
           <CardHeader>
-            <CardTitle>Timeline, notes, follow-up</CardTitle>
+            <CardTitle>Customer timeline</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {snapshot.customers.slice(0, 3).map((customer) => (
-              <div key={customer.id} className="rounded-lg border bg-muted/20 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{customer.name}</span>
-                  <Badge variant="outline">{customer.lifecycle}</Badge>
+          <CardContent>
+            <div className="relative space-y-0">
+              {snapshot.customers.slice(0, 4).map((customer, ci) => (
+                <div key={customer.id} className="relative pb-6 last:pb-0">
+                  {ci < Math.min(snapshot.customers.length, 4) - 1 ? (
+                    <span className="absolute left-5 top-10 -ml-px h-full w-px bg-border" />
+                  ) : null}
+                  <div className="flex gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full border bg-muted/40 text-xs font-semibold">
+                      {customer.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{customer.name}</span>
+                        <Badge variant="outline">{customer.lifecycle}</Badge>
+                        <span className="text-xs text-muted-foreground">{customer.company}</span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {customer.timeline.slice(0, 4).map((entry, ei) => (
+                          <div key={`${customer.id}-t-${ei}`} className="flex items-start gap-2 text-sm">
+                            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
+                            <span className="text-muted-foreground">{entry}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {customer.notes[0] ? (
+                        <p className="mt-2 text-xs text-primary">{customer.notes[0]}</p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{customer.totalOrders} orders</span>
+                        <span>·</span>
+                        <span>{currency.format(customer.totalRevenue)}</span>
+                        {customer.b2bAccount ? (
+                          <>
+                            <span>·</span>
+                            <span>B2B: {customer.b2bAccount}</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  {customer.timeline.slice(0, 3).map((item) => (
-                    <p key={`${customer.id}-${item}`}>{item}</p>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-primary">{customer.notes[0]}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -740,18 +1594,55 @@ function FinancePanel({ towerId }: { towerId: PrimeTowerId }) {
   }
 
   if (towerId === 'lending') {
+    const signalCompleteness = Math.min(98, 58 + snapshot.orders.length * 6);
+    const lendingSteps = [
+      { step: 1, title: 'Operating proof collected', done: snapshot.orders.length > 0, detail: `${snapshot.orders.length} orders, ${snapshot.customers.length} customers, ${snapshot.fulfillmentJobsCount} fulfillment jobs tracked in PrimeOS.` },
+      { step: 2, title: 'Capital need identified', done: snapshot.campaigns.length > 0, detail: `${snapshot.campaigns.length} campaigns running require budget. RFQ pipeline shows ${currency.format(snapshot.metrics.opportunityValue)} in open opportunity.` },
+      { step: 3, title: 'Risk profile assessed', done: serviceRisk <= 2, detail: `${serviceRisk} high-priority issues. Inventory pressure on ${snapshot.forecasts.filter((f) => f.risk !== 'low').length} SKUs. Trust score: ${Math.max(38, 84 - serviceRisk * 8)}%.` },
+      { step: 4, title: 'Partner matched', done: false, detail: 'Ready to route application package to SMB bank, lender, or embedded finance partner.' },
+    ];
+
     return (
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Potential partners" value="3" meta="Illustrates a future flow to bank, lender, or strategic finance partner." icon={<CircleDollarSign className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Merchants in scope" value={snapshot.customers.length} meta="Profiles that already have operating and transaction evidence in PrimeOS." icon={<HeartHandshake className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Application-ready cases" value={Math.min(snapshot.customers.length, 4)} meta="Shortlisted examples that can be routed into partner discussion." icon={<ClipboardList className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Signal completeness" value={`${Math.min(98, 58 + snapshot.orders.length * 6)}%`} meta="Shows how close the data is to a finance-grade application package." icon={<TrendingUp className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Signal completeness" value={`${signalCompleteness}%`} meta="How close the data is to a finance-grade application." icon={<TrendingUp className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Merchants in scope" value={snapshot.customers.length} meta="Profiles with operating and transaction evidence." icon={<HeartHandshake className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Capital need" value={currency.format(snapshot.metrics.opportunityValue)} meta="Open pipeline that requires working capital to convert." icon={<CircleDollarSign className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Application-ready" value={Math.min(snapshot.customers.length, 4)} meta="Cases that can be routed into partner discussion." icon={<ClipboardList className="size-5" />} tone="purple" />
         </div>
 
         <Card className="rounded-lg border">
           <CardHeader>
-            <CardTitle>Lending and partner routing</CardTitle>
+            <CardTitle>Lending flow</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative space-y-0">
+              {lendingSteps.map((item, index) => (
+                <div key={item.step} className="relative pb-6 last:pb-0">
+                  {index < lendingSteps.length - 1 ? (
+                    <span className={`absolute left-5 top-10 -ml-px h-full w-px ${item.done ? 'bg-primary/40' : 'bg-border'}`} />
+                  ) : null}
+                  <div className="flex gap-3">
+                    <div className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${item.done ? 'border-primary/40 bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground'}`}>
+                      {item.step}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{item.title}</span>
+                        {item.done ? <Badge variant="outline" className="text-emerald-600 dark:text-emerald-300">done</Badge> : <Badge variant="outline">pending</Badge>}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Partner routing</CardTitle>
           </CardHeader>
           <CardContent>
             <Table variant="embedded">
@@ -812,90 +1703,7 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
 
   if (towerId === 'creators') {
-    const creatorProfiles = snapshot.campaigns.map((campaign, index) => {
-      const stream = snapshot.socialStreams[index % snapshot.socialStreams.length];
-      const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
-      const voc = snapshot.vocInsights[index % snapshot.vocInsights.length];
-      const fitScore = Math.min(98, 71 + index * 6 + Math.round(play.projectedLift / 3));
-      const engagementRate = (5.2 + index * 1.1).toFixed(1);
-
-      return {
-        id: campaign.id,
-        name: ['Linh Dao', 'Minh Chau', 'Ha An', 'Quynh My'][index] || `Creator ${index + 1}`,
-        handle: ['@linhdesk', '@minhmarkets', '@haan.live', '@quynhchoice'][index] || `@creator${index + 1}`,
-        category: ['Office setup', 'SME buying', 'Lifestyle commerce', 'Value review'][index] || 'Commerce',
-        avatarTone: ['from-fuchsia-500/20 to-violet-500/20', 'from-sky-500/20 to-cyan-500/20', 'from-amber-500/20 to-orange-500/20', 'from-emerald-500/20 to-teal-500/20'][index] || 'from-primary/20 to-primary/10',
-        channel: campaign.channel,
-        fitScore,
-        engagementRate,
-        revenue: campaign.revenue,
-        product: campaign.skuCode,
-        recommendation: play.nextBestAction,
-        signal: stream?.source || 'Social listening',
-        summary: voc?.summary || 'Audience response remains healthy for creator-led launches.',
-      };
-    });
-
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Tracked creators" value={creatorProfiles.length} meta="Ranking combines creator performance, social signal, and SKU fit." icon={<CircleUserRound className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Top fit score" value={`${Math.max(...creatorProfiles.map((creator) => creator.fitScore))}%`} meta="Best current creator-to-product alignment." icon={<TrendingUp className="size-5" />} tone="success" />
-          <SummaryMetricCard label="KOL signals" value={snapshot.socialStreams.length} meta="TikTok, review, and partner feeds refresh creator confidence." icon={<ScanSearch className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Ready actions" value={snapshot.activationPlays.length} meta="Shortlist and launch suggestions are linked to products and campaigns." icon={<Bot className="size-5" />} tone="purple" />
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Creator ranking and product fit</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {creatorProfiles.map((creator, index) => (
-                <div key={creator.id} className="grid gap-3 rounded-lg border bg-muted/20 p-3 md:grid-cols-[auto_1fr_auto] md:items-center">
-                  <div className={`flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br ${creator.avatarTone} text-sm font-semibold text-foreground`}>
-                    {initials(creator.name)}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">#{index + 1} {creator.name}</span>
-                      <Badge variant="outline">{creator.handle}</Badge>
-                      <Badge variant="outline">{creator.category}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Primary product: {creator.product} · Main channel: {creator.channel}</p>
-                    <p className="text-sm text-primary">{creator.recommendation}</p>
-                  </div>
-                  <div className="grid gap-1 text-right text-sm">
-                    <span className="font-medium">Fit {creator.fitScore}%</span>
-                    <span className="text-muted-foreground">ER {creator.engagementRate}%</span>
-                    <span className="text-muted-foreground">{currency.format(creator.revenue)}</span>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Creator insight and next action</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {creatorProfiles.slice(0, 3).map((creator) => (
-                <div key={`insight-${creator.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{creator.name}</span>
-                    <Badge>{creator.fitScore}% fit</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">Signal source: {creator.signal}</p>
-                  <p className="mt-2 text-sm">{creator.summary}</p>
-                  <p className="mt-2 text-xs text-primary">Action: bundle {creator.product} into the next creator brief and move to shortlist.</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
+    return <CreatorIntelligencePanel />;
   }
 
   if (towerId === 'customers') {
@@ -1371,8 +2179,30 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
   );
 }
 
+const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; handoff: string; handoffHref: string }>> = {
+  creators: { decide: 'Which creators fit my products and are worth booking?', handoff: 'Shortlisted creators go to Content & Creator Ops for execution.', handoffHref: '/demand/content-creator-ops' },
+  customers: { decide: 'Which customer segments should I target next and through which channel?', handoff: 'Selected segments go to Retargeting & Outreach for follow-up.', handoffHref: '/demand/retargeting-outreach' },
+  campaigns: { decide: 'Which campaign plan should I launch first?', handoff: 'Approved plans go to Campaign Ops for live execution.', handoffHref: '/demand/campaign-ops' },
+  analytics: { decide: 'Where is my funnel breaking and what is working?', handoff: 'Findings feed into Campaign Planner and AI Operator.', handoffHref: '/intelligence/campaigns' },
+  attribution: { decide: 'Which channel is actually driving orders, not just clicks?', handoff: 'Attribution data guides budget decisions in Campaign Planner.', handoffHref: '/intelligence/campaigns' },
+  forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: '/demand/campaign-ops' },
+  voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: '/demand/campaign-ops' },
+  alerts: { decide: 'What needs my attention right now across the entire system?', handoff: 'Each alert links to the responsible tower for resolution.', handoffHref: '/intelligence/ai-operator' },
+  'ai-operator': { decide: 'What should the system do next based on everything it knows?', handoff: 'Recommendations route to the tower that owns the action.', handoffHref: '/overview' },
+  'campaign-ops': { decide: 'Are my campaigns running on schedule with the right assets?', handoff: 'Campaign traffic flows into Lead & Response Capture.', handoffHref: '/demand/lead-response-capture' },
+  'content-creator-ops': { decide: 'Are creator briefs, bookings, and posts on track?', handoff: 'Published content drives traffic that enters Lead Capture.', handoffHref: '/demand/lead-response-capture' },
+  'lead-response-capture': { decide: 'Which inbound responses are worth qualifying?', handoff: 'Qualified leads go to CRM Compact with full context.', handoffHref: '/customer/crm-compact' },
+  'retargeting-outreach': { decide: 'Who should I follow up with and through which channel?', handoff: 'Converted contacts enter CRM Compact as retained customers.', handoffHref: '/customer/crm-compact' },
+  'crm-compact': { decide: 'What do I know about this customer and what should I do next?', handoff: 'Customer history feeds Intelligence for smarter targeting.', handoffHref: '/intelligence/customers' },
+  service: { decide: 'Is this issue resolved and did it affect customer trust?', handoff: 'Resolution updates the CRM Compact timeline.', handoffHref: '/customer/crm-compact' },
+  capital: { decide: 'Is my operating performance strong enough to approach a finance partner?', handoff: 'Readiness data goes to Lending & Partner Flow.', handoffHref: '/finance/lending' },
+  lending: { decide: 'Which finance partner fits my growth need?', handoff: 'Application packages are backed by Risk & Trust scoring.', handoffHref: '/finance/risk' },
+  risk: { decide: 'What are the risks a lender would see in my business?', handoff: 'Trust scores feed back into Capital Readiness for the full picture.', handoffHref: '/finance/capital' },
+};
+
 export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
   const config = PRIME_TOWER_CONFIGS[towerId];
+  const job = towerJobDescriptions[towerId];
 
   return (
     <div className="min-h-full bg-background">
@@ -1380,16 +2210,24 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
         title={config.tower}
         description={config.promise}
         actions={(
-          <>
-            <Badge variant="outline">{config.area}</Badge>
-            <Badge variant="outline">{config.reuseSource}</Badge>
-          </>
+          <Badge variant="outline">{config.area}</Badge>
         )}
       />
 
       <div className="space-y-6 p-4 md:p-6">
-        <StrategicNarrativeBanner towerId={towerId} />
-        <TowerFloorMap floors={config.floors} />
+        {job ? (
+          <Card className="rounded-lg border border-primary/20 bg-primary/5">
+            <CardContent className="flex flex-col gap-2 p-4 text-sm md:flex-row md:items-center md:justify-between">
+              <div>
+                <span className="font-medium">You decide:</span>{' '}
+                <span className="text-muted-foreground">{job.decide}</span>
+              </div>
+              <Link to={job.handoffHref} className="inline-flex items-center gap-1 whitespace-nowrap text-primary hover:underline">
+                {job.handoff} <ArrowRight className="size-3" />
+              </Link>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {financeTowerIds.includes(towerId) ? <FinancePanel towerId={towerId} /> : null}
         {demandTowerIds.includes(towerId) ? <DemandPanel towerId={towerId} /> : null}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BrainCircuit, ChevronRight } from 'lucide-react';
+import { BrainCircuit, ChevronRight, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getPrimeNavPath,
@@ -139,8 +139,20 @@ export function AppSidebar() {
           className="h-7 w-auto shrink-0"
         />
         <div className="hidden min-w-0 flex-col md:flex">
-          <span className="truncate text-sm font-semibold leading-none">Prime OS Phase 1</span>
-          <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">COS-first commerce operating system</span>
+          <span className="truncate text-sm font-semibold leading-none">Prime OS</span>
+          <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">Closed-loop commerce platform</span>
+        </div>
+      </div>
+
+      <div className="hidden border-b px-3 py-2 md:block md:px-4">
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <div className="flex size-7 items-center justify-center rounded-full bg-primary/10">
+            <User className="size-3.5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Viewing as</p>
+            <p className="truncate text-sm font-medium text-foreground">Brand Manager</p>
+          </div>
         </div>
       </div>
 

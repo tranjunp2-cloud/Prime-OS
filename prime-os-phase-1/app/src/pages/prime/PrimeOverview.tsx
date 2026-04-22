@@ -1,16 +1,13 @@
 import {
+  AlertTriangle,
   ArrowRight,
+  BarChart3,
   Bot,
   Boxes,
-  BrainCircuit,
-  Building2,
   CircleDollarSign,
-  Database,
   HeartHandshake,
-  LineChart,
   Megaphone,
   ShoppingCart,
-  Sparkles,
   Store,
   TrendingUp,
 } from 'lucide-react';
@@ -29,338 +26,280 @@ const currency = new Intl.NumberFormat('ja-JP', {
   maximumFractionDigits: 0,
 });
 
-const areaCards = [
+const journeySteps = [
   {
-    title: 'Intelligence Area',
-    signal: 'Step 1 · Understand the market',
-    detail: 'Creators, Customers, Campaigns, AI Operator, VOC, and analytics help a brand see product opportunity, trend direction, and target audience before execution begins.',
+    step: 1,
+    area: 'Intelligence',
+    question: 'What should I sell and to whom?',
     href: '/intelligence/creators',
-    icon: BrainCircuit,
+    icon: BarChart3,
+    metricLabel: 'Insights',
   },
   {
-    title: 'Ecom Area',
-    signal: 'Step 2 · Set up what to sell',
-    detail: 'Commerce Surface and COS turn insight into sellable readiness: product master, SKU, inventory, listing, OMS, fulfillment, policy, and audit.',
+    step: 2,
+    area: 'Ecom',
+    question: 'Is my product ready to sell?',
     href: '/ecom/cos/product-master',
     icon: Store,
+    metricLabel: 'Products',
   },
   {
-    title: 'Demand Area',
-    signal: 'Step 3 · Bring demand in',
-    detail: 'Campaign Ops, Content & Creator Ops, Lead & Response Capture, and Retargeting & Outreach activate traffic, creators, offers, and lead conversion against live products.',
+    step: 3,
+    area: 'Demand',
+    question: 'Am I reaching the right people?',
     href: '/demand/campaign-ops',
     icon: Megaphone,
+    metricLabel: 'Campaigns',
   },
   {
-    title: 'Customer Area',
-    signal: 'Step 4 · Retain and grow',
-    detail: 'CRM Compact and Service keep customer memory, follow-up, issue recovery, lifecycle context, and repeat purchase motion inside the same operating system.',
+    step: 4,
+    area: 'Customer',
+    question: 'Am I turning buyers into repeat customers?',
     href: '/customer/crm-compact',
     icon: HeartHandshake,
+    metricLabel: 'Profiles',
   },
   {
-    title: 'Finance Area',
-    signal: 'Step 5 · Expand strategic value',
-    detail: 'Capital Readiness, Lending & Partner Flow, and Risk & Trust Layer show how PrimeOS can extend from operating software into finance-enabling infrastructure.',
+    step: 5,
+    area: 'Finance',
+    question: 'Can my operating data support growth capital?',
     href: '/finance/capital',
     icon: CircleDollarSign,
-  },
-];
-
-const differentiationCards = [
-  {
-    title: 'Not just a dashboard',
-    detail: 'PrimeOS is designed to turn data into recommendation, action, and execution instead of stopping at charts or reporting.',
-    icon: TrendingUp,
-  },
-  {
-    title: 'Not just one tool',
-    detail: 'The value is not a single feature like CRM, ads, KOL, or listing. The value is the closed loop across those capabilities.',
-    icon: Sparkles,
-  },
-  {
-    title: 'Not just inbound',
-    detail: 'PrimeOS covers both inbound signal capture and outbound execution, so it can create opportunity and also react to it.',
-    icon: ArrowRight,
-  },
-  {
-    title: 'Not just software ops',
-    detail: 'The system creates transactional intelligence that can become a strategic data layer for CR over time.',
-    icon: Database,
-  },
-];
-
-const crValueCards = [
-  {
-    title: 'CR today',
-    points: [
-      'Company, tax, and transaction-related business data',
-      'Existing ecosystem relationships with buyers and partners',
-      'Strong visibility at company level, but less at customer behavior level',
-    ],
-    icon: Building2,
-  },
-  {
-    title: 'PrimeOS adds',
-    points: [
-      'Who buys what, through which channel, and with what repeat behavior',
-      'Audience, trend, and product opportunity signals',
-      'A linked layer from market insight to transaction and retention',
-    ],
-    icon: Database,
-  },
-  {
-    title: 'Combined outcome',
-    points: [
-      'A stronger transaction intelligence platform for manufacturers and SMBs',
-      'A path toward financial services, lending, or bank partnership use cases',
-      'A revenue model that can grow beyond pure subscription software',
-    ],
-    icon: CircleDollarSign,
+    metricLabel: 'Score',
   },
 ];
 
 export function PrimeOverview() {
   const snapshot = getPrimeSnapshot();
-  const cosProof = [
-    { label: 'Products', value: snapshot.products.length },
-    { label: 'Inventory rows', value: snapshot.inventoryPositions.length },
-    { label: 'Orders', value: snapshot.orders.length },
-    { label: 'Fulfillment jobs', value: snapshot.fulfillmentJobsCount },
-    { label: 'Shipments', value: snapshot.shipmentsCount },
-    { label: 'Audit events', value: snapshot.orderEvents.length + snapshot.trackingEventsCount },
-  ];
+
+  const totalTraffic = snapshot.campaigns.reduce((sum, c) => sum + c.traffic, 0);
+  const totalLeads = snapshot.leads.length;
+  const totalOrders = snapshot.orders.length;
+  const repeatCustomers = snapshot.customers.filter((c) => c.totalOrders > 1).length;
+  const highRiskSkus = snapshot.forecasts.filter((f) => f.risk === 'high').length;
+  const openTickets = snapshot.tickets.filter((t) => t.status !== 'resolved').length;
+  const topCreator = snapshot.campaigns[0];
+  const leadToOrder = snapshot.metrics.leadToOrderRate;
+
+  const repaymentReadiness = snapshot.customers.length
+    ? Math.min(96, 62 + snapshot.customers.filter((c) => c.totalOrders > 0).length * 4)
+    : 0;
+
+  const areaMetricValues: Record<string, string> = {
+    Intelligence: `${snapshot.vocInsights.length + snapshot.insightModels.length}`,
+    Ecom: `${snapshot.products.length}`,
+    Demand: `${snapshot.campaigns.length}`,
+    Customer: `${snapshot.customers.length}`,
+    Finance: `${repaymentReadiness}%`,
+  };
+
+  const areaHealthStatus: Record<string, 'healthy' | 'warning' | 'critical'> = {
+    Intelligence: snapshot.vocInsights.length > 0 ? 'healthy' : 'warning',
+    Ecom: snapshot.products.length > 0 && snapshot.inventoryPositions.length > 0 ? 'healthy' : 'warning',
+    Demand: snapshot.campaigns.length > 0 ? 'healthy' : 'warning',
+    Customer: openTickets > 2 ? 'warning' : 'healthy',
+    Finance: repaymentReadiness > 70 ? 'healthy' : repaymentReadiness > 40 ? 'warning' : 'critical',
+  };
+
+  const healthDot = (status: 'healthy' | 'warning' | 'critical') => {
+    if (status === 'healthy') return 'bg-emerald-500';
+    if (status === 'warning') return 'bg-amber-500';
+    return 'bg-rose-500';
+  };
 
   return (
     <div className="min-h-full bg-background">
       <PageHeader
-        title="Prime OS Phase 1"
-        description="PrimeOS is positioned as a closed-loop sales, marketing, commerce, and intelligence platform: understand the market, set up the product, bring demand in, retain the customer, and build transactional intelligence over time."
+        title="Prime OS"
+        description="One system to understand the market, sell the product, reach the customer, keep them coming back, and prove you are ready to scale."
         actions={(
           <>
             <Button asChild variant="outline" size="sm">
-              <Link to="/intelligence/creators">Open story start</Link>
+              <Link to="/intelligence/creators">Start from Intelligence</Link>
             </Button>
             <Button asChild size="sm">
-              <Link to="/finance/capital">Open finance layer</Link>
+              <Link to="/ecom/cos/oms">Check live orders</Link>
             </Button>
           </>
         )}
       />
 
       <div className="space-y-6 p-4 md:p-6">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {/* Operating state at a glance */}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <SummaryMetricCard
-            label="Storyline areas"
-            value="5"
-            meta="Intelligence -> Ecom -> Demand -> Customer -> Finance is now mapped directly into the app."
-            icon={<BrainCircuit className="size-5" />}
-            tone="success"
-          />
-          <SummaryMetricCard
-            label="COS control core"
-            value={`${snapshot.metrics.cosStrength}%`}
-            meta="COS still anchors product, inventory, OMS, and fulfillment proof in Phase 1."
+            label="Products ready"
+            value={snapshot.products.length}
+            meta={`${snapshot.inventoryPositions.length} inventory rows across ${snapshot.warehousesCount} warehouses.`}
             icon={<Boxes className="size-5" />}
             tone="info"
           />
           <SummaryMetricCard
-            label="Transactional intelligence"
-            value={currency.format(snapshot.metrics.revenue)}
-            meta="The business story is not only GMV, but who bought, how they converted, and what to do next."
+            label="Traffic this period"
+            value={totalTraffic.toLocaleString()}
+            meta={`${snapshot.campaigns.length} campaigns running across ${new Set(snapshot.campaigns.map((c) => c.channel)).size} channels.`}
             icon={<Megaphone className="size-5" />}
+            tone="success"
+          />
+          <SummaryMetricCard
+            label="Leads → Orders"
+            value={`${totalLeads} → ${totalOrders}`}
+            meta={`${leadToOrder}% conversion rate from lead to completed order.`}
+            icon={<TrendingUp className="size-5" />}
             tone="warning"
           />
           <SummaryMetricCard
-            label="Vision layer"
-            value="Live"
-            meta="Finance is no longer just narrative text. It is now mapped as an explicit PrimeOS area and routing layer."
-            icon={<CircleDollarSign className="size-5" />}
-            tone="purple"
+            label="Revenue"
+            value={currency.format(snapshot.metrics.revenue)}
+            meta={`${repeatCustomers} repeat customers out of ${snapshot.customers.length} total.`}
+            icon={<ShoppingCart className="size-5" />}
+            tone="success"
+          />
+          <SummaryMetricCard
+            label="Needs attention"
+            value={highRiskSkus + openTickets}
+            meta={`${highRiskSkus} SKU at stock risk, ${openTickets} open service cases.`}
+            icon={<AlertTriangle className="size-5" />}
+            tone={highRiskSkus + openTickets > 0 ? 'danger' : 'muted'}
           />
         </div>
 
-        <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {areaCards.map((area) => {
-              const Icon = area.icon;
-              return (
-                <Card key={area.title} className="rounded-lg border">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Badge variant="outline" className="mb-3">{area.signal}</Badge>
-                        <CardTitle>{area.title}</CardTitle>
-                      </div>
-                      <div className="rounded-lg border bg-muted/40 p-2">
-                        <Icon className="size-5 text-primary" />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="min-h-[4.5rem] text-sm text-muted-foreground">{area.detail}</p>
-                    <Button asChild variant="ghost" size="sm" className="mt-4 px-0">
-                      <Link to={area.href}>
-                        Open area
-                        <ArrowRight className="ml-1.5 size-4" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>PrimeOS In One Line</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
-                PrimeOS should be told as a single platform where market understanding, commerce execution, demand creation, customer retention, and AI-assisted action stay connected.
-              </div>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>Pitch message:</p>
-                <p className="font-medium text-foreground">A 360 sales and marketing 2-in-1 platform that moves from signal to decision to transaction to retention.</p>
-              </div>
-              {cosProof.map((item) => (
-                <div key={item.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="font-semibold">{item.value}</span>
-                  </div>
-                  <Progress value={Math.min(100, Math.max(12, item.value * 8))} className="h-2" />
-                </div>
-              ))}
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
-                Product Master, Inventory Brain, OMS, Fulfillment, Policy & Rule, and Event & Audit remain the proof that PrimeOS is not abstract strategy only. COS is still the control core.
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-4">
-          {differentiationCards.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card key={item.title} className="rounded-lg border">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-base">{item.title}</CardTitle>
-                    <div className="rounded-lg border bg-muted/40 p-2">
-                      <Icon className="size-4 text-primary" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{item.detail}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>CR Today + PrimeOS Tomorrow</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
-              {crValueCards.map((item) => {
-                const Icon = item.icon;
+        {/* Seller journey — the 5 questions */}
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Your seller journey</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-5">
+              {journeySteps.map((step) => {
+                const Icon = step.icon;
+                const health = areaHealthStatus[step.area];
+                const metricValue = areaMetricValues[step.area];
                 return (
-                  <div key={item.title} className="rounded-lg border bg-muted/20 p-4">
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="rounded-lg border bg-background p-2">
+                  <Link
+                    key={step.area}
+                    to={step.href}
+                    className="group flex flex-col gap-3 rounded-lg border bg-muted/20 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{step.step}</Badge>
                         <Icon className="size-4 text-primary" />
+                        <span className="font-medium">{step.area}</span>
                       </div>
-                      <span className="font-medium">{item.title}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`size-2 rounded-full ${healthDot(health)}`} />
+                        <span className="text-xs font-semibold text-muted-foreground">{metricValue}</span>
+                      </div>
                     </div>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      {item.points.map((point) => (
-                        <div key={point} className="flex items-start gap-2">
-                          <span className="mt-1 size-1.5 rounded-full bg-primary" />
-                          <span>{point}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                    <p className="text-sm text-muted-foreground">{step.question}</p>
+                    <span className="mt-auto inline-flex items-center gap-1 text-xs text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                      Open <ArrowRight className="size-3" />
+                    </span>
+                  </Link>
                 );
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* What is happening right now + Control tower */}
+        <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <Card className="rounded-lg border">
             <CardHeader>
-              <CardTitle>Safe Long-term Vision</CardTitle>
+              <CardTitle>What is happening right now</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <p className="font-medium">What we can say safely</p>
-                <p className="mt-2 text-muted-foreground">PrimeOS gives CR a missing layer of transaction visibility and customer-level intelligence that can support bigger strategic moves in the future.</p>
-              </div>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <p className="font-medium">What the long-term vision can be</p>
-                <p className="mt-2 text-muted-foreground">Financial services enablement, lending, or bank partnership scenarios for SMBs and manufacturers using operating signals from the platform.</p>
-              </div>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <p className="font-medium">What we should avoid claiming</p>
-                <p className="mt-2 text-muted-foreground">Do not position Phase 1 as if PrimeOS alone directly turns CR into a digital bank. Keep finance as a future-facing vision layer.</p>
-              </div>
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                <div className="flex items-start gap-2">
-                  <Bot className="mt-0.5 size-4 text-primary" />
-                  <div>
-                    <p className="font-medium">Agentic AI as acceleration layer</p>
-                    <p className="mt-1 text-sm text-muted-foreground">AI should be pitched as the layer that helps operators ask, navigate, and execute faster on top of the system, not as the only product story.</p>
+            <CardContent className="space-y-3">
+              {topCreator ? (
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">Top campaign: {topCreator.name}</span>
+                    <Badge variant="outline">{topCreator.status}</Badge>
                   </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Running on {topCreator.channel} · SKU {topCreator.skuCode} · {topCreator.traffic.toLocaleString()} traffic · {topCreator.leads} leads · {topCreator.rfqs} RFQs · {currency.format(topCreator.revenue)} revenue
+                  </p>
                 </div>
-              </div>
+              ) : null}
+
+              {snapshot.forecasts.filter((f) => f.risk !== 'low').slice(0, 2).map((forecast) => (
+                <div key={forecast.id} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">Inventory watch: {forecast.skuCode}</span>
+                    <Badge variant={forecast.risk === 'high' ? 'destructive' : 'outline'}>{forecast.risk} risk</Badge>
+                  </div>
+                  <Progress value={forecast.ats ? Math.min(100, Math.round((forecast.demand7d / Math.max(forecast.ats, 1)) * 100)) : 100} className="mt-2 h-2" />
+                  <p className="mt-2 text-sm text-muted-foreground">{forecast.suggestedAction}</p>
+                </div>
+              ))}
+
+              {snapshot.tickets.filter((t) => t.priority === 'high').slice(0, 2).map((ticket) => (
+                <div key={ticket.id} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">Service: {ticket.subject}</span>
+                    <Badge variant="destructive">{ticket.priority}</Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">Linked to {ticket.linkedEntity} · SLA: {ticket.sla}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
-        </section>
 
-        <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
           <Card className="rounded-lg border">
             <CardHeader>
-              <CardTitle>Slide-ready Storyline</CardTitle>
+              <CardTitle>Control tower</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                'PrimeOS helps a manufacturer or brand understand the market first.',
-                'Then it prepares the product, SKU, inventory, and commerce readiness inside Ecom.',
-                'Then it brings traffic and demand through campaigns, creators, and lead capture.',
-                'Then it retains customer memory and repeat purchase context after the transaction.',
-                'Then it extends into finance-ready signals, lender routing, and trust scoring for larger strategic value.',
-                'The combined result is a new layer of transactional intelligence for CR.',
-              ].map((line, index) => (
-                <div key={line} className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
-                  <Badge variant="outline">{index + 1}</Badge>
-                  <span className="text-muted-foreground">{line}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Linked Proof From Phase 1</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {[
-                `product + inventory + OMS + fulfillment: ${snapshot.products.length} products / ${snapshot.inventoryPositions.length} inventory rows / ${snapshot.orders.length} orders`,
-                `demand + response capture: ${snapshot.campaigns.length} campaigns / ${snapshot.leads.length} leads / ${snapshot.rfqs.length} RFQs`,
-                `customer memory + service: ${snapshot.customers.length} compact profiles / ${snapshot.tickets.length} service cases`,
-                `intelligence + action: ${snapshot.vocInsights.length} insights / ${snapshot.recommendations.length} recommendations / ${snapshot.alerts.length} alerts`,
-              ].map((line) => (
-                <div key={line} className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3">
-                  <LineChart className="mt-0.5 size-4 text-primary" />
-                  <span className="text-muted-foreground">{line}</span>
+                { channel: 'Product catalog', status: snapshot.products.length > 0 ? 'live' as const : 'offline' as const, count: snapshot.products.length, unit: 'SKUs' },
+                { channel: 'Inventory', status: snapshot.inventoryPositions.length > 0 ? 'live' as const : 'offline' as const, count: snapshot.inventoryPositions.length, unit: 'positions' },
+                { channel: 'Order management', status: snapshot.orders.length > 0 ? 'live' as const : 'idle' as const, count: snapshot.orders.length, unit: 'orders' },
+                { channel: 'Fulfillment', status: snapshot.fulfillmentJobsCount > 0 ? 'live' as const : 'idle' as const, count: snapshot.fulfillmentJobsCount, unit: 'jobs' },
+                { channel: 'Campaigns', status: snapshot.campaigns.length > 0 ? 'live' as const : 'idle' as const, count: snapshot.campaigns.length, unit: 'active' },
+                { channel: 'Customer profiles', status: snapshot.customers.length > 0 ? 'live' as const : 'idle' as const, count: snapshot.customers.length, unit: 'profiles' },
+                { channel: 'AI operator', status: snapshot.recommendations.length > 0 ? 'live' as const : 'idle' as const, count: snapshot.recommendations.length, unit: 'actions' },
+                { channel: 'Finance signals', status: repaymentReadiness > 50 ? 'live' as const : 'idle' as const, count: repaymentReadiness, unit: '% ready' },
+              ].map((item) => (
+                <div key={item.channel} className="flex items-center gap-3 text-sm">
+                  <span className={`size-2 rounded-full ${item.status === 'live' ? 'bg-emerald-500' : item.status === 'idle' ? 'bg-amber-500' : 'bg-muted-foreground/30'}`} />
+                  <span className="flex-1 text-muted-foreground">{item.channel}</span>
+                  <span className="font-semibold">{item.count}</span>
+                  <span className="w-16 text-xs text-muted-foreground">{item.unit}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
         </section>
+
+        {/* Where to act next */}
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Where to act next</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {snapshot.recommendations.map((rec) => (
+              <div key={rec.id} className="rounded-lg border bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{rec.target}</span>
+                  <Badge variant="outline">{rec.confidence}%</Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{rec.reasoning}</p>
+                <p className="mt-2 text-sm text-primary">{rec.action}</p>
+              </div>
+            ))}
+
+            {snapshot.activationPlays.map((play) => (
+              <div key={play.id} className="rounded-lg border bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{play.audience}</span>
+                  <Badge variant="outline">+{play.projectedLift}% lift</Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{play.trigger}</p>
+                <p className="mt-2 text-sm text-primary">{play.nextBestAction}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
