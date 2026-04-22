@@ -53,14 +53,22 @@ const App = () => {
                   <Route element={<AppLayout />}>
                     <Route path="/overview" element={<PrimeOverview />} />
 
-                    <Route path="/demand/acquisition" element={<PrimeTowerPage towerId="acquisition" />} />
-                    <Route path="/demand/campaign" element={<PrimeTowerPage towerId="campaign" />} />
-                    <Route path="/demand/content-social" element={<PrimeTowerPage towerId="content-social" />} />
-                    <Route path="/demand/lead-capture" element={<PrimeTowerPage towerId="lead-capture" />} />
-                    <Route path="/demand/retargeting" element={<PrimeTowerPage towerId="retargeting" />} />
+                    <Route path="/demand/campaign-ops" element={<PrimeTowerPage towerId="campaign-ops" />} />
+                    <Route path="/demand/content-creator-ops" element={<PrimeTowerPage towerId="content-creator-ops" />} />
+                    <Route path="/demand/lead-response-capture" element={<PrimeTowerPage towerId="lead-response-capture" />} />
+                    <Route path="/demand/retargeting-outreach" element={<PrimeTowerPage towerId="retargeting-outreach" />} />
+                    <Route path="/demand/acquisition" element={<Navigate to="/demand/campaign-ops" replace />} />
+                    <Route path="/demand/campaign" element={<Navigate to="/demand/campaign-ops" replace />} />
+                    <Route path="/demand/content-social" element={<Navigate to="/demand/content-creator-ops" replace />} />
+                    <Route path="/demand/lead-capture" element={<Navigate to="/demand/lead-response-capture" replace />} />
+                    <Route path="/demand/retargeting" element={<Navigate to="/demand/retargeting-outreach" replace />} />
 
                     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
                     <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />
+
+                    <Route path="/finance/capital" element={<PrimeTowerPage towerId="capital" />} />
+                    <Route path="/finance/lending" element={<PrimeTowerPage towerId="lending" />} />
+                    <Route path="/finance/risk" element={<PrimeTowerPage towerId="risk" />} />
 
                     <Route path="/ecom/commerce-surface" element={<CommerceSurfacePage />} />
                     <Route path="/ecom/cos/product-master" element={<Products />} />
@@ -87,6 +95,9 @@ const App = () => {
                     <Route path="/intelligence/ai-operator" element={<PrimeTowerPage towerId="ai-operator" />} />
                     <Route path="/intelligence/voc" element={<PrimeTowerPage towerId="voc" />} />
                     <Route path="/intelligence/alerts" element={<PrimeTowerPage towerId="alerts" />} />
+                    <Route path="/intelligence/creators" element={<PrimeTowerPage towerId="creators" />} />
+                    <Route path="/intelligence/customers" element={<PrimeTowerPage towerId="customers" />} />
+                    <Route path="/intelligence/campaigns" element={<PrimeTowerPage towerId="campaigns" />} />
 
                     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
                     <Route path="/products" element={<Navigate to="/ecom/cos/product-master" replace />} />

@@ -9,16 +9,21 @@ import type { InventoryPosition } from '@/lib/inventory-store';
 import type { Order, OrderEvent, OrderItem } from '@/lib/oms-types';
 import type { Product } from '@/lib/product-store';
 
-export type PrimeArea = 'Demand Area' | 'Customer Area' | 'Ecom Area' | 'Intelligence Area';
+export type PrimeArea = 'Demand Area' | 'Customer Area' | 'Ecom Area' | 'Intelligence Area' | 'Finance Area';
 
 export type PrimeTowerId =
-  | 'acquisition'
-  | 'campaign'
-  | 'content-social'
-  | 'lead-capture'
-  | 'retargeting'
+  | 'capital'
+  | 'lending'
+  | 'risk'
+  | 'campaign-ops'
+  | 'content-creator-ops'
+  | 'lead-response-capture'
+  | 'retargeting-outreach'
   | 'crm-compact'
   | 'service'
+  | 'creators'
+  | 'customers'
+  | 'campaigns'
   | 'analytics'
   | 'attribution'
   | 'forecasting'
@@ -218,45 +223,61 @@ export interface PrimeSnapshot {
 }
 
 export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
-  acquisition: {
-    id: 'acquisition',
-    area: 'Demand Area',
-    tower: 'Acquisition Tower',
-    promise: 'Capture qualified traffic against real COS products and channels.',
-    reuseSource: 'New Prime OS wrapper, seeded from COS Product Master and Listings.',
-    floors: ['Channel mix', 'Traffic source', 'Product audience fit', 'Landing intent'],
+  capital: {
+    id: 'capital',
+    area: 'Finance Area',
+    tower: 'Capital Readiness',
+    promise: 'Translate operating performance into a lender-ready view of growth readiness, cash need, and transaction quality.',
+    reuseSource: 'New Prime OS wrapper, derived from campaign, order, customer, and fulfillment proof.',
+    floors: ['GMV trend', 'Cash need', 'Working capital profile', 'Partner fit'],
   },
-  campaign: {
-    id: 'campaign',
+  lending: {
+    id: 'lending',
+    area: 'Finance Area',
+    tower: 'Lending & Partner Flow',
+    promise: 'Connect merchants and manufacturers to financing or bank partners using live commerce and operating signals.',
+    reuseSource: 'New Prime OS wrapper, linked to transactional intelligence and future financial workflow.',
+    floors: ['Partner routing', 'Offer package', 'Application status', 'Repayment signal'],
+  },
+  risk: {
+    id: 'risk',
+    area: 'Finance Area',
+    tower: 'Risk & Trust Layer',
+    promise: 'Turn inventory, fulfillment, service, and repeat purchase behavior into an explainable trust layer for finance decisions.',
+    reuseSource: 'New Prime OS wrapper, combining COS execution health with customer and demand signals.',
+    floors: ['Signal score', 'Risk flags', 'Trust explanation', 'Guardrails'],
+  },
+  'campaign-ops': {
+    id: 'campaign-ops',
     area: 'Demand Area',
-    tower: 'Campaign Tower',
-    promise: 'Plan campaigns that can be traced from spend to lead, RFQ, order, and fulfillment.',
+    tower: 'Campaign Ops',
+    promise: 'Run live campaigns with clear ownership, launch readiness, timeline, and channel deployment.',
     reuseSource: 'New Prime OS wrapper, linked to COS SKU, order, and listing data.',
-    floors: ['Campaign plan', 'Budget pacing', 'Offer logic', 'Conversion path'],
+    floors: ['Campaign calendar', 'Objective', 'Budget assignment', 'Launch status', 'Asset readiness', 'Owner timeline'],
   },
-  'content-social': {
-    id: 'content-social',
+  'content-creator-ops': {
+    id: 'content-creator-ops',
     area: 'Demand Area',
-    tower: 'Content & Social Tower',
-    promise: 'Turn product proof, social proof, and VOC signals into campaign assets.',
-    reuseSource: 'New Prime OS wrapper, linked to COS products and VOC insights.',
-    floors: ['Content calendar', 'Social post queue', 'Creative evidence', 'VOC reuse'],
+    tower: 'Content & Creator Ops',
+    promise: 'Execute creator briefs, content schedules, approvals, and publishing without mixing in ranking logic.',
+    reuseSource: 'New Prime OS wrapper, linked to campaign plans, creator ops, and publishing surfaces.',
+    floors: ['Creator brief', 'Booking status', 'Post plan', 'Livestream schedule', 'Asset approval', 'Publishing queue'],
   },
-  'lead-capture': {
-    id: 'lead-capture',
+  'lead-response-capture': {
+    id: 'lead-response-capture',
     area: 'Demand Area',
-    tower: 'Lead Capture Tower',
-    promise: 'Convert campaign intent into CRM Compact entries and RFQ candidates.',
+    tower: 'Lead & Response Capture',
+    promise: 'Receive market responses, route inbound leads, and hand qualified intent into CRM Compact and RFQ flow.',
     reuseSource: 'New Prime OS wrapper, linked to campaign, customer, and RFQ objects.',
-    floors: ['Lead queue', 'Qualification', 'RFQ trigger', 'CRM handoff'],
+    floors: ['Inbound leads', 'Form capture', 'Message capture', 'RFQ intake', 'Lead assignment', 'CRM handoff'],
   },
-  retargeting: {
-    id: 'retargeting',
+  'retargeting-outreach': {
+    id: 'retargeting-outreach',
     area: 'Demand Area',
-    tower: 'Retargeting Tower',
-    promise: 'Reactivate product and order intent using inventory, issue, and lifecycle context.',
-    reuseSource: 'New Prime OS wrapper, linked to inventory risk and customer timeline.',
-    floors: ['Audience rules', 'Suppression rules', 'Offer guardrails', 'Follow-up paths'],
+    tower: 'Retargeting & Outreach',
+    promise: 'Execute follow-up sequences, retargeting audiences, and promo pushes across owned and paid channels.',
+    reuseSource: 'New Prime OS wrapper, linked to audience lists, CRM handoff, and campaign deployment surfaces.',
+    floors: ['Retargeting audiences', 'Outreach sequence', 'Promo push', 'Suppression rules', 'Resend recall', 'Remarketing actions'],
   },
   'crm-compact': {
     id: 'crm-compact',
@@ -273,6 +294,30 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     promise: 'Resolve order issues while feeding the customer timeline and COS operating context.',
     reuseSource: 'New Prime OS wrapper, linked to COS Returns, OMS, and Fulfillment.',
     floors: ['Ticket queue', 'Case detail', 'RMA', 'SLA', 'Resolution'],
+  },
+  creators: {
+    id: 'creators',
+    area: 'Intelligence Area',
+    tower: 'Creators Intelligence',
+    promise: 'Understand which creators and KOLs fit which products before campaign execution begins.',
+    reuseSource: 'New Prime OS wrapper, combining attribution, social listening, and operator recommendations.',
+    floors: ['Ranking', 'Creator profile', 'Product fit', 'Activation shortlist'],
+  },
+  customers: {
+    id: 'customers',
+    area: 'Intelligence Area',
+    tower: 'Customer Intelligence',
+    promise: 'Understand which customer segments matter, what they are likely to buy, and how they should be reached.',
+    reuseSource: 'New Prime OS wrapper, combining CRM compact, forecasting, and activation guidance.',
+    floors: ['Segment list', 'Affinity model', 'Channel fit', 'Next best action'],
+  },
+  campaigns: {
+    id: 'campaigns',
+    area: 'Intelligence Area',
+    tower: 'Campaign Planner',
+    promise: 'Turn market understanding into executable campaign plans across products, audiences, channels, and creators.',
+    reuseSource: 'New Prime OS wrapper, combining demand performance, recommendations, and risk alerts.',
+    floors: ['Recommended campaigns', 'Channel mix', 'Budget focus', 'Execution alerts'],
   },
   analytics: {
     id: 'analytics',
@@ -302,7 +347,7 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     id: 'ai-operator',
     area: 'Intelligence Area',
     tower: 'AI Operator Tower',
-    promise: 'Operate on live system context, not disconnected chat messages.',
+    promise: 'Accelerate operator work with an agent layer that reads live context and helps users ask, navigate, and execute faster.',
     reuseSource: 'New Prime OS wrapper plus existing GlobalCopilotWorkspace shell.',
     floors: ['Context reader', 'Decision queue', 'Recommendation', 'Action log'],
   },
