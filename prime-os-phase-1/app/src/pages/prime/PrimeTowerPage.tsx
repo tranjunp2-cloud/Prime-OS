@@ -51,6 +51,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
 import {
@@ -101,6 +109,29 @@ type CreatorProfile = {
   authenticityScore: number;
   audienceQualityScore: number;
   benchmarkIndex: number;
+};
+
+type CustomerProfile = {
+  id: string;
+  name: string;
+  company: string;
+  lifecycle: string;
+  segment: string;
+  segmentLabel: string;
+  momentum: string;
+  totalRevenue: number;
+  totalOrders: number;
+  potentialScore: number;
+  conversionLikelihood: number;
+  churnRisk: number;
+  revenueContribution: number;
+  recommendedProduct: string;
+  recommendedChannels: readonly string[];
+  nextBestAction: string;
+  reasoning: string;
+  target: string;
+  signalSummary: string;
+  nextCategory: string;
 };
 
 const currency = new Intl.NumberFormat('ja-JP', {
@@ -367,7 +398,42 @@ function CreatorIntelligencePanel() {
           <CardHeader className="space-y-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <CardTitle>Creator search and discovery</CardTitle>
+                <div className="flex items-center gap-3">
+                  <CardTitle>Creator search and discovery</CardTitle>
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="secondary" size="sm" className="h-7 text-xs rounded-full gap-1.5 border">
+                        <Bot className="size-3.5" />
+                        View Shortlist ({shortlistCount})
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-[400px] sm:max-w-[400px] overflow-y-auto">
+                      <SheetHeader className="mb-6 mt-4">
+                        <SheetTitle>Shortlist queue</SheetTitle>
+                        <SheetDescription>Candidates ready for campaign ops execution.</SheetDescription>
+                      </SheetHeader>
+                      <div className="space-y-3">
+                        {filteredCreators.map((creator, index) => (
+                          <div key={`shortlist-${creator.id}`} className="rounded-lg border bg-muted/20 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium">#{index + 1} {creator.name}</span>
+                              <Badge>{creator.fitScore}% fit</Badge>
+                            </div>
+                            <p className="mt-2 text-sm text-muted-foreground">{creator.handle} · {creator.category} · {creator.channel}</p>
+                            <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1"><TrendingUp className="size-3" />{creator.engagementRate.toFixed(1)}% ER</span>
+                              <span>{(creator.reach / 1000000).toFixed(1)}M reach</span>
+                              <span>{currency.format(creator.revenue)}</span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {creator.brandsMentioned.map((brand: string) => <Badge key={`${creator.id}-${brand}`} variant="outline">{brand}</Badge>)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
                 <p className="mt-1 text-sm text-muted-foreground">Apply query-first filters, review content style, then compare creators in a dense shortlist table.</p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -432,15 +498,17 @@ function CreatorIntelligencePanel() {
               <div className="rounded-2xl border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold">Filter logic</div>
-                    <div className="text-xs text-muted-foreground">Query-builder framing inspired by creator intelligence tools.</div>
+                    <div className="text-sm font-semibold">Active filters</div>
+                    <div className="text-xs text-muted-foreground">Applying strict logic to candidate pool.</div>
                   </div>
                   <Badge variant="outline">{filteredCreators.length} matches</Badge>
                 </div>
-                <div className="mt-4 space-y-2 text-sm">
-                  <div className="rounded-xl border bg-muted/20 px-4 py-3"><span className="text-muted-foreground">Where</span> engagement rate is above <span className="font-medium">5.0%</span> and fit score is above <span className="font-medium">80%</span></div>
-                  <div className="rounded-xl border bg-muted/20 px-4 py-3"><span className="text-muted-foreground">And</span> platform focus is <span className="font-medium capitalize">{platformFilter === 'all' ? 'multi-platform' : platformFilter}</span> in <span className="font-medium capitalize">{marketFilter === 'all' ? 'all active markets' : marketFilter}</span></div>
-                  <div className="rounded-xl border bg-muted/20 px-4 py-3"><span className="text-muted-foreground">Content where</span> style signals match <span className="font-medium">brand-safe commerce storytelling</span> and audience skews toward <span className="font-medium">{selectedCreator?.topFollowerSegment || 'high-intent shoppers'}</span></div>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground">ER &gt; 5.0%</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground">Fit Score &gt; 80%</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground capitalize">{platformFilter === 'all' ? 'Multi-platform' : platformFilter}</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground capitalize">{marketFilter === 'all' ? 'Global market' : marketFilter}</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground truncate max-w-[200px]">Audience: {selectedCreator?.topFollowerSegment || 'High-intent'}</Badge>
                 </div>
               </div>
               <div className="rounded-2xl border bg-background p-4">
@@ -555,97 +623,6 @@ function CreatorIntelligencePanel() {
             </Table>
           </CardContent>
         </Card>
-
-        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Selected creator snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedCreator ? (
-                <>
-                  <div className="flex flex-col gap-4 rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 md:flex-row md:items-start md:justify-between shadow-sm">
-                    <div className="flex items-start gap-4">
-                      <div className={`flex size-20 items-center justify-center rounded-3xl border bg-gradient-to-br ${selectedCreator.avatarTone} text-lg font-semibold shadow-sm`}>
-                        {initials(selectedCreator.name)}
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-2xl font-semibold">{selectedCreator.name}</h3>
-                          {selectedCreator.verified ? <Badge variant="outline">verified</Badge> : null}
-                          <Badge variant="outline">{selectedCreator.category}</Badge>
-                          <Badge variant="outline">{selectedCreator.channel}</Badge>
-                        </div>
-                        <p className="mt-2 text-sm text-muted-foreground">{selectedCreator.summary}</p>
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline"><Globe className="mr-1 size-3" />{selectedCreator.country}</Badge>
-                          <Badge variant="outline"><Heart className="mr-1 size-3" />Fit {selectedCreator.fitScore}%</Badge>
-                          <Badge variant="outline">Authenticity {selectedCreator.authenticityScore}%</Badge>
-                          <Badge variant="outline">Audience quality {selectedCreator.audienceQualityScore}%</Badge>
-                          <Badge variant="outline">Primary SKU {selectedCreator.product}</Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid gap-2 text-sm md:text-right">
-                      <span className="font-medium">{(selectedCreator.followers / 1000).toFixed(1)}K followers</span>
-                      <span className="text-muted-foreground">{selectedCreator.engagementRate.toFixed(1)}% engagement rate</span>
-                      <span className="text-muted-foreground">{currency.format(selectedCreator.revenue)} revenue influenced</span>
-                      <span className="text-muted-foreground">Top segment: {selectedCreator.topFollowerSegment}</span>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-5">
-                    <MetricPill label="Connections" value={`${(selectedCreator.followers / 1000).toFixed(1)}K`} />
-                    <MetricPill label="Profile reach" value={`${(selectedCreator.reach / 1000000).toFixed(1)}M`} />
-                    <MetricPill label="Active audience" value={`${selectedCreator.activeAudience}%`} />
-                    <MetricPill label="Matched posts" value={String(selectedCreator.matchedPosts)} />
-                    <MetricPill label="Authenticity" value={`${selectedCreator.authenticityScore}%`} />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
-                    <AudienceDonutCard creator={selectedCreator} />
-                    <Card className="rounded-2xl border bg-muted/10 shadow-sm">
-                      <CardHeader>
-                        <CardTitle className="text-base">Audience engagement benchmark</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <DistributionCurveCard creator={selectedCreator} />
-                        <p className="text-sm text-muted-foreground">Signal source: {selectedCreator.signal}</p>
-                        <div className="rounded-lg border bg-background p-3 text-sm text-primary">{selectedCreator.recommendation}</div>
-                        <Button className="w-full" onClick={() => setIsDialogOpen(true)}>Open full audience profile</Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Shortlist and compare queue</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {filteredCreators.map((creator, index) => (
-                <div key={`shortlist-${creator.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">#{index + 1} {creator.name}</span>
-                    <Badge>{creator.fitScore}% fit</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{creator.handle} · {creator.category} · {creator.channel}</p>
-                  <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><TrendingUp className="size-3" />{creator.engagementRate.toFixed(1)}% ER</span>
-                    <span>{(creator.reach / 1000000).toFixed(1)}M reach</span>
-                    <span>{currency.format(creator.revenue)}</span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {creator.brandsMentioned.map((brand: string) => <Badge key={`${creator.id}-${brand}`} variant="outline">{brand}</Badge>)}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {selectedCreator ? (
@@ -802,6 +779,426 @@ function creatorProfilesHandle(index: number, channel: 'instagram' | 'youtube' |
 
   return handles[channel][index] || `${channel}-creator-${index + 1}`;
 }
+
+function CustomerIntelligencePanel() {
+  const snapshot = getPrimeSnapshot();
+  const recommendedChannels = [
+    ['TikTok', 'WhatsApp'],
+    ['Facebook', 'Email'],
+    ['Email', 'SMS'],
+    ['WhatsApp', 'Phone'],
+  ] as const;
+
+  const customerProfiles = useMemo<CustomerProfile[]>(() => snapshot.customers.map((customer, index) => {
+    const campaign = snapshot.campaigns[index % snapshot.campaigns.length];
+    const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
+    const recommendation = snapshot.recommendations[index % snapshot.recommendations.length];
+    const vocInsight = snapshot.vocInsights[index % snapshot.vocInsights.length];
+    const channels = recommendedChannels[index % recommendedChannels.length];
+    const potentialScore = Math.min(96, 68 + customer.totalOrders * 4 + index * 5);
+    const conversionLikelihood = Math.min(94, 54 + customer.totalOrders * 7 + index * 4);
+    const churnRisk = customer.lifecycle === 'at-risk' ? 74 : customer.lifecycle === 'retention' ? 48 : 23;
+    const revenueContribution = Math.max(4, Math.round((customer.totalRevenue / Math.max(1, snapshot.metrics.revenue)) * 100));
+    const segmentLabel = [
+      'Dormant repeat customers',
+      'High-value loyalists',
+      'Recent first-time buyers',
+      'Marketplace expansion buyers',
+    ][index % 4];
+    const nextCategory = ['Refill bundles', 'Desk essentials', 'Creative kits', 'Marketplace packs'][index % 4];
+    const momentum = ['Rising intent', 'Stable demand', 'Reactivation window', 'Cross-sell opening'][index % 4];
+
+    return {
+      ...customer,
+      potentialScore,
+      conversionLikelihood,
+      churnRisk,
+      revenueContribution,
+      segmentLabel,
+      recommendedProduct: campaign.skuCode,
+      recommendedChannels: channels,
+      nextBestAction: play.nextBestAction,
+      reasoning: recommendation?.reasoning || 'Prime AI detected a reachable segment with strong product-fit signals.',
+      target: recommendation?.target || customer.segment,
+      signalSummary: vocInsight?.summary || 'Repeat engagement and catalog activity are recovering in this segment.',
+      nextCategory,
+      momentum,
+    };
+  }), [snapshot]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [lifecycleFilter, setLifecycleFilter] = useState('all');
+  const [channelFilter, setChannelFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('potential');
+  const [selectedCustomerId, setSelectedCustomerId] = useState(customerProfiles[0]?.id ?? '');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const filteredCustomers = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const next = customerProfiles.filter((customer) => {
+      const matchesQuery = !normalizedQuery || [
+        customer.name,
+        customer.company,
+        customer.segment,
+        customer.segmentLabel,
+        customer.signalSummary,
+        customer.nextCategory,
+      ].join(' ').toLowerCase().includes(normalizedQuery);
+      const matchesLifecycle = lifecycleFilter === 'all' || customer.lifecycle === lifecycleFilter;
+      const matchesChannel = channelFilter === 'all' || customer.recommendedChannels.some((channel) => channel.toLowerCase() === channelFilter);
+      return matchesQuery && matchesLifecycle && matchesChannel;
+    });
+
+    next.sort((left, right) => {
+      if (sortBy === 'revenue') return right.totalRevenue - left.totalRevenue;
+      if (sortBy === 'conversion') return right.conversionLikelihood - left.conversionLikelihood;
+      if (sortBy === 'risk') return right.churnRisk - left.churnRisk;
+      return right.potentialScore - left.potentialScore;
+    });
+
+    return next;
+  }, [channelFilter, customerProfiles, lifecycleFilter, searchQuery, sortBy]);
+
+  const selectedCustomer = filteredCustomers.find((customer) => customer.id === selectedCustomerId)
+    ?? customerProfiles.find((customer) => customer.id === selectedCustomerId)
+    ?? filteredCustomers[0]
+    ?? customerProfiles[0];
+
+  const atRiskValue = filteredCustomers
+    .filter((customer) => customer.lifecycle === 'at-risk')
+    .reduce((sum, customer) => sum + customer.totalRevenue, 0);
+  const activationReadiness = filteredCustomers.length
+    ? Math.round(filteredCustomers.reduce((sum, customer) => sum + customer.potentialScore, 0) / filteredCustomers.length)
+    : 0;
+  const repeatPurchasePotential = filteredCustomers.filter((customer) => customer.totalOrders > 1).length;
+  const totalReachableRevenue = filteredCustomers.reduce((sum, customer) => sum + customer.totalRevenue, 0);
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Tracked segments" value={filteredCustomers.length} meta="Compact customer discovery view with shortlist-ready segment rows." icon={<CircleUserRound className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Reachable revenue" value={currency.format(totalReachableRevenue)} meta="Revenue currently inside the filtered customer opportunity set." icon={<TrendingUp className="size-5" />} tone="success" />
+          <SummaryMetricCard label="At-risk value" value={currency.format(atRiskValue)} meta="Revenue exposed if fragile cohorts are not reactivated in time." icon={<BellRing className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Activation readiness" value={`${activationReadiness}%`} meta={`${repeatPurchasePotential} segments already show repeat-order or replenishment behavior.`} icon={<Bot className="size-5" />} tone="purple" />
+        </div>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <CardTitle>Customer search and discovery</CardTitle>
+                  <Badge variant="outline" className="gap-1">
+                    <Sparkles className="size-3" />
+                    Compact decision workspace
+                  </Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">Filter by lifecycle and activation lane, compare customers in one dense table, then open the profile for the full intelligence story.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="gap-1"><SlidersHorizontal className="size-3" /> Query + filters</Badge>
+                <Badge variant="outline" className="gap-1"><HeartHandshake className="size-3" /> Segment scoring</Badge>
+                <Badge variant="outline" className="gap-1"><Bot className="size-3" /> Prime AI drilldown</Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Search query</div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="pl-9" placeholder="Search customer, segment, signal, or product" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Lifecycle</div>
+                <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose lifecycle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All lifecycles</SelectItem>
+                    <SelectItem value="retention">Retention</SelectItem>
+                    <SelectItem value="at-risk">At-risk</SelectItem>
+                    <SelectItem value="new">New</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Channel lane</div>
+                <Select value={channelFilter} onValueChange={setChannelFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose channel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All channels</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sort by</div>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sort customers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="potential">Potential score</SelectItem>
+                    <SelectItem value="conversion">Conversion likelihood</SelectItem>
+                    <SelectItem value="revenue">Revenue</SelectItem>
+                    <SelectItem value="risk">Churn risk</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <div className="rounded-2xl border bg-background p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Active filters</div>
+                    <div className="text-xs text-muted-foreground">Shortlist logic applied to the customer universe.</div>
+                  </div>
+                  <Badge variant="outline">{filteredCustomers.length} matches</Badge>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{lifecycleFilter === 'all' ? 'Mixed lifecycle' : lifecycleFilter}</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{channelFilter === 'all' ? 'Multi-channel' : channelFilter}</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">Readiness {activationReadiness}%</Badge>
+                  <Badge variant="secondary" className="max-w-[220px] truncate px-3 py-1 text-xs font-medium text-muted-foreground">Prime focus: {selectedCustomer?.segmentLabel || 'Highest-fit segment'}</Badge>
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-background p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Prime signal strip</div>
+                    <div className="text-xs text-muted-foreground">A tight snapshot before you open the full segment profile.</div>
+                  </div>
+                  {selectedCustomer ? <Badge>{selectedCustomer.potentialScore}% fit</Badge> : null}
+                </div>
+                {selectedCustomer ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next category</div>
+                      <div className="mt-2 text-sm font-medium">{selectedCustomer.nextCategory}</div>
+                    </div>
+                    <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best channels</div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {selectedCustomer.recommendedChannels.map((channel) => (
+                          <Badge key={`${selectedCustomer.id}-${channel}-signal`} variant={channelTone(channel)}>{channel}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Momentum</div>
+                      <div className="mt-2 text-sm font-medium">{selectedCustomer.momentum}</div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Segment</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Conversion</TableHead>
+                  <TableHead className="text-right">Risk</TableHead>
+                  <TableHead>Channels</TableHead>
+                  <TableHead>Context</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id} className={selectedCustomer?.id === customer.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button
+                        type="button"
+                        className="flex items-center gap-3 text-left"
+                        onClick={() => {
+                          setSelectedCustomerId(customer.id);
+                          setIsDialogOpen(true);
+                        }}
+                      >
+                        <div className="flex size-12 items-center justify-center rounded-2xl border bg-gradient-to-br from-sky-500/15 to-cyan-500/10 text-sm font-semibold text-foreground shadow-sm">
+                          {initials(customer.name)}
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                          <div className="font-semibold text-foreground">{customer.name}</div>
+                          <div className="text-xs text-muted-foreground">{customer.company}</div>
+                          <div className="text-[11px] text-muted-foreground">{customer.lifecycle} lifecycle · {customer.totalOrders} orders</div>
+                        </div>
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium">{customer.segmentLabel}</div>
+                        <div className="text-xs text-muted-foreground">{customer.momentum}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">{currency.format(customer.totalRevenue)}</TableCell>
+                    <TableCell className="text-right">{customer.conversionLikelihood}%</TableCell>
+                    <TableCell className="text-right">{customer.churnRisk}%</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1.5">
+                        {customer.recommendedChannels.map((channel) => (
+                          <Badge key={`${customer.id}-${channel}`} variant={channelTone(channel)}>{channel}</Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[320px]">
+                      <div className="space-y-2">
+                        <p className="line-clamp-2 text-sm text-muted-foreground">{customer.signalSummary}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <Badge variant="outline" className="rounded-full">{customer.nextCategory}</Badge>
+                          <span>SKU: {customer.recommendedProduct}</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => {
+                        setSelectedCustomerId(customer.id);
+                        setIsDialogOpen(true);
+                      }}>
+                        Open profile
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {selectedCustomer ? (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-5xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedCustomer.name}</DialogTitle>
+              <DialogDescription>Customer profile, segment signals, recommended channels, and next-best-action details.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex gap-4">
+                      <div className="flex size-24 items-center justify-center rounded-3xl border bg-gradient-to-br from-sky-500/15 to-cyan-500/10 text-2xl font-semibold shadow-sm">
+                        {initials(selectedCustomer.name)}
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-3xl font-semibold">{selectedCustomer.name}</h3>
+                          <Badge variant="outline">{selectedCustomer.company}</Badge>
+                          <Badge variant="outline" className="capitalize">{selectedCustomer.lifecycle}</Badge>
+                        </div>
+                        <p className="max-w-2xl text-sm text-muted-foreground">{selectedCustomer.reasoning}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">{selectedCustomer.segmentLabel}</Badge>
+                          <Badge variant="outline">Target {selectedCustomer.target}</Badge>
+                          <Badge variant="outline">Potential {selectedCustomer.potentialScore}%</Badge>
+                          <Badge variant="outline">Conversion {selectedCustomer.conversionLikelihood}%</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Button>Send to journey</Button>
+                  </div>
+                </div>
+                <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Decision snapshot</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best move</div>
+                      <div className="mt-2 font-medium">{selectedCustomer.nextBestAction}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended product</div>
+                      <div className="mt-2 font-medium">{selectedCustomer.recommendedProduct}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Expected upside</div>
+                      <div className="mt-2 font-medium">+8-12% reactivation or cross-sell lift</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Tabs defaultValue="overview" className="space-y-4">
+                <TabsList className="h-auto flex-wrap gap-2 bg-transparent p-0">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="signals">Signals</TabsTrigger>
+                  <TabsTrigger value="channels">Channels</TabsTrigger>
+                  <TabsTrigger value="actions">Actions</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricPill label="Revenue" value={currency.format(selectedCustomer.totalRevenue)} />
+                    <MetricPill label="Orders" value={`${selectedCustomer.totalOrders}`} />
+                    <MetricPill label="Contribution" value={`${selectedCustomer.revenueContribution}%`} />
+                    <MetricPill label="Churn risk" value={`${selectedCustomer.churnRisk}%`} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="signals" className="space-y-3">
+                  <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">{selectedCustomer.signalSummary}</div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Momentum</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedCustomer.momentum}</div>
+                    </div>
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next category</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedCustomer.nextCategory}</div>
+                    </div>
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime target</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedCustomer.target}</div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="channels" className="space-y-3">
+                  {selectedCustomer.recommendedChannels.map((channel) => (
+                    <div key={`${selectedCustomer.id}-${channel}-detail`} className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
+                      <div>
+                        <div className="font-medium">{channel}</div>
+                        <div className="text-xs text-muted-foreground">Recommended lane for {selectedCustomer.segmentLabel.toLowerCase()}.</div>
+                      </div>
+                      <Badge variant={channelTone(channel)}>{channel}</Badge>
+                    </div>
+                  ))}
+                </TabsContent>
+
+                <TabsContent value="actions" className="space-y-3">
+                  <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime AI recommendation</div>
+                    <div className="mt-2 font-medium">{selectedCustomer.nextBestAction}</div>
+                    <p className="mt-2 text-sm text-muted-foreground">Lead with {selectedCustomer.recommendedProduct}, sequence {selectedCustomer.recommendedChannels.join(' + ')}, and time the message around the {selectedCustomer.nextCategory.toLowerCase()} window.</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
 
 function socialIcon(icon: 'instagram' | 'youtube' | 'web') {
   if (icon === 'instagram') return <Instagram className="size-3.5" />;
@@ -1707,105 +2104,7 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
   }
 
   if (towerId === 'customers') {
-    const recommendedChannels = [
-      ['TikTok', 'WhatsApp'],
-      ['Facebook', 'Email'],
-      ['Email', 'SMS'],
-      ['WhatsApp', 'Phone'],
-    ] as const;
-    const customerIntelligence = snapshot.customers.map((customer, index) => {
-      const campaign = snapshot.campaigns[index % snapshot.campaigns.length];
-      const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
-      const channels = recommendedChannels[index % recommendedChannels.length];
-      const potentialScore = Math.min(96, 68 + customer.totalOrders * 4 + index * 5);
-
-      return {
-        ...customer,
-        potentialScore,
-        recommendedProduct: campaign.skuCode,
-        recommendedChannels: channels,
-        nextBestAction: play.nextBestAction,
-      };
-    });
-
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Priority customers" value={customerIntelligence.length} meta="Scored by lifecycle, revenue, and campaign response context." icon={<HeartHandshake className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Best product matches" value={snapshot.campaigns.length} meta="Each segment is mapped to the strongest current product push." icon={<Target className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Reach channels" value="5" meta="TikTok, Facebook, email, phone, and WhatsApp are ranked per segment." icon={<MessageCircle className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="AI follow-ups" value={snapshot.activationPlays.length} meta="Outreach recommendations are ready to route into CRM or media actions." icon={<Bot className="size-5" />} tone="purple" />
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Customer list, potential, and product affinity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table variant="embedded">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Segment</TableHead>
-                    <TableHead>Recommended product</TableHead>
-                    <TableHead>Best channels</TableHead>
-                    <TableHead className="text-right">Potential</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {customerIntelligence.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{customer.name}</span>
-                          <span className="text-xs text-muted-foreground">{customer.company}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{customer.segment}</TableCell>
-                      <TableCell>{customer.recommendedProduct}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {customer.recommendedChannels.map((channel) => (
-                            <Badge key={`${customer.id}-${channel}`} variant={channelTone(channel)}>{channel}</Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{customer.potentialScore}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Recommended outreach mix</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {customerIntelligence.slice(0, 4).map((customer) => (
-                <div key={`outreach-${customer.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{customer.name}</span>
-                    <Badge variant="outline">{customer.lifecycle}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">Best product: {customer.recommendedProduct}</p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    {hasChannel(customer.recommendedChannels, 'Email') ? <Badge variant="outline"><Mail className="mr-1 size-3" />Email</Badge> : null}
-                    {hasChannel(customer.recommendedChannels, 'Phone') || hasChannel(customer.recommendedChannels, 'SMS') ? <Badge variant="outline"><Phone className="mr-1 size-3" />Phone / SMS</Badge> : null}
-                    {hasChannel(customer.recommendedChannels, 'WhatsApp') ? <Badge variant="outline"><MessageCircle className="mr-1 size-3" />WhatsApp</Badge> : null}
-                    {hasChannel(customer.recommendedChannels, 'TikTok') ? <Badge variant="outline">TikTok</Badge> : null}
-                    {hasChannel(customer.recommendedChannels, 'Facebook') ? <Badge variant="outline">Facebook</Badge> : null}
-                  </div>
-                  <p className="mt-3 text-sm text-primary">{customer.nextBestAction}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
+    return <CustomerIntelligencePanel />;
   }
 
   if (towerId === 'campaigns') {
