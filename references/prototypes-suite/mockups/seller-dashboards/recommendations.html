@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Recommendations - PrimeOS Seller</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .recommend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .recommend-card { padding: 16px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-surface); }
+    .recommend-priority { display: inline-block; margin-bottom: 8px; }
+    .recommend-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .score-box { text-align: center; padding: 20px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-hover); }
+    .score-value { font-size: 40px; font-weight: 700; color: var(--primary); }
+    .score-label { color: var(--text-secondary); }
+    @media (max-width: 1200px) { .recommend-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;"><div class="sidebar-logo-icon">P</div><div class="sidebar-logo-text">PrimeOS</div></a></div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Seller Workspace</div>
+          <a class="sidebar-link" href="overview.html"><span class="sidebar-link-icon">📊</span><span>Overview</span></a>
+          <a class="sidebar-link" href="products.html"><span class="sidebar-link-icon">📦</span><span>Products</span></a>
+          <a class="sidebar-link" href="orders.html"><span class="sidebar-link-icon">🛍️</span><span>Orders</span></a>
+          <a class="sidebar-link" href="customers.html"><span class="sidebar-link-icon">👤</span><span>Customers</span></a>
+          <a class="sidebar-link" href="ads.html"><span class="sidebar-link-icon">📢</span><span>Ads Manager</span></a>
+          <a class="sidebar-link" href="analytics.html"><span class="sidebar-link-icon">📈</span><span>Analytics</span></a>
+          <a class="sidebar-link active" href="recommendations.html"><span class="sidebar-link-icon">💡</span><span>AI Recommendations</span></a>
+          <a class="sidebar-link" href="settings.html"><span class="sidebar-link-icon">⚙️</span><span>Settings</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn" onclick="window.location.href='../dashboards/primeos.html'">🏢 Admin</button><button type="button" class="role-btn active" onclick="window.location.href='overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">SM</div><div class="sidebar-user-info"><div class="sidebar-user-name">Seller Account</div><div class="sidebar-user-role">Beauty Store Pro</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>Seller</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">AI Recommendations</span></div><div class="header-title">Smart Growth Suggestions</div></div></div>
+        <div class="header-right"><button type="button" class="btn btn-secondary">Dismiss All</button><button type="button" class="btn btn-primary" id="refreshBtn">Generate New</button></div>
+      </header>
+      <main class="content-area">
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Active Suggestions</span></div><div class="stat-value">12</div><div class="stat-comparison">Awaiting your decision</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Accepted This Week</span></div><div class="stat-value">8</div><div class="stat-comparison">67% acceptance rate</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Impact Revenue</span></div><div class="stat-value">+₫126M</div><div class="stat-comparison">From accepted recommendations</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Confidence Avg</span></div><div class="stat-value">84%</div><div class="stat-comparison">Prediction quality score</div></div>
+        </section>
+
+        <div class="recommend-grid">
+          <section class="card">
+            <div class="card-header"><div class="card-title">Top recommendations</div></div>
+            <div class="card-body">
+              <div class="recommend-card">
+                <span class="badge badge-warning recommend-priority">High Priority</span>
+                <strong>Increase price +8% for Serum Refill 30ml</strong>
+                <div>Elasticity model shows demand remains stable up to +10% in current cohort.</div>
+                <div class="recommend-actions"><button type="button" class="btn btn-sm btn-primary">Apply</button><button type="button" class="btn btn-sm btn-secondary">Simulate</button></div>
+              </div>
+              <div class="recommend-card" style="margin-top:12px;">
+                <span class="badge badge-info recommend-priority">Medium</span>
+                <strong>Launch bundle promo at 19:00 - 22:00</strong>
+                <div>Peak conversion window from last 21-day behavior analysis.</div>
+                <div class="recommend-actions"><button type="button" class="btn btn-sm btn-primary">Apply</button><button type="button" class="btn btn-sm btn-ghost">Ignore</button></div>
+              </div>
+              <div class="recommend-card" style="margin-top:12px;">
+                <span class="badge badge-success recommend-priority">Low Risk</span>
+                <strong>Restock Sunscreen SPF50 to 250 units</strong>
+                <div>Projected stock-out in 3 days at current sell-through pace.</div>
+                <div class="recommend-actions"><button type="button" class="btn btn-sm btn-primary">Create PO</button><button type="button" class="btn btn-sm btn-secondary">Schedule</button></div>
+              </div>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-header"><div class="card-title">AI health score</div></div>
+            <div class="card-body">
+              <div class="score-box"><div class="score-value">84</div><div class="score-label">Model Confidence</div></div>
+              <table class="data-table" style="margin-top:16px;">
+                <thead><tr><th>Model</th><th>Accuracy</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td>Pricing Optimizer</td><td>86%</td><td><span class="badge badge-success">Healthy</span></td></tr>
+                  <tr><td>Demand Forecast</td><td>82%</td><td><span class="badge badge-success">Healthy</span></td></tr>
+                  <tr><td>Churn Predictor</td><td>79%</td><td><span class="badge badge-warning">Monitor</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>PrimeOSDashboard.init({module:"recommendations",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"}})</script>
+</body>
+</html>

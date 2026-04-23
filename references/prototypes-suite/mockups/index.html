@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS Dashboard Suite</title>
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .suite-hero {
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      border-radius: var(--radius-xl);
+      padding: 36px;
+      color: white;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .suite-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
+
+    .suite-title {
+      font-size: clamp(34px, 4vw, 54px);
+      line-height: 1.05;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 12px;
+    }
+
+    .suite-desc {
+      max-width: 900px;
+      font-size: 16px;
+      line-height: 1.7;
+      opacity: 0.95;
+      margin: 0;
+    }
+
+    .role-switcher {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .role-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 24px;
+      border-radius: var(--radius-lg);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid var(--border-light);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+    }
+
+    .role-btn:hover {
+      border-color: var(--border-focus);
+      background: var(--bg-hover);
+    }
+
+    .role-btn.active {
+      border-color: var(--primary);
+      background: var(--primary-subtle);
+      color: var(--primary);
+    }
+
+    .role-btn-icon {
+      font-size: 20px;
+    }
+
+    .suite-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .suite-card {
+      text-decoration: none;
+      color: inherit;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      min-height: 188px;
+    }
+
+    .suite-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-focus);
+    }
+
+    .suite-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .suite-card.admin .suite-icon { background: var(--primary-subtle); }
+    .suite-card.seller .suite-icon { background: var(--success-subtle); }
+
+    .suite-card h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .suite-card p {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.62;
+      flex: 1;
+    }
+
+    .suite-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .suite-tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--bg-hover);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-light);
+    }
+
+    .suite-tag.admin { background: var(--primary-light); color: var(--primary); border-color: #bfdbfe; }
+    .suite-tag.seller { background: var(--success-light); color: var(--success); border-color: #a7f3d0; }
+
+    .suite-open {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .dashboard-section { display: none; }
+    .dashboard-section.active { display: block; }
+
+    @media (max-width: 1280px) { .suite-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 900px) { .suite-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .suite-hero { padding: 24px; } }
+    @media (max-width: 640px) { .suite-grid { grid-template-columns: 1fr; } .suite-title { font-size: 34px; } }
+  </style>
+</head>
+<body>
+  <div class="content-area">
+    <section class="suite-hero">
+      <div class="suite-eyebrow">PrimeOS Lark-style Workspace</div>
+      <h1 class="suite-title">Dashboard Suite</h1>
+      <p class="suite-desc">
+        Chọn vai trò để xem dashboard tương ứng. Admin dùng cho internal team vận hành, Seller dùng cho merchant/brand quản lý shop của mình.
+      </p>
+    </section>
+
+    <div class="role-switcher">
+      <button type="button" class="role-btn active" onclick="switchRole('admin')">
+        <span class="role-btn-icon">🏢</span>
+        <span>Admin / Internal Team</span>
+      </button>
+      <button type="button" class="role-btn" onclick="switchRole('seller')">
+        <span class="role-btn-icon">🏪</span>
+        <span>Seller / Merchant</span>
+      </button>
+    </div>
+
+    <section id="adminSection" class="dashboard-section active">
+      <section class="suite-grid">
+        <a class="suite-card admin" href="dashboards/social-listening.html">
+          <div class="suite-icon">📡</div>
+          <h2>Social Listening</h2>
+          <p>Signal intelligence: sentiment stream, keyword cluster, issue escalation, geo heat distribution.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 01</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="dashboards/kol.html">
+          <div class="suite-icon">🎯</div>
+          <h2>KOL</h2>
+          <p>Creator ops: livestream conversion, scorecards, booking queue, audience overlap analysis.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 02</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="dashboards/ads.html">
+          <div class="suite-icon">📈</div>
+          <h2>ADS</h2>
+          <p>Media control: spend pacing, campaign health, fatigue alerts, budget reallocation.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 03</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="dashboards/primeos.html">
+          <div class="suite-icon">🧠</div>
+          <h2>PrimeOS</h2>
+          <p>Decision orchestration: unified events, policy engine, command queue, audit timeline.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 04</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="dashboards/crm.html">
+          <div class="suite-icon">👥</div>
+          <h2>CRM</h2>
+          <p>Customer command center: 360 profiles, segmentation, retention playbooks, contact workflow.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 05</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="dashboards/pos.html">
+          <div class="suite-icon">🛒</div>
+          <h2>POS</h2>
+          <p>Store execution: checkout analytics, promo sync, store alerts, staff guidance.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 06</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="dashboards/cos.html">
+          <div class="suite-icon">🧩</div>
+          <h2>COS</h2>
+          <p>Commerce ops: inventory flow, listing, fulfillment, channel orchestration.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Module 07</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card admin" href="../primeos-architecture.html">
+          <div class="suite-icon">🗺️</div>
+          <h2>Architecture Map</h2>
+          <p>Sơ đồ kiến trúc PrimeOS - click node để mở dashboard tương ứng.</p>
+          <div class="suite-meta"><span class="suite-tag admin">Navigation</span><span class="suite-open">Open →</span></div>
+        </a>
+      </section>
+    </section>
+
+    <section id="sellerSection" class="dashboard-section">
+      <section class="suite-grid">
+        <a class="suite-card seller" href="seller-dashboards/overview.html">
+          <div class="suite-icon">📊</div>
+          <h2>Overview</h2>
+          <p>Tổng quan shop: GMV, orders, customers, performance metrics theo ngày/tuần/tháng.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 01</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/products.html">
+          <div class="suite-icon">📦</div>
+          <h2>Products</h2>
+          <p>Quản lý sản phẩm: inventory, pricing, listing status, SKU performance, marketplace sync.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 02</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/orders.html">
+          <div class="suite-icon">🛍️</div>
+          <h2>Orders</h2>
+          <p>Quản lý đơn hàng: fulfillment status, returns, shipping, order details theo kênh.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 03</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/customers.html">
+          <div class="suite-icon">👤</div>
+          <h2>Customers</h2>
+          <p>Hồ sơ khách hàng: purchase history, loyalty tier, segmentation, communication log.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 04</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/ads.html">
+          <div class="suite-icon">📢</div>
+          <h2>Ads Manager</h2>
+          <p>Quản lý ads: campaign performance, spend tracking, ROAS, audience targeting insights.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 05</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/analytics.html">
+          <div class="suite-icon">📈</div>
+          <h2>Analytics</h2>
+          <p>Báo cáo chi tiết: sales trends, traffic sources, conversion funnel, product heatmap.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 06</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/recommendations.html">
+          <div class="suite-icon">💡</div>
+          <h2>AI Recommendations</h2>
+          <p>Gợi ý thông minh: pricing, listing, inventory, promo timing dựa trên data và market signals.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 07</span><span class="suite-open">Open →</span></div>
+        </a>
+
+        <a class="suite-card seller" href="seller-dashboards/settings.html">
+          <div class="suite-icon">⚙️</div>
+          <h2>Settings</h2>
+          <p>Cài đặt shop: profile, payment, shipping, notifications, team members, integrations.</p>
+          <div class="suite-meta"><span class="suite-tag seller">Dashboard 08</span><span class="suite-open">Open →</span></div>
+        </a>
+      </section>
+    </section>
+  </div>
+
+  <script>
+    function switchRole(role) {
+      const roleButtons = document.querySelectorAll('.role-btn')
+      roleButtons.forEach((btn) => {
+        btn.classList.remove('active')
+      })
+
+      const activeButton = document.querySelector(`.role-btn[onclick="switchRole('${role}')"]`)
+      if (activeButton) {
+        activeButton.classList.add('active')
+      }
+
+      document.getElementById('adminSection').classList.toggle('active', role === 'admin')
+      document.getElementById('sellerSection').classList.toggle('active', role === 'seller')
+    }
+  </script>
+</body>
+</html>

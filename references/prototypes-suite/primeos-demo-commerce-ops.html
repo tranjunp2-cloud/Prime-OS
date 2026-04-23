@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS Demo - Commerce Operations</title>
+  <style>
+    :root {
+      --bg: #07111d;
+      --panel: rgba(9, 17, 29, 0.9);
+      --panel-strong: rgba(5, 11, 21, 0.96);
+      --border: rgba(77, 98, 119, 0.46);
+      --text: #e7eef6;
+      --muted: #97aabd;
+      --emerald: #34d399;
+      --cyan: #22d3ee;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(52, 211, 153, 0.08), transparent 24%),
+        radial-gradient(circle at bottom left, rgba(34, 211, 238, 0.08), transparent 26%),
+        linear-gradient(180deg, #08111d 0%, #020712 100%);
+      padding: 22px;
+    }
+
+    .page {
+      width: min(96vw, 1680px);
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero,
+    .panel {
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 26px 30px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--emerald);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 920px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.72;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .hero-stat {
+      padding: 16px;
+      border-radius: 20px;
+      background: rgba(8, 14, 26, 0.86);
+      border: 1px solid rgba(77, 98, 119, 0.32);
+    }
+
+    .hero-stat strong {
+      display: block;
+      font-size: 28px;
+      letter-spacing: -0.05em;
+      margin-bottom: 6px;
+    }
+
+    .hero-stat span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .panel-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid rgba(77, 98, 119, 0.28);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .content {
+      padding: 18px 22px 22px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .stack-item {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.56);
+      border: 1px solid rgba(77, 98, 119, 0.3);
+    }
+
+    .stack-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .stack-item span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.62;
+    }
+
+    .subgrid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .table {
+      display: grid;
+      gap: 10px;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 70px;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(8, 14, 26, 0.82);
+      border: 1px solid rgba(77, 98, 119, 0.26);
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .good { color: #d9f99d; background: rgba(22, 163, 74, 0.18); }
+    .warn { color: #fde68a; background: rgba(180, 83, 9, 0.2); }
+    .info { color: #baf7ff; background: rgba(8, 145, 178, 0.18); }
+    .risk { color: #ffd1db; background: rgba(159, 18, 57, 0.2); }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 1200px) {
+      .hero,
+      .layout,
+      .subgrid,
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Demo Page 03</div>
+        <h1>Commerce Operations Lane</h1>
+        <p>
+          Trang này mô phỏng phần Destination & Operations trong kiến trúc PrimeOS: CRM giữ customer memory,
+          POS vận hành giao dịch và COS thực thi tồn kho, listing, fulfillment trên nhiều kênh như một lane thống nhất.
+        </p>
+      </div>
+      <div class="hero-grid">
+        <div class="hero-stat"><strong>4.8K</strong><span>orders synchronized giữa cửa hàng, web và marketplace trong ngày</span></div>
+        <div class="hero-stat"><strong>97%</strong><span>inventory accuracy sau khi COS reconcile stock delta</span></div>
+        <div class="hero-stat"><strong>31m</strong><span>thời gian trung bình từ order đến fulfillment-ready</span></div>
+        <div class="hero-stat"><strong>18%</strong><span>uplift repeat rate nhờ CRM retention trigger từ PrimeOS</span></div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>CRM Command Center</h2>
+          <p>Customer profile, loyalty signal và playbook retention được đồng bộ từ control tower.</p>
+        </div>
+        <div class="content">
+          <div class="stack-item">
+            <strong>Customer 360 snapshot</strong>
+            <span>VIP-2 / female / HCMC / repeat cadence 21 days / preferred channel: Zalo + store pickup.</span>
+          </div>
+          <div class="stack-item">
+            <strong>Behavioral trigger</strong>
+            <span>Complaint tag từ social listening được gắn vào hồ sơ, tự động chuyển sang playbook win-back thay vì generic promo.</span>
+          </div>
+          <div class="stack-item">
+            <strong>Next best action</strong>
+            <span>Gửi tư vấn bundle refill + hotline note cho store staff trước khi customer quay lại cửa hàng.</span>
+          </div>
+          <div class="stack-item">
+            <strong>Loyalty impact</strong>
+            <span>Projected repeat probability tăng từ 43% lên 57% nếu giữ được phản hồi trong 24 giờ.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>POS Live Floor</h2>
+          <p>Điểm bán nhận lệnh giá, promo và guidance để đảm bảo frontline phản hồi đồng nhất.</p>
+        </div>
+        <div class="content">
+          <div class="table">
+            <div class="table-row"><strong>Store A12</strong><span>Combo serum + refill đã được publish lại sau pricing incident.</span><span class="badge good">Synced</span></div>
+            <div class="table-row"><strong>Store B07</strong><span>Checkout script mới cho staff đang chạy trên tablet POS.</span><span class="badge info">Live</span></div>
+            <div class="table-row"><strong>Store C18</strong><span>Traffic cao bất thường, PrimeOS đề xuất chuyển thêm hàng từ hub gần nhất.</span><span class="badge warn">Watch</span></div>
+            <div class="table-row"><strong>Store D03</strong><span>Conversion giảm do out-of-stock màu best seller, cần COS xử lý.</span><span class="badge risk">Risk</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>COS Execution Board</h2>
+          <p>Khối vận hành commerce xử lý listing, inventory allocation, fulfillment và channel sync.</p>
+        </div>
+        <div class="content">
+          <div class="stack-item">
+            <strong>Inventory reallocation</strong>
+            <span>Chuyển 120 units từ warehouse east sang 3 điểm bán đang có demand spike.</span>
+          </div>
+          <div class="stack-item">
+            <strong>Marketplace guard</strong>
+            <span>Tạm giảm exposure ở marketplace cho SKU low-stock để tránh oversell và late fulfillment.</span>
+          </div>
+          <div class="stack-item">
+            <strong>Fulfillment routing</strong>
+            <span>67% đơn hàng được route về micro-fulfillment node gần khách hàng nhất để giảm SLA giao.</span>
+          </div>
+          <div class="stack-item">
+            <strong>Listing operations</strong>
+            <span>Auto refresh nội dung product card theo narrative mới từ PrimeOS campaign brief.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>End-to-End Order Story</h2>
+        <p>Một ví dụ luồng vận hành đầy đủ giữa CRM, POS và COS sau khi PrimeOS phát lệnh.</p>
+      </div>
+      <div class="content subgrid">
+        <div class="table">
+          <div class="table-row"><strong>12:43</strong><span>CRM nhận customer risk flag từ control tower và cập nhật hồ sơ chăm sóc.</span><span class="badge info">CRM</span></div>
+          <div class="table-row"><strong>12:46</strong><span>POS publish combo pricing mới đến các cửa hàng tier-1.</span><span class="badge good">POS</span></div>
+          <div class="table-row"><strong>12:48</strong><span>COS khóa marketplace exposure cho SKU thiếu hàng tại miền Nam.</span><span class="badge warn">COS</span></div>
+          <div class="table-row"><strong>12:52</strong><span>Order mới được route về hub gần nhất, ETA giao giảm 5 giờ.</span><span class="badge good">Flow</span></div>
+        </div>
+        <div class="stack-item">
+          <strong>Operating principle</strong>
+          <span>
+            Lane này không chỉ là nơi “nhận lệnh” từ PrimeOS, mà là nơi các hệ thống thực thi có phản hồi ngược lại thành order truth,
+            customer truth và inventory truth để vòng lặp dữ liệu được đóng kín.
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer-note">Standalone demo page cho lane CRM, POS và COS.</div>
+  </div>
+</body>
+</html>

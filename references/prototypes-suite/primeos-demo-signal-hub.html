@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS Demo - Signal Intelligence Hub</title>
+  <style>
+    :root {
+      --bg: #07111d;
+      --panel: rgba(8, 16, 28, 0.88);
+      --panel-strong: rgba(6, 12, 22, 0.96);
+      --border: rgba(77, 98, 119, 0.46);
+      --text: #e5edf6;
+      --muted: #95a7bb;
+      --cyan: #22d3ee;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --lime: #a3e635;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(34, 211, 238, 0.1), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.08), transparent 26%),
+        linear-gradient(180deg, #08111d 0%, #020712 100%);
+      padding: 22px;
+    }
+
+    .page {
+      width: min(96vw, 1640px);
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero,
+    .panel {
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 1.3fr 0.7fr;
+      gap: 18px;
+      align-items: end;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      color: var(--muted);
+      max-width: 860px;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-chip {
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(77, 98, 119, 0.42);
+      background: rgba(15, 23, 42, 0.64);
+    }
+
+    .action-chip strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--amber);
+    }
+
+    .action-chip span {
+      color: #dce6f0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 18px;
+    }
+
+    .panel-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid rgba(77, 98, 119, 0.28);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .content {
+      padding: 18px 22px 22px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.66);
+      border: 1px solid rgba(77, 98, 119, 0.3);
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+    }
+
+    .metric-sub {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #dbe6f1;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    .list-card,
+    .stream-card,
+    .chart-card {
+      border-radius: 22px;
+      border: 1px solid rgba(77, 98, 119, 0.3);
+      background: rgba(15, 23, 42, 0.58);
+      padding: 16px;
+    }
+
+    .card-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .chart-bars {
+      display: grid;
+      gap: 10px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 54px;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .bar-track {
+      height: 11px;
+      border-radius: 999px;
+      background: rgba(51, 65, 85, 0.72);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--lime));
+    }
+
+    .signal-list,
+    .feed-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .signal-item,
+    .feed-item {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(7, 12, 24, 0.8);
+      border: 1px solid rgba(77, 98, 119, 0.25);
+    }
+
+    .signal-top,
+    .feed-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .rose { color: #ffd1db; background: rgba(159, 18, 57, 0.22); }
+    .amber { color: #fde68a; background: rgba(180, 83, 9, 0.22); }
+    .cyan { color: #baf7ff; background: rgba(8, 145, 178, 0.2); }
+    .lime { color: #ecfccb; background: rgba(77, 124, 15, 0.2); }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .command-queue {
+      display: grid;
+      gap: 12px;
+    }
+
+    .command {
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(77, 98, 119, 0.32);
+      background: rgba(8, 14, 26, 0.82);
+    }
+
+    .command strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .command span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 1080px) {
+      .hero,
+      .layout,
+      .grid-2,
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Demo Page 01</div>
+        <h1>Signal Intelligence Hub</h1>
+        <p>
+          Trang demo này mô phỏng khối Amplifier & Listening trong `primeos-architecture.html`: thu tín hiệu từ creator,
+          paid media và social community, sau đó chuẩn hóa thành insight có thể đẩy tiếp vào PrimeOS control tower.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <div class="action-chip">
+          <strong>Realtime loop</strong>
+          <span>Mention stream, CTR delta, campaign anomaly và creator uplift cùng đổ về một luồng quyết định.</span>
+        </div>
+        <div class="action-chip">
+          <strong>Operator goal</strong>
+          <span>Rút ngắn thời gian từ tín hiệu thị trường sang hành động growth chỉ còn vài phút.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Campaign Pulse</h2>
+          <p>Tổng hợp hiệu quả KOL, paid media và social mention trong cùng một nhịp nhìn.</p>
+        </div>
+        <div class="content">
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-label">Live Mentions</div>
+              <div class="metric-value">18.4K</div>
+              <div class="metric-sub">+22% vs yesterday</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Sentiment Score</div>
+              <div class="metric-value">74</div>
+              <div class="metric-sub">Stable positive trend</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Creator Uplift</div>
+              <div class="metric-value">2.8x</div>
+              <div class="metric-sub">Top KOL vs baseline</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Ad Efficiency</div>
+              <div class="metric-value">-14%</div>
+              <div class="metric-sub">CAC improved after audience shift</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="chart-card">
+              <h3 class="card-title">Channel Signal Strength</h3>
+              <div class="chart-bars">
+                <div class="bar-row"><span>TikTok Live</span><div class="bar-track"><div class="bar-fill" style="width: 91%"></div></div><strong>91</strong></div>
+                <div class="bar-row"><span>Facebook Ads</span><div class="bar-track"><div class="bar-fill" style="width: 76%"></div></div><strong>76</strong></div>
+                <div class="bar-row"><span>Zalo OA</span><div class="bar-track"><div class="bar-fill" style="width: 58%"></div></div><strong>58</strong></div>
+                <div class="bar-row"><span>YouTube Shorts</span><div class="bar-track"><div class="bar-fill" style="width: 69%"></div></div><strong>69</strong></div>
+                <div class="bar-row"><span>Threads / X</span><div class="bar-track"><div class="bar-fill" style="width: 44%"></div></div><strong>44</strong></div>
+              </div>
+            </div>
+
+            <div class="list-card">
+              <h3 class="card-title">Top Anomalies</h3>
+              <ul class="signal-list">
+                <li class="signal-item">
+                  <div class="signal-top"><strong>Price complaint spike</strong><span class="pill rose">Critical</span></div>
+                  <div class="muted">SKU serum 30ml tăng 3.2x negative comment sau livestream 11:20.</div>
+                </li>
+                <li class="signal-item">
+                  <div class="signal-top"><strong>KOL conversion breakout</strong><span class="pill lime">Opportunity</span></div>
+                  <div class="muted">Creator Hana đem về CVR 7.4%, cao hơn cluster beauty average 2.1x.</div>
+                </li>
+                <li class="signal-item">
+                  <div class="signal-top"><strong>Paid audience fatigue</strong><span class="pill amber">Watch</span></div>
+                  <div class="muted">Lookalike 5% trên Meta bắt đầu tăng CPC 18% sau 36 giờ.</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Insight Stream</h2>
+          <p>Chuỗi insight đã chuẩn hóa để gửi sang PrimeOS decision engine.</p>
+        </div>
+        <div class="content">
+          <div class="stream-card" style="margin-bottom: 14px;">
+            <h3 class="card-title">Live Feed</h3>
+            <ul class="feed-list">
+              <li class="feed-item">
+                <div class="feed-top"><strong>12:40</strong><span class="pill cyan">Social</span></div>
+                <div class="muted">Sentiment của nhóm “new moms” tăng mạnh quanh cụm từ “gentle formula”.</div>
+              </li>
+              <li class="feed-item">
+                <div class="feed-top"><strong>12:36</strong><span class="pill amber">Ads</span></div>
+                <div class="muted">Ad set retargeting video 15s giảm CPA 11% khi dùng message “restock now”.</div>
+              </li>
+              <li class="feed-item">
+                <div class="feed-top"><strong>12:31</strong><span class="pill lime">KOL</span></div>
+                <div class="muted">Creator shortlist được đề xuất cho tuần tới dựa trên overlap audience với CRM VIP-2.</div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="command-queue">
+            <div class="command">
+              <strong>Recommended next action: refresh promo narrative</strong>
+              <span>PrimeOS có thể ưu tiên thay thông điệp chiến dịch sang “gentle + refill ready” cho cohort new moms trong 2 giờ tới.</span>
+            </div>
+            <div class="command">
+              <strong>Recommended next action: shift creator budget</strong>
+              <span>Tăng 18% booking budget cho creator Hana và giảm spend ở creator tier-3 đang dưới threshold CVR.</span>
+            </div>
+            <div class="command">
+              <strong>Recommended next action: sync complaint reason</strong>
+              <span>Đẩy complaint tag “pricing confusion” sang CRM và POS để frontline có script phản hồi thống nhất.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer-note">Standalone demo page cho lane Amplifier & Listening.</div>
+  </div>
+</body>
+</html>

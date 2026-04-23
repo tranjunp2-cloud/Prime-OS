@@ -9,7 +9,7 @@ beforeAll(async () => {
 
 describe('copilot prompt matrix smoke', () => {
   const order = () => {
-    const candidate = getOrders().find((item) => /ech-[a-z]{2}-\d{4}/i.test(item.order_id));
+    const candidate = getOrders().find((item) => /prime-[a-z]{2,4}-\d{4}/i.test(item.order_id));
     if (!candidate) {
       throw new Error('Missing seeded order for prompt matrix');
     }
@@ -36,7 +36,7 @@ describe('copilot prompt matrix smoke', () => {
     {
       label: 'products draft request',
       pathname: '/products',
-      prompt: 'Tạo product mới tên "Compact Lamp" brand "ECH" sku ECH-LAMP-001',
+      prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001',
       expectedIntent: 'write_draft',
       expectedDomain: 'product',
       expectedActionIncludes: '/products/new?',

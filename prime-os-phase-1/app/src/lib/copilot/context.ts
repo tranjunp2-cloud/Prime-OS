@@ -30,7 +30,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_PROMPTS = [
   { label: 'Đơn pending', prompt: 'Cho mình danh sách order đang pending' },
   { label: 'Đang giao', prompt: 'Tóm tắt queue shipping hiện tại' },
-  { label: 'Tạo product', prompt: 'Tạo product mới tên "Travel Organizer" brand "ECH" sku ECH-TRAVEL-ORG-01' },
+  { label: 'Tạo product', prompt: 'Tạo product mới tên "Travel Organizer" brand "PrimeOS" sku PRIME-TRAVEL-ORG-01' },
   { label: 'Sang Inventory', prompt: 'Tại sao inventory copilot tách riêng?' },
 ];
 
@@ -268,7 +268,7 @@ function createProductsSummary(): CopilotContextSummary {
     citations: ['Current route: /products', 'Source: product-store'],
     quickPrompts: [
       { label: 'Tóm tắt product', prompt: 'Tóm tắt product master hiện tại' },
-      { label: 'Tạo mới', prompt: 'Tạo product mới tên "Compact Desk Lamp" brand "ECH" sku ECH-LAMP-001' },
+      { label: 'Tạo mới', prompt: 'Tạo product mới tên "Compact Desk Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
       { label: 'Đang draft', prompt: 'Có bao nhiêu product đang ở draft?' },
       { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
     ],
@@ -394,7 +394,7 @@ function createListingsSummary(): CopilotContextSummary {
     quickPrompts: [
       { label: 'Theo kênh', prompt: 'Tóm tắt listing theo channel hiện tại' },
       { label: 'Về Products', prompt: 'Mở lại product master' },
-      { label: 'Listings để làm gì?', prompt: 'Channel layer trong ECH dùng để làm gì?' },
+      { label: 'Listings để làm gì?', prompt: 'Channel layer trong PrimeOS dùng để làm gì?' },
       { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
     ],
   };
@@ -543,7 +543,7 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
       insight: 'Assistant có thể chuẩn bị query-prefill cho form create này.',
       citations: ['Current route: /products/new'],
       quickPrompts: [
-        { label: 'Tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "ECH" sku ECH-LAMP-001' },
+        { label: 'Tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
         { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
         { label: 'Về Products', prompt: 'Mở lại products' },
         { label: 'Bạn xử lý sao?', prompt: 'Assistant đang chạy safety model nào?' },
@@ -721,7 +721,7 @@ function summarizeProduct(product: Product): CopilotResponse {
 }
 
 function findOrderFromMessage(message: string) {
-  const exactRef = message.match(/ech-[a-z]{2}-\d{4}/i)?.[0];
+  const exactRef = message.match(/(?:ech|prime)-[a-z]{2,4}-\d{4}/i)?.[0];
 
   if (exactRef) {
     return getOrders().find((order) => order.order_id.toLowerCase() === exactRef.toLowerCase());
@@ -988,7 +988,7 @@ function slugToSku(title: string) {
     .slice(0, 4)
     .map((token) => token.toUpperCase());
 
-  return `ECH-${tokens.join('-') || 'DRAFT'}`;
+  return `PRIME-${tokens.join('-') || 'DRAFT'}`;
 }
 
 function extractField(content: string, patterns: RegExp[]) {
@@ -1043,7 +1043,7 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       citations: ['Product create page supports URL-based prefill'],
       followUpPrompts: [
         { label: 'Mở form create', prompt: 'Mở form tạo product mới' },
-        { label: 'Ví dụ tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "ECH" sku ECH-LAMP-001' },
+        { label: 'Ví dụ tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
       ],
       actions: [
         {
@@ -1077,7 +1077,7 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       'Target flow: /products/new query-prefill',
     ],
     followUpPrompts: [
-      { label: 'Mở draft product', prompt: `Tạo product mới tên "${title || 'Compact Lamp'}" brand "${brand || 'ECH'}" sku ${resolvedSku}` },
+      { label: 'Mở draft product', prompt: `Tạo product mới tên "${title || 'Compact Lamp'}" brand "${brand || 'PrimeOS'}" sku ${resolvedSku}` },
       { label: 'Về Products', prompt: 'Mở lại products' },
     ],
     actions: [
@@ -1189,7 +1189,7 @@ function summarizeProductsIndex() {
     intent: 'read' as const,
     citations: ['Source: product-store'],
     followUpPrompts: [
-      { label: 'Tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "ECH" sku ECH-LAMP-001' },
+      { label: 'Tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
       { label: 'Đang draft', prompt: 'Có bao nhiêu product đang ở draft?' },
       { label: 'Mở Products', prompt: 'Mở lại products' },
     ],

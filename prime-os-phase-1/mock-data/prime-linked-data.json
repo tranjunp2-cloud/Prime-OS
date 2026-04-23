@@ -1,5 +1,5 @@
 {
-  "sourceOfTruth": "/Users/admin/Desktop/SME_ECH/SME_ECH_V1.0/frontend",
+  "sourceOfTruth": "legacy-cos-frontend",
   "runtimeAdapter": "app/src/lib/prime/prime-data.ts",
   "principle": "COS mock data is the backbone; generated Prime entities must link back to COS product, SKU, order, inventory, fulfillment, return, or event context.",
   "relationships": {

@@ -30,6 +30,7 @@ export interface PrimeNavNode {
   label: string;
   kind: PrimeNavKind;
   href?: string;
+  external?: boolean;
   matchPaths?: string[];
   icon?: LucideIcon;
   badge?: string;
@@ -68,10 +69,10 @@ export const primeNavigation: PrimeNavNode[] = [
       },
       {
         id: 'campaigns',
-        label: 'Campaigns',
+        label: 'Launch Decisions',
         kind: 'tower',
-        href: '/intelligence/campaigns',
-        matchPaths: ['/intelligence/alerts'],
+        href: '/intelligence/launch-decisions',
+        matchPaths: ['/intelligence/campaigns', '/intelligence/alerts'],
         icon: PanelsTopLeft,
       },
     ],
@@ -84,14 +85,15 @@ export const primeNavigation: PrimeNavNode[] = [
     children: [
       {
         id: 'commerce-surface',
-        label: 'Commerce Surface',
+        label: 'COS',
         kind: 'tower',
-        href: '/ecom/commerce-surface',
+        href: 'https://client-portal.bdskhudong.com/auth',
+        external: true,
         icon: Store,
       },
       {
         id: 'cos',
-        label: 'COS',
+        label: 'COS Analysis',
         kind: 'tower',
         href: '/ecom/cos/product-master',
         matchPaths: ['/ecom/cos'],
@@ -179,22 +181,29 @@ export const primeNavigation: PrimeNavNode[] = [
         id: 'capital',
         label: 'Capital Readiness',
         kind: 'tower',
-        href: '/finance/capital',
+        href: '/finance/capital-readiness',
         icon: CircleDollarSign,
       },
       {
-        id: 'lending',
-        label: 'Lending & Partner Flow',
+        id: 'offers',
+        label: 'Capital Offers',
         kind: 'tower',
-        href: '/finance/lending',
+        href: '/finance/capital-offers',
         icon: ClipboardList,
       },
       {
         id: 'risk',
-        label: 'Risk & Trust Layer',
+        label: 'Risk & Trust',
         kind: 'tower',
-        href: '/finance/risk',
+        href: '/finance/risk-trust',
         icon: Gauge,
+      },
+      {
+        id: 'settlement',
+        label: 'Settlement & Repayment',
+        kind: 'tower',
+        href: '/finance/settlement-repayment',
+        icon: Workflow,
       },
     ],
   },

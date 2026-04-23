@@ -29,7 +29,7 @@ describe('useGlobalCopilotEngine', () => {
     });
 
     expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0].content).toContain('Mình sẵn sàng rồi.');
+    expect(result.current.messages[0].content).toContain('context của Orders');
     expect(result.current.messages[0].followUpPrompts?.length).toBeGreaterThan(0);
     expect(result.current.quickPrompts.some((item) => item.label === 'Đơn pending')).toBe(true);
   });
@@ -44,13 +44,13 @@ describe('useGlobalCopilotEngine', () => {
     });
 
     await act(async () => {
-      await result.current.sendMessage('Tạo product mới tên "Compact Lamp" brand "ECH" sku ECH-LAMP-001');
+      await result.current.sendMessage('Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001');
     });
 
     const lastMessage = result.current.messages[result.current.messages.length - 1];
     expect(lastMessage.intent).toBe('write_draft');
     expect(lastMessage.actions?.[0]?.url).toContain('/products/new?');
-    expect(lastMessage.actions?.[0]?.url).toContain('sku=ECH-LAMP-001');
+    expect(lastMessage.actions?.[0]?.url).toContain('sku=PRIME-LAMP-001');
     expect(lastMessage.content).toContain('product draft');
   });
 
@@ -76,7 +76,7 @@ describe('useGlobalCopilotEngine', () => {
   });
 
   it('keeps lightweight memory for follow-up questions about the same order', async () => {
-    const order = getOrders().find((candidate) => /ech-[a-z]{2}-\d{4}/i.test(candidate.order_id));
+    const order = getOrders().find((candidate) => /prime-[a-z]{2,4}-\d{4}/i.test(candidate.order_id));
     if (!order) {
       throw new Error('Missing seeded assistant QA order');
     }

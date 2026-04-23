@@ -198,7 +198,7 @@ export function GlobalCopilotChatThread({
       {messages.length === 0 && !isProcessing && (
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
           <Bot className="size-12 mb-4 opacity-50" />
-          <p className="text-sm">Bắt đầu hỏi để dùng ECH Assistant</p>
+          <p className="text-sm">Bắt đầu hỏi để dùng PrimeOS Assistant</p>
         </div>
       )}
     </div>

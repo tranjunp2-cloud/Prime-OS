@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Social Listening - PrimeOS</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    .content-stack {
+      display: grid;
+      gap: 20px;
+    }
+
+    .insight-panel {
+      display: grid;
+      gap: 12px;
+    }
+
+    .insight-item {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-light);
+      background: var(--bg-surface);
+    }
+
+    .keyword-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .keyword-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 80px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .stream-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .stream-item {
+      padding: 14px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+    }
+
+    .stream-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .stream-time {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      font-weight: 600;
+    }
+
+    .map-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .map-card {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-light);
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;">
+          <div class="sidebar-logo-icon">P</div>
+          <div class="sidebar-logo-text">PrimeOS</div>
+        </a>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Dashboard Suite</div>
+          <a class="sidebar-link active" href="social-listening.html" data-module="social-listening"><span class="sidebar-link-icon">📡</span><span>Social Listening</span></a>
+          <a class="sidebar-link" href="kol.html" data-module="kol"><span class="sidebar-link-icon">🎯</span><span>KOL</span></a>
+          <a class="sidebar-link" href="ads.html" data-module="ads"><span class="sidebar-link-icon">📈</span><span>ADS</span></a>
+          <a class="sidebar-link" href="primeos.html" data-module="primeos"><span class="sidebar-link-icon">🧠</span><span>PrimeOS</span></a>
+          <a class="sidebar-link" href="crm.html" data-module="crm"><span class="sidebar-link-icon">👥</span><span>CRM</span></a>
+          <a class="sidebar-link" href="pos.html" data-module="pos"><span class="sidebar-link-icon">🛒</span><span>POS</span></a>
+          <a class="sidebar-link" href="cos.html" data-module="cos"><span class="sidebar-link-icon">🧩</span><span>COS</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn active" onclick="window.location.href='primeos.html'">🏢 Admin</button><button type="button" class="role-btn" onclick="window.location.href='../seller-dashboards/overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">SL</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Signal Ops</div>
+          <div class="sidebar-user-role">Listening Team</div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left">
+          <div>
+            <div class="header-breadcrumb">
+              <span>PrimeOS</span>
+              <span class="header-breadcrumb-sep">/</span>
+              <span class="header-breadcrumb-current">Social Listening</span>
+            </div>
+            <div class="header-title">Signal Intelligence Center</div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="search-box">
+            <span class="search-box-icon">⌕</span>
+            <input class="search-box-input" type="text" placeholder="Search mentions, issue tags, creator names" />
+            <span class="search-box-shortcut">/</span>
+          </div>
+          <button type="button" class="icon-btn tooltip" data-tooltip="Notifications">🔔</button>
+          <button type="button" class="btn btn-primary" id="refreshBtn">Refresh Feed</button>
+        </div>
+      </header>
+
+      <main class="content-area animate-fade-in">
+        <div class="filters-bar">
+          <div class="filter-group">
+            <span class="filter-label">Channel</span>
+            <select class="filter-select" id="channelFilter">
+              <option value="all">All channels</option>
+              <option value="tiktok">TikTok</option>
+              <option value="facebook">Facebook</option>
+              <option value="zalo">Zalo</option>
+              <option value="youtube">YouTube</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Severity</span>
+            <select class="filter-select" id="severityFilter">
+              <option value="all">All severities</option>
+              <option value="critical">Critical</option>
+              <option value="warning">Warning</option>
+              <option value="info">Info</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Time range</span>
+            <input class="filter-date" type="text" value="Today, 12:00 - Now" readonly />
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Last sync</span>
+            <strong id="lastSync">--:--:--</strong>
+          </div>
+        </div>
+
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-label">Live mentions</span><span class="stat-trend up">↑ 22%</span></div>
+            <div class="stat-value">18.4K</div>
+            <div class="stat-comparison">vs previous livestream window</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-label">Negative drift</span><span class="stat-trend down">↑ 31%</span></div>
+            <div class="stat-value">31%</div>
+            <div class="stat-comparison">pricing confusion cluster</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-label">Escalation score</span><span class="stat-trend up">High</span></div>
+            <div class="stat-value">82</div>
+            <div class="stat-comparison">above PrimeOS routing threshold</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-label">Impacted cohort</span><span class="stat-trend up">64%</span></div>
+            <div class="stat-value">NM-HI</div>
+            <div class="stat-comparison">new moms high-intent overlap</div>
+          </div>
+        </section>
+
+        <div class="dashboard-grid">
+          <div class="content-stack">
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">Live escalation feed</div>
+                <a class="card-action" href="#">Open incident log</a>
+              </div>
+              <div class="card-body">
+                <div class="stream-list">
+                  <div class="stream-item">
+                    <div class="stream-meta"><span class="stream-time">12:40:12</span><span class="badge badge-danger">Critical</span></div>
+                    <strong>Negative comments spike around “giá refill”</strong>
+                    <div>Volume surged 3.2x from TikTok livestream comment stream in 8 minutes.</div>
+                  </div>
+                  <div class="stream-item">
+                    <div class="stream-meta"><span class="stream-time">12:41:04</span><span class="badge badge-warning">Mismatch</span></div>
+                    <strong>Store quote mismatch detected</strong>
+                    <div>Store pickup messages and livestream host description do not align on refill/full-size bundle pricing.</div>
+                  </div>
+                  <div class="stream-item">
+                    <div class="stream-meta"><span class="stream-time">12:42:30</span><span class="badge badge-info">Routed</span></div>
+                    <strong>Incident forwarded to PrimeOS</strong>
+                    <div>Tag <code>pricing_confusion_refill</code> attached and sent to decision orchestration queue.</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">Keyword cluster strength</div>
+                <a class="card-action" href="#">Export keyword set</a>
+              </div>
+              <div class="card-body">
+                <div class="keyword-list">
+                  <div class="keyword-row"><span>Giá refill</span><div class="progress-bar"><div class="progress-fill danger" style="width:92%"></div></div><strong>92</strong></div>
+                  <div class="keyword-row"><span>Combo khó hiểu</span><div class="progress-bar"><div class="progress-fill danger" style="width:86%"></div></div><strong>86</strong></div>
+                  <div class="keyword-row"><span>Store quote</span><div class="progress-bar"><div class="progress-fill warning" style="width:74%"></div></div><strong>74</strong></div>
+                  <div class="keyword-row"><span>Refill size</span><div class="progress-bar"><div class="progress-fill primary" style="width:61%"></div></div><strong>61</strong></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">Mention table</div>
+                <a class="card-action" href="#">Bulk classify</a>
+              </div>
+              <div class="card-body">
+                <input class="filter-date" id="mentionSearch" type="text" placeholder="Search mention text, user, issue" style="width:100%; margin-bottom:14px;" />
+                <div style="overflow:auto;">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Channel</th>
+                        <th>Issue</th>
+                        <th>Status</th>
+                        <th>Owner</th>
+                      </tr>
+                    </thead>
+                    <tbody id="mentionTableBody">
+                      <tr data-status="critical" data-channel="tiktok"><td>@linh.mom</td><td>TikTok</td><td>“Giá refill là cho chai nào?”</td><td><span class="badge badge-danger">Critical</span></td><td>Auto-route</td></tr>
+                      <tr data-status="warning" data-channel="facebook"><td>Thu Nguyen</td><td>Facebook</td><td>Store quote differs from livestream</td><td><span class="badge badge-warning">Warning</span></td><td>Ops Team</td></tr>
+                      <tr data-status="critical" data-channel="zalo"><td>Mai Pham</td><td>Zalo</td><td>Cart abandoned after price confusion</td><td><span class="badge badge-danger">Critical</span></td><td>CRM Queue</td></tr>
+                      <tr data-status="info" data-channel="youtube"><td>@beauty.daily</td><td>YouTube</td><td>Asked about refill value only</td><td><span class="badge badge-info">Info</span></td><td>Listening</td></tr>
+                      <tr data-status="warning" data-channel="tiktok"><td>@nhi.store</td><td>TikTok</td><td>Question spike from pickup customers</td><td><span class="badge badge-warning">Warning</span></td><td>POS Alert</td></tr>
+                      <tr data-status="critical" data-channel="facebook"><td>Hana community</td><td>Facebook</td><td>Bundle explanation mismatch screenshot</td><td><span class="badge badge-danger">Critical</span></td><td>PrimeOS</td></tr>
+                      <tr data-status="info" data-channel="zalo"><td>Lan Anh</td><td>Zalo</td><td>Looking for refill savings clarification</td><td><span class="badge badge-info">Info</span></td><td>CRM Queue</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="empty-state" id="mentionEmpty" style="display:none; padding:24px 0;">
+                  <div class="empty-state-title">No mentions matched</div>
+                  <div class="empty-state-desc">Try a different channel, severity or search term.</div>
+                </div>
+                <div class="pagination">
+                  <div class="pagination-info"><span id="mentionTotal">0</span> mentions matched</div>
+                  <div class="pagination-controls" id="mentionPagination"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="content-stack">
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">Geo heat distribution</div>
+              </div>
+              <div class="card-body">
+                <div class="map-grid">
+                  <div class="map-card"><strong>HCMC Cluster</strong><div>48% mention volume, strongest around pickup-store threads.</div></div>
+                  <div class="map-card"><strong>Ha Noi Cluster</strong><div>26% volume, more questions about refill size and savings value.</div></div>
+                  <div class="map-card"><strong>Da Nang Cluster</strong><div>12% volume, mostly neutral but rising clarification requests.</div></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">Action suggestions</div>
+              </div>
+              <div class="card-body">
+                <div class="insight-panel">
+                  <div class="insight-item"><strong>Route to PrimeOS</strong><div>Confidence high enough to trigger orchestration.</div></div>
+                  <div class="insight-item"><strong>Attach CRM overlap</strong><div>64% overlap with VIP-2 and new moms cohort.</div></div>
+                  <div class="insight-item"><strong>Notify POS</strong><div>Store quote mismatch likely to intensify conversion loss.</div></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <script src="../assets/dashboard.js"></script>
+  <script>
+    PrimeOSDashboard.init({
+      module: "social-listening",
+      timestampId: "lastSync",
+      refresh: {
+        buttonId: "refreshBtn",
+        overlayId: "loadingOverlay",
+        timestampId: "lastSync",
+      },
+      table: {
+        tableBodyId: "mentionTableBody",
+        searchInputId: "mentionSearch",
+        statusFilterId: "severityFilter",
+        extraFilters: [{ id: "channelFilter", attr: "channel" }],
+        paginationId: "mentionPagination",
+        emptyStateId: "mentionEmpty",
+        totalCountId: "mentionTotal",
+        pageSize: 5,
+      },
+    })
+  </script>
+</body>
+</html>

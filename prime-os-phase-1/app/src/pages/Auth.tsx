@@ -22,7 +22,7 @@ export default function Auth() {
   const handleLaunchDemo = async () => {
     setIsLoading(true);
     setStatusText('Authenticating...');
-    const demoEmail = 'demo@ok-ech.com';
+    const demoEmail = 'demo@primeos.local';
     const demoPassword = 'demo-password-123';
 
     try {
@@ -56,7 +56,7 @@ export default function Auth() {
 
       if (seedRes.success) {
         toast({
-          title: 'Welcome to okECH',
+          title: 'Welcome to PrimeOS',
           description: 'Demo mode initialized successfully!',
         });
         navigate('/dashboard');
@@ -88,7 +88,7 @@ export default function Auth() {
             <Rocket className="size-8 text-primary" />
           </div>
           <CardTitle className="text-3xl font-bold tracking-tight text-white">
-            okECH Demo
+            PrimeOS Demo
           </CardTitle>
           <CardDescription className="text-slate-400 mt-2 text-base">
             One-click interactive sandbox equipped with comprehensive warehouse, inventory, and order data.

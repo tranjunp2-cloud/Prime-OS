@@ -73,7 +73,7 @@ export function AppLayout() {
             </div>
             <Badge variant="outline" className="hidden gap-1.5 whitespace-nowrap md:inline-flex">
               <Sparkles className="size-3.5 text-primary" />
-              AI Operator reads COS live context
+              AI Operator reads PrimeOS live context
             </Badge>
           </header>
           <main

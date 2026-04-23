@@ -1,4 +1,5 @@
 .DS_Store
+*.tsbuildinfo
 node_modules/
 dist/
 build/
@@ -8,11 +9,15 @@ test-results/
 .env
 .env.*
 !.env.example
+.primeos-dev.log
 
 # Local QA evidence can be regenerated; keep markdown/json reports only.
 .gstack/qa-reports/screenshots/
 
-# OS/editor noise
+# Local agent/editor noise
+.claude/
+.kilo/
+kilo.jsonc
 *.log
 .idea/
 .vscode/

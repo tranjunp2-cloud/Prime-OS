@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS vs Zilingo</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: rgba(11, 19, 34, 0.88);
+      --panel-strong: rgba(8, 14, 26, 0.96);
+      --border: rgba(71, 85, 105, 0.55);
+      --text: #e5edf6;
+      --muted: #93a4b8;
+      --cyan: #22d3ee;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --violet: #8b5cf6;
+      --shadow: 0 28px 60px rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 26%),
+        radial-gradient(circle at top right, rgba(139, 92, 246, 0.08), transparent 24%),
+        linear-gradient(180deg, #09111d 0%, #030712 100%);
+      padding: 22px;
+    }
+
+    .page {
+      width: min(96vw, 1680px);
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 24px 28px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(12, 20, 34, 0.96), rgba(9, 15, 27, 0.9));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 4vw, 58px);
+      line-height: 1.06;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 980px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      border-radius: 26px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 22px 24px 14px;
+      border-bottom: 1px solid rgba(71, 85, 105, 0.35);
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .card-desc {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .company {
+      padding: 22px 24px 24px;
+      min-height: 100%;
+    }
+
+    .company + .company {
+      border-left: 1px solid rgba(71, 85, 105, 0.35);
+    }
+
+    .company-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 14px;
+      border: 1px solid;
+    }
+
+    .primeos-badge {
+      color: #d9f99d;
+      background: rgba(22, 163, 74, 0.12);
+      border-color: rgba(52, 211, 153, 0.45);
+    }
+
+    .zilingo-badge {
+      color: #fbcfe8;
+      background: rgba(190, 24, 93, 0.14);
+      border-color: rgba(251, 113, 133, 0.4);
+    }
+
+    .company h3 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .company-sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 18px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(71, 85, 105, 0.35);
+    }
+
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .bullet-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .bullet-list li {
+      display: grid;
+      grid-template-columns: 10px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: #d6e0ea;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      margin-top: 8px;
+    }
+
+    .primeos-dot { background: var(--emerald); }
+    .zilingo-dot { background: var(--rose); }
+    .amber-dot { background: var(--amber); }
+    .cyan-dot { background: var(--cyan); }
+
+    .timeline {
+      padding: 18px 24px 24px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+
+    .year {
+      color: var(--amber);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .timeline-row p {
+      margin: 0;
+      color: #dce6ef;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .matrix {
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .matrix-row {
+      display: grid;
+      grid-template-columns: 180px 1fr 1fr;
+      gap: 10px;
+    }
+
+    .matrix-cell {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.64);
+      border: 1px solid rgba(71, 85, 105, 0.35);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .matrix-head {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-weight: 700;
+    }
+
+    .matrix-key {
+      color: #f8fafc;
+      font-weight: 700;
+      background: rgba(8, 14, 26, 0.9);
+    }
+
+    .takeaway {
+      padding: 18px 24px 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .takeaway-panel {
+      padding: 18px 18px 18px 20px;
+      border-left: 4px solid;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.58);
+      border-top: 1px solid rgba(71, 85, 105, 0.25);
+      border-right: 1px solid rgba(71, 85, 105, 0.25);
+      border-bottom: 1px solid rgba(71, 85, 105, 0.25);
+    }
+
+    .takeaway-panel h4 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .takeaway-panel p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .primeos-accent { border-left-color: var(--emerald); }
+    .zilingo-accent { border-left-color: var(--rose); }
+    .lesson-accent { border-left-color: var(--amber); }
+
+    .footer-note {
+      margin-top: 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    @media (max-width: 1100px) {
+      .layout,
+      .compare-grid,
+      .matrix-row,
+      .metric-row,
+      .timeline-row {
+        grid-template-columns: 1fr;
+      }
+
+      .company + .company {
+        border-left: none;
+        border-top: 1px solid rgba(71, 85, 105, 0.35);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Comparative Strategy View</div>
+      <h1>PrimeOS vs Zilingo</h1>
+      <p>
+        Một bên là câu chuyện tham vọng số hóa chuỗi cung ứng thời trang châu Á để hút gần 308 triệu USD vốn đầu tư.
+        Một bên là PrimeOS – nếu pitch đúng, phải định vị không chỉ là một bộ công cụ vận hành, mà là một operating system
+        thương mại với kiểm soát dữ liệu, điều phối tăng trưởng và quản trị thực thi tốt hơn.
+      </p>
+    </section>
+
+    <div class="layout">
+      <div class="stack">
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Định vị chiến lược</h2>
+            <p class="card-desc">So sánh narrative tăng trưởng, mô hình kinh doanh và năng lực vận hành mà nhà đầu tư hoặc đối tác chiến lược sẽ nhìn vào.</p>
+          </div>
+          <div class="compare-grid">
+            <article class="company">
+              <div class="company-badge primeos-badge">PrimeOS</div>
+              <h3>Operating System cho thương mại</h3>
+              <div class="company-sub">
+                Hợp nhất dữ liệu, điều phối kênh bán, tối ưu marketing và kích hoạt vận hành như một hệ điều hành thống nhất.
+              </div>
+              <div class="metric-row">
+                <div class="metric">
+                  <div class="metric-label">Narrative</div>
+                  <div class="metric-value">OS</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">Core</div>
+                  <div class="metric-value">SSOT</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">Focus</div>
+                  <div class="metric-value">Control</div>
+                </div>
+              </div>
+              <ul class="bullet-list">
+                <li><span class="dot primeos-dot"></span><span>Xuất phát từ vấn đề phân mảnh giữa POS, marketplace, CRM, ads và vận hành.</span></li>
+                <li><span class="dot primeos-dot"></span><span>Giá trị cốt lõi là ra quyết định tốt hơn nhờ một nguồn dữ liệu thật và vòng lặp vận hành khép kín.</span></li>
+                <li><span class="dot primeos-dot"></span><span>Khả năng pitch mạnh nhất là biến dữ liệu thương mại thành chỉ lệnh cho tăng trưởng và kiểm soát.</span></li>
+                <li><span class="dot primeos-dot"></span><span>Nếu làm tốt, PrimeOS không bán “tool”, mà bán “hệ điều hành tăng trưởng có governance”.</span></li>
+              </ul>
+            </article>
+
+            <article class="company">
+              <div class="company-badge zilingo-badge">Zilingo</div>
+              <h3>Marketplace mở rộng sang B2B supply chain</h3>
+              <div class="company-sub">
+                Bắt đầu từ số hóa shop thời trang nhỏ, sau đó mở rộng thành câu chuyện lớn hơn: số hóa chuỗi cung ứng thời trang châu Á.
+              </div>
+              <div class="metric-row">
+                <div class="metric">
+                  <div class="metric-label">Founded</div>
+                  <div class="metric-value">2015</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">Funding</div>
+                  <div class="metric-value">$308M</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">Peak</div>
+                  <div class="metric-value">~$1B</div>
+                </div>
+              </div>
+              <ul class="bullet-list">
+                <li><span class="dot zilingo-dot"></span><span>Được thành lập tại Singapore bởi Ankiti Bose và Dhruv Kapoor.</span></li>
+                <li><span class="dot zilingo-dot"></span><span>Mô hình ban đầu là marketplace thời trang B2C cho seller nhỏ ở traditional market.</span></li>
+                <li><span class="dot zilingo-dot"></span><span>Chuyển hướng sang B2B và supply chain enablement để mở rộng narrative gọi vốn.</span></li>
+                <li><span class="dot zilingo-dot"></span><span>Thu hút vốn mạnh nhờ câu chuyện số hóa toàn bộ chuỗi cung ứng thời trang khu vực.</span></li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Zilingo Timeline</h2>
+            <p class="card-desc">Tăng trưởng vốn và narrative là rất mạnh, nhưng governance là điểm đứt gãy cuối cùng.</p>
+          </div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <div class="year">2015</div>
+              <p>Zilingo được thành lập tại Singapore. Ý tưởng ban đầu là số hóa các shop thời trang nhỏ, đưa họ lên online.</p>
+            </div>
+            <div class="timeline-row">
+              <div class="year">Seed</div>
+              <p>Huy động khoảng 1,9 triệu USD, có Sequoia tham gia sớm, xác nhận market narrative ban đầu là đủ hấp dẫn.</p>
+            </div>
+            <div class="timeline-row">
+              <div class="year">2016–2019</div>
+              <p>Series A: 8 triệu USD, Series B: 18 triệu USD, Series C: 54 triệu USD, Series D: 226 triệu USD với Temasek tham gia.</p>
+            </div>
+            <div class="timeline-row">
+              <div class="year">2019</div>
+              <p>Đỉnh cao về narrative và định giá, gần mốc unicorn khoảng 1 tỷ USD.</p>
+            </div>
+            <div class="timeline-row">
+              <div class="year">2022–2023</div>
+              <p>Khủng hoảng quản trị tài chính, CEO bị đình chỉ rồi sa thải; đến 2023 công ty rơi vào thanh lý.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Comparison Matrix</h2>
+            <p class="card-desc">Phần này dùng được trực tiếp khi pitching để giải thích vì sao PrimeOS nên kể câu chuyện lớn nhưng không được lỏng ở governance.</p>
+          </div>
+          <div class="matrix">
+            <div class="matrix-row">
+              <div class="matrix-cell matrix-head">Dimension</div>
+              <div class="matrix-cell matrix-head">PrimeOS</div>
+              <div class="matrix-cell matrix-head">Zilingo</div>
+            </div>
+            <div class="matrix-row">
+              <div class="matrix-cell matrix-key">Narrative lớn</div>
+              <div class="matrix-cell">Operating system cho commerce, data orchestration, growth control.</div>
+              <div class="matrix-cell">Số hóa seller nhỏ rồi nâng cấp thành digital supply chain cho fashion châu Á.</div>
+            </div>
+            <div class="matrix-row">
+              <div class="matrix-cell matrix-key">Điểm hút vốn</div>
+              <div class="matrix-cell">Có thể hút nếu chứng minh được khả năng kiểm soát và mở rộng đa kênh bằng dữ liệu thật.</div>
+              <div class="matrix-cell">Hút vốn mạnh vì thị trường lớn, narrative khu vực rõ, supply chain story rất hấp dẫn.</div>
+            </div>
+            <div class="matrix-row">
+              <div class="matrix-cell matrix-key">Execution risk</div>
+              <div class="matrix-cell">Rủi ro nằm ở độ phức tạp tích hợp và governance khi scale đa module.</div>
+              <div class="matrix-cell">Rủi ro nằm ở mở rộng quá nhanh, kiểm soát tài chính yếu và quản trị nội bộ không theo kịp.</div>
+            </div>
+            <div class="matrix-row">
+              <div class="matrix-cell matrix-key">Investor lens</div>
+              <div class="matrix-cell">Nhà đầu tư sẽ hỏi: dữ liệu thật ở đâu, unit economics nào, quyền điều phối nào, moat nào?</div>
+              <div class="matrix-cell">Nhà đầu tư từng tin vào TAM và tốc độ tăng trưởng, nhưng governance failure phá hủy niềm tin.</div>
+            </div>
+            <div class="matrix-row">
+              <div class="matrix-cell matrix-key">Thông điệp cần chốt</div>
+              <div class="matrix-cell">PrimeOS phải đi cùng câu chuyện: scale được vì có kiểm soát, không chỉ vì tăng trưởng.</div>
+              <div class="matrix-cell">Zilingo chứng minh rằng growth story rất mạnh vẫn có thể sụp nếu không giữ được kiểm soát tài chính.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Pitch Takeaways</h2>
+            <p class="card-desc">Chỗ này là phần rút ý cho slide hoặc speaker notes.</p>
+          </div>
+          <div class="takeaway">
+            <div class="takeaway-panel primeos-accent">
+              <h4>PrimeOS nên học điều gì</h4>
+              <p>Hãy kể câu chuyện lớn như một nền tảng điều phối toàn diện, nhưng phải chứng minh được rằng cấu trúc dữ liệu, kiểm soát tài chính và governance đi trước tăng trưởng.</p>
+            </div>
+            <div class="takeaway-panel zilingo-accent">
+              <h4>Zilingo cho thấy điều gì</h4>
+              <p>Ý tưởng tốt, tốc độ nhanh và narrative rộng có thể giúp gọi vốn cực mạnh. Nhưng nếu hệ thống kiểm soát nội bộ yếu, startup vẫn có thể gãy ở thời điểm tưởng như thành công nhất.</p>
+            </div>
+            <div class="takeaway-panel lesson-accent">
+              <h4>Thông điệp chốt để dùng trong pitch</h4>
+              <p>PrimeOS không nên chỉ được nhìn như một growth stack. Nó phải được định vị là một commerce operating system có khả năng vừa tăng trưởng vừa kiểm soát rủi ro vận hành và tài chính.</p>
+            </div>
+            <ul class="bullet-list">
+              <li><span class="dot amber-dot"></span><span>Zilingo thắng lớn ở narrative “digital supply chain”, không chỉ ở marketplace.</span></li>
+              <li><span class="dot amber-dot"></span><span>PrimeOS cũng cần một narrative đủ lớn: từ tool sang operating system.</span></li>
+              <li><span class="dot amber-dot"></span><span>Khác biệt cần nhấn mạnh là governance, control tower và khả năng đo lường theo dữ liệu thật.</span></li>
+              <li><span class="dot amber-dot"></span><span>Nhà đầu tư thích scale, nhưng sẽ trả premium cho scale có kiểm soát.</span></li>
+              <li><span class="dot amber-dot"></span><span>Nếu muốn lên slide cực ngắn: “Zilingo sold the dream. PrimeOS must sell the system.”</span></li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      Standalone HTML comparison sheet – suitable for slide reference, founder memo, or pitching support.
+    </div>
+  </div>
+</body>
+</html>

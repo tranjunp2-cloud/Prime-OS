@@ -1,0 +1,30 @@
+services:
+  prime-web:
+    build:
+      context: ./app
+    container_name: prime-os-prime-web
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+  admin-web:
+    build:
+      context: ./admin-web
+    container_name: prime-os-admin-web
+    depends_on:
+      - backend
+    ports:
+      - "5174:80"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: prime-os-backend
+    environment:
+      PORT: 8080
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./backend/data:/app/data
+    restart: unless-stopped

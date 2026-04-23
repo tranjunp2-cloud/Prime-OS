@@ -13,8 +13,9 @@ export type PrimeArea = 'Demand Area' | 'Customer Area' | 'Ecom Area' | 'Intelli
 
 export type PrimeTowerId =
   | 'capital'
-  | 'lending'
+  | 'offers'
   | 'risk'
+  | 'settlement'
   | 'campaign-ops'
   | 'content-creator-ops'
   | 'lead-response-capture'
@@ -227,25 +228,33 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     id: 'capital',
     area: 'Finance Area',
     tower: 'Capital Readiness',
-    promise: 'Translate operating performance into a lender-ready view of growth readiness, cash need, and transaction quality.',
-    reuseSource: 'New Prime OS wrapper, derived from campaign, order, customer, and fulfillment proof.',
-    floors: ['GMV trend', 'Cash need', 'Working capital profile', 'Partner fit'],
+    promise: 'Show whether a seller, launch, and SKU are truly ready for capital before any offer is surfaced.',
+    reuseSource: 'New Prime OS wrapper, derived from launch decisions, CRM proof, COS readiness, and service quality.',
+    floors: ['Readiness score', 'Funding need', 'Launch fit', 'Commercial proof'],
   },
-  lending: {
-    id: 'lending',
+  offers: {
+    id: 'offers',
     area: 'Finance Area',
-    tower: 'Lending & Partner Flow',
-    promise: 'Connect merchants and manufacturers to financing or bank partners using live commerce and operating signals.',
-    reuseSource: 'New Prime OS wrapper, linked to transactional intelligence and future financial workflow.',
-    floors: ['Partner routing', 'Offer package', 'Application status', 'Repayment signal'],
+    tower: 'Capital Offers',
+    promise: 'Turn readiness into concrete capital offers with amount, provider, fee, term, and repayment model.',
+    reuseSource: 'New Prime OS wrapper, linked to finance control-plane offers and launch context.',
+    floors: ['Offer lane', 'Provider fit', 'Pricing', 'Repayment model'],
   },
   risk: {
     id: 'risk',
     area: 'Finance Area',
-    tower: 'Risk & Trust Layer',
-    promise: 'Turn inventory, fulfillment, service, and repeat purchase behavior into an explainable trust layer for finance decisions.',
-    reuseSource: 'New Prime OS wrapper, combining COS execution health with customer and demand signals.',
-    floors: ['Signal score', 'Risk flags', 'Trust explanation', 'Guardrails'],
+    tower: 'Risk & Trust',
+    promise: 'Make financial trust explainable by surfacing the exact risks, trust signals, and fixes before more capital is committed.',
+    reuseSource: 'New Prime OS wrapper, combining admin-defined trust profiles with COS, CRM, and demand signals.',
+    floors: ['Trust score', 'Top risk', 'Signal source', 'Fix before scale'],
+  },
+  settlement: {
+    id: 'settlement',
+    area: 'Finance Area',
+    tower: 'Settlement & Repayment',
+    promise: 'Track where capital went, how repayment will be collected, what is outstanding, and when the next due hits.',
+    reuseSource: 'New Prime OS wrapper, linked to settlement control-plane data and operating cashflow signals.',
+    floors: ['Disbursement target', 'Outstanding balance', 'Next due', 'Collection mode'],
   },
   'campaign-ops': {
     id: 'campaign-ops',
@@ -299,7 +308,7 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     id: 'creators',
     area: 'Intelligence Area',
     tower: 'Creators Intelligence',
-    promise: 'Understand which creators and KOLs fit which products before campaign execution begins.',
+    promise: 'Show which creators fit which products, why they fit, and whether the system can support moving them into launch.',
     reuseSource: 'New Prime OS wrapper, combining attribution, social listening, and operator recommendations.',
     floors: ['Ranking', 'Creator profile', 'Product fit', 'Activation shortlist'],
   },
@@ -307,17 +316,17 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     id: 'customers',
     area: 'Intelligence Area',
     tower: 'Customer Intelligence',
-    promise: 'Understand which customer segments matter, what they are likely to buy, and how they should be reached.',
+    promise: 'Show which customer segments matter now, what action to take, and how CRM, Ecom, and Demand support that move.',
     reuseSource: 'New Prime OS wrapper, combining CRM compact, forecasting, and activation guidance.',
     floors: ['Segment list', 'Affinity model', 'Channel fit', 'Next best action'],
   },
   campaigns: {
     id: 'campaigns',
     area: 'Intelligence Area',
-    tower: 'Campaign Planner',
-    promise: 'Turn market understanding into executable campaign plans across products, audiences, channels, and creators.',
+    tower: 'Launch Decisions',
+    promise: 'Turn creator proof, customer intent, Ecom guardrails, and finance context into one executable launch decision.',
     reuseSource: 'New Prime OS wrapper, combining demand performance, recommendations, and risk alerts.',
-    floors: ['Recommended campaigns', 'Channel mix', 'Budget focus', 'Execution alerts'],
+    floors: ['Decision stack', 'Visual inputs', 'Recommended launches', 'Ops handoff'],
   },
   analytics: {
     id: 'analytics',

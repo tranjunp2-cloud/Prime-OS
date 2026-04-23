@@ -66,9 +66,13 @@ const App = () => {
                     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
                     <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />
 
-                    <Route path="/finance/capital" element={<PrimeTowerPage towerId="capital" />} />
-                    <Route path="/finance/lending" element={<PrimeTowerPage towerId="lending" />} />
-                    <Route path="/finance/risk" element={<PrimeTowerPage towerId="risk" />} />
+                    <Route path="/finance/capital-readiness" element={<PrimeTowerPage towerId="capital" />} />
+                    <Route path="/finance/capital-offers" element={<PrimeTowerPage towerId="offers" />} />
+                    <Route path="/finance/risk-trust" element={<PrimeTowerPage towerId="risk" />} />
+                    <Route path="/finance/settlement-repayment" element={<PrimeTowerPage towerId="settlement" />} />
+                    <Route path="/finance/capital" element={<Navigate to="/finance/capital-readiness" replace />} />
+                    <Route path="/finance/lending" element={<Navigate to="/finance/capital-offers" replace />} />
+                    <Route path="/finance/risk" element={<Navigate to="/finance/risk-trust" replace />} />
 
                     <Route path="/ecom/commerce-surface" element={<CommerceSurfacePage />} />
                     <Route path="/ecom/cos/product-master" element={<Products />} />
@@ -97,7 +101,8 @@ const App = () => {
                     <Route path="/intelligence/alerts" element={<PrimeTowerPage towerId="alerts" />} />
                     <Route path="/intelligence/creators" element={<PrimeTowerPage towerId="creators" />} />
                     <Route path="/intelligence/customers" element={<PrimeTowerPage towerId="customers" />} />
-                    <Route path="/intelligence/campaigns" element={<PrimeTowerPage towerId="campaigns" />} />
+                    <Route path="/intelligence/launch-decisions" element={<PrimeTowerPage towerId="campaigns" />} />
+                    <Route path="/intelligence/campaigns" element={<Navigate to="/intelligence/launch-decisions" replace />} />
 
                     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
                     <Route path="/products" element={<Navigate to="/ecom/cos/product-master" replace />} />

@@ -34,11 +34,11 @@ describe('copilot context resolver', () => {
   });
 
   it('builds a safe product draft response with prefilled create-form params', () => {
-    const response = resolveProductDraftResponse('Tạo product mới tên "Compact Lamp" brand "ECH" sku ECH-LAMP-001');
+    const response = resolveProductDraftResponse('Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001');
 
     expect(response?.intent).toBe('write_draft');
     expect(response?.actions?.[0]?.url).toContain('/products/new?');
-    expect(response?.actions?.[0]?.url).toContain('sku=ECH-LAMP-001');
+    expect(response?.actions?.[0]?.url).toContain('sku=PRIME-LAMP-001');
     expect(response?.content).toContain('chưa có dữ liệu nào được save');
   });
 
@@ -51,7 +51,7 @@ describe('copilot context resolver', () => {
   });
 
   it('finds orders from natural language and returns detail-safe summaries', () => {
-    const order = getOrders().find((candidate) => /ech-[a-z]{2}-\d{4}/i.test(candidate.order_id));
+    const order = getOrders().find((candidate) => /prime-[a-z]{2,4}-\d{4}/i.test(candidate.order_id));
     if (!order) {
       throw new Error('Missing seeded assistant QA order');
     }
@@ -67,7 +67,7 @@ describe('copilot context resolver', () => {
   });
 
   it('uses prior entity context for follow-up questions', () => {
-    const order = getOrders().find((candidate) => /ech-[a-z]{2}-\d{4}/i.test(candidate.order_id));
+    const order = getOrders().find((candidate) => /prime-[a-z]{2,4}-\d{4}/i.test(candidate.order_id));
     if (!order) {
       throw new Error('Missing seeded assistant QA order');
     }

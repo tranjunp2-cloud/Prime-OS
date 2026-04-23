@@ -20,7 +20,7 @@ describe('AlertsFeed', () => {
                 severity: 'CRITICAL',
                 title: 'Allocation blocked for KR region',
                 detail: 'Routing rule is missing for KR region orders.',
-                entityRef: 'ECH-KR-1001',
+                entityRef: 'PRIME-KR-1001',
                 createdAt: '2026-04-14T10:00:00.000Z',
                 actionLink: '/orders?status=pending',
               },
@@ -32,7 +32,7 @@ describe('AlertsFeed', () => {
 
     expect(screen.getByText('Critical')).toBeInTheDocument();
     expect(screen.getByText('OMS')).toBeInTheDocument();
-    expect(screen.getByText('ECH-KR-1001')).toBeInTheDocument();
+    expect(screen.getByText('PRIME-KR-1001')).toBeInTheDocument();
     expect(screen.getByText('Allocation blocked for KR region')).toBeInTheDocument();
   });
 

@@ -1,14 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const DEMO_EMAIL = 'demo@ok-ech.com';
-const CLEANUP_VERSION = 'cos-demo-cleanup-v2';
+const DEMO_EMAIL = 'demo@primeos.local';
+const CLEANUP_VERSION = 'primeos-demo-cleanup-v1';
 const LEGACY_SKU_CODES = new Set([
   'NISSIN-RAOH-TONKOTSU-90G',
   'ICHIRAN-RAMEN-SET-5',
 ]);
 
 function getCleanupStorageKey(userId: string) {
-  return `cos.demo.cleanup.${userId}`;
+  return `primeos.demo.cleanup.${userId}`;
 }
 
 function getStoredCleanupVersion(userId: string) {

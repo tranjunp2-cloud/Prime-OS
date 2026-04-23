@@ -1,4 +1,4 @@
-// Response templates for the Global ECH Orchestration Copilot
+// Response templates for the PrimeOS orchestration copilot
 // Provides domain-specific responses for the UI shell (Phase 1)
 
 import { CopilotDomain, GlobalCopilotMessage, GlobalCopilotAction } from './types';
@@ -11,7 +11,7 @@ interface TemplateResponse {
 export function getWelcomeMessage(): Omit<GlobalCopilotMessage, 'id' | 'timestamp'> {
   return {
     role: 'assistant',
-    content: `👋 **Xin chào! Tôi là ECH Global Copilot.**
+    content: `👋 **Xin chào! Tôi là PrimeOS Copilot.**
 
 Tôi có thể hỗ trợ bạn với:
 

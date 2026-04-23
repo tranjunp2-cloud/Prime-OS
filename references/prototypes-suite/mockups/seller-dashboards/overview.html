@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seller Overview - PrimeOS</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .overview-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .sales-chart { height: 260px; display: flex; align-items: end; gap: 8px; padding: 16px 0; }
+    .chart-bar { flex: 1; background: linear-gradient(180deg, #93c5fd, #2563eb); border-radius: 6px 6px 0 0; min-height: 30px; position: relative; }
+    .chart-label { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--text-tertiary); }
+    .quick-actions { display: grid; gap: 10px; }
+    .quick-btn { width: 100%; text-align: left; padding: 12px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-surface); cursor: pointer; font-weight: 600; }
+    .quick-btn:hover { background: var(--bg-hover); }
+    @media (max-width: 1200px) { .overview-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;"><div class="sidebar-logo-icon">P</div><div class="sidebar-logo-text">PrimeOS</div></a></div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Seller Workspace</div>
+          <a class="sidebar-link active" href="overview.html"><span class="sidebar-link-icon">📊</span><span>Overview</span></a>
+          <a class="sidebar-link" href="products.html"><span class="sidebar-link-icon">📦</span><span>Products</span></a>
+          <a class="sidebar-link" href="orders.html"><span class="sidebar-link-icon">🛍️</span><span>Orders</span></a>
+          <a class="sidebar-link" href="customers.html"><span class="sidebar-link-icon">👤</span><span>Customers</span></a>
+          <a class="sidebar-link" href="ads.html"><span class="sidebar-link-icon">📢</span><span>Ads Manager</span></a>
+          <a class="sidebar-link" href="analytics.html"><span class="sidebar-link-icon">📈</span><span>Analytics</span></a>
+          <a class="sidebar-link" href="recommendations.html"><span class="sidebar-link-icon">💡</span><span>AI Recommendations</span></a>
+          <a class="sidebar-link" href="settings.html"><span class="sidebar-link-icon">⚙️</span><span>Settings</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn" onclick="window.location.href='../dashboards/primeos.html'">🏢 Admin</button><button type="button" class="role-btn active" onclick="window.location.href='overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">SM</div><div class="sidebar-user-info"><div class="sidebar-user-name">Seller Account</div><div class="sidebar-user-role">Beauty Store Pro</div></div></div>
+    </aside>
+
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>Seller</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">Overview</span></div><div class="header-title">Store Performance Overview</div></div></div>
+        <div class="header-right"><div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search orders, products, customers" /></div><button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button></div>
+      </header>
+
+      <main class="content-area">
+        <div class="filters-bar"><div class="filter-group"><span class="filter-label">Period</span><select class="filter-select"><option>Today</option><option selected>Last 7 days</option><option>Last 30 days</option></select></div><div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div></div>
+
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">GMV</span><span class="stat-trend up">+14%</span></div><div class="stat-value">₫428M</div><div class="stat-comparison">Last 7 days</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Orders</span><span class="stat-trend up">+9%</span></div><div class="stat-value">1,284</div><div class="stat-comparison">Across all channels</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">AOV</span><span class="stat-trend up">+4%</span></div><div class="stat-value">₫333K</div><div class="stat-comparison">Average order value</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Repeat Rate</span><span class="stat-trend up">+6%</span></div><div class="stat-value">38%</div><div class="stat-comparison">Returning customers</div></div>
+        </section>
+
+        <div class="overview-grid">
+          <section class="card">
+            <div class="card-header"><div class="card-title">Sales trend (7 days)</div><a class="card-action" href="analytics.html">View analytics</a></div>
+            <div class="card-body">
+              <div class="sales-chart">
+                <div class="chart-bar" style="height:45%;"><span class="chart-label">Mon</span></div>
+                <div class="chart-bar" style="height:62%;"><span class="chart-label">Tue</span></div>
+                <div class="chart-bar" style="height:58%;"><span class="chart-label">Wed</span></div>
+                <div class="chart-bar" style="height:74%;"><span class="chart-label">Thu</span></div>
+                <div class="chart-bar" style="height:81%;"><span class="chart-label">Fri</span></div>
+                <div class="chart-bar" style="height:69%;"><span class="chart-label">Sat</span></div>
+                <div class="chart-bar" style="height:88%;"><span class="chart-label">Sun</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header"><div class="card-title">Quick actions</div></div>
+            <div class="card-body">
+              <div class="quick-actions">
+                <button type="button" class="quick-btn">Create new product listing</button>
+                <button type="button" class="quick-btn">Launch promotion campaign</button>
+                <button type="button" class="quick-btn">Review low stock items</button>
+                <button type="button" class="quick-btn">Export weekly report</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>
+    PrimeOSDashboard.init({ module: "overview", timestampId: "lastSync", refresh: { buttonId: "refreshBtn", overlayId: "loadingOverlay", timestampId: "lastSync" } })
+  </script>
+</body>
+</html>

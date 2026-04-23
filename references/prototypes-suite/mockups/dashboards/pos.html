@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POS Dashboard - PrimeOS</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .store-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
+    .store-alerts { display: grid; gap: 12px; }
+    .store-alert { padding: 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-surface); }
+    .script-panel { display: grid; gap: 12px; }
+    .script-block { padding: 14px; border-radius: var(--radius-md); background: var(--bg-hover); border: 1px solid var(--border-light); }
+    @media (max-width: 1200px) { .store-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;">
+          <div class="sidebar-logo-icon">P</div>
+          <div class="sidebar-logo-text">PrimeOS</div>
+        </a>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Dashboard Suite</div>
+          <a class="sidebar-link" href="social-listening.html" data-module="social-listening"><span class="sidebar-link-icon">📡</span><span>Social Listening</span></a>
+          <a class="sidebar-link" href="kol.html" data-module="kol"><span class="sidebar-link-icon">🎯</span><span>KOL</span></a>
+          <a class="sidebar-link" href="ads.html" data-module="ads"><span class="sidebar-link-icon">📈</span><span>ADS</span></a>
+          <a class="sidebar-link" href="primeos.html" data-module="primeos"><span class="sidebar-link-icon">🧠</span><span>PrimeOS</span></a>
+          <a class="sidebar-link" href="crm.html" data-module="crm"><span class="sidebar-link-icon">👥</span><span>CRM</span></a>
+          <a class="sidebar-link active" href="pos.html" data-module="pos"><span class="sidebar-link-icon">🛒</span><span>POS</span></a>
+          <a class="sidebar-link" href="cos.html" data-module="cos"><span class="sidebar-link-icon">🧩</span><span>COS</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn active" onclick="window.location.href='primeos.html'">🏢 Admin</button><button type="button" class="role-btn" onclick="window.location.href='../seller-dashboards/overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">PS</div><div class="sidebar-user-info"><div class="sidebar-user-name">Store Ops</div><div class="sidebar-user-role">POS Network</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>PrimeOS</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">POS</span></div><div class="header-title">Store Execution</div></div></div>
+        <div class="header-right"><div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search store, alert" /></div><button type="button" class="btn btn-primary" id="refreshBtn">Sync Stores</button></div>
+      </header>
+      <main class="content-area animate-fade-in">
+        <div class="filters-bar"><div class="filter-group"><span class="filter-label">Region</span><select class="filter-select"><option value="all">All</option><option value="hcm" selected>HCMC</option><option value="hn">Ha Noi</option></select></div><div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div></div>
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Stores synced</span><span class="stat-trend up">42</span></div><div class="stat-value">42</div><div class="stat-comparison">talk track and price patch deployed</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Patch ETA</span><span class="stat-trend up">4m</span></div><div class="stat-value">4m</div><div class="stat-comparison">network-wide update time</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Traffic surge</span><span class="stat-trend up">18%</span></div><div class="stat-value">18%</div><div class="stat-comparison">at 6 major stores</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Conversion risk</span><span class="stat-trend down">12%</span></div><div class="stat-value">12%</div><div class="stat-comparison">if stock/script stays misaligned</div></div>
+        </section>
+        <div class="store-grid">
+          <section class="card">
+            <div class="card-header"><div class="card-title">Store operations board</div><a class="card-action" href="#">Open network map</a></div>
+            <div class="card-body">
+              <table class="data-table">
+                <thead><tr><th>Store</th><th>Situation</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="posTableBody">
+                  <tr data-status="synced"><td>Store A12</td><td>Combo explanation live on counter tablets and display cards</td><td><span class="badge badge-success">Synced</span></td><td><button type="button" class="btn btn-sm btn-secondary">View</button></td></tr>
+                  <tr data-status="watch"><td>Store C18</td><td>Traffic spike, waiting for COS full-size replenishment</td><td><span class="badge badge-warning">Watch</span></td><td><button type="button" class="btn btn-sm btn-primary">Escalate</button></td></tr>
+                  <tr data-status="risk"><td>Store D03</td><td>Best seller nearly out of stock, staff needs substitute flow</td><td><span class="badge badge-danger">Risk</span></td><td><button type="button" class="btn btn-sm btn-secondary">Open Note</button></td></tr>
+                  <tr data-status="synced"><td>Store B07</td><td>Pricing patch confirmed, checkout notes updated</td><td><span class="badge badge-success">Synced</span></td><td><button type="button" class="btn btn-sm btn-ghost">Logs</button></td></tr>
+                  <tr data-status="watch"><td>Store E02</td><td>Staff acknowledged script but promo card not swapped yet</td><td><span class="badge badge-warning">Watch</span></td><td><button type="button" class="btn btn-sm btn-secondary">Follow up</button></td></tr>
+                </tbody>
+              </table>
+              <div class="pagination"><div class="pagination-info"><span id="posTotal">0</span> stores tracked</div><div class="pagination-controls" id="posPagination"></div></div>
+            </div>
+          </section>
+          <div style="display:grid; gap:20px;">
+            <section class="card"><div class="card-header"><div class="card-title">Frontline script console</div></div><div class="card-body"><div class="script-panel"><div class="script-block"><strong>Opening line</strong><div>“Giá trên live là cho combo refill, em sẽ giúp chị phân biệt refill 30ml và full-size 50ml.”</div></div><div class="script-block"><strong>Fallback offer</strong><div>If full-size unavailable, suggest refill bundle + pickup voucher.</div></div><div class="script-block"><strong>Feedback sync</strong><div>Every objection gets tagged and returned to PrimeOS as store truth.</div></div></div></div></section>
+            <section class="card"><div class="card-header"><div class="card-title">Store alerts</div></div><div class="card-body"><div class="store-alerts"><div class="store-alert"><strong>Counter display mismatch</strong><div>2 stores still showing old flash combo wording.</div></div><div class="store-alert"><strong>Pickup confusion risk</strong><div>Customers asking whether store price matches livestream.</div></div></div></div></section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>
+    PrimeOSDashboard.init({module:"pos",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"},table:{tableBodyId:"posTableBody",paginationId:"posPagination",totalCountId:"posTotal",pageSize:4}})
+  </script>
+</body>
+</html>

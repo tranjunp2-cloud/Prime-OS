@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BrainCircuit, ChevronRight, User } from 'lucide-react';
+import { BrainCircuit, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getPrimeNavPath,
@@ -23,23 +23,19 @@ function SidebarLink({
   const Icon = node.icon;
   const isActive = activeIds.has(node.id);
   const href = getPrimeNodeHref(node);
+  const isExternal = node.external || /^https?:\/\//.test(href);
+  const baseClassName = cn(
+    'group flex min-h-11 items-center gap-2.5 rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/70',
+    isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
+    isActive
+      ? isLeaf
+        ? 'bg-primary/10 text-primary ring-1 ring-primary/25'
+        : 'bg-muted/70 text-foreground'
+      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+  );
 
-  return (
-    <NavLink
-      to={href}
-      aria-label={node.label}
-      aria-current={isActive && isLeaf ? 'page' : undefined}
-      title={node.label}
-      className={cn(
-        'group flex min-h-11 items-center gap-2.5 rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/70',
-        isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
-        isActive
-          ? isLeaf
-            ? 'bg-primary/10 text-primary ring-1 ring-primary/25'
-            : 'bg-muted/70 text-foreground'
-          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-      )}
-    >
+  const content = (
+    <>
       {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
       <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
       {node.badge ? (
@@ -50,6 +46,33 @@ function SidebarLink({
       {node.children?.length ? (
         <ChevronRight className={cn('hidden size-3.5 shrink-0 text-muted-foreground transition-transform md:block', isActive && 'rotate-90 text-primary')} />
       ) : null}
+    </>
+  );
+
+  if (isExternal) {
+    return (
+      <a
+        href={href}
+        aria-label={node.label}
+        title={node.label}
+        target="_blank"
+        rel="noreferrer"
+        className={baseClassName}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <NavLink
+      to={href}
+      aria-label={node.label}
+      aria-current={isActive && isLeaf ? 'page' : undefined}
+      title={node.label}
+      className={baseClassName}
+    >
+      {content}
     </NavLink>
   );
 }
@@ -125,9 +148,6 @@ export function AppSidebar() {
   const location = useLocation();
   const activePath = getPrimeNavPath(location.pathname);
   const activeIds = new Set(activePath.map((node) => node.id));
-  const contextLabel = activePath.length
-    ? activePath.map((node) => node.label).join(' / ')
-    : 'Unified workspace';
   const [overviewNode, ...areaNodes] = primeNavigation;
 
   return (
@@ -141,27 +161,6 @@ export function AppSidebar() {
         <div className="hidden min-w-0 flex-col md:flex">
           <span className="truncate text-sm font-semibold leading-none">Prime OS</span>
           <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">Closed-loop commerce platform</span>
-        </div>
-      </div>
-
-      <div className="hidden border-b px-3 py-2 md:block md:px-4">
-        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
-          <div className="flex size-7 items-center justify-center rounded-full bg-primary/10">
-            <User className="size-3.5 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Viewing as</p>
-            <p className="truncate text-sm font-medium text-foreground">Brand Manager</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden border-b px-3 py-2 md:block md:px-4">
-        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-left">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Current context</p>
-          <p className="mt-1 text-sm font-medium leading-snug text-foreground">
-            {contextLabel}
-          </p>
         </div>
       </div>
 

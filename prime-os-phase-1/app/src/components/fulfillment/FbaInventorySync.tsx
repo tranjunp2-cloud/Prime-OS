@@ -163,7 +163,7 @@ export function FbaInventorySync({
         <div className="grid grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">ECH Local ATS</p>
+              <p className="text-xs text-muted-foreground">PrimeOS Local ATS</p>
               <p className="text-xl font-bold">{totalLocalAts.toLocaleString()}</p>
             </CardContent>
           </Card>

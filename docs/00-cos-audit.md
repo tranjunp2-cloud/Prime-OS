@@ -2,8 +2,8 @@
 
 Source of truth audited:
 
-- `/Users/admin/Desktop/SME_ECH/SME_ECH_V1.0`
-- Reused prototype source copied into `/Users/admin/Desktop/Prime OS/prime-os-phase-1/app`
+- Legacy COS workspace captured before PrimeOS wrapping
+- Current Phase 1 runtime workspace: `/prime-os-phase-1/app`
 
 ## Audit result
 

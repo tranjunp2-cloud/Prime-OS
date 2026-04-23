@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS Demo - Control Tower</title>
+  <style>
+    :root {
+      --bg: #06101c;
+      --panel: rgba(9, 17, 30, 0.9);
+      --panel-strong: rgba(5, 11, 22, 0.96);
+      --border: rgba(77, 98, 119, 0.48);
+      --text: #e7eef7;
+      --muted: #99acc0;
+      --cyan: #22d3ee;
+      --violet: #8b5cf6;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(34, 211, 238, 0.08), transparent 26%),
+        radial-gradient(circle at right, rgba(139, 92, 246, 0.08), transparent 24%),
+        linear-gradient(180deg, #07111f 0%, #020712 100%);
+      padding: 22px;
+    }
+
+    .page {
+      width: min(96vw, 1680px);
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero,
+    .panel {
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 26px 30px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 60px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .hero-board {
+      padding: 18px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(18, 28, 48, 0.92), rgba(9, 15, 27, 0.9));
+      border: 1px solid rgba(77, 98, 119, 0.34);
+      display: grid;
+      gap: 12px;
+    }
+
+    .board-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .board-cell {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(5, 11, 22, 0.88);
+      border: 1px solid rgba(77, 98, 119, 0.32);
+    }
+
+    .board-cell strong {
+      display: block;
+      font-size: 22px;
+      letter-spacing: -0.04em;
+      margin-bottom: 6px;
+    }
+
+    .board-cell span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+    }
+
+    .panel-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid rgba(77, 98, 119, 0.28);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .content {
+      padding: 18px 22px 22px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .kpi {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(77, 98, 119, 0.3);
+    }
+
+    .kpi-label {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .kpi-value {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+    }
+
+    .kpi-note {
+      margin-top: 6px;
+      color: #dce6f1;
+      font-size: 12px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .module,
+    .queue,
+    .rules,
+    .timeline {
+      border-radius: 22px;
+      padding: 16px;
+      border: 1px solid rgba(77, 98, 119, 0.3);
+      background: rgba(15, 23, 42, 0.56);
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .module-stack,
+    .queue-list,
+    .rule-list,
+    .timeline-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .module-row,
+    .queue-item,
+    .rule-item,
+    .timeline-item {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(7, 12, 24, 0.84);
+      border: 1px solid rgba(77, 98, 119, 0.25);
+    }
+
+    .module-row strong,
+    .queue-item strong,
+    .rule-item strong,
+    .timeline-item strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .module-row span,
+    .queue-item span,
+    .rule-item span,
+    .timeline-item span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .live { color: #baf7ff; background: rgba(8, 145, 178, 0.18); }
+    .sync { color: #d9f99d; background: rgba(22, 163, 74, 0.18); }
+    .risk { color: #fde68a; background: rgba(180, 83, 9, 0.2); }
+    .violet { color: #ddd6fe; background: rgba(91, 33, 182, 0.18); }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .layout,
+      .grid-2,
+      .kpi-grid,
+      .board-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Demo Page 02</div>
+        <h1>PrimeOS Control Tower</h1>
+        <p>
+          Đây là trang mô phỏng phần trung tâm trong sơ đồ kiến trúc: PrimeOS hoạt động như bộ não gom dữ liệu thật,
+          chạy workflow orchestration, áp quy tắc điều phối và phát lệnh xuống CRM, POS, COS theo một decision graph thống nhất.
+        </p>
+      </div>
+      <div class="hero-board">
+        <div class="board-row">
+          <div class="board-cell"><strong>31</strong><span>active workflows đang chạy theo thời gian thực</span></div>
+          <div class="board-cell"><strong>92%</strong><span>records được đồng bộ vào SSOT trong vòng 5 phút</span></div>
+          <div class="board-cell"><strong>7</strong><span>risk policies khóa quyết định sai lệch giá và tồn kho</span></div>
+        </div>
+        <div class="board-row">
+          <div class="board-cell"><strong>4</strong><span>decision lane: growth, retention, pricing, fulfillment</span></div>
+          <div class="board-cell"><strong>11</strong><span>cross-system automations giữa marketing và commerce</span></div>
+          <div class="board-cell"><strong>1</strong><span>single source of truth cho demand, order và customer state</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Decision Graph</h2>
+          <p>Khối hiển thị cách PrimeOS gom input, đánh giá rule và phát lệnh vận hành.</p>
+        </div>
+        <div class="content">
+          <div class="kpi-grid">
+            <div class="kpi"><div class="kpi-label">Signal Inputs</div><div class="kpi-value">128</div><div class="kpi-note">events/minute từ listening + transaction</div></div>
+            <div class="kpi"><div class="kpi-label">Priority Alerts</div><div class="kpi-value">09</div><div class="kpi-note">cần operator review ngay</div></div>
+            <div class="kpi"><div class="kpi-label">Auto Commands</div><div class="kpi-value">57</div><div class="kpi-note">được phát tự động hôm nay</div></div>
+            <div class="kpi"><div class="kpi-label">Confidence</div><div class="kpi-value">86%</div><div class="kpi-note">điểm tin cậy của quyết định hiện tại</div></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="module">
+              <h3 class="section-title">Orchestration Modules</h3>
+              <div class="module-stack">
+                <div class="module-row">
+                  <div class="status live">Live</div>
+                  <strong>Audience Resolver</strong>
+                  <span>Gom cohort từ CRM, social sentiment và POS basket behavior thành segment vận hành.</span>
+                </div>
+                <div class="module-row">
+                  <div class="status violet">Core</div>
+                  <strong>Decision Engine</strong>
+                  <span>Chạy policy theo margin, inventory pressure, promotion calendar và campaign objective.</span>
+                </div>
+                <div class="module-row">
+                  <div class="status sync">Sync</div>
+                  <strong>Execution Router</strong>
+                  <span>Định tuyến lệnh xuống POS, CRM, COS với trạng thái idempotent và audit trail.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="rules">
+              <h3 class="section-title">Active Policies</h3>
+              <div class="rule-list">
+                <div class="rule-item">
+                  <strong>Promo guardrail</strong>
+                  <span>Không cho tăng coupon nếu gross margin SKU dưới ngưỡng 24%.</span>
+                </div>
+                <div class="rule-item">
+                  <strong>Inventory pressure policy</strong>
+                  <span>Khi sell-through dưới forecast 18%, ưu tiên chuyển demand sang bundle combo.</span>
+                </div>
+                <div class="rule-item">
+                  <strong>Retention recovery</strong>
+                  <span>Nếu VIP cohort giảm repeat trong 14 ngày, đẩy trigger win-back sang CRM trước paid media.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Command Queue</h2>
+          <p>Danh sách lệnh mà PrimeOS chuẩn bị phát hoặc đang theo dõi hậu kiểm.</p>
+        </div>
+        <div class="content">
+          <div class="queue" style="margin-bottom: 14px;">
+            <h3 class="section-title">Pending / Running Commands</h3>
+            <div class="queue-list">
+              <div class="queue-item">
+                <div class="status live">Running</div>
+                <strong>Reprice serum bundle on POS</strong>
+                <span>Điều chỉnh combo price tại 42 cửa hàng để phản hồi complaint về giá đơn lẻ.</span>
+              </div>
+              <div class="queue-item">
+                <div class="status sync">Queued</div>
+                <strong>Refresh CRM segment "new moms high intent"</strong>
+                <span>Kết hợp listening insight + purchase propensity để tạo audience cho chiến dịch chiều nay.</span>
+              </div>
+              <div class="queue-item">
+                <div class="status risk">Review</div>
+                <strong>Pause ad set on low-stock SKU</strong>
+                <span>Đang chờ xác nhận tồn kho từ COS trước khi khóa spend để tránh oversell.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <h3 class="section-title">Audit Timeline</h3>
+            <div class="timeline-list">
+              <div class="timeline-item"><strong>12:42</strong><span>PrimeOS nhận sentiment spike từ Signal Hub và gắn thẻ risk: pricing_confusion.</span></div>
+              <div class="timeline-item"><strong>12:44</strong><span>Decision Engine tạo 3 command: reprice combo, refresh FAQ script, lower Meta spend.</span></div>
+              <div class="timeline-item"><strong>12:47</strong><span>POS xác nhận command đã publish tới tất cả cửa hàng tier-1.</span></div>
+              <div class="timeline-item"><strong>12:50</strong><span>CRM queue nhận trigger chăm sóc cho cohort đã complain nhưng chưa churn.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer-note">Standalone demo page cho PrimeOS core control tower.</div>
+  </div>
+</body>
+</html>

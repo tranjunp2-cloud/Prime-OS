@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KOL Dashboard - PrimeOS</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .creator-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .creator-board {
+      display: grid;
+      gap: 14px;
+    }
+
+    .creator-row {
+      display: grid;
+      grid-template-columns: 1fr 120px 120px;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+    }
+
+    .creator-info strong { display: block; margin-bottom: 4px; }
+    .creator-info span { font-size: 13px; color: var(--text-secondary); }
+
+    .funnel-stage {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .funnel-card {
+      padding: 16px;
+      border-radius: var(--radius-md);
+      text-align: center;
+    }
+
+    .funnel-card-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .funnel-card-value {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .funnel-card-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .funnel-card:nth-child(1) { background: var(--primary-subtle); }
+    .funnel-card:nth-child(2) { background: var(--success-subtle); }
+    .funnel-card:nth-child(3) { background: var(--warning-subtle); }
+    .funnel-card:nth-child(4) { background: var(--danger-subtle); }
+
+    @media (max-width: 1200px) { .creator-stats { grid-template-columns: 1fr; } .funnel-stage { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;">
+          <div class="sidebar-logo-icon">P</div>
+          <div class="sidebar-logo-text">PrimeOS</div>
+        </a>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Dashboard Suite</div>
+          <a class="sidebar-link" href="social-listening.html" data-module="social-listening"><span class="sidebar-link-icon">📡</span><span>Social Listening</span></a>
+          <a class="sidebar-link active" href="kol.html" data-module="kol"><span class="sidebar-link-icon">🎯</span><span>KOL</span></a>
+          <a class="sidebar-link" href="ads.html" data-module="ads"><span class="sidebar-link-icon">📈</span><span>ADS</span></a>
+          <a class="sidebar-link" href="primeos.html" data-module="primeos"><span class="sidebar-link-icon">🧠</span><span>PrimeOS</span></a>
+          <a class="sidebar-link" href="crm.html" data-module="crm"><span class="sidebar-link-icon">👥</span><span>CRM</span></a>
+          <a class="sidebar-link" href="pos.html" data-module="pos"><span class="sidebar-link-icon">🛒</span><span>POS</span></a>
+          <a class="sidebar-link" href="cos.html" data-module="cos"><span class="sidebar-link-icon">🧩</span><span>COS</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn active" onclick="window.location.href='primeos.html'">🏢 Admin</button><button type="button" class="role-btn" onclick="window.location.href='../seller-dashboards/overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">KO</div><div class="sidebar-user-info"><div class="sidebar-user-name">Creator Ops</div><div class="sidebar-user-role">KOL Team</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>PrimeOS</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">KOL Dashboard</span></div><div class="header-title">Creator Operations</div></div></div>
+        <div class="header-right">
+          <div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search creator, campaign" /><span class="search-box-shortcut">/</span></div>
+          <button type="button" class="btn btn-primary" id="refreshBtn">Refresh Data</button>
+        </div>
+      </header>
+      <main class="content-area animate-fade-in">
+        <div class="filters-bar">
+          <div class="filter-group"><span class="filter-label">Campaign</span><select class="filter-select"><option value="all">All campaigns</option><option value="glow-reset" selected>Glow Reset 4.4</option><option value="spring-sale">Spring Sale</option></select></div>
+          <div class="filter-group"><span class="filter-label">Creator tier</span><select class="filter-select"><option value="all">All tiers</option><option value="tier-1">Tier 1 (Top)</option><option value="tier-2">Tier 2</option><option value="tier-3">Tier 3</option></select></div>
+          <div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Livestream GMV</span><span class="stat-trend up">↑ 12%</span></div><div class="stat-value">412M</div><div class="stat-comparison">VND revenue this campaign</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Top Creator CVR</span><span class="stat-trend up">+2.1x</span></div><div class="stat-value">7.4%</div><div class="stat-comparison">Hana Beauty vs cluster avg</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Comment trigger</span><span class="stat-trend down">58%</span></div><div class="stat-value">58%</div><div class="stat-comparison">negative from live viewers</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Audience overlap</span><span class="stat-trend up">+64%</span></div><div class="stat-value">64%</div><div class="stat-comparison">VIP-2 + new moms</div></div>
+        </div>
+        <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+          <section class="card">
+            <div class="card-header"><div class="card-title">Livestream funnel</div><a class="card-action" href="#">View details</a></div>
+            <div class="card-body">
+              <div class="funnel-stage">
+                <div class="funnel-card"><div class="funnel-card-icon">👁️</div><div class="funnel-card-value">95%</div><div class="funnel-card-label">Viewers reached</div></div>
+                <div class="funnel-card"><div class="funnel-card-icon">🛒</div><div class="funnel-card-value">72%</div><div class="funnel-card-label">Add to cart</div></div>
+                <div class="funnel-card"><div class="funnel-card-icon">💬</div><div class="funnel-card-value">68%</div><div class="funnel-card-label">Question spike</div></div>
+                <div class="funnel-card"><div class="funnel-card-icon">❌</div><div class="funnel-card-value">43%</div><div class="funnel-card-label">Drop-off rate</div></div>
+              </div>
+              <div class="creator-board">
+                <div class="creator-row"><div class="creator-info"><strong>Hana Beauty</strong><span>Watch 18m, CVR 7.4%, demand strong but script unclear on refill</span></div><div class="badge badge-warning">Fix Script</div><div class="btn btn-sm btn-secondary">Adjust</div></div>
+                <div class="creator-row"><div class="creator-info"><strong>Lynk Momcare</strong><span>High trust, good sentiment, good for recovery content</span></div><div class="badge badge-success">Recovery</div><div class="btn btn-sm btn-primary">Push Slot</div></div>
+                <div class="creator-row"><div class="creator-info"><strong>Mai Skinlab</strong><span>CTR ok but low overlap with incident cohort</span></div><div class="badge badge-primary">Hold</div><div class="btn btn-sm btn-ghost">View</div></div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; margin-top:20px;">
+          <section class="card"><div class="card-header"><div class="card-title">Budget signals to PrimeOS</div></div><div class="card-body"><div class="insight-panel"><div class="insight-item"><strong>Keep Hana spend</strong><div>Don't cut demand, only fix message and visual pricing</div></div><div class="insight-item"><strong>Add Lynk slot</strong><div>Best for explanation content in next 6h</div></div></div></div></section>
+          <section class="card"><div class="card-header"><div class="card-title">Audience map overlap</div></div><div class="card-body"><div class="insight-panel"><div class="insight-item"><strong>New moms</strong><div>Most asking about refill savings and value calculation</div></div><div class="insight-item"><strong>VIP-2</strong><div>Sensitive to live vs store price mismatch</div></div></div></div></section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>PrimeOSDashboard.init({module:"kol",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"}})</script>
+</body>
+</html>

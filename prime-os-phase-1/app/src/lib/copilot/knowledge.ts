@@ -27,7 +27,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
       ],
       content: [
         'Mình đang hỗ trợ 4 lớp việc chính ngay trong app:',
-        '- trả lời câu hỏi về workflow SaaS và các module ECH',
+        '- trả lời câu hỏi về workflow SaaS và các module PrimeOS',
         '- giải thích ngữ cảnh của page hoặc entity bạn đang mở',
         '- mở đúng màn hình / bộ lọc phù hợp cho user',
         '- chuẩn bị low-risk draft như prefill Create Product để user chỉ cần review rồi submit',
@@ -74,7 +74,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Inventory and order execution live in other towers',
       ],
       content:
-        'Trong ECH, Product Master là nơi giữ identity của hàng hóa: SKU, brand, media, pricing, compliance, và variant structure. Nó không phải nơi tính ATS hay điều phối order execution; các phần đó đi qua Inventory và OMS/Fulfillment.',
+        'Trong PrimeOS, Product Master là nơi giữ identity của hàng hóa: SKU, brand, media, pricing, compliance, và variant structure. Nó không phải nơi tính ATS hay điều phối order execution; các phần đó đi qua Inventory và OMS/Fulfillment.',
     },
   },
   {
@@ -88,7 +88,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Capabilities and status determine operational fit',
       ],
       content: [
-        'ECH hiện đang xoay quanh vài nhóm warehouse chính:',
+        'PrimeOS hiện đang xoay quanh vài nhóm warehouse chính:',
         '- internal: kho vận hành trực tiếp',
         '- fba / fbs: kho marketplace-managed',
         '- 3pl: đối tác fulfillment ngoài',

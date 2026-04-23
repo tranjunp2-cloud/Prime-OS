@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS Ecosystem Architecture</title>
+  <style>
+    :root {
+      --bg: #06111f;
+      --panel: rgba(10, 18, 31, 0.82);
+      --panel-soft: rgba(15, 23, 42, 0.68);
+      --border: #274155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --purple: #8b5cf6;
+      --violet: #8b5cf6;
+      --cyan: #22d3ee;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --lime: #a3e635;
+      --line: rgba(148, 163, 184, 0.22);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(34, 211, 238, 0.08), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.08), transparent 32%),
+        linear-gradient(180deg, #07101d 0%, #020617 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 18px;
+    }
+
+    .wrapper {
+      width: min(96vw, 1800px);
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      margin: 0 0 10px;
+      font-size: 36px;
+      line-height: 1.2;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--purple), var(--emerald));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .canvas {
+      position: relative;
+      width: 100%;
+      height: min(88vh, 1100px);
+      min-height: 860px;
+      margin: 0 auto;
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+        radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0) 0 0 / 40px 40px,
+        var(--panel);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(18px);
+      touch-action: none;
+    }
+
+    .canvas::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 24%, rgba(34, 211, 238, 0.05) 24%, rgba(34, 211, 238, 0.05) 26%, transparent 26%),
+        linear-gradient(90deg, transparent 49%, rgba(139, 92, 246, 0.07) 49%, rgba(139, 92, 246, 0.07) 51%, transparent 51%),
+        linear-gradient(90deg, transparent 74%, rgba(52, 211, 153, 0.05) 74%, rgba(52, 211, 153, 0.05) 76%, transparent 76%);
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    svg.flow-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .node {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      min-width: 220px;
+      max-width: 240px;
+      border-radius: 18px;
+      padding: 18px;
+      border: 1px solid;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 24px rgba(255,255,255,0.06);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .node:hover {
+      transform: translate(-50%, -50%) scale(1.02);
+    }
+
+    .node.dragging {
+      cursor: grabbing;
+      z-index: 20;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.6);
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.07) 50%, transparent 80%);
+      transform: translateX(-100%);
+      transition: transform 0.8s ease;
+    }
+
+    .node:hover::before { transform: translateX(100%); }
+
+    .node-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      position: relative;
+      z-index: 1;
+    }
+
+    .icon {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: rgba(2, 6, 23, 0.55);
+      font-size: 18px;
+    }
+
+    .node-title {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .features {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .features li {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      color: #cbd5e1;
+      font-size: 12.5px;
+      line-height: 1.45;
+      margin-bottom: 7px;
+    }
+
+    .node-caption {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      position: relative;
+      z-index: 1;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      margin-top: 5px;
+      flex: 0 0 auto;
+    }
+
+    .purple {
+      color: #ddd6fe;
+      background: linear-gradient(180deg, rgba(91, 33, 182, 0.28), rgba(30, 41, 59, 0.92));
+      border-color: rgba(167, 139, 250, 0.58);
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.22);
+    }
+
+    .emerald {
+      color: #a7f3d0;
+      background: linear-gradient(180deg, rgba(6, 95, 70, 0.26), rgba(30, 41, 59, 0.92));
+      border-color: rgba(52, 211, 153, 0.52);
+      box-shadow: 0 0 22px rgba(52, 211, 153, 0.18);
+    }
+
+    .red {
+      color: #fecdd3;
+      background: linear-gradient(180deg, rgba(159, 18, 57, 0.26), rgba(30, 41, 59, 0.92));
+      border-color: rgba(251, 113, 133, 0.5);
+      box-shadow: 0 0 22px rgba(251, 113, 133, 0.16);
+    }
+
+    .lime {
+      color: #ecfccb;
+      background: linear-gradient(180deg, rgba(77, 124, 15, 0.24), rgba(30, 41, 59, 0.92));
+      border-color: rgba(163, 230, 53, 0.48);
+      box-shadow: 0 0 22px rgba(163, 230, 53, 0.14);
+    }
+
+    .legend {
+      max-width: 100%;
+      margin: 16px auto 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .flow-bg {
+      fill: none;
+      stroke: var(--line);
+    }
+
+    .flow-animated {
+      fill: none;
+      stroke: rgba(34, 211, 238, 0.88);
+      stroke-linecap: round;
+      animation: pulseLine 2.4s ease-in-out infinite;
+    }
+
+    .flow-inbound {
+      fill: none;
+      stroke: rgba(251, 191, 36, 0.85);
+      stroke-linecap: round;
+      opacity: 0.9;
+    }
+
+    .label-box {
+      fill: rgba(7, 16, 29, 0.97);
+      stroke: #36526b;
+      stroke-width: 1;
+    }
+
+    .label-text {
+      fill: #cbd5e1;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-anchor: middle;
+    }
+
+    .lane-title {
+      position: absolute;
+      top: 14px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #8ea4bb;
+      background: rgba(7, 16, 29, 0.74);
+      border: 1px solid rgba(71, 85, 105, 0.45);
+      border-radius: 999px;
+      padding: 6px 12px;
+      backdrop-filter: blur(10px);
+      z-index: 2;
+    }
+
+    .lane-left { left: 32px; }
+    .lane-center { left: 50%; transform: translateX(-50%); }
+    .lane-right { right: 32px; }
+
+    @keyframes pulseLine {
+      0%, 100% { opacity: 0.82; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 1280px) {
+      body { overflow-x: auto; }
+      .wrapper { min-width: 1500px; }
+    }
+
+    @media (max-width: 980px) {
+      .canvas {
+        min-height: 760px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>PrimeOS Ecosystem Architecture</h1>
+      <p>Sơ đồ luồng dữ liệu tương tác (I/O) thời gian thực</p>
+    </div>
+
+    <div class="canvas" id="canvas">
+      <div class="lane-title lane-left">Amplifier & Listening</div>
+      <div class="lane-title lane-center">PrimeOS Core</div>
+      <div class="lane-title lane-right">Destination & Operations</div>
+      <svg class="flow-layer" id="flowLayer" viewBox="0 0 1380 900" preserveAspectRatio="none">
+        <title>PrimeOS architecture data flow diagram</title>
+      </svg>
+    </div>
+
+    <div class="legend">
+      Click vào từng node để mở dashboard SaaS tương ứng trong workspace PrimeOS.
+    </div>
+  </div>
+
+  <script>
+    const systemNodes = {
+      primeOS: {
+        id: 'primeOS', title: 'PrimeOS', icon: '🧠', cls: 'purple',
+        x: 50, y: 50,
+        caption: 'Trung tâm điều phối',
+        features: ['Control Tower', 'Data Unification (SSOT)', 'Workflow Orchestration', 'Decision Engine']
+      },
+      socialListening: {
+        id: 'socialListening', title: 'Social Listening', icon: '📡', cls: 'red',
+        x: 27, y: 50,
+        caption: 'Khối nghiên cứu tín hiệu',
+        features: ['Customer Insight', 'Sentiment Analysis', 'Trend Detection']
+      },
+      crm: {
+        id: 'crm', title: 'CRM', icon: '👥', cls: 'emerald',
+        x: 78, y: 22,
+        caption: 'Hồ sơ khách hàng hợp nhất',
+        features: ['Customer Profile', 'Interaction Tracking', 'Segmentation', 'Loyalty / Retention']
+      },
+      pos: {
+        id: 'pos', title: 'POS', icon: '🛒', cls: 'emerald',
+        x: 81, y: 50,
+        caption: 'Điểm bán & giao dịch',
+        features: ['Order Management', 'Payment', 'Inventory sync', 'Sales Data', 'Traffic', 'Promotion / coupon', 'Conversion', 'Checkout flow']
+      },
+      cos: {
+        id: 'cos', title: 'COS', icon: '🧩', cls: 'emerald',
+        x: 78, y: 78,
+        caption: 'Commerce operations system',
+        features: ['Listing Management', 'Inventory Management', 'Order Sync', 'Fulfillment', 'Multi-channel Orch.']
+      },
+      kol: {
+        id: 'kol', title: 'KOL', icon: '🎯', cls: 'lime',
+        x: 10, y: 20,
+        caption: 'Nguồn demand creator',
+        features: ['Booking', 'Livestream', 'Data Enrich']
+      },
+      ads: {
+        id: 'ads', title: 'ADS', icon: '📈', cls: 'lime',
+        x: 10, y: 50,
+        caption: 'Paid media engine',
+        features: ['Ads Campaign', 'Ads Price', 'Ads Booking']
+      },
+      socialMedia: {
+        id: 'socialMedia', title: 'Social Media', icon: '🔗', cls: 'lime',
+        x: 10, y: 80,
+        caption: 'Kênh cộng đồng & nội dung',
+        features: ['Facebook', 'Youtube', 'Tiktok', 'Threads', 'X / Github', 'Whatsapp/Zalo...', 'Email / Line']
+      }
+    };
+
+    const flows = [
+      {
+        from: 'kol', to: 'socialListening',
+        labelOut: 'Chỉ số hiệu quả KOL',
+        labelIn: 'Booking brief / creator list',
+        curve: 0.02
+      },
+      {
+        from: 'ads', to: 'socialListening',
+        labelOut: 'CTR / CPC / comment stream',
+        labelIn: 'Media plan / budget rule',
+        curve: 0
+      },
+      {
+        from: 'socialMedia', to: 'socialListening',
+        labelOut: 'Mention / UGC / sentiment',
+        labelIn: 'Content response / moderation',
+        curve: -0.02
+      },
+      {
+        from: 'socialListening', to: 'primeOS',
+        labelOut: 'Insight / trend / audience pulse',
+        labelIn: 'Scenario / direction command',
+        curve: 0,
+        thick: true
+      },
+      {
+        from: 'primeOS', to: 'crm',
+        labelOut: 'Audience sync / buying signals',
+        labelIn: 'Loyalty trigger / segment refresh',
+        curve: 0.08
+      },
+      {
+        from: 'primeOS', to: 'pos',
+        labelOut: 'Sales feedback / order truth',
+        labelIn: 'Price / promo / stock sync',
+        curve: 0,
+        thick: true
+      },
+      {
+        from: 'primeOS', to: 'cos',
+        labelOut: 'Demand forecast / multi-channel load',
+        labelIn: 'Inventory allocation / listing ops',
+        curve: -0.08
+      }
+    ];
+
+    const canvas = document.getElementById('canvas');
+    const flowLayer = document.getElementById('flowLayer');
+    const prototypeRoutes = {
+      socialListening: 'PrimeOS/dashboards/social-listening.html',
+      kol: 'PrimeOS/dashboards/kol.html',
+      ads: 'PrimeOS/dashboards/ads.html',
+      primeOS: 'PrimeOS/dashboards/primeos.html',
+      crm: 'PrimeOS/dashboards/crm.html',
+      pos: 'PrimeOS/dashboards/pos.html',
+      cos: 'PrimeOS/dashboards/cos.html'
+    };
+
+    const nodeElements = new Map();
+    let activeDrag = null;
+    const clickSuppression = {
+      nodeId: null,
+      until: 0,
+    };
+
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function createNode(node) {
+      const div = document.createElement('div');
+      div.className = `node ${node.cls}`;
+      div.style.left = `${node.x}%`;
+      div.style.top = `${node.y}%`;
+      div.dataset.nodeId = node.id;
+      div.title = 'Click để mở dashboard SaaS';
+
+      div.innerHTML = `
+        <div class="node-header">
+          <div class="icon">${node.icon}</div>
+          <h3 class="node-title">${node.title}</h3>
+        </div>
+        <p class="node-caption">${node.caption || ''}</p>
+        <ul class="features">
+          ${node.features.map(f => `<li><span class="dot" style="background: currentColor"></span><span>${f}</span></li>`).join('')}
+        </ul>
+      `;
+
+      div.addEventListener('pointerdown', (event) => startDrag(event, node.id));
+      div.addEventListener('click', (event) => handleNodeClick(event, node.id));
+      canvas.appendChild(div);
+      nodeElements.set(node.id, div);
+    }
+
+    function handleNodeClick(event, nodeId) {
+      if (activeDrag && activeDrag.nodeId === nodeId) return;
+      if (event.detail > 1) return;
+
+      const now = Date.now();
+      if (clickSuppression.nodeId === nodeId && clickSuppression.until > now) {
+        return;
+      }
+
+      openPrototype(nodeId);
+    }
+
+    function openPrototype(nodeId) {
+      const route = prototypeRoutes[nodeId];
+      if (!route) return;
+      window.location.href = route;
+    }
+
+    function percentToPoint(node) {
+      return { x: node.x * 13.8, y: node.y * 9 };
+    }
+
+    function createSVG(tag, attrs) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+      return el;
+    }
+
+    function addMarkerDefs() {
+      const defs = createSVG('defs', {});
+
+      const outMarker = createSVG('marker', {
+        id: 'arrowOut', viewBox: '0 0 10 10', refX: '8', refY: '5',
+        markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse'
+      });
+      outMarker.appendChild(createSVG('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#22d3ee' }));
+
+      const inMarker = createSVG('marker', {
+        id: 'arrowIn', viewBox: '0 0 10 10', refX: '8', refY: '5',
+        markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse'
+      });
+      inMarker.appendChild(createSVG('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#fbbf24' }));
+
+      defs.appendChild(outMarker);
+      defs.appendChild(inMarker);
+      flowLayer.appendChild(defs);
+    }
+
+    function pointOnBezier(t, p0, p1, p2, p3) {
+      const mt = 1 - t;
+      const x = (mt ** 3) * p0.x + 3 * (mt ** 2) * t * p1.x + 3 * mt * (t ** 2) * p2.x + (t ** 3) * p3.x;
+      const y = (mt ** 3) * p0.y + 3 * (mt ** 2) * t * p1.y + 3 * mt * (t ** 2) * p2.y + (t ** 3) * p3.y;
+      return { x, y };
+    }
+
+    function renderFlows() {
+      flowLayer.innerHTML = '';
+      addMarkerDefs();
+      flows.forEach(createFlow);
+    }
+
+    function updateNodePosition(nodeId) {
+      const node = systemNodes[nodeId];
+      const element = nodeElements.get(nodeId);
+      if (!node || !element) return;
+      element.style.left = `${node.x}%`;
+      element.style.top = `${node.y}%`;
+    }
+
+    function startDrag(event, nodeId) {
+      event.preventDefault();
+      const node = systemNodes[nodeId];
+      const element = nodeElements.get(nodeId);
+      if (!node || !element) return;
+
+      activeDrag = {
+        nodeId,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+      };
+
+      element.classList.add('dragging');
+      element.setPointerCapture(event.pointerId);
+    }
+
+    function handlePointerMove(event) {
+      if (!activeDrag) return;
+      const node = systemNodes[activeDrag.nodeId];
+      if (!node) return;
+
+      const deltaX = event.clientX - activeDrag.startX;
+      const deltaY = event.clientY - activeDrag.startY;
+      if (!activeDrag.moved && Math.hypot(deltaX, deltaY) > 4) {
+        activeDrag.moved = true;
+      }
+
+      const canvasRect = canvas.getBoundingClientRect();
+
+      const xPercent = ((event.clientX - canvasRect.left) / canvasRect.width) * 100;
+      const yPercent = ((event.clientY - canvasRect.top) / canvasRect.height) * 100;
+
+      node.x = clamp(Number(xPercent.toFixed(2)), 8, 92);
+      node.y = clamp(Number(yPercent.toFixed(2)), 10, 90);
+
+      updateNodePosition(activeDrag.nodeId);
+      renderFlows();
+    }
+
+    function endDrag() {
+      if (!activeDrag) return;
+      const nodeId = activeDrag.nodeId;
+      const moved = activeDrag.moved;
+
+      const element = nodeElements.get(nodeId);
+      if (element) {
+        element.classList.remove('dragging');
+        if (activeDrag.pointerId !== undefined) {
+          try {
+            element.releasePointerCapture(activeDrag.pointerId);
+          } catch (_) {}
+        }
+      }
+
+      if (moved) {
+        clickSuppression.nodeId = nodeId;
+        clickSuppression.until = Date.now() + 300;
+      }
+
+      activeDrag = null;
+    }
+
+    function createFlow(flow) {
+      const start = percentToPoint(systemNodes[flow.from]);
+      const end = percentToPoint(systemNodes[flow.to]);
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const curve = flow.curve || 0;
+      const bendFactor = 12;
+      const c1 = { x: start.x + dx * 0.33 + dy * curve * bendFactor, y: start.y + dy * 0.33 - dx * curve * bendFactor };
+      const c2 = { x: start.x + dx * 0.67 + dy * curve * bendFactor, y: start.y + dy * 0.67 - dx * curve * bendFactor };
+      const pathD = `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
+
+      const bg = createSVG('path', {
+        d: pathD,
+        class: 'flow-bg',
+        'stroke-width': flow.thick ? 4 : 2
+      });
+
+      const fg = createSVG('path', {
+        d: pathD,
+        class: 'flow-animated',
+        'stroke-width': flow.thick ? 4 : 2,
+        'marker-end': 'url(#arrowOut)'
+      });
+
+      const inbound = createSVG('path', {
+        d: pathD,
+        class: 'flow-inbound',
+        'stroke-width': flow.thick ? 3 : 1.8,
+        'marker-start': 'url(#arrowIn)'
+      });
+
+      flowLayer.appendChild(bg);
+      flowLayer.appendChild(fg);
+      flowLayer.appendChild(inbound);
+
+      const middle = pointOnBezier(0.5, start, c1, c2, end);
+
+      const group = createSVG('g', { transform: `translate(${middle.x}, ${middle.y})` });
+      const rect = createSVG('rect', { x: -88, y: -22, width: 176, height: 44, rx: 10, class: 'label-box' });
+      const text1 = createSVG('text', { x: 0, y: -6, class: 'label-text' });
+      text1.textContent = `${flow.labelOut} ➡`;
+      const text2 = createSVG('text', { x: 0, y: 14, class: 'label-text' });
+      text2.textContent = `⬅ ${flow.labelIn}`;
+
+      group.appendChild(rect);
+      group.appendChild(text1);
+      group.appendChild(text2);
+      flowLayer.appendChild(group);
+    }
+
+    Object.values(systemNodes).forEach(createNode);
+    renderFlows();
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+  </script>
+</body>
+</html>

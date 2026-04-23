@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS Control Tower</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .command-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .rule-list { display: grid; gap: 12px; }
+    .rule-item { padding: 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-surface); }
+    .timeline-list { display: grid; gap: 12px; }
+    .timeline-item { display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius-md); }
+    .timeline-time { font-size: 12px; font-weight: 700; color: var(--warning); text-transform: uppercase; letter-spacing: 0.08em; }
+    @media (max-width: 1200px) { .command-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;">
+          <div class="sidebar-logo-icon">P</div>
+          <div class="sidebar-logo-text">PrimeOS</div>
+        </a>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Dashboard Suite</div>
+          <a class="sidebar-link" href="social-listening.html" data-module="social-listening"><span class="sidebar-link-icon">📡</span><span>Social Listening</span></a>
+          <a class="sidebar-link" href="kol.html" data-module="kol"><span class="sidebar-link-icon">🎯</span><span>KOL</span></a>
+          <a class="sidebar-link" href="ads.html" data-module="ads"><span class="sidebar-link-icon">📈</span><span>ADS</span></a>
+          <a class="sidebar-link active" href="primeos.html" data-module="primeos"><span class="sidebar-link-icon">🧠</span><span>PrimeOS</span></a>
+          <a class="sidebar-link" href="crm.html" data-module="crm"><span class="sidebar-link-icon">👥</span><span>CRM</span></a>
+          <a class="sidebar-link" href="pos.html" data-module="pos"><span class="sidebar-link-icon">🛒</span><span>POS</span></a>
+          <a class="sidebar-link" href="cos.html" data-module="cos"><span class="sidebar-link-icon">🧩</span><span>COS</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn active" onclick="window.location.href='primeos.html'">🏢 Admin</button><button type="button" class="role-btn" onclick="window.location.href='../seller-dashboards/overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">PO</div><div class="sidebar-user-info"><div class="sidebar-user-name">PrimeOS Ops</div><div class="sidebar-user-role">Control Tower</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>PrimeOS</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">Control Tower</span></div><div class="header-title">Decision Orchestration</div></div></div>
+        <div class="header-right"><div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search command, rule, incident" /></div><button type="button" class="btn btn-primary" id="refreshBtn">Sync All</button></div>
+      </header>
+      <main class="content-area animate-fade-in">
+        <div class="filters-bar"><div class="filter-group"><span class="filter-label">Mode</span><select class="filter-select"><option value="live">Live</option><option value="review">Review</option></select></div><div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div></div>
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Signals/min</span><span class="stat-trend up">128</span></div><div class="stat-value">128</div><div class="stat-comparison">unified input stream</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Priority alerts</span><span class="stat-trend down">9</span></div><div class="stat-value">09</div><div class="stat-comparison">pricing_confusion_refill is top</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Auto commands</span><span class="stat-trend up">3</span></div><div class="stat-value">03</div><div class="stat-comparison">CRM, POS, COS dispatch</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Decision confidence</span><span class="stat-trend up">86%</span></div><div class="stat-value">86%</div><div class="stat-comparison">above automation threshold</div></div>
+        </section>
+
+        <div class="command-grid">
+          <section class="card">
+            <div class="card-header"><div class="card-title">Rule evaluation engine</div><a class="card-action" href="#">Policy settings</a></div>
+            <div class="card-body">
+              <div class="rule-list">
+                <div class="rule-item"><strong>Promo Guardrail</strong><div>Do not scale combo if pricing narrative not unified across livestream and store channels.</div></div>
+                <div class="rule-item"><strong>Retention Recovery</strong><div>Complainer cohort must enter CRM playbook before paid retargeting resumes.</div></div>
+                <div class="rule-item"><strong>Inventory Pressure</strong><div>Store C18 and D03 under stock pressure; request COS protection before demand scaling.</div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header"><div class="card-title">Command queue</div><a class="card-action" href="#">Open queue manager</a></div>
+            <div class="card-body">
+              <div style="overflow:auto;">
+                <table class="data-table">
+                  <thead><tr><th>Command ID</th><th>Target</th><th>Description</th><th>Status</th></tr></thead>
+                  <tbody id="commandTableBody">
+                    <tr data-status="queued"><td>CMD-CRM-441</td><td>CRM</td><td>Refresh incident segment and launch win-back script</td><td><span class="badge badge-success">Queued</span></td></tr>
+                    <tr data-status="running"><td>CMD-POS-812</td><td>POS</td><td>Publish combo explanation to 42 stores</td><td><span class="badge badge-info">Running</span></td></tr>
+                    <tr data-status="review"><td>CMD-COS-203</td><td>COS</td><td>Reroute stock and reduce low-stock exposure</td><td><span class="badge badge-warning">Review</span></td></tr>
+                    <tr data-status="running"><td>CMD-ADS-110</td><td>ADS</td><td>Reduce 20% spend on old pricing creatives</td><td><span class="badge badge-info">Running</span></td></tr>
+                    <tr data-status="done"><td>CMD-SL-026</td><td>Listening</td><td>Attach normalized incident tag and cohort overlap</td><td><span class="badge badge-primary">Done</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pagination"><div class="pagination-info"><span id="commandTotal">0</span> commands matched</div><div class="pagination-controls" id="commandPagination"></div></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="card" style="margin-top:20px;">
+          <div class="card-header"><div class="card-title">Audit timeline</div><a class="card-action" href="#">Export timeline</a></div>
+          <div class="card-body">
+            <div class="timeline-list">
+              <div class="timeline-item"><div class="timeline-time">12:42</div><div><strong>Incident detected</strong><div>Social Listening tags pricing_confusion_refill and routes to PrimeOS</div></div></div>
+              <div class="timeline-item"><div class="timeline-time">12:44</div><div><strong>Context merged</strong><div>KOL uplift, ads fatigue, CRM overlap and POS risk unified into one decision context</div></div></div>
+              <div class="timeline-item"><div class="timeline-time">12:46</div><div><strong>Commands dispatched</strong><div>3 core commands issued to CRM, POS, COS with confidence 86%</div></div></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>
+    PrimeOSDashboard.init({
+      module:"primeos",
+      timestampId:"lastSync",
+      refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"},
+      table:{tableBodyId:"commandTableBody",paginationId:"commandPagination",totalCountId:"commandTotal",pageSize:4}
+    })
+  </script>
+</body>
+</html>

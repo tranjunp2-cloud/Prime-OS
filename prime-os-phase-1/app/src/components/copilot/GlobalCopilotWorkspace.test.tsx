@@ -2,8 +2,8 @@
 
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalCopilotWorkspace } from './GlobalCopilotWorkspace';
 
 const mockEngine = {
@@ -82,6 +82,10 @@ vi.mock('./GlobalCopilotFAB', () => ({
 }));
 
 describe('GlobalCopilotWorkspace', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     const storage = (() => {
       let store = new Map<string, string>();
@@ -111,7 +115,7 @@ describe('GlobalCopilotWorkspace', () => {
     mockEngine.initialize.mockClear();
   });
 
-  it('renders the desktop assistant surface and initializes the engine', () => {
+  it('initializes the engine and opens the desktop assistant when toggled', () => {
     render(
       <GlobalCopilotWorkspace>
         <div>main content</div>
@@ -119,8 +123,10 @@ describe('GlobalCopilotWorkspace', () => {
     );
 
     expect(screen.getByText('main content')).toBeInTheDocument();
-    expect(screen.getByTestId('assistant-surface')).toHaveTextContent('Orders');
     expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('assistant-fab'));
+    expect(screen.getByTestId('assistant-surface')).toHaveTextContent('Orders');
   });
 
   it('persists desktop assistant preference in local storage', () => {
@@ -130,7 +136,10 @@ describe('GlobalCopilotWorkspace', () => {
       </GlobalCopilotWorkspace>,
     );
 
-    expect(window.localStorage.getItem('ech.assistant.desktop-open')).toBe('expanded');
+    expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('closed');
+
+    fireEvent.click(screen.getByTestId('assistant-fab'));
+    expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('open');
   });
 
   it('falls back to FAB + drawer on mobile and opens the drawer on click', () => {

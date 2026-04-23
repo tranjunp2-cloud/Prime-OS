@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customers - PrimeOS Seller</title>
+  <link rel="stylesheet" href="../shared.css" />
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;"><div class="sidebar-logo-icon">P</div><div class="sidebar-logo-text">PrimeOS</div></a></div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Seller Workspace</div>
+          <a class="sidebar-link" href="overview.html"><span class="sidebar-link-icon">📊</span><span>Overview</span></a>
+          <a class="sidebar-link" href="products.html"><span class="sidebar-link-icon">📦</span><span>Products</span></a>
+          <a class="sidebar-link" href="orders.html"><span class="sidebar-link-icon">🛍️</span><span>Orders</span></a>
+          <a class="sidebar-link active" href="customers.html"><span class="sidebar-link-icon">👤</span><span>Customers</span></a>
+          <a class="sidebar-link" href="ads.html"><span class="sidebar-link-icon">📢</span><span>Ads Manager</span></a>
+          <a class="sidebar-link" href="analytics.html"><span class="sidebar-link-icon">📈</span><span>Analytics</span></a>
+          <a class="sidebar-link" href="recommendations.html"><span class="sidebar-link-icon">💡</span><span>AI Recommendations</span></a>
+          <a class="sidebar-link" href="settings.html"><span class="sidebar-link-icon">⚙️</span><span>Settings</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn" onclick="window.location.href='../dashboards/primeos.html'">🏢 Admin</button><button type="button" class="role-btn active" onclick="window.location.href='overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">SM</div><div class="sidebar-user-info"><div class="sidebar-user-name">Seller Account</div><div class="sidebar-user-role">Beauty Store Pro</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>Seller</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">Customers</span></div><div class="header-title">Customer Management</div></div></div>
+        <div class="header-right"><div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search customer name, email" /></div><button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button></div>
+      </header>
+      <main class="content-area">
+        <div class="filters-bar">
+          <div class="filter-group"><span class="filter-label">Tier</span><select class="filter-select"><option value="all">All Tiers</option><option value="vip">VIP</option><option value="regular">Regular</option><option value="new">New</option></select></div>
+          <div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div>
+        </div>
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Total Customers</span></div><div class="stat-value">4,821</div><div class="stat-comparison">Registered accounts</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">VIP Tier</span></div><div class="stat-value">312</div><div class="stat-comparison">6.5% of total</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Repeat Buyers</span></div><div class="stat-value">38%</div><div class="stat-comparison">Returning customers</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Avg. LTV</span></div><div class="stat-value">₫1.2M</div><div class="stat-comparison">Lifetime value</div></div>
+        </section>
+        <section class="card">
+          <div class="card-header"><div class="card-title">Customer list</div><a class="card-action" href="#">Segment customers</a></div>
+          <div class="card-body">
+            <div style="overflow:auto;">
+              <table class="data-table">
+                <thead><tr><th>Customer</th><th>Phone</th><th>Tier</th><th>Total Orders</th><th>Spent</th><th>Last Order</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td>Nguyen Thuy Linh</td><td>0912***789</td><td><span class="badge badge-success">VIP</span></td><td>24</td><td>₫8.4M</td><td>2 days ago</td><td><button type="button" class="btn btn-sm btn-secondary">View</button></td></tr>
+                  <tr><td>Tran Minh Anh</td><td>0987***123</td><td><span class="badge badge-primary">Regular</span></td><td>8</td><td>₫2.1M</td><td>5 days ago</td><td><button type="button" class="btn btn-sm btn-ghost">View</button></td></tr>
+                  <tr><td>Le Hoang Nam</td><td>0905***456</td><td><span class="badge badge-success">VIP</span></td><td>31</td><td>₫12.8M</td><td>Yesterday</td><td><button type="button" class="btn btn-sm btn-secondary">View</button></td></tr>
+                  <tr><td>Pham Ngoc Huyen</td><td>0933***789</td><td><span class="badge badge-primary">Regular</span></td><td>3</td><td>₫890K</td><td>1 week ago</td><td><button type="button" class="btn btn-sm btn-ghost">View</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination"><div class="pagination-info">Showing 4 of 4,821 customers</div><div class="pagination-controls"><button type="button" class="pagination-btn">‹</button><button type="button" class="pagination-btn active">1</button><button type="button" class="pagination-btn">2</button><button type="button" class="pagination-btn">›</button></div></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>PrimeOSDashboard.init({module:"customers",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"}})</script>
+</body>
+</html>

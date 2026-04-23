@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products - PrimeOS Seller</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .product-card { padding: 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-surface); }
+    .product-image { height: 100px; background: var(--bg-hover); border-radius: var(--radius-sm); margin-bottom: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); }
+    .product-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .product-price { font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+    .product-stock { font-size: 12px; color: var(--text-secondary); }
+    @media (max-width: 1200px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 768px) { .product-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;"><div class="sidebar-logo-icon">P</div><div class="sidebar-logo-text">PrimeOS</div></a></div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Seller Workspace</div>
+          <a class="sidebar-link" href="overview.html"><span class="sidebar-link-icon">📊</span><span>Overview</span></a>
+          <a class="sidebar-link active" href="products.html"><span class="sidebar-link-icon">📦</span><span>Products</span></a>
+          <a class="sidebar-link" href="orders.html"><span class="sidebar-link-icon">🛍️</span><span>Orders</span></a>
+          <a class="sidebar-link" href="customers.html"><span class="sidebar-link-icon">👤</span><span>Customers</span></a>
+          <a class="sidebar-link" href="ads.html"><span class="sidebar-link-icon">📢</span><span>Ads Manager</span></a>
+          <a class="sidebar-link" href="analytics.html"><span class="sidebar-link-icon">📈</span><span>Analytics</span></a>
+          <a class="sidebar-link" href="recommendations.html"><span class="sidebar-link-icon">💡</span><span>AI Recommendations</span></a>
+          <a class="sidebar-link" href="settings.html"><span class="sidebar-link-icon">⚙️</span><span>Settings</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn" onclick="window.location.href='../dashboards/primeos.html'">🏢 Admin</button><button type="button" class="role-btn active" onclick="window.location.href='overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">SM</div><div class="sidebar-user-info"><div class="sidebar-user-name">Seller Account</div><div class="sidebar-user-role">Beauty Store Pro</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>Seller</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">Products</span></div><div class="header-title">Product Management</div></div></div>
+        <div class="header-right"><div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search products, SKU" /></div><button type="button" class="btn btn-primary">+ Add Product</button></div>
+      </header>
+      <main class="content-area">
+        <div class="filters-bar">
+          <div class="filter-group"><span class="filter-label">Status</span><select class="filter-select"><option value="all">All</option><option value="active">Active</option><option value="low-stock">Low Stock</option><option value="inactive">Inactive</option></select></div>
+          <div class="filter-group"><span class="filter-label">Category</span><select class="filter-select"><option value="all">All Categories</option><option value="skincare">Skincare</option><option value="makeup">Makeup</option><option value="supplements">Supplements</option></select></div>
+          <div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div>
+        </div>
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Total SKUs</span></div><div class="stat-value">247</div><div class="stat-comparison">Active products</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Low Stock</span><span class="stat-trend down">18</span></div><div class="stat-value">18</div><div class="stat-comparison">Need restocking</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Marketplace Listed</span></div><div class="stat-value">198</div><div class="stat-comparison">Across 4 channels</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Avg. Price</span></div><div class="stat-value">₫285K</div><div class="stat-comparison">Current catalog</div></div>
+        </section>
+        <section class="card">
+          <div class="card-header"><div class="card-title">Product catalog</div><a class="card-action" href="#">Bulk import</a></div>
+          <div class="card-body">
+            <div class="product-grid">
+              <div class="product-card"><div class="product-image">Serum</div><div class="product-name">Serum Refill 30ml</div><div class="product-price">₫189K</div><div class="product-stock"><span class="badge badge-success">In Stock</span> · 142 units</div></div>
+              <div class="product-card"><div class="product-image">Face Cream</div><div class="product-name">Face Cream 50ml</div><div class="product-price">₫259K</div><div class="product-stock"><span class="badge badge-warning">Low</span> · 8 units</div></div>
+              <div class="product-card"><div class="product-image">Toner</div><div class="product-name">Toner 150ml</div><div class="product-price">₫129K</div><div class="product-stock"><span class="badge badge-success">In Stock</span> · 89 units</div></div>
+              <div class="product-card"><div class="product-image">Sunscreen</div><div class="product-name">Sunscreen SPF50</div><div class="product-price">₫199K</div><div class="product-stock"><span class="badge badge-success">In Stock</span> · 201 units</div></div>
+              <div class="product-card"><div class="product-image">Cleanser</div><div class="product-name">Cleanser 100ml</div><div class="product-price">₫149K</div><div class="product-stock"><span class="badge badge-danger">Out</span> · 0 units</div></div>
+              <div class="product-card"><div class="product-image">Mask</div><div class="product-name">Sheet Mask Pack</div><div class="product-price">₫89K</div><div class="product-stock"><span class="badge badge-success">In Stock</span> · 312 units</div></div>
+              <div class="product-card"><div class="product-image">Essence</div><div class="product-name">Essence 30ml</div><div class="product-price">₫219K</div><div class="product-stock"><span class="badge badge-warning">Low</span> · 12 units</div></div>
+              <div class="product-card"><div class="product-image">Eye Cream</div><div class="product-name">Eye Cream 15ml</div><div class="product-price">₫299K</div><div class="product-stock"><span class="badge badge-success">In Stock</span> · 45 units</div></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>PrimeOSDashboard.init({module:"products",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"}})</script>
+</body>
+</html>

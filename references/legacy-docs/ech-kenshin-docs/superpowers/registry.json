@@ -1,0 +1,60 @@
+{
+  "generated": "2026-04-03T06:12:07Z",
+  "skills": [
+    {
+      "name": "create-nestjs-module",
+      "path": ".ai/skills/create-nestjs-module",
+      "triggers": [
+        "/create-module",
+        "create nestjs module",
+        "create NestJS module"
+      ],
+      "description": "Scaffold a new NestJS domain submodule in a tower (PM, INV, OMS, FUL). Creates folder structure, Drizzle schema, Zod DTOs, service, controller, module registration, and generates database migration.",
+      "hasAutomation": true,
+      "uses": [
+        "database-migration"
+      ]
+    },
+    {
+      "name": "create-react-page",
+      "path": ".ai/skills/create-react-page",
+      "triggers": [
+        "/create-react-page",
+        "create react page",
+        "add react page",
+        "create page"
+      ],
+      "description": "Scaffold a new React page in client-portal or admin-portal. Creates the page component, adds the route to App.tsx. Hooks and business logic remain manual.",
+      "hasAutomation": true,
+      "uses": []
+    },
+    {
+      "name": "debugging-guide",
+      "path": ".ai/skills/debugging-guide.md",
+      "hasAutomation": false
+    },
+    {
+      "name": "pr-review-guide",
+      "path": ".ai/skills/pr-review-guide.md",
+      "hasAutomation": false
+    },
+    {
+      "name": "database-migration",
+      "path": ".ai/skills/database-migration",
+      "triggers": [
+        "database migration",
+        "run migration",
+        "pnpm db:generate",
+        "generate migration"
+      ],
+      "description": "Run Drizzle ORM schema diffing to generate migration SQL files, review the output, and apply migrations via pnpm db:migrate. Handles new tables, column modifications, indexes, and data migrations.",
+      "hasAutomation": true,
+      "uses": []
+    },
+    {
+      "name": "api-endpoint-checklist",
+      "path": ".ai/skills/api-endpoint-checklist.md",
+      "hasAutomation": false
+    }
+  ]
+}

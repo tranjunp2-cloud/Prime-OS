@@ -63,7 +63,7 @@ const journeySteps = [
     step: 5,
     area: 'Finance',
     question: 'Can my operating data support growth capital?',
-    href: '/finance/capital',
+    href: '/finance/capital-readiness',
     icon: CircleDollarSign,
     metricLabel: 'Score',
   },

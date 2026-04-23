@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS SaaS Dashboards</title>
+  <style>
+    :root {
+      --bg: #f3f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fbff;
+      --surface-strong: #eef5ff;
+      --border: #dbe7f3;
+      --text: #10233a;
+      --muted: #6d7f94;
+      --primary: #2563eb;
+      --primary-soft: #dbeafe;
+      --emerald: #059669;
+      --emerald-soft: #d1fae5;
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --rose: #e11d48;
+      --rose-soft: #ffe4e6;
+      --violet: #7c3aed;
+      --violet-soft: #ede9fe;
+      --cyan: #0891b2;
+      --cyan-soft: #cffafe;
+      --shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --radius-sm: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(8, 145, 178, 0.08), transparent 22%),
+        var(--bg);
+      padding: 18px;
+    }
+
+    .app {
+      width: min(98vw, 1860px);
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .topbar,
+    .shell {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(219, 231, 243, 0.9);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar {
+      padding: 18px 22px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 52px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+
+    .topbar p {
+      margin: 12px 0 0;
+      max-width: 960px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.72;
+    }
+
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .hero-card,
+    .stat,
+    .panel,
+    .table-row,
+    .feed-item,
+    .progress-card,
+    .timeline-row,
+    .mini-card,
+    .chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    .hero-card {
+      padding: 14px 16px;
+      background: linear-gradient(180deg, #ffffff, var(--surface-soft));
+    }
+
+    .hero-card strong {
+      display: block;
+      font-size: 28px;
+      letter-spacing: -0.05em;
+      margin-bottom: 6px;
+    }
+
+    .hero-card span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 270px 1fr;
+      min-height: calc(100vh - 182px);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      padding: 18px;
+      border-right: 1px solid var(--border);
+      background: linear-gradient(180deg, #fbfdff, #f4f8fd);
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .brand,
+    .incident {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+    }
+
+    .brand strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 18px;
+      letter-spacing: -0.03em;
+    }
+
+    .brand span,
+    .incident li {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.58;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      padding: 14px;
+      text-align: left;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      transform: translateX(2px);
+      border-color: #bfd4ea;
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.06);
+    }
+
+    .nav-btn.active {
+      border-color: #93c5fd;
+      background: linear-gradient(180deg, #ffffff, #eff6ff);
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+    }
+
+    .nav-btn small {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .nav-btn strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .nav-btn span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.48;
+    }
+
+    .incident h2 {
+      margin: 0 0 10px;
+      color: var(--amber);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .incident ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .workspace {
+      padding: 18px;
+      display: grid;
+    }
+
+    .screen {
+      display: none;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .screen.active { display: grid; }
+
+    .screen-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+    }
+
+    .screen-head h2 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: -0.04em;
+    }
+
+    .screen-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.68;
+      max-width: 920px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+
+    .badge-primary { color: var(--primary); background: var(--primary-soft); border-color: #bfdbfe; }
+    .badge-emerald { color: var(--emerald); background: var(--emerald-soft); border-color: #a7f3d0; }
+    .badge-amber { color: var(--amber); background: var(--amber-soft); border-color: #fde68a; }
+    .badge-rose { color: var(--rose); background: var(--rose-soft); border-color: #fecdd3; }
+    .badge-violet { color: var(--violet); background: var(--violet-soft); border-color: #ddd6fe; }
+    .badge-cyan { color: var(--cyan); background: var(--cyan-soft); border-color: #a5f3fc; }
+
+    .stats-grid,
+    .grid-2,
+    .grid-3,
+    .grid-4,
+    .chips {
+      display: grid;
+      gap: 14px;
+    }
+
+    .stats-grid { grid-template-columns: repeat(4, 1fr); }
+    .grid-2 { grid-template-columns: 1.1fr 0.9fr; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .chips { grid-template-columns: repeat(2, 1fr); }
+
+    .stat {
+      padding: 16px;
+      background: linear-gradient(180deg, #ffffff, var(--surface-soft));
+    }
+
+    .stat small {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .stat strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 30px;
+      letter-spacing: -0.05em;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .panel {
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .panel-body {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 12px;
+      background: var(--surface);
+    }
+
+    .stack,
+    .table,
+    .timeline,
+    .progress-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .feed-item,
+    .table-row,
+    .timeline-row,
+    .mini-card,
+    .progress-card,
+    .chip {
+      padding: 12px 14px;
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .feed-item strong,
+    .table-row strong,
+    .timeline-row strong,
+    .mini-card strong,
+    .progress-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .feed-item span,
+    .table-row span,
+    .timeline-row span,
+    .mini-card span,
+    .progress-card span,
+    .chip {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.58;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 130px 1fr 90px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .time {
+      color: var(--amber);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .progress-head {
+      display: grid;
+      grid-template-columns: 120px 1fr 46px;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .track {
+      height: 10px;
+      border-radius: 999px;
+      background: #e6edf5;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--primary), var(--cyan));
+    }
+
+    .fill-emerald { background: linear-gradient(90deg, #10b981, #34d399); }
+    .fill-amber { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .fill-rose { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+    .fill-violet { background: linear-gradient(90deg, #7c3aed, #818cf8); }
+
+    .footer-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .footer-nav p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .actions button,
+    .actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 124px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid #c7d8ea;
+      background: linear-gradient(180deg, #ffffff, #eff6ff);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+
+    .actions button.secondary {
+      background: #ffffff;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 1380px) {
+      .topbar,
+      .shell,
+      .stats-grid,
+      .grid-2,
+      .grid-3,
+      .grid-4,
+      .chips {
+        grid-template-columns: 1fr;
+      }
+
+      .shell {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 980px) {
+      body { padding: 12px; }
+
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .screen-head,
+      .footer-nav {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .hero-metrics,
+      .table-row,
+      .timeline-row,
+      .progress-head {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="topbar">
+      <div>
+        <div class="eyebrow">PrimeOS SaaS Dashboards</div>
+        <h1>7 dashboard theo kiểu SaaS product</h1>
+        <p>
+          Đây là bộ màn hình mockup theo hướng SaaS dashboard rõ ràng, sạch, trực quan. Mỗi module là một màn riêng với KPI,
+          bảng dữ liệu, queue, activity feed và insight panel, nhưng tất cả vẫn dùng chung một incident:
+          livestream `Glow Reset 4.4` đẩy mạnh demand cho `Serum Refill 30ml` và làm phát sinh `pricing confusion`.
+        </p>
+      </div>
+      <div class="hero-metrics">
+        <div class="hero-card"><strong>18.4K</strong><span>mentions sau livestream trong 90 phút</span></div>
+        <div class="hero-card"><strong>412M</strong><span>GMV phiên live trước khi escalation</span></div>
+        <div class="hero-card"><strong>86%</strong><span>decision confidence tại PrimeOS</span></div>
+        <div class="hero-card"><strong>15m</strong><span>time-to-action mục tiêu của hệ thống</span></div>
+      </div>
+    </section>
+
+    <section class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <strong>PrimeOS Workspace</strong>
+          <span>Bấm từng module để xem dashboard tương ứng như một SaaS product thật.</span>
+        </div>
+
+        <div class="nav-list">
+          <button type="button" class="nav-btn active" data-screen="social-listening">
+            <small>Module 01</small>
+            <strong>Social Listening</strong>
+            <span>Signal monitoring, topic clusters, escalation feed</span>
+          </button>
+          <button type="button" class="nav-btn" data-screen="kol">
+            <small>Module 02</small>
+            <strong>KOL</strong>
+            <span>Creator leaderboard, livestream funnel, overlap</span>
+          </button>
+          <button type="button" class="nav-btn" data-screen="ads">
+            <small>Module 03</small>
+            <strong>ADS</strong>
+            <span>Spend efficiency, fatigue, campaign watchlist</span>
+          </button>
+          <button type="button" class="nav-btn" data-screen="primeos">
+            <small>Module 04</small>
+            <strong>PrimeOS</strong>
+            <span>Decision engine, command queue, audit timeline</span>
+          </button>
+          <button type="button" class="nav-btn" data-screen="crm">
+            <small>Module 05</small>
+            <strong>CRM</strong>
+            <span>Customer 360, retention playbook, case queue</span>
+          </button>
+          <button type="button" class="nav-btn" data-screen="pos">
+            <small>Module 06</small>
+            <strong>POS</strong>
+            <span>Store operations, script sync, pricing patch</span>
+          </button>
+          <button type="button" class="nav-btn" data-screen="cos">
+            <small>Module 07</small>
+            <strong>COS</strong>
+            <span>Inventory, fulfillment, channel execution</span>
+          </button>
+        </div>
+
+        <div class="incident">
+          <h2>Shared Incident</h2>
+          <ul>
+            <li><strong>Campaign:</strong> Glow Reset 4.4 livestream</li>
+            <li><strong>SKU:</strong> Serum Refill 30ml / Full-size 50ml</li>
+            <li><strong>Audience:</strong> New moms high-intent, VIP-2 repeat</li>
+            <li><strong>Issue:</strong> pricing confusion + stock pressure tại tier-1 stores</li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="screen active" id="screen-social-listening">
+          <div class="screen-head">
+            <div>
+              <h2>Social Listening</h2>
+              <p>Dashboard giám sát tín hiệu thị trường. Màn này tập trung vào sentiment, keyword cluster, escalation feed và audience hot spot để xác định incident có đáng chuyển sang PrimeOS hay không.</p>
+            </div>
+            <div class="badge badge-rose">Escalated</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>Live Mentions</small><strong>18.4K</strong><span>+22% so với phiên live gần nhất</span></div>
+            <div class="stat"><small>Negative Drift</small><strong>31%</strong><span>tăng mạnh ở nhóm hỏi về giá</span></div>
+            <div class="stat"><small>Escalation Score</small><strong>82</strong><span>đủ ngưỡng để gửi sang PrimeOS</span></div>
+            <div class="stat"><small>Main Cohort</small><strong>NM-HI</strong><span>new moms high-intent phản ứng rõ nhất</span></div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Topic Clusters</h3>
+                <p>Các cụm tín hiệu chính gây bùng escalation.</p>
+              </div>
+              <div class="panel-body progress-list">
+                <div class="progress-card"><div class="progress-head"><span>Gia refill</span><div class="track"><div class="fill fill-rose" style="width: 92%"></div></div><strong>92</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Combo kho hieu</span><div class="track"><div class="fill fill-rose" style="width: 86%"></div></div><strong>86</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Store quote</span><div class="track"><div class="fill fill-amber" style="width: 74%"></div></div><strong>74</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Refill size</span><div class="track"><div class="fill fill-violet" style="width: 61%"></div></div><strong>61</strong></div></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Escalation Feed</h3>
+                <p>Những insight đã được chuẩn hóa thành alert.</p>
+              </div>
+              <div class="panel-body stack">
+                <div class="feed-item"><div class="meta"><strong>12:40</strong><span class="badge badge-rose">Critical</span></div><span>Negative comments tăng 3.2x ở cụm livestream serum refill.</span></div>
+                <div class="feed-item"><div class="meta"><strong>12:41</strong><span class="badge badge-amber">Mismatch</span></div><span>Store staff và host đang dùng 2 cách mô tả giá khác nhau.</span></div>
+                <div class="feed-item"><div class="meta"><strong>12:42</strong><span class="badge badge-cyan">Sent</span></div><span>Incident tag `pricing_confusion_refill` đã chuyển sang PrimeOS.</span></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Audience Hot Spots</h3>
+                <p>Những điểm nóng cần được CRM và POS nhìn thấy.</p>
+              </div>
+              <div class="panel-body stack">
+                <div class="mini-card"><strong>HCMC cluster</strong><span>48% mention volume, tập trung quanh pickup store questions.</span></div>
+                <div class="mini-card"><strong>Ha Noi cluster</strong><span>26% volume, hỏi nhiều về refill size và savings.</span></div>
+                <div class="mini-card"><strong>CRM overlap</strong><span>64% audience overlap với VIP-2 và new moms high-intent.</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: đây là incident về pricing narrative, không phải product defect.</p>
+            <div class="actions"><button type="button" data-next="kol">Next: KOL</button></div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-kol">
+          <div class="screen-head">
+            <div>
+              <h2>KOL</h2>
+              <p>Dashboard creator performance theo kiểu SaaS vận hành campaign. Màn này cho thấy creator nào vẫn tạo demand tốt, creator nào làm message bị lệch và creator nào phù hợp cho phase recovery.</p>
+            </div>
+            <div class="badge badge-emerald">Demand Active</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>Livestream GMV</small><strong>412M</strong><span>phiên live vẫn rất tốt về doanh số</span></div>
+            <div class="stat"><small>Top Creator CVR</small><strong>7.4%</strong><span>Hana Beauty vượt cluster 2.1x</span></div>
+            <div class="stat"><small>Comment Trigger</small><strong>58%</strong><span>negative comments xuất phát từ live viewers</span></div>
+            <div class="stat"><small>Audience Overlap</small><strong>64%</strong><span>trùng với CRM VIP-2 + new moms</span></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Creator Leaderboard</h3>
+                <p>Hiệu quả creator gắn với operational note.</p>
+              </div>
+              <div class="panel-body table">
+                <div class="table-row"><strong>Hana Beauty</strong><span>CVR 7.4%, watch time 18m, demand rất mạnh nhưng script combo chưa rõ phần refill.</span><div class="badge badge-amber">Fix</div></div>
+                <div class="table-row"><strong>Lynk Momcare</strong><span>Audience trust tốt, sentiment ổn, phù hợp cho content recovery.</span><div class="badge badge-emerald">Push</div></div>
+                <div class="table-row"><strong>Mai Skinlab</strong><span>CTR ổn nhưng overlap thấp với cohort incident.</span><div class="badge badge-primary">Hold</div></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Livestream Funnel</h3>
+                <p>Demand vẫn mạnh nhưng clarity bị giảm.</p>
+              </div>
+              <div class="panel-body progress-list">
+                <div class="progress-card"><div class="progress-head"><span>Viewers</span><div class="track"><div class="fill fill-violet" style="width: 95%"></div></div><strong>95</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Add to cart</span><div class="track"><div class="fill" style="width: 72%"></div></div><strong>72</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Question spike</span><div class="track"><div class="fill fill-amber" style="width: 68%"></div></div><strong>68</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Drop-off</span><div class="track"><div class="fill fill-rose" style="width: 43%"></div></div><strong>43</strong></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel"><div class="panel-head"><h3>Budget Signals</h3><p>Input để chuyển qua PrimeOS.</p></div><div class="panel-body stack"><div class="mini-card"><strong>Keep Hana spend</strong><span>Không cắt demand, chỉ sửa message.</span></div><div class="mini-card"><strong>Add Lynk slot</strong><span>Creator phù hợp để giải thích pricing narrative.</span></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Audience Map</h3><p>Creator data nối với CRM.</p></div><div class="panel-body chips"><div class="chip">New moms hỏi nhiều về refill savings.</div><div class="chip">VIP-2 nhạy với mismatch giữa live và store.</div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Summary</h3><p>Kết luận ở module KOL.</p></div><div class="panel-body stack"><div class="mini-card"><strong>Demand issue = no</strong><span>Problem nằm ở message clarity và downstream execution.</span></div></div></div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: KOL lane cần được tối ưu narrative, không phải tắt demand engine.</p>
+            <div class="actions"><button type="button" class="secondary" data-prev="social-listening">Back</button><button type="button" data-next="ads">Next: ADS</button></div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-ads">
+          <div class="screen-head">
+            <div>
+              <h2>ADS</h2>
+              <p>Dashboard paid media mang tinh thần SaaS marketing ops. Tập trung vào campaign health, spend-at-risk, channel mix và những hành động PrimeOS cần phê duyệt.</p>
+            </div>
+            <div class="badge badge-amber">Guardrails On</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>CTR</small><strong>2.9%</strong><span>vẫn cao nhưng không bền</span></div>
+            <div class="stat"><small>CPC Drift</small><strong>+18%</strong><span>Meta retargeting bắt đầu fatigue</span></div>
+            <div class="stat"><small>Spend at Risk</small><strong>62M</strong><span>nếu tiếp tục dùng creative giá cũ</span></div>
+            <div class="stat"><small>Recovery Channel</small><strong>Zalo</strong><span>kênh tốt cho explanation message</span></div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel">
+              <div class="panel-head"><h3>Campaign Watchlist</h3><p>Những campaign cần can thiệp.</p></div>
+              <div class="panel-body stack">
+                <div class="feed-item"><div class="meta"><strong>Meta Retargeting 15s</strong><span class="badge badge-amber">Fatigue</span></div><span>CPA tăng 11% sau comment spike về pricing.</span></div>
+                <div class="feed-item"><div class="meta"><strong>TikTok Spark Live</strong><span class="badge badge-emerald">Keep</span></div><span>Demand tốt, chỉ cần refresh pinned message.</span></div>
+                <div class="feed-item"><div class="meta"><strong>Zalo OA Boost</strong><span class="badge badge-cyan">Recover</span></div><span>Phù hợp cho nhóm existing buyers cần clarification.</span></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Channel Mix</h3><p>Phân bổ budget theo tín hiệu hiện tại.</p></div>
+              <div class="panel-body progress-list">
+                <div class="progress-card"><div class="progress-head"><span>Meta</span><div class="track"><div class="fill fill-rose" style="width: 76%"></div></div><strong>76</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>TikTok</span><div class="track"><div class="fill fill-violet" style="width: 69%"></div></div><strong>69</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Zalo OA</span><div class="track"><div class="fill fill-emerald" style="width: 42%"></div></div><strong>42</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>YouTube</span><div class="track"><div class="fill" style="width: 28%"></div></div><strong>28</strong></div></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Action Queue</h3><p>Recommendations cho PrimeOS.</p></div><div class="panel-body stack"><div class="mini-card"><strong>Reduce 20% spend</strong><span>Cho ad set đang dùng pricing narrative cũ.</span></div><div class="mini-card"><strong>Shift message</strong><span>Đổi sang “refill savings explained”.</span></div><div class="mini-card"><strong>Check stock</strong><span>Không scale nếu tier-1 stores còn căng hàng.</span></div></div></div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: ads không nên tối ưu độc lập, mà phải chờ quyết định orchestration từ PrimeOS.</p>
+            <div class="actions"><button type="button" class="secondary" data-prev="kol">Back</button><button type="button" data-next="primeos">Next: PrimeOS</button></div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-primeos">
+          <div class="screen-head">
+            <div>
+              <h2>PrimeOS</h2>
+              <p>Dashboard trung tâm theo kiểu SaaS control tower. Đây là màn gom signal, chạy policy, tạo command và cho operator nhìn rõ mọi quyết định đang được đưa xuống CRM, POS và COS.</p>
+            </div>
+            <div class="badge badge-violet">Decision Live</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>Signals / Min</small><strong>128</strong><span>luồng input hợp nhất vào SSOT</span></div>
+            <div class="stat"><small>Priority Alert</small><strong>#01</strong><span>pricing confusion refill</span></div>
+            <div class="stat"><small>Auto Commands</small><strong>03</strong><span>đang chờ hoặc đã dispatch</span></div>
+            <div class="stat"><small>Confidence</small><strong>86%</strong><span>đủ ngưỡng phát lệnh tự động</span></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head"><h3>Rule Evaluation</h3><p>Các rule chính trong decision engine.</p></div>
+              <div class="panel-body stack">
+                <div class="feed-item"><div class="meta"><strong>Promo Guardrail</strong><span class="badge badge-amber">On</span></div><span>Không scale combo nếu narrative pricing chưa đồng bộ.</span></div>
+                <div class="feed-item"><div class="meta"><strong>Retention Recovery</strong><span class="badge badge-emerald">On</span></div><span>Complainers phải đi qua CRM playbook trước paid retargeting.</span></div>
+                <div class="feed-item"><div class="meta"><strong>Inventory Pressure</strong><span class="badge badge-rose">Alert</span></div><span>Store D03 và C18 cần COS bảo vệ stock trước khi demand tăng tiếp.</span></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Command Queue</h3><p>Lệnh phát xuống downstream systems.</p></div>
+              <div class="panel-body table">
+                <div class="table-row"><strong>CMD-CRM-441</strong><span>Refresh segment `pricing_confusion_refill` và gửi win-back script.</span><div class="badge badge-emerald">Queued</div></div>
+                <div class="table-row"><strong>CMD-POS-812</strong><span>Publish combo explanation + talk track tới 42 cửa hàng.</span><div class="badge badge-cyan">Running</div></div>
+                <div class="table-row"><strong>CMD-COS-203</strong><span>Reroute inventory và giảm exposure cho low-stock SKU.</span><div class="badge badge-amber">Review</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel"><div class="panel-head"><h3>Audit Timeline</h3><p>Chuỗi sự kiện được ghi lại.</p></div><div class="panel-body timeline"><div class="timeline-row"><div class="time">12:42</div><div><strong>Incident detected</strong><span>Listening gắn tag `pricing_confusion_refill`.</span></div></div><div class="timeline-row"><div class="time">12:44</div><div><strong>Context merged</strong><span>KOL, Ads, CRM overlap, POS traffic, COS stock được hợp nhất.</span></div></div><div class="timeline-row"><div class="time">12:46</div><div><strong>Commands issued</strong><span>3 lệnh được tạo theo policy engine.</span></div></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Risk Register</h3><p>Những risk đang được PrimeOS theo dõi.</p></div><div class="panel-body stack"><div class="mini-card"><strong>Store mismatch</strong><span>POS chưa sync script sẽ làm experience vỡ.</span></div><div class="mini-card"><strong>VIP churn</strong><span>CRM phải phản hồi trong 24h để giữ trust.</span></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Expected Outcome</h3><p>PrimeOS tối ưu cả growth lẫn control.</p></div><div class="panel-body chips"><div class="chip">Giảm confusion sentiment trong 30 phút tới.</div><div class="chip">Bảo toàn conversion mà không oversell stock.</div></div></div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: PrimeOS là SaaS control tower, không phải chỉ là một dashboard tổng hợp số liệu.</p>
+            <div class="actions"><button type="button" class="secondary" data-prev="ads">Back</button><button type="button" data-next="crm">Next: CRM</button></div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-crm">
+          <div class="screen-head">
+            <div>
+              <h2>CRM</h2>
+              <p>Dashboard customer intelligence theo kiểu SaaS retention platform. Màn này cho operator nhìn được impacted profiles, case queue, customer 360 và những playbook đang chạy.</p>
+            </div>
+            <div class="badge badge-emerald">Playbook Running</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>Impacted Profiles</small><strong>2,148</strong><span>được match từ incident tag</span></div>
+            <div class="stat"><small>VIP-2 Share</small><strong>34%</strong><span>cohort giá trị cao bị ảnh hưởng</span></div>
+            <div class="stat"><small>Repeat Risk</small><strong>43%</strong><span>nếu không phản hồi trong 24h</span></div>
+            <div class="stat"><small>Recovery Prob.</small><strong>57%</strong><span>sau win-back playbook</span></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head"><h3>Customer 360</h3><p>Một profile điển hình trong incident.</p></div>
+              <div class="panel-body stack">
+                <div class="mini-card"><strong>KH-8831 / VIP-2</strong><span>HCMC, preferred channel Zalo, store pickup, last purchase 18 ngày trước.</span></div>
+                <div class="mini-card"><strong>Incident Evidence</strong><span>Commented: “Refill gia nay la cho chai nao?” rồi bỏ cart.</span></div>
+                <div class="mini-card"><strong>Next Best Action</strong><span>Gửi clarification message và push note cho nearest store.</span></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Playbook Queue</h3><p>Những workflow đang được thực thi.</p></div>
+              <div class="panel-body table">
+                <div class="table-row"><strong>Zalo Clarify</strong><span>Giải thích refill vs full-size cho existing buyers.</span><div class="badge badge-emerald">Live</div></div>
+                <div class="table-row"><strong>Loyalty Flag</strong><span>Tag risk sync ngược về PrimeOS để đo hiệu quả.</span><div class="badge badge-cyan">Synced</div></div>
+                <div class="table-row"><strong>Store Note</strong><span>Push script xuống POS để staff không quote sai.</span><div class="badge badge-amber">Sent</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel"><div class="panel-head"><h3>Cohort Recovery</h3><p>Nhóm cần ưu tiên giữ chân.</p></div><div class="panel-body progress-list"><div class="progress-card"><div class="progress-head"><span>VIP-2</span><div class="track"><div class="fill fill-violet" style="width: 81%"></div></div><strong>81</strong></div></div><div class="progress-card"><div class="progress-head"><span>New moms</span><div class="track"><div class="fill fill-emerald" style="width: 74%"></div></div><strong>74</strong></div></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Case Queue</h3><p>Những case cần manual review.</p></div><div class="panel-body stack"><div class="mini-card"><strong>34 escalated cases</strong><span>Khách yêu cầu gọi trực tiếp hoặc hỗ trợ pickup rõ ràng hơn.</span></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Strategic Note</h3><p>Góc nhìn retention.</p></div><div class="panel-body chips"><div class="chip">Giữ trust trước khi đẩy thêm coupon.</div><div class="chip">Complaint history sẽ thành suppression rule cho tương lai.</div></div></div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: CRM ở đây là SaaS memory layer cho customer truth, không chỉ là broadcast tool.</p>
+            <div class="actions"><button type="button" class="secondary" data-prev="primeos">Back</button><button type="button" data-next="pos">Next: POS</button></div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-pos">
+          <div class="screen-head">
+            <div>
+              <h2>POS</h2>
+              <p>Dashboard vận hành cửa hàng theo kiểu SaaS retail ops. Màn này ưu tiên store sync, pricing patch status, frontline script và conversion risk theo từng store cluster.</p>
+            </div>
+            <div class="badge badge-cyan">Store Sync Live</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>Stores Synced</small><strong>42</strong><span>đã nhận talk track mới</span></div>
+            <div class="stat"><small>Patch ETA</small><strong>4m</strong><span>publish giá và script toàn mạng lưới</span></div>
+            <div class="stat"><small>Traffic Surge</small><strong>18%</strong><span>tăng tại 6 store sau livestream</span></div>
+            <div class="stat"><small>Conv. Risk</small><strong>12%</strong><span>nếu stock và quote vẫn lệch</span></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head"><h3>Store Operations</h3><p>PrimeOS command đã biến thành task tại cửa hàng.</p></div>
+              <div class="panel-body table">
+                <div class="table-row"><strong>Store A12</strong><span>Combo explanation đã lên tablet POS và standee counter.</span><div class="badge badge-emerald">Synced</div></div>
+                <div class="table-row"><strong>Store C18</strong><span>Traffic tăng mạnh, cần COS cấp thêm full-size.</span><div class="badge badge-amber">Watch</div></div>
+                <div class="table-row"><strong>Store D03</strong><span>Best seller gần hết, phải offer SKU thay thế.</span><div class="badge badge-rose">Risk</div></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Frontline Script</h3><p>Console nội dung cho nhân viên cửa hàng.</p></div>
+              <div class="panel-body stack">
+                <div class="mini-card"><strong>Opening line</strong><span>“Gia tren live la cho combo refill, em se giup chi phan biet refill 30ml va chai full-size 50ml.”</span></div>
+                <div class="mini-card"><strong>Fallback offer</strong><span>Nếu thiếu full-size, ưu tiên refill bundle + pickup voucher.</span></div>
+                <div class="mini-card"><strong>Feedback sync</strong><span>Mỗi objection được gắn tag gửi lại về PrimeOS như store truth.</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel"><div class="panel-head"><h3>Store Pulse</h3><p>Chỉ số vận hành tại điểm bán.</p></div><div class="panel-body progress-list"><div class="progress-card"><div class="progress-head"><span>AOV</span><div class="track"><div class="fill" style="width: 72%"></div></div><strong>72</strong></div></div><div class="progress-card"><div class="progress-head"><span>Checkout speed</span><div class="track"><div class="fill fill-emerald" style="width: 67%"></div></div><strong>67</strong></div></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Manager Tasks</h3><p>Task queue cho store manager.</p></div><div class="panel-body stack"><div class="mini-card"><strong>Refresh display card</strong><span>Thay bảng giá cũ tại counter trong 10 phút.</span></div><div class="mini-card"><strong>Brief team</strong><span>Nhắc lại rule quote giá cho toàn bộ ca.</span></div></div></div>
+            <div class="panel"><div class="panel-head"><h3>Strategic Note</h3><p>Góc nhìn PrimeOS tại tuyến cuối.</p></div><div class="panel-body chips"><div class="chip">POS là nơi giữ narrative không bị vỡ ở điểm chạm cuối.</div><div class="chip">Nếu POS fail, toàn bộ orchestration phía trên sẽ mất hiệu lực.</div></div></div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: POS là SaaS execution layer cho frontline consistency.</p>
+            <div class="actions"><button type="button" class="secondary" data-prev="crm">Back</button><button type="button" data-next="cos">Next: COS</button></div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-cos">
+          <div class="screen-head">
+            <div>
+              <h2>COS</h2>
+              <p>Dashboard commerce operations theo kiểu SaaS backoffice. Màn này gói inventory, listing, channel exposure, fulfillment và outcome loop để đóng vòng dữ liệu cho PrimeOS.</p>
+            </div>
+            <div class="badge badge-amber">Execution Guard</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat"><small>Inventory Accuracy</small><strong>97%</strong><span>sau reconcile warehouse + store</span></div>
+            <div class="stat"><small>Units Rerouted</small><strong>120</strong><span>đi về 3 điểm bán demand spike</span></div>
+            <div class="stat"><small>Exposure Cut</small><strong>-28%</strong><span>giảm marketplace pressure</span></div>
+            <div class="stat"><small>ETA Reduction</small><strong>-5h</strong><span>route sang node gần khách hơn</span></div>
+          </div>
+
+          <div class="grid-3">
+            <div class="panel">
+              <div class="panel-head"><h3>Inventory Board</h3><p>Tồn kho theo quyết định điều phối.</p></div>
+              <div class="panel-body stack">
+                <div class="mini-card"><strong>Warehouse East</strong><span>Còn 420 units, sẵn sàng chuyển 120 xuống HCMC cluster.</span></div>
+                <div class="mini-card"><strong>Store C18</strong><span>Full-size dưới safety stock, cần replenishment ngay.</span></div>
+                <div class="mini-card"><strong>Store D03</strong><span>Kích hoạt substitution flow bằng refill bundle.</span></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Listing & Channel</h3><p>Content và exposure phải nhất quán.</p></div>
+              <div class="panel-body stack">
+                <div class="mini-card"><strong>Marketplace Guard</strong><span>Giảm exposure low-stock để tránh oversell.</span></div>
+                <div class="mini-card"><strong>Listing Refresh</strong><span>Đổi copy sang “refill savings explained”.</span></div>
+                <div class="mini-card"><strong>Bundle Logic</strong><span>Ưu tiên SKU margin khỏe và stock an toàn hơn.</span></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Fulfillment Pulse</h3><p>SLA sau orchestration.</p></div>
+              <div class="panel-body progress-list">
+                <div class="progress-card"><div class="progress-head"><span>SLA on time</span><div class="track"><div class="fill fill-emerald" style="width: 89%"></div></div><strong>89</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Node utilization</span><div class="track"><div class="fill fill-violet" style="width: 66%"></div></div><strong>66</strong></div></div>
+                <div class="progress-card"><div class="progress-head"><span>Oversell risk</span><div class="track"><div class="fill fill-rose" style="width: 19%"></div></div><strong>19</strong></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head"><h3>Returned Truth</h3><p>Dữ liệu trả ngược về PrimeOS.</p></div>
+              <div class="panel-body timeline">
+                <div class="timeline-row"><div class="time">13:02</div><div><strong>Messaging unified</strong><span>Listing, CRM và POS cùng dùng một cách giải thích giá.</span></div></div>
+                <div class="timeline-row"><div class="time">13:08</div><div><strong>Demand protected</strong><span>Ads giữ hiệu quả mà không overpush low-stock SKU.</span></div></div>
+                <div class="timeline-row"><div class="time">13:15</div><div><strong>Ops stabilized</strong><span>Store pressure giảm, ETA giao tốt hơn, confusion trend hạ.</span></div></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>Outcome Snapshot</h3><p>Ảnh chụp nhanh hiệu quả end-to-end.</p></div><div class="panel-body chips"><div class="chip">Comment confusion bắt đầu giảm sau khi message được thống nhất.</div><div class="chip">CRM giữ được cohort giá trị cao trước khi churn.</div><div class="chip">POS không gãy conversion vì có script và fallback offer.</div><div class="chip">COS trả inventory truth để PrimeOS mở lại growth an toàn.</div></div></div>
+          </div>
+
+          <div class="footer-nav">
+            <p>Insight: COS là SaaS execution backbone để PrimeOS scale mà vẫn có kiểm soát.</p>
+            <div class="actions"><button type="button" class="secondary" data-prev="pos">Back</button><button type="button" data-next="social-listening">Back to Start</button><a href="primeos-architecture.html">Architecture Map</a></div>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <div class="footer-note">Standalone SaaS-style dashboard mockups aligned with the PrimeOS architecture flow</div>
+  </div>
+
+  <script>
+    const order = [
+      "social-listening",
+      "kol",
+      "ads",
+      "primeos",
+      "crm",
+      "pos",
+      "cos"
+    ];
+
+    const navButtons = Array.from(document.querySelectorAll(".nav-btn"));
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const actionButtons = Array.from(document.querySelectorAll("[data-next], [data-prev]"));
+
+    function activate(screenId) {
+      navButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.screen === screenId);
+      });
+
+      screens.forEach((screen) => {
+        screen.classList.toggle("active", screen.id === `screen-${screenId}`);
+      });
+
+      const url = new URL(window.location.href);
+      url.hash = screenId;
+      history.replaceState({}, "", url);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    navButtons.forEach((button) => {
+      button.addEventListener("click", () => activate(button.dataset.screen));
+    });
+
+    actionButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.next || button.dataset.prev;
+        if (target) activate(target);
+      });
+    });
+
+    const initial = window.location.hash.replace("#", "");
+    activate(order.includes(initial) ? initial : order[0]);
+  </script>
+</body>
+</html>

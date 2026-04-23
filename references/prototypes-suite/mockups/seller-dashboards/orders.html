@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orders - PrimeOS Seller</title>
+  <link rel="stylesheet" href="../shared.css" />
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;"><div class="sidebar-logo-icon">P</div><div class="sidebar-logo-text">PrimeOS</div></a></div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Seller Workspace</div>
+          <a class="sidebar-link" href="overview.html"><span class="sidebar-link-icon">📊</span><span>Overview</span></a>
+          <a class="sidebar-link" href="products.html"><span class="sidebar-link-icon">📦</span><span>Products</span></a>
+          <a class="sidebar-link active" href="orders.html"><span class="sidebar-link-icon">🛍️</span><span>Orders</span></a>
+          <a class="sidebar-link" href="customers.html"><span class="sidebar-link-icon">👤</span><span>Customers</span></a>
+          <a class="sidebar-link" href="ads.html"><span class="sidebar-link-icon">📢</span><span>Ads Manager</span></a>
+          <a class="sidebar-link" href="analytics.html"><span class="sidebar-link-icon">📈</span><span>Analytics</span></a>
+          <a class="sidebar-link" href="recommendations.html"><span class="sidebar-link-icon">💡</span><span>AI Recommendations</span></a>
+          <a class="sidebar-link" href="settings.html"><span class="sidebar-link-icon">⚙️</span><span>Settings</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn" onclick="window.location.href='../dashboards/primeos.html'">🏢 Admin</button><button type="button" class="role-btn active" onclick="window.location.href='overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">SM</div><div class="sidebar-user-info"><div class="sidebar-user-name">Seller Account</div><div class="sidebar-user-role">Beauty Store Pro</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>Seller</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">Orders</span></div><div class="header-title">Order Management</div></div></div>
+        <div class="header-right"><div class="search-box"><span class="search-box-icon">⌕</span><input class="search-box-input" type="text" placeholder="Search order ID, customer" /></div><button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button></div>
+      </header>
+      <main class="content-area">
+        <div class="filters-bar">
+          <div class="filter-group"><span class="filter-label">Status</span><select class="filter-select"><option value="all">All</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option></select></div>
+          <div class="filter-group"><span class="filter-label">Channel</span><select class="filter-select"><option value="all">All Channels</option><option value="shopee">Shopee</option><option value="lazada">Lazada</option><option value="tiktok">TikTok Shop</option><option value="website">Website</option></select></div>
+          <div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div>
+        </div>
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Pending</span></div><div class="stat-value">24</div><div class="stat-comparison">Awaiting processing</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">In Transit</span></div><div class="stat-value">87</div><div class="stat-comparison">Shipped orders</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Delivered Today</span></div><div class="stat-value">142</div><div class="stat-comparison">Successfully delivered</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Return Request</span></div><div class="stat-value">8</div><div class="stat-comparison">Processing returns</div></div>
+        </section>
+        <section class="card">
+          <div class="card-header"><div class="card-title">Recent orders</div><a class="card-action" href="#">Export</a></div>
+          <div class="card-body">
+            <div style="overflow:auto;">
+              <table class="data-table">
+                <thead><tr><th>Order ID</th><th>Customer</th><th>Products</th><th>Total</th><th>Channel</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td>#ORD-88421</td><td>Nguyen Thuy Linh</td><td>Serum Refill + Toner</td><td>₫318K</td><td>Shopee</td><td><span class="badge badge-warning">Pending</span></td><td><button type="button" class="btn btn-sm btn-primary">Process</button></td></tr>
+                  <tr><td>#ORD-88420</td><td>Tran Minh Anh</td><td>Face Cream</td><td>₫259K</td><td>Lazada</td><td><span class="badge badge-info">Shipped</span></td><td><button type="button" class="btn btn-sm btn-ghost">Track</button></td></tr>
+                  <tr><td>#ORD-88419</td><td>Le Hoang Nam</td><td>Sunscreen x2</td><td>₫398K</td><td>TikTok</td><td><span class="badge badge-success">Delivered</span></td><td><button type="button" class="btn btn-sm btn-ghost">View</button></td></tr>
+                  <tr><td>#ORD-88418</td><td>Pham Ngoc Huyen</td><td>Mask Pack + Cleanser</td><td>₫238K</td><td>Website</td><td><span class="badge badge-info">Shipped</span></td><td><button type="button" class="btn btn-sm btn-ghost">Track</button></td></tr>
+                  <tr><td>#ORD-88417</td><td>Vo Thi Mai</td><td>Essence</td><td>₫219K</td><td>Shopee</td><td><span class="badge badge-danger">Return</span></td><td><button type="button" class="btn btn-sm btn-secondary">Review</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination"><div class="pagination-info">Showing 5 of 1,284 orders</div><div class="pagination-controls"><button type="button" class="pagination-btn">‹</button><button type="button" class="pagination-btn active">1</button><button type="button" class="pagination-btn">2</button><button type="button" class="pagination-btn">3</button><button type="button" class="pagination-btn">›</button></div></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>PrimeOSDashboard.init({module:"orders",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"}})</script>
+</body>
+</html>

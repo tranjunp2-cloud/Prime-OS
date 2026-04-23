@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics - PrimeOS Seller</title>
+  <link rel="stylesheet" href="../shared.css" />
+  <style>
+    .analytics-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .funnel-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; }
+    .funnel-step { text-align: center; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-surface); }
+    .step-value { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .step-label { font-size: 12px; color: var(--text-secondary); }
+    @media (max-width: 1200px) { .analytics-grid { grid-template-columns: 1fr; } .funnel-grid { grid-template-columns: repeat(3,1fr); } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><a href="../../primeos-architecture.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;"><div class="sidebar-logo-icon">P</div><div class="sidebar-logo-text">PrimeOS</div></a></div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section"><div class="sidebar-section-title">Seller Workspace</div>
+          <a class="sidebar-link" href="overview.html"><span class="sidebar-link-icon">📊</span><span>Overview</span></a>
+          <a class="sidebar-link" href="products.html"><span class="sidebar-link-icon">📦</span><span>Products</span></a>
+          <a class="sidebar-link" href="orders.html"><span class="sidebar-link-icon">🛍️</span><span>Orders</span></a>
+          <a class="sidebar-link" href="customers.html"><span class="sidebar-link-icon">👤</span><span>Customers</span></a>
+          <a class="sidebar-link" href="ads.html"><span class="sidebar-link-icon">📢</span><span>Ads Manager</span></a>
+          <a class="sidebar-link active" href="analytics.html"><span class="sidebar-link-icon">📈</span><span>Analytics</span></a>
+          <a class="sidebar-link" href="recommendations.html"><span class="sidebar-link-icon">💡</span><span>AI Recommendations</span></a>
+          <a class="sidebar-link" href="settings.html"><span class="sidebar-link-icon">⚙️</span><span>Settings</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-role-switcher"><button type="button" class="role-btn" onclick="window.location.href='../dashboards/primeos.html'">🏢 Admin</button><button type="button" class="role-btn active" onclick="window.location.href='overview.html'">🏪 Seller</button></div>
+      <div class="sidebar-user"><div class="sidebar-avatar">SM</div><div class="sidebar-user-info"><div class="sidebar-user-name">Seller Account</div><div class="sidebar-user-role">Beauty Store Pro</div></div></div>
+    </aside>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-left"><div><div class="header-breadcrumb"><span>Seller</span><span class="header-breadcrumb-sep">/</span><span class="header-breadcrumb-current">Analytics</span></div><div class="header-title">Performance Analytics</div></div></div>
+        <div class="header-right"><button type="button" class="btn btn-secondary">Export PDF</button><button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button></div>
+      </header>
+      <main class="content-area">
+        <div class="filters-bar"><div class="filter-group"><span class="filter-label">Period</span><select class="filter-select"><option>Today</option><option>Last 7 days</option><option selected>Last 30 days</option></select></div><div class="filter-group"><span class="filter-label">Compare</span><select class="filter-select"><option>Previous period</option><option>Last year same period</option></select></div><div class="filter-group"><span class="filter-label">Last sync</span><strong id="lastSync">--:--:--</strong></div></div>
+        <section class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Revenue</span><span class="stat-trend up">+18%</span></div><div class="stat-value">₫1.78B</div><div class="stat-comparison">Last 30 days</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Sessions</span><span class="stat-trend up">+9%</span></div><div class="stat-value">84,120</div><div class="stat-comparison">Store visits</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Conversion</span><span class="stat-trend up">+1.4%</span></div><div class="stat-value">3.9%</div><div class="stat-comparison">Visit to purchase</div></div>
+          <div class="stat-card"><div class="stat-header"><span class="stat-label">Bounce Rate</span><span class="stat-trend down">-3%</span></div><div class="stat-value">28%</div><div class="stat-comparison">Landing page quality</div></div>
+        </section>
+        <div class="analytics-grid">
+          <section class="card"><div class="card-header"><div class="card-title">Conversion funnel</div></div><div class="card-body"><div class="funnel-grid"><div class="funnel-step"><div class="step-value">84K</div><div class="step-label">Visits</div></div><div class="funnel-step"><div class="step-value">31K</div><div class="step-label">Product View</div></div><div class="funnel-step"><div class="step-value">9.2K</div><div class="step-label">Add to Cart</div></div><div class="funnel-step"><div class="step-value">4.1K</div><div class="step-label">Checkout</div></div><div class="funnel-step"><div class="step-value">3.2K</div><div class="step-label">Paid</div></div></div></div></section>
+          <section class="card"><div class="card-header"><div class="card-title">Top traffic source</div></div><div class="card-body"><table class="data-table"><thead><tr><th>Source</th><th>Sessions</th><th>CVR</th></tr></thead><tbody><tr><td>Facebook Ads</td><td>32,142</td><td>4.1%</td></tr><tr><td>TikTok Shop</td><td>24,908</td><td>3.8%</td></tr><tr><td>Organic Search</td><td>15,771</td><td>2.9%</td></tr><tr><td>Email</td><td>6,420</td><td>5.4%</td></tr></tbody></table></div></section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;"><div class="loading-spinner"></div></div>
+  <script src="../assets/dashboard.js"></script>
+  <script>PrimeOSDashboard.init({module:"analytics",timestampId:"lastSync",refresh:{buttonId:"refreshBtn",overlayId:"loadingOverlay",timestampId:"lastSync"}})</script>
+</body>
+</html>

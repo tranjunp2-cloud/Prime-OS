@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeOS - Real-time Sync Hub</title>
+  <style>
+    :root {
+      --bg: #06101c;
+      --panel: rgba(9, 17, 30, 0.9);
+      --panel-strong: rgba(5, 11, 22, 0.96);
+      --border: rgba(77, 98, 119, 0.42);
+      --line: rgba(77, 98, 119, 0.28);
+      --text: #e7eef7;
+      --muted: #99acc0;
+      --cyan: #22d3ee;
+      --violet: #8b5cf6;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --lime: #a3e635;
+      --shadow: 0 28px 72px rgba(0, 0, 0, 0.36);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(34, 211, 238, 0.09), transparent 26%),
+        radial-gradient(circle at right, rgba(139, 92, 246, 0.08), transparent 24%),
+        linear-gradient(180deg, #07111f 0%, #020712 100%);
+      padding: 22px;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .page {
+      width: min(96vw, 1720px);
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero,
+    .panel {
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 28px 30px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 1.01;
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 920px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .hero-emphasis {
+      color: #eef7ff;
+      font-weight: 700;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .hero-stat {
+      padding: 16px;
+      border-radius: 20px;
+      background: rgba(8, 14, 26, 0.86);
+      border: 1px solid rgba(77, 98, 119, 0.32);
+    }
+
+    .hero-stat strong {
+      display: block;
+      font-size: 28px;
+      letter-spacing: -0.05em;
+      margin-bottom: 6px;
+    }
+
+    .hero-stat span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: stretch;
+      padding: 18px 22px;
+    }
+
+    .scenario-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .scenario-tab {
+      border: 1px solid rgba(77, 98, 119, 0.34);
+      background: rgba(8, 14, 26, 0.85);
+      color: var(--text);
+      border-radius: 18px;
+      padding: 14px 16px;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .scenario-tab:hover {
+      transform: translateY(-1px);
+      border-color: rgba(34, 211, 238, 0.5);
+    }
+
+    .scenario-tab.active {
+      background: linear-gradient(135deg, rgba(18, 28, 48, 0.94), rgba(10, 17, 30, 0.88));
+      border-color: rgba(34, 211, 238, 0.62);
+      box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.08);
+    }
+
+    .scenario-tab strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .scenario-tab span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-btn {
+      border: 1px solid rgba(77, 98, 119, 0.34);
+      background: rgba(8, 14, 26, 0.86);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 11px 16px;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(52, 211, 153, 0.54);
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(90deg, rgba(34, 211, 238, 0.2), rgba(139, 92, 246, 0.2));
+      border-color: rgba(34, 211, 238, 0.48);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .panel-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header h2,
+    .panel-header h3 {
+      margin: 0;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-header h2 { font-size: 24px; }
+    .panel-header h3 { font-size: 18px; }
+
+    .panel-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .content {
+      padding: 18px 22px 22px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .kpi {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(77, 98, 119, 0.3);
+    }
+
+    .kpi-label {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .kpi-value {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+    }
+
+    .kpi-note {
+      margin-top: 6px;
+      color: #dce6f1;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .command-bar {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 14px;
+    }
+
+    .card,
+    .stream-card,
+    .stage-card,
+    .system-card,
+    .signal-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(77, 98, 119, 0.3);
+      background: rgba(15, 23, 42, 0.56);
+      padding: 16px;
+    }
+
+    .card-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .card-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .input,
+    .select {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(77, 98, 119, 0.34);
+      background: rgba(8, 14, 26, 0.84);
+      color: var(--text);
+      padding: 11px 12px;
+      outline: none;
+    }
+
+    .input:focus,
+    .select:focus {
+      border-color: rgba(34, 211, 238, 0.54);
+      box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.08);
+    }
+
+    .submit-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .submit-note {
+      align-self: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .signal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .signal-card strong,
+    .system-card strong,
+    .stage-card strong,
+    .stream-item strong,
+    .timeline-item strong,
+    .insight-item strong,
+    .action-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .signal-card span,
+    .system-card span,
+    .stage-card span,
+    .stream-item span,
+    .timeline-item span,
+    .insight-item span,
+    .action-item span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .live { color: #baf7ff; background: rgba(8, 145, 178, 0.18); }
+    .sync { color: #d9f99d; background: rgba(22, 163, 74, 0.18); }
+    .risk { color: #fde68a; background: rgba(180, 83, 9, 0.2); }
+    .violet { color: #ddd6fe; background: rgba(91, 33, 182, 0.18); }
+    .rose { color: #ffd1db; background: rgba(159, 18, 57, 0.2); }
+
+    .stream-list,
+    .timeline-list,
+    .insight-list,
+    .action-list,
+    .system-list,
+    .stage-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stream-item,
+    .timeline-item,
+    .insight-item,
+    .action-item,
+    .system-card,
+    .stage-card {
+      padding: 13px 14px;
+      border-radius: 16px;
+      background: rgba(7, 12, 24, 0.82);
+      border: 1px solid rgba(77, 98, 119, 0.25);
+    }
+
+    .stream-item {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stream-item.latest::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(34, 211, 238, 0.1), transparent 65%);
+      pointer-events: none;
+    }
+
+    .stream-top,
+    .system-top,
+    .timeline-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 7px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stream-metadata {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .micro-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(77, 98, 119, 0.25);
+      color: #dce6f1;
+      font-size: 11px;
+    }
+
+    .sync-map {
+      display: grid;
+      grid-template-columns: 0.78fr 1.22fr;
+      gap: 14px;
+    }
+
+    .prime-core {
+      padding: 18px;
+      border-radius: 24px;
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      background:
+        radial-gradient(circle at top, rgba(34, 211, 238, 0.08), transparent 35%),
+        linear-gradient(180deg, rgba(12, 24, 40, 0.94), rgba(7, 12, 24, 0.92));
+      min-height: 100%;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .prime-core h3 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .prime-core p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .core-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .core-layer {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.62);
+      border: 1px solid rgba(77, 98, 119, 0.3);
+    }
+
+    .core-layer small {
+      display: block;
+      color: var(--cyan);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 6px;
+    }
+
+    .core-layer strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .core-layer span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .systems-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .system-card.active {
+      border-color: rgba(34, 211, 238, 0.52);
+      box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.08);
+    }
+
+    .system-card.dimmed {
+      opacity: 0.5;
+    }
+
+    .system-track {
+      height: 8px;
+      margin-top: 10px;
+      border-radius: 999px;
+      background: rgba(51, 65, 85, 0.72);
+      overflow: hidden;
+    }
+
+    .system-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--emerald));
+      transition: width 0.35s ease;
+    }
+
+    .playback-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .timeline-list {
+      max-height: 430px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .timeline-item.active {
+      border-color: rgba(52, 211, 153, 0.48);
+      box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.08);
+    }
+
+    .timeline-item.done {
+      opacity: 0.72;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 1280px) {
+      .hero,
+      .layout,
+      .command-bar,
+      .sync-map,
+      .playback-grid,
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar-actions {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .kpi-grid,
+      .signal-grid,
+      .systems-grid,
+      .hero-grid,
+      .scenario-tabs,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Pitch Prototype</div>
+        <h1>PrimeOS<br />Real-time Sync Hub</h1>
+        <p>
+          Prototype này không cố gắng ôm toàn bộ PrimeOS. Nó tập trung vào đúng phần <span class="hero-emphasis">lõi đồng bộ và điều phối thời gian thực</span>:
+          tín hiệu đi vào từ POS, Web, Marketplace, CRM, Ads hay Social được gom về PrimeOS, chuẩn hóa thành một event stream thống nhất, sau đó chuyển thành quyết định và hành động vận hành ngay lập tức.
+        </p>
+      </div>
+      <div class="hero-grid">
+        <div class="hero-stat"><strong id="heroSyncLatency">1.8s</strong><span>median sync latency giữa nguồn vào và downstream action</span></div>
+        <div class="hero-stat"><strong id="heroSystems">6</strong><span>systems được điều phối trong cùng một command surface</span></div>
+        <div class="hero-stat"><strong id="heroActions">14</strong><span>automated actions / recommendations đã được trigger trong phiên demo</span></div>
+        <div class="hero-stat"><strong id="heroOutcome">-32%</strong><span>estimated manual ops reduction khi dùng PrimeOS làm sync hub</span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <div class="scenario-tabs" id="scenarioTabs"></div>
+        <div class="toolbar-actions">
+          <button class="action-btn" id="stepBtn" type="button">Step event</button>
+          <button class="action-btn primary" id="playBtn" type="button">Auto play</button>
+          <button class="action-btn" id="resetBtn" type="button">Reset flow</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 id="scenarioTitle">Scenario</h2>
+          <p id="scenarioSummary"></p>
+        </div>
+        <div class="content">
+          <div class="kpi-grid" id="kpiGrid"></div>
+
+          <div class="command-bar">
+            <div class="card">
+              <h3 class="card-title" id="commandTitle">PrimeOS Command Surface</h3>
+              <div class="card-copy" id="commandCopy"></div>
+              <div class="form-grid" id="commandFields"></div>
+              <div class="submit-row">
+                <button class="action-btn primary" id="commandBtn" type="button">Publish to PrimeOS</button>
+                <span class="submit-note" id="commandNote">Một thao tác tại PrimeOS sẽ tạo event và đồng bộ tới các hệ thống liên quan.</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3 class="card-title">Live Signal Snapshot</h3>
+              <div class="signal-grid" id="signalGrid"></div>
+            </div>
+          </div>
+
+          <div class="sync-map">
+            <div class="prime-core">
+              <div class="status live">PrimeOS Core</div>
+              <h3>Event-driven Orchestration</h3>
+              <p id="coreNarrative"></p>
+              <div class="core-stack" id="coreStack"></div>
+            </div>
+            <div class="card">
+              <h3 class="card-title">Connected Systems</h3>
+              <div class="systems-grid" id="systemsGrid"></div>
+            </div>
+          </div>
+
+          <div class="playback-grid">
+            <div class="stream-card">
+              <h3 class="card-title">Real-time Event Stream</h3>
+              <div class="stream-list" id="streamList"></div>
+            </div>
+            <div class="stream-card">
+              <h3 class="card-title">Scenario Playback</h3>
+              <div class="timeline-list" id="timelineList"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Decision & Outcome Board</h2>
+          <p>PrimeOS biến signal thành decision, action và business outcome thay vì chỉ hiển thị data.</p>
+        </div>
+        <div class="content">
+          <div class="stage-list" id="stageList"></div>
+          <div class="card">
+            <h3 class="card-title">Recommended Actions</h3>
+            <div class="action-list" id="actionList"></div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">Operator Insights</h3>
+            <div class="insight-list" id="insightList"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer-note">
+      PrimeOS demo concept: Signal -> Context -> Decision -> Sync -> Outcome. Suitable for pitching around real-time synchronization and closed-loop commerce execution.
+    </div>
+  </div>
+
+  <script>
+    const scenarios = [
+      {
+        id: "launch",
+        shortLabel: "Product Launch",
+        title: "Scenario 1 - New Product Launch Synchronization",
+        summary: "PrimeOS rút ngắn time-to-market bằng cách biến một thay đổi từ catalog trung tâm thành đồng bộ tức thời tới web, marketplace và commerce ops.",
+        command: {
+          title: "PrimeOS Catalog / Database Support",
+          copy: "Mô phỏng thao tác thêm sản phẩm mới hoặc thay đổi giá ở PrimeOS. Trong buổi pitch, đây là khoảnh khắc thể hiện rõ nhất câu chuyện: một thay đổi duy nhất tại trung tâm, nhiều điểm chạm được cập nhật đồng thời.",
+          note: "Event có thể map với Kafka topic như `catalog.product.updated` rồi consume bởi web, listing và ops surfaces.",
+          button: "Publish launch event",
+          fields: [
+            { label: "SKU", value: "SKU-JP-0421" },
+            { label: "Product name", value: "Prime Renewal Serum 30ml" },
+            { label: "Launch price", value: "2,480 JPY" },
+            { label: "Primary channel", value: "Amazon JP + Brand Web" }
+          ]
+        },
+        metrics: [
+          { label: "sync latency", value: "1.8s", note: "Catalog update -> downstream publish" },
+          { label: "channels updated", value: "3", note: "Web, marketplace, ops floor" },
+          { label: "manual steps removed", value: "11", note: "Không cần chỉnh từng channel riêng" },
+          { label: "time-to-market", value: "-68%", note: "So với vận hành thủ công" }
+        ],
+        signalCards: [
+          { status: "live", title: "Inbound command", copy: "Product metadata + launch price được submit từ PrimeOS catalog." },
+          { status: "sync", title: "Kafka topic", copy: "`catalog.product.updated` publish với routing key launch." },
+          { status: "violet", title: "Spark enrichment", copy: "Normalize title, channel payload và inventory availability." }
+        ],
+        coreNarrative: "PrimeOS hoạt động như command surface duy nhất để gom thay đổi từ catalog, gắn context cho từng channel rồi phát hành xuống web, listing và ops theo một event graph thống nhất.",
+        coreLayers: [
+          { label: "ingest", title: "Command Intake", copy: "Nhận thay đổi sản phẩm từ catalog, pricing hoặc merchant ops." },
+          { label: "normalize", title: "Unified Product Context", copy: "Chuẩn hóa SKU, product copy, media, channel mapping." },
+          { label: "decide", title: "Sync Decision", copy: "Xác định hệ nào cần update và payload nào cần publish." },
+          { label: "execute", title: "Downstream Action", copy: "Push tới landing page, marketplace listing và COS execution." }
+        ],
+        systems: [
+          { name: "PrimeOS Catalog", status: "Command source", detail: "Single source of truth cho product + price.", progress: 100 },
+          { name: "Brand Web", status: "Landing refresh", detail: "Hero block, price card và CTA được cập nhật.", progress: 86 },
+          { name: "Marketplace Listing", status: "Listing publish", detail: "Amazon-style payload nhận title, price, stock flag.", progress: 82 },
+          { name: "COS Operations", status: "Ops ready", detail: "Ops floor nhận publish job và stock readiness.", progress: 74 }
+        ],
+        stages: [
+          { status: "live", title: "Signal", copy: "Catalog manager tạo launch event cho SKU mới với giá và channel mix." },
+          { status: "violet", title: "Context", copy: "PrimeOS gắn channel mapping, launch rules và inventory availability." },
+          { status: "sync", title: "Decision", copy: "Xác định web và marketplace cần đồng bộ ngay, COS nhận work order theo sau." },
+          { status: "sync", title: "Action", copy: "Publish payload ra các channel và cập nhật dashboard trạng thái đồng bộ." }
+        ],
+        recommendations: [
+          { title: "Auto-publish landing hero", copy: "Đẩy product story và CTA lên web ngay khi launch event được xác nhận." },
+          { title: "Refresh marketplace price", copy: "Đồng bộ giá và badge launch để tránh mismatch giữa các kênh." },
+          { title: "Notify operations lane", copy: "Gửi checklist tới COS để xác nhận stock, fulfillment và listing health." }
+        ],
+        insights: [
+          { title: "Pitch line", copy: "One change in PrimeOS, every customer-facing surface updates in sync." },
+          { title: "Operational value", copy: "Loại bỏ việc login vào từng website hay sàn để cập nhật tay." },
+          { title: "Technical proof", copy: "Có thể gắn sau bằng Kafka consumer, Spark stream hoặc Databricks job mà không đổi narrative." }
+        ],
+        steps: [
+          {
+            title: "PrimeOS catalog receives launch command",
+            detail: "Product manager submit SKU, name và launch price từ command surface trung tâm.",
+            event: {
+              source: "PrimeOS Catalog",
+              type: "catalog.product.updated",
+              title: "Launch payload created for SKU-JP-0421",
+              metadata: ["SKU-JP-0421", "Price 2,480 JPY", "2 channels"]
+            },
+            systems: [
+              { name: "PrimeOS Catalog", progress: 100, active: true },
+              { name: "Brand Web", progress: 18, active: false },
+              { name: "Marketplace Listing", progress: 12, active: false },
+              { name: "COS Operations", progress: 10, active: false }
+            ],
+            recommendations: [
+              { title: "Validate launch readiness", copy: "Kiểm tra title, media pack và stock threshold trước khi fan-out." },
+              { title: "PrimeOS note", copy: "Launch command đã được chuẩn hóa thành một outbound event duy nhất." },
+              { title: "Next move", copy: "Bắt đầu fan-out tới web và marketplace ngay khi payload pass rule." }
+            ],
+            insights: [
+              { title: "Business meaning", copy: "Người dùng chỉ thao tác ở một nơi, không cần nghĩ về cấu trúc từng channel." },
+              { title: "Data layer", copy: "Đây là điểm publish tốt nhất cho Kafka topic product update." },
+              { title: "Narrative", copy: "PrimeOS là command center chứ không chỉ là dashboard quan sát." }
+            ]
+          },
+          {
+            title: "Web channel consumes update",
+            detail: "Landing page giả lập nhận payload mới và refresh product story cùng giá niêm yết.",
+            event: {
+              source: "Brand Web",
+              type: "landing.refresh.completed",
+              title: "Brand web product card refreshed",
+              metadata: ["Hero synced", "Price visible", "CTA updated"]
+            },
+            systems: [
+              { name: "PrimeOS Catalog", progress: 100, active: false },
+              { name: "Brand Web", progress: 100, active: true },
+              { name: "Marketplace Listing", progress: 28, active: false },
+              { name: "COS Operations", progress: 22, active: false }
+            ],
+            recommendations: [
+              { title: "Promote launch banner", copy: "Đưa SKU mới lên hero slot để tận dụng traffic đầu phiên." },
+              { title: "Track landing conversion", copy: "Bắt đầu đo CTR và add-to-cart ngay khi page được refresh." },
+              { title: "QA guardrail", copy: "PrimeOS gắn badge synced để đảm bảo giá hiển thị khớp với trung tâm." }
+            ],
+            insights: [
+              { title: "Pitch value", copy: "Không còn độ trễ giữa catalog team và web team." },
+              { title: "Realtime proof", copy: "Downstream update xảy ra như một reaction tự động sau event đầu vào." },
+              { title: "Trust", copy: "Khách hàng nhìn thấy kết quả trực tiếp ngay trên bề mặt bán hàng." }
+            ]
+          },
+          {
+            title: "Marketplace listing sync completes",
+            detail: "Payload launch được transform sang schema marketplace và đồng bộ tới listing surface.",
+            event: {
+              source: "Marketplace Listing",
+              type: "listing.publish.completed",
+              title: "Marketplace listing updated with launch price",
+              metadata: ["Schema mapped", "Inventory flag synced", "Listing live"]
+            },
+            systems: [
+              { name: "PrimeOS Catalog", progress: 100, active: false },
+              { name: "Brand Web", progress: 100, active: false },
+              { name: "Marketplace Listing", progress: 100, active: true },
+              { name: "COS Operations", progress: 44, active: false }
+            ],
+            recommendations: [
+              { title: "Lock pricing parity", copy: "PrimeOS giữ giá đồng bộ giữa web và marketplace để tránh mismatch." },
+              { title: "Start launch monitor", copy: "Bật luồng theo dõi first-hour traffic và conversion cho SKU mới." },
+              { title: "Escalate anomalies", copy: "Nếu listing reject hoặc warning, gửi alert ngay về operator." }
+            ],
+            insights: [
+              { title: "Operational impact", copy: "PrimeOS biến channel complexity thành orchestration ở backend, không đẩy sang người dùng." },
+              { title: "Closed loop setup", copy: "Khi traffic về, dữ liệu sẽ quay ngược lại hub để theo dõi hiệu suất launch." },
+              { title: "Pitch line", copy: "No more manual login-update-check cycles across channels." }
+            ]
+          },
+          {
+            title: "COS receives ops-ready instruction",
+            detail: "Commerce ops lane nhận work order để xác nhận stock readiness, fulfillment và merchandising health.",
+            event: {
+              source: "COS Operations",
+              type: "ops.workorder.created",
+              title: "Launch checklist sent to operations lane",
+              metadata: ["Stock verified", "Fulfillment ready", "Merchandising synced"]
+            },
+            systems: [
+              { name: "PrimeOS Catalog", progress: 100, active: false },
+              { name: "Brand Web", progress: 100, active: false },
+              { name: "Marketplace Listing", progress: 100, active: false },
+              { name: "COS Operations", progress: 100, active: true }
+            ],
+            recommendations: [
+              { title: "Mark launch complete", copy: "PrimeOS có thể báo synced across all customer-facing surfaces." },
+              { title: "Measure first-hour performance", copy: "Theo dõi add-to-cart, order rate và stock burn sau launch." },
+              { title: "Use as pitch climax", copy: "Kết lại bằng thông điệp: một thay đổi ở PrimeOS tạo ra hành động thực tế toàn mạng lưới." }
+            ],
+            insights: [
+              { title: "Business outcome", copy: "Time-to-market giảm mạnh vì teams không còn phải chuyền tay update." },
+              { title: "Sync hub value", copy: "PrimeOS là lớp đồng bộ trung tâm giữa product, channel và operations." },
+              { title: "Demo ending", copy: "Màn hình đã đủ để kể câu chuyện hoàn chỉnh từ signal đến execution." }
+            ]
+          }
+        ]
+      },
+      {
+        id: "marketing",
+        shortLabel: "Marketing Optimization",
+        title: "Scenario 2 - Real-time Marketing Performance Optimization",
+        summary: "PrimeOS không chỉ nhìn thấy dữ liệu. Nó phát hiện CTR giảm, gắn ngữ cảnh chiến dịch rồi đề xuất hoặc tự động kích hoạt hành động để giảm lãng phí ngân sách.",
+        command: {
+          title: "Campaign Monitoring Surface",
+          copy: "Mô phỏng luồng traffic và campaign performance từ Paid Ads hoặc Social. Trong thực tế có thể feed dữ liệu từ Kafka producer hoặc scraper để tạo cảm giác live stream.",
+          note: "Dùng rule engine trước, AI suggestion sau. Điều quan trọng là khách hàng thấy PrimeOS phản ứng ngay khi performance lệch chuẩn.",
+          button: "Inject performance anomaly",
+          fields: [
+            { label: "Campaign", value: "Spring Serum Prospecting" },
+            { label: "Channel", value: "Meta Ads + Social" },
+            { label: "CTR threshold", value: "1.2%" },
+            { label: "Observed CTR", value: "0.74%" }
+          ]
+        },
+        metrics: [
+          { label: "alert latency", value: "2.4s", note: "Signal drop -> operator alert" },
+          { label: "wasted spend avoided", value: "-21%", note: "Rule-based budget response" },
+          { label: "creative variants compared", value: "4", note: "Message options for quick pivot" },
+          { label: "decision confidence", value: "86%", note: "Historical signal + rule match" }
+        ],
+        signalCards: [
+          { status: "live", title: "Traffic stream", copy: "Ads clicks, visits và campaign tag đổ về hub theo thời gian thực." },
+          { status: "risk", title: "Anomaly detected", copy: "CTR giảm xuống dưới threshold và CPC bắt đầu tăng cao." },
+          { status: "violet", title: "Decision engine", copy: "PrimeOS đánh giá rule budget guardrail và creative fallback." }
+        ],
+        coreNarrative: "PrimeOS kết nối data stream từ paid media và social, biến chúng thành operator signal có ngữ cảnh kinh doanh để đề xuất hành động tối ưu trước khi ngân sách bị đốt lãng phí.",
+        coreLayers: [
+          { label: "stream", title: "Signal Intake", copy: "Consume CTR, CPC, traffic quality và source identity." },
+          { label: "detect", title: "Anomaly Detection", copy: "Phát hiện CTR drop, volume spike hoặc quality decay." },
+          { label: "recommend", title: "Action Recommendation", copy: "Đề xuất giảm ngân sách, đổi message hoặc chuyển segment." },
+          { label: "act", title: "Execution Hook", copy: "Gửi alert tới operator hoặc trigger automation layer." }
+        ],
+        systems: [
+          { name: "Ads Manager", status: "Signal source", detail: "CTR, CPC, spend và campaign context.", progress: 100 },
+          { name: "Social Feed", status: "Engagement feed", detail: "Comment, click, save và social reaction.", progress: 88 },
+          { name: "PrimeOS Analytics", status: "Decision core", detail: "Rule engine + benchmark + alerting.", progress: 96 },
+          { name: "Operator Queue", status: "Execution lane", detail: "Alert, recommendation và budget suggestion.", progress: 72 }
+        ],
+        stages: [
+          { status: "live", title: "Signal", copy: "Campaign traffic và engagement stream về hub liên tục." },
+          { status: "risk", title: "Context", copy: "CTR giảm nhưng spend vẫn giữ nguyên, nghĩa là hiệu suất đang xấu đi." },
+          { status: "violet", title: "Decision", copy: "PrimeOS chọn playbook: budget trim + creative switch suggestion." },
+          { status: "sync", title: "Action", copy: "Alert được đẩy tới operator và automation lane để phản ứng ngay." }
+        ],
+        recommendations: [
+          { title: "Reduce spend guardrail", copy: "Hạ ngân sách 15% cho tới khi creative mới ổn định." },
+          { title: "Swap message hook", copy: "Đổi headline theo variant có CTR cao nhất trong 7 ngày gần nhất." },
+          { title: "Escalate to operator", copy: "Tạo recommendation card và hiển thị lý do để operator quyết định nhanh." }
+        ],
+        insights: [
+          { title: "Pitch line", copy: "PrimeOS turns data into action, not just charts." },
+          { title: "Operational value", copy: "Giảm thời gian phát hiện vấn đề và giảm lãng phí ngân sách đang chạy sai." },
+          { title: "Tech mapping", copy: "Spark stream hoặc Databricks job có thể đảm nhiệm lớp signal scoring phía sau." }
+        ],
+        steps: [
+          {
+            title: "Traffic and CTR stream enters PrimeOS",
+            detail: "PrimeOS nhận feed từ ads manager và social channel cho cùng một campaign.",
+            event: {
+              source: "Ads Manager",
+              type: "campaign.metrics.ingested",
+              title: "Realtime campaign performance stream received",
+              metadata: ["CTR 0.74%", "CPC rising", "Spend stable"]
+            },
+            systems: [
+              { name: "Ads Manager", progress: 100, active: true },
+              { name: "Social Feed", progress: 62, active: false },
+              { name: "PrimeOS Analytics", progress: 24, active: false },
+              { name: "Operator Queue", progress: 8, active: false }
+            ],
+            recommendations: [
+              { title: "Collect supporting context", copy: "Kéo thêm engagement signal và audience quality trước khi kết luận." },
+              { title: "PrimeOS note", copy: "Đây là tín hiệu đầu vào quan trọng cho anomaly detection." },
+              { title: "Watch spend", copy: "Giữ ngân sách dưới quan sát vì signal đang xấu dần." }
+            ],
+            insights: [
+              { title: "Business meaning", copy: "Không cần chờ analyst tổng hợp cuối ngày mới thấy chiến dịch đang lệch." },
+              { title: "Data story", copy: "Event stream tới trước, dashboard chỉ là lớp kể chuyện phía trên." },
+              { title: "Pitch angle", copy: "PrimeOS sees performance drift as it happens." }
+            ]
+          },
+          {
+            title: "PrimeOS detects performance anomaly",
+            detail: "Rule engine so sánh observed CTR với threshold và historical band để xác nhận bất thường.",
+            event: {
+              source: "PrimeOS Analytics",
+              type: "campaign.anomaly.detected",
+              title: "CTR drop detected below operational threshold",
+              metadata: ["Threshold breached", "Confidence 86%", "Alert ready"]
+            },
+            systems: [
+              { name: "Ads Manager", progress: 100, active: false },
+              { name: "Social Feed", progress: 100, active: false },
+              { name: "PrimeOS Analytics", progress: 100, active: true },
+              { name: "Operator Queue", progress: 22, active: false }
+            ],
+            recommendations: [
+              { title: "Flag spend inefficiency", copy: "Nếu giữ nguyên ngân sách, campaign sẽ tiếp tục burn mà không tạo quality traffic." },
+              { title: "Prepare message pivot", copy: "PrimeOS chọn sẵn creative variant hiệu quả hơn làm fallback." },
+              { title: "Trigger operator review", copy: "Đưa alert lên command board để operator thấy ngay lý do và mức độ nghiêm trọng." }
+            ],
+            insights: [
+              { title: "Value", copy: "Đây là điểm chứng minh PrimeOS không chỉ sync data mà còn understand context." },
+              { title: "Simple and credible", copy: "Rule-based detection đã đủ thuyết phục hơn là nói về AI mơ hồ." },
+              { title: "Pitch line", copy: "The system reacts before marketing waste compounds." }
+            ]
+          },
+          {
+            title: "Recommended action package is generated",
+            detail: "PrimeOS tạo bundle quyết định gồm budget trim, creative suggestion và audience note cho operator.",
+            event: {
+              source: "PrimeOS Analytics",
+              type: "campaign.playbook.recommended",
+              title: "Budget trim and creative pivot recommendation created",
+              metadata: ["-15% budget", "Creative B", "Review audience"]
+            },
+            systems: [
+              { name: "Ads Manager", progress: 100, active: false },
+              { name: "Social Feed", progress: 100, active: false },
+              { name: "PrimeOS Analytics", progress: 100, active: true },
+              { name: "Operator Queue", progress: 66, active: false }
+            ],
+            recommendations: [
+              { title: "Trim budget now", copy: "Bảo vệ ngân sách khi hiệu suất đang dưới ngưỡng chấp nhận." },
+              { title: "Switch hook", copy: "Đổi message sang hook có CTR tốt hơn ở cùng segment." },
+              { title: "Audit segment quality", copy: "Kiểm tra source quality nếu lượng click tăng mà CTR/engagement xấu." }
+            ],
+            insights: [
+              { title: "Outcome framing", copy: "PrimeOS không buộc khách hàng phải đoán nên làm gì tiếp theo." },
+              { title: "Ops impact", copy: "Decision package giúp đội marketing phản ứng nhanh hơn nhiều so với đọc dashboard rồi bàn tiếp." },
+              { title: "Credibility", copy: "Mỗi khuyến nghị đều có logic giải thích, không phải black-box AI." }
+            ]
+          },
+          {
+            title: "Operator queue receives alert and next best action",
+            detail: "Alert lên command board với action rõ ràng: giảm spend, đổi message, theo dõi kết quả sau pivot.",
+            event: {
+              source: "Operator Queue",
+              type: "operator.alert.dispatched",
+              title: "Optimization alert dispatched to marketing operator",
+              metadata: ["Operator notified", "Playbook attached", "Follow-up tracked"]
+            },
+            systems: [
+              { name: "Ads Manager", progress: 100, active: false },
+              { name: "Social Feed", progress: 100, active: false },
+              { name: "PrimeOS Analytics", progress: 100, active: false },
+              { name: "Operator Queue", progress: 100, active: true }
+            ],
+            recommendations: [
+              { title: "Use this as payoff", copy: "Kết luận bằng việc PrimeOS giúp doanh nghiệp phản ứng nhanh hơn với biến động thị trường." },
+              { title: "Show reduced waste", copy: "Nhấn mạnh ngân sách được bảo vệ ngay trong lúc campaign đang chạy." },
+              { title: "Extend later", copy: "Nếu cần, Databricks/Spark có thể thay rule bằng scoring nâng cao mà không đổi UX." }
+            ],
+            insights: [
+              { title: "Business outcome", copy: "PrimeOS biến một chỉ số xấu thành phản ứng vận hành ngay lập tức." },
+              { title: "Pitch ending", copy: "Data becomes action, and action protects budget." },
+              { title: "Product meaning", copy: "Đây là lớp intelligence thực dụng, gần với nhu cầu khách hàng hơn là một AI showpiece." }
+            ]
+          }
+        ]
+      },
+      {
+        id: "closed-loop",
+        shortLabel: "Offline-Online Loop",
+        title: "Scenario 3 - Closed-loop Offline to Online Synchronization",
+        summary: "Một giao dịch tại cửa hàng offline ngay lập tức được biến thành customer context mới, hành động CRM mới và tối ưu media spend mới. Đây là lợi thế closed-loop mà hệ thống rời rạc không làm được.",
+        command: {
+          title: "POS to CRM Sync Surface",
+          copy: "Mô phỏng một giao dịch phát sinh tại cửa hàng offline. PrimeOS nhận transaction event, cập nhật hồ sơ khách hàng rồi điều phối cả CRM lẫn marketing suppression trong cùng một flow.",
+          note: "Đây là scenario chiến lược mạnh nhất để pitch vì nó nối offline, CRM và media thành một vòng khép kín.",
+          button: "Simulate offline purchase",
+          fields: [
+            { label: "Store", value: "Tokyo Ginza Store" },
+            { label: "Customer ID", value: "CUS-880219" },
+            { label: "Purchased SKU", value: "Serum Refill Pack" },
+            { label: "Basket value", value: "6,900 JPY" }
+          ]
+        },
+        metrics: [
+          { label: "profile sync", value: "2.1s", note: "POS event -> CRM update" },
+          { label: "audience waste reduced", value: "-27%", note: "Stop serving conversion ads to converted buyer" },
+          { label: "upsell readiness", value: "+19%", note: "Customer enters upsell/cross-sell segment" },
+          { label: "closed-loop score", value: "94", note: "Offline + online context stitched together" }
+        ],
+        signalCards: [
+          { status: "live", title: "POS transaction", copy: "Offline order completed at store and emitted to PrimeOS." },
+          { status: "sync", title: "CRM context sync", copy: "Customer timeline, basket and preference updated instantly." },
+          { status: "risk", title: "Media suppression", copy: "Remove converted customer from conversion ads to avoid wasted spend." }
+        ],
+        coreNarrative: "PrimeOS biến mỗi giao dịch offline thành dữ liệu sống cho toàn hệ thống: CRM hiểu khách hàng hơn, marketing ngừng đốt ngân sách sai và commerce team có thêm tín hiệu cho lượt bán tiếp theo.",
+        coreLayers: [
+          { label: "capture", title: "Transaction Capture", copy: "Nhận POS event với store, customer, basket và SKU context." },
+          { label: "merge", title: "Customer Context Merge", copy: "Nối giao dịch mới vào profile, timeline và behavioral state." },
+          { label: "decide", title: "Audience Decision", copy: "Xác định ai cần được upsell, ai cần bị loại khỏi conversion ads." },
+          { label: "trigger", title: "Cross-system Trigger", copy: "Đẩy action sang CRM segment và media suppression lane." }
+        ],
+        systems: [
+          { name: "POS Network", status: "Transaction source", detail: "Store sale event enters PrimeOS immediately.", progress: 100 },
+          { name: "Customer Context", status: "Profile sync", detail: "Timeline, segment và purchase history updated.", progress: 90 },
+          { name: "CRM / Retention", status: "Action lane", detail: "Upsell and cross-sell list assignment.", progress: 82 },
+          { name: "Ads Audience", status: "Suppression", detail: "Remove converted customer from active conversion audience.", progress: 78 }
+        ],
+        stages: [
+          { status: "live", title: "Signal", copy: "Một đơn hàng offline phát sinh tại cửa hàng." },
+          { status: "violet", title: "Context", copy: "PrimeOS gắn order vào hồ sơ khách hàng, cập nhật preference và purchase memory." },
+          { status: "sync", title: "Decision", copy: "Khách hàng được đưa vào upsell segment và bị loại khỏi conversion ads." },
+          { status: "sync", title: "Action", copy: "CRM và media lane cùng nhận lệnh, tạo closed-loop execution thật sự." }
+        ],
+        recommendations: [
+          { title: "Assign upsell segment", copy: "Đưa khách vào nhóm refill / cross-sell thay vì generic prospecting." },
+          { title: "Suppress conversion ads", copy: "Ngừng bơm ads chuyển đổi cho người vừa mua xong tại cửa hàng." },
+          { title: "Create staff note", copy: "Gợi ý kịch bản chăm sóc cho lần quay lại tiếp theo hoặc chat follow-up." }
+        ],
+        insights: [
+          { title: "Pitch line", copy: "Every transaction becomes operational intelligence." },
+          { title: "Strategic value", copy: "PrimeOS kết nối offline và online thành vòng học liên tục thay vì hai thế giới riêng." },
+          { title: "Why it lands", copy: "Khách hàng dễ nhìn ra ngay việc tiết kiệm media waste và tăng repeat potential." }
+        ],
+        steps: [
+          {
+            title: "Offline POS transaction enters PrimeOS",
+            detail: "Store hoàn tất giao dịch và phát transaction event về PrimeOS ngay sau thanh toán.",
+            event: {
+              source: "POS Network",
+              type: "pos.order.completed",
+              title: "Offline purchase captured from Tokyo Ginza Store",
+              metadata: ["Customer CUS-880219", "Basket 6,900 JPY", "Refill pack"]
+            },
+            systems: [
+              { name: "POS Network", progress: 100, active: true },
+              { name: "Customer Context", progress: 18, active: false },
+              { name: "CRM / Retention", progress: 8, active: false },
+              { name: "Ads Audience", progress: 6, active: false }
+            ],
+            recommendations: [
+              { title: "Capture loyalty context", copy: "Gắn store location, basket type và product affinity vào event." },
+              { title: "PrimeOS note", copy: "Đây là điểm chứng minh offline không còn nằm ngoài hệ thống." },
+              { title: "Prepare CRM sync", copy: "Sẵn sàng merge transaction vào hồ sơ customer ngay bước kế tiếp." }
+            ],
+            insights: [
+              { title: "Business meaning", copy: "Giao dịch tại cửa hàng cũng trở thành dữ liệu sống cho toàn doanh nghiệp." },
+              { title: "Pitch value", copy: "PrimeOS closes the gap between physical stores and digital operations." },
+              { title: "Tech angle", copy: "Kafka rất phù hợp để ingest POS events với low latency." }
+            ]
+          },
+          {
+            title: "Customer profile is updated in real time",
+            detail: "PrimeOS merge transaction vào timeline và cập nhật trạng thái khách hàng trong customer context / CRM lite.",
+            event: {
+              source: "Customer Context",
+              type: "customer.profile.updated",
+              title: "Customer memory refreshed with latest offline purchase",
+              metadata: ["Repeat buyer", "Refill affinity", "Store preference"]
+            },
+            systems: [
+              { name: "POS Network", progress: 100, active: false },
+              { name: "Customer Context", progress: 100, active: true },
+              { name: "CRM / Retention", progress: 28, active: false },
+              { name: "Ads Audience", progress: 16, active: false }
+            ],
+            recommendations: [
+              { title: "Create enriched profile", copy: "Bổ sung purchase cadence, channel preference và likely next need." },
+              { title: "Update lifecycle", copy: "Chuyển customer từ prospecting sang recent purchaser state." },
+              { title: "PrimeOS value", copy: "Customer memory được làm giàu tự động, không cần staff nhập tay vào CRM." }
+            ],
+            insights: [
+              { title: "Operational meaning", copy: "Mỗi lần mua là một lần hồ sơ khách hàng trở nên chính xác hơn." },
+              { title: "Closed-loop setup", copy: "Từ đây PrimeOS mới có thể ra quyết định đúng cho CRM và media." },
+              { title: "Pitch line", copy: "The transaction is not the end, it is the start of the next action." }
+            ]
+          },
+          {
+            title: "PrimeOS triggers upsell and suppression decisions",
+            detail: "Decision engine xác định khách phù hợp với refill/cross-sell, đồng thời không nên tiếp tục nằm trong conversion audience.",
+            event: {
+              source: "PrimeOS Decision Engine",
+              type: "customer.next-actions.decided",
+              title: "Upsell segment and ad suppression actions prepared",
+              metadata: ["Upsell list yes", "Conversion suppression yes", "Follow-up note"]
+            },
+            systems: [
+              { name: "POS Network", progress: 100, active: false },
+              { name: "Customer Context", progress: 100, active: false },
+              { name: "CRM / Retention", progress: 56, active: false },
+              { name: "Ads Audience", progress: 48, active: false }
+            ],
+            recommendations: [
+              { title: "Assign refill segment", copy: "Đưa khách vào tệp upsell / cross-sell phù hợp với basket vừa mua." },
+              { title: "Suppress from conversion ads", copy: "Tránh tiếp tục mua traffic cho người đã chuyển đổi offline." },
+              { title: "Create follow-up task", copy: "Để CRM hoặc store staff có kịch bản chăm sóc đúng bối cảnh." }
+            ],
+            insights: [
+              { title: "Strategic value", copy: "PrimeOS ra quyết định dựa trên full context thay vì từng hệ thống nhìn cục bộ." },
+              { title: "Media efficiency", copy: "Đây là phần dễ chuyển thành con số tiết kiệm ngân sách khi pitch." },
+              { title: "Narrative", copy: "One purchase triggers smarter next actions across the business." }
+            ]
+          },
+          {
+            title: "CRM and ads audience are synchronized",
+            detail: "CRM retention lane nhận customer vào tệp upsell, còn ads audience loại người này khỏi conversion campaign đang chạy.",
+            event: {
+              source: "CRM / Ads Audience",
+              type: "closed.loop.actions.completed",
+              title: "Customer synced into retention lane and removed from conversion ads",
+              metadata: ["Upsell active", "Ads waste reduced", "Loop closed"]
+            },
+            systems: [
+              { name: "POS Network", progress: 100, active: false },
+              { name: "Customer Context", progress: 100, active: false },
+              { name: "CRM / Retention", progress: 100, active: true },
+              { name: "Ads Audience", progress: 100, active: true }
+            ],
+            recommendations: [
+              { title: "Use as wow moment", copy: "Kết luận bằng việc một giao dịch offline tạo ra hai hành động online rất cụ thể." },
+              { title: "Quantify outcome", copy: "Nhấn mạnh tiết kiệm ad spend và tăng khả năng repeat / upsell." },
+              { title: "Bridge to roadmap", copy: "Đây là nền tảng để mở rộng sang loyalty, service và intelligence area về sau." }
+            ],
+            insights: [
+              { title: "Business outcome", copy: "Doanh nghiệp vừa hiểu khách hơn vừa tránh lãng phí ngân sách quảng cáo." },
+              { title: "PrimeOS meaning", copy: "PrimeOS là closed-loop operating system, không phải tập hợp dashboard rời." },
+              { title: "Pitch ending", copy: "Every transaction creates the next best action." }
+            ]
+          }
+        ]
+      }
+    ];
+
+    const state = {
+      scenarioIndex: 0,
+      currentStep: -1,
+      stream: [],
+      autoTimer: null,
+      actionCounter: 14,
+    };
+
+    const refs = {
+      scenarioTabs: document.getElementById("scenarioTabs"),
+      scenarioTitle: document.getElementById("scenarioTitle"),
+      scenarioSummary: document.getElementById("scenarioSummary"),
+      kpiGrid: document.getElementById("kpiGrid"),
+      commandTitle: document.getElementById("commandTitle"),
+      commandCopy: document.getElementById("commandCopy"),
+      commandFields: document.getElementById("commandFields"),
+      commandBtn: document.getElementById("commandBtn"),
+      commandNote: document.getElementById("commandNote"),
+      signalGrid: document.getElementById("signalGrid"),
+      coreNarrative: document.getElementById("coreNarrative"),
+      coreStack: document.getElementById("coreStack"),
+      systemsGrid: document.getElementById("systemsGrid"),
+      streamList: document.getElementById("streamList"),
+      timelineList: document.getElementById("timelineList"),
+      stageList: document.getElementById("stageList"),
+      actionList: document.getElementById("actionList"),
+      insightList: document.getElementById("insightList"),
+      playBtn: document.getElementById("playBtn"),
+      stepBtn: document.getElementById("stepBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      heroSyncLatency: document.getElementById("heroSyncLatency"),
+      heroSystems: document.getElementById("heroSystems"),
+      heroActions: document.getElementById("heroActions"),
+      heroOutcome: document.getElementById("heroOutcome")
+    };
+
+    function currentScenario() {
+      return scenarios[state.scenarioIndex];
+    }
+
+    function stopAutoPlay() {
+      if (state.autoTimer) {
+        window.clearInterval(state.autoTimer);
+        state.autoTimer = null;
+      }
+      refs.playBtn.textContent = "Auto play";
+    }
+
+    function resetScenario(keepStream = false) {
+      state.currentStep = -1;
+      if (!keepStream) state.stream = [];
+      render();
+    }
+
+    function setScenario(index) {
+      stopAutoPlay();
+      state.scenarioIndex = index;
+      state.stream = [];
+      state.currentStep = -1;
+      render();
+    }
+
+    function buildTabs() {
+      refs.scenarioTabs.innerHTML = scenarios.map((scenario, index) => `
+        <button class="scenario-tab ${index === state.scenarioIndex ? "active" : ""}" data-index="${index}" type="button">
+          <strong>${scenario.shortLabel}</strong>
+          <span>${scenario.summary}</span>
+        </button>
+      `).join("");
+
+      refs.scenarioTabs.querySelectorAll(".scenario-tab").forEach((button) => {
+        button.addEventListener("click", () => setScenario(Number(button.dataset.index)));
+      });
+    }
+
+    function renderKpis(scenario) {
+      refs.kpiGrid.innerHTML = scenario.metrics.map((metric) => `
+        <div class="kpi">
+          <div class="kpi-label">${metric.label}</div>
+          <div class="kpi-value">${metric.value}</div>
+          <div class="kpi-note">${metric.note}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderCommandSurface(scenario) {
+      refs.commandTitle.textContent = scenario.command.title;
+      refs.commandCopy.textContent = scenario.command.copy;
+      refs.commandNote.textContent = scenario.command.note;
+      refs.commandBtn.textContent = scenario.command.button;
+      refs.commandFields.innerHTML = scenario.command.fields.map((field) => `
+        <div>
+          <label style="display:block; margin-bottom:6px; color: var(--muted); font-size: 12px;">${field.label}</label>
+          <input class="input" type="text" value="${field.value}" readonly />
+        </div>
+      `).join("");
+    }
+
+    function renderSignalCards(scenario) {
+      refs.signalGrid.innerHTML = scenario.signalCards.map((card) => `
+        <div class="signal-card">
+          <div class="status ${card.status}">${card.status === "sync" ? "Sync" : card.status === "risk" ? "Alert" : card.status === "violet" ? "Decision" : "Live"}</div>
+          <strong>${card.title}</strong>
+          <span>${card.copy}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderCore(scenario) {
+      refs.coreNarrative.textContent = scenario.coreNarrative;
+      refs.coreStack.innerHTML = scenario.coreLayers.map((layer) => `
+        <div class="core-layer">
+          <small>${layer.label}</small>
+          <strong>${layer.title}</strong>
+          <span>${layer.copy}</span>
+        </div>
+      `).join("");
+    }
+
+    function activeSystems() {
+      const scenario = currentScenario();
+      if (state.currentStep < 0) return scenario.systems.map((system) => ({ ...system, active: false }));
+      return scenario.steps[state.currentStep].systems;
+    }
+
+    function renderSystems() {
+      const scenario = currentScenario();
+      const systems = activeSystems();
+      refs.systemsGrid.innerHTML = systems.map((system, index) => {
+        const base = scenario.systems[index] || {};
+        const status = base.status || "Connected";
+        const detail = base.detail || "PrimeOS connected system";
+        const cls = system.active ? "active" : state.currentStep >= 0 ? "dimmed" : "";
+        return `
+          <div class="system-card ${cls}">
+            <div class="system-top">
+              <strong>${system.name}</strong>
+              <span>${status}</span>
+            </div>
+            <span>${detail}</span>
+            <div class="system-track"><div class="system-fill" style="width:${system.progress}%"></div></div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderStages(scenario) {
+      refs.stageList.innerHTML = scenario.stages.map((stage) => `
+        <div class="stage-card">
+          <div class="status ${stage.status}">${stage.title}</div>
+          <strong>${stage.title}</strong>
+          <span>${stage.copy}</span>
+        </div>
+      `).join("");
+    }
+
+    function recommendationsForView() {
+      const scenario = currentScenario();
+      if (state.currentStep < 0) return scenario.recommendations;
+      return scenario.steps[state.currentStep].recommendations;
+    }
+
+    function insightsForView() {
+      const scenario = currentScenario();
+      if (state.currentStep < 0) return scenario.insights;
+      return scenario.steps[state.currentStep].insights;
+    }
+
+    function renderRecommendations() {
+      refs.actionList.innerHTML = recommendationsForView().map((item) => `
+        <div class="action-item">
+          <strong>${item.title}</strong>
+          <span>${item.copy}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderInsights() {
+      refs.insightList.innerHTML = insightsForView().map((item) => `
+        <div class="insight-item">
+          <strong>${item.title}</strong>
+          <span>${item.copy}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderTimeline(scenario) {
+      refs.timelineList.innerHTML = scenario.steps.map((step, index) => {
+        const cls = index === state.currentStep ? "active" : index < state.currentStep ? "done" : "";
+        return `
+          <div class="timeline-item ${cls}">
+            <div class="timeline-top">
+              <span>Step ${index + 1}</span>
+              <span>${index <= state.currentStep ? "Triggered" : "Pending"}</span>
+            </div>
+            <strong>${step.title}</strong>
+            <span>${step.detail}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderStream() {
+      if (state.stream.length === 0) {
+        refs.streamList.innerHTML = `
+          <div class="stream-item">
+            <strong>Waiting for first event</strong>
+            <span>Nhấn nút command hoặc Step event để phát event đầu tiên cho scenario hiện tại.</span>
+          </div>
+        `;
+        return;
+      }
+
+      refs.streamList.innerHTML = state.stream.slice().reverse().map((entry, index) => `
+        <div class="stream-item ${index === 0 ? "latest" : ""}">
+          <div class="stream-top">
+            <span>${entry.source}</span>
+            <span>${entry.time}</span>
+          </div>
+          <strong>${entry.title}</strong>
+          <span>${entry.type}</span>
+          <div class="stream-metadata">
+            ${entry.metadata.map((item) => `<span class="micro-pill">${item}</span>`).join("")}
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function updateHero() {
+      const scenario = currentScenario();
+      refs.heroSyncLatency.textContent = scenario.metrics[0].value;
+      refs.heroSystems.textContent = String(scenario.systems.length + 2);
+      refs.heroActions.textContent = String(state.actionCounter + Math.max(state.currentStep + 1, 0));
+      refs.heroOutcome.textContent = scenario.id === "launch" ? "-32%" : scenario.id === "marketing" ? "-21%" : "-27%";
+    }
+
+    function render() {
+      const scenario = currentScenario();
+      buildTabs();
+      refs.scenarioTitle.textContent = scenario.title;
+      refs.scenarioSummary.textContent = scenario.summary;
+      renderKpis(scenario);
+      renderCommandSurface(scenario);
+      renderSignalCards(scenario);
+      renderCore(scenario);
+      renderSystems();
+      renderStages(scenario);
+      renderRecommendations();
+      renderInsights();
+      renderTimeline(scenario);
+      renderStream();
+      updateHero();
+    }
+
+    function timestampLabel(stepNumber) {
+      const seconds = 12 + stepNumber * 4;
+      return `11:${String(5 + Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+    }
+
+    function advanceStep() {
+      const scenario = currentScenario();
+      const nextStep = state.currentStep + 1;
+
+      if (nextStep >= scenario.steps.length) {
+        stopAutoPlay();
+        return;
+      }
+
+      state.currentStep = nextStep;
+      const step = scenario.steps[nextStep];
+      state.stream.push({
+        ...step.event,
+        time: timestampLabel(nextStep)
+      });
+
+      render();
+
+      if (state.currentStep >= scenario.steps.length - 1) {
+        stopAutoPlay();
+      }
+    }
+
+    refs.playBtn.addEventListener("click", () => {
+      if (state.autoTimer) {
+        stopAutoPlay();
+        return;
+      }
+
+      if (state.currentStep >= currentScenario().steps.length - 1) {
+        resetScenario();
+      }
+
+      refs.playBtn.textContent = "Pause";
+      state.autoTimer = window.setInterval(() => {
+        advanceStep();
+        if (state.currentStep >= currentScenario().steps.length - 1) stopAutoPlay();
+      }, 1400);
+    });
+
+    refs.stepBtn.addEventListener("click", () => {
+      stopAutoPlay();
+      advanceStep();
+    });
+
+    refs.resetBtn.addEventListener("click", () => {
+      stopAutoPlay();
+      resetScenario();
+    });
+
+    refs.commandBtn.addEventListener("click", () => {
+      stopAutoPlay();
+      if (state.currentStep < 0) {
+        advanceStep();
+        return;
+      }
+
+      if (state.currentStep < currentScenario().steps.length - 1) {
+        advanceStep();
+      } else {
+        resetScenario();
+        advanceStep();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   BellRing,
@@ -12,7 +13,9 @@ import {
   Globe,
   Heart,
   HeartHandshake,
+  ImagePlus,
   Instagram,
+  Loader2,
   Mail,
   Megaphone,
   MessageCircle,
@@ -24,8 +27,10 @@ import {
   SlidersHorizontal,
   Sparkles,
   Target,
+  Trash2,
   TrendingUp,
   UserRoundCheck,
+  Upload,
   Youtube,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -67,9 +72,30 @@ import {
   getSkuLabel,
   type PrimeActivationPlay,
   type PrimeInsightModel,
+  type PrimeSnapshot,
   type PrimeSocialStream,
   type PrimeTowerId,
 } from '@/lib/prime/prime-data';
+import {
+  fetchFinanceControlPlane,
+  type FinanceControlPlaneSnapshot,
+  type RiskTrustRecord,
+} from '@/lib/prime/finance-control-plane';
+import {
+  fetchIntelligenceControlPlane,
+  type IntelligenceControlPlaneSnapshot,
+  type IntelligenceCreatorRecord,
+  type IntelligenceCustomerRecord,
+  type IntelligenceLaunchDecisionRecord,
+} from '@/lib/prime/intelligence-control-plane';
+import { useToast } from '@/hooks/use-toast';
+import { formatFileSize } from '@/lib/product-images';
+import {
+  getIntelligenceAssets,
+  removeIntelligenceAsset,
+  type IntelligenceAsset,
+  uploadIntelligenceAsset,
+} from '@/lib/prime/intelligence-assets';
 
 interface PrimeTowerPageProps {
   towerId: PrimeTowerId;
@@ -134,6 +160,39 @@ type CustomerProfile = {
   nextCategory: string;
 };
 
+type LaunchDecisionPlan = {
+  id: string;
+  name: string;
+  skuCode: string;
+  productLabel: string;
+  creatorName: string;
+  creatorHandle: string;
+  creatorFit: number;
+  customerName: string;
+  customerCompany: string;
+  customerSegment: string;
+  customerLifecycle: string;
+  customerFit: number;
+  channel: string;
+  channels: readonly string[];
+  angle: string;
+  budget: number;
+  revenue: number;
+  launchReadiness: number;
+  outcomeScore: number;
+  riskLevel: number;
+  executionRisk: string;
+  nextBestAction: string;
+  narrative: string;
+  whyItWins: string;
+  offerHook: string;
+  messageHook: string;
+  optimization: string;
+  timing: string;
+};
+
+const INTELLIGENCE_DECISIONS_HREF = '/intelligence/launch-decisions';
+
 const currency = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
   currency: 'JPY',
@@ -142,7 +201,7 @@ const currency = new Intl.NumberFormat('ja-JP', {
 
 const demandTowerIds: PrimeTowerId[] = ['campaign-ops', 'content-creator-ops', 'lead-response-capture', 'retargeting-outreach'];
 const intelligenceTowerIds: PrimeTowerId[] = ['creators', 'customers', 'campaigns', 'analytics', 'attribution', 'forecasting', 'ai-operator', 'voc', 'alerts'];
-const financeTowerIds: PrimeTowerId[] = ['capital', 'lending', 'risk'];
+const financeTowerIds: PrimeTowerId[] = ['capital', 'offers', 'risk', 'settlement'];
 
 function statusTone(status: string) {
   if (['active', 'qualified', 'converted', 'resolved', 'positive', 'low'].includes(status)) return 'text-emerald-600 dark:text-emerald-300';
@@ -267,8 +326,340 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function LinkedIntelligenceAssetCard({
+  title,
+  description,
+  entityLabel,
+  contextLabel,
+  assets,
+  isUploading,
+  inputRef,
+  onOpenPicker,
+  onUpload,
+  onRemove,
+}: {
+  title: string;
+  description: string;
+  entityLabel: string;
+  contextLabel: string;
+  assets: IntelligenceAsset[];
+  isUploading: boolean;
+  inputRef: RefObject<HTMLInputElement>;
+  onOpenPicker: () => void;
+  onUpload: (files: FileList | null) => Promise<void>;
+  onRemove: (assetId: string) => Promise<void>;
+}) {
+  return (
+    <div className="mt-4 rounded-2xl border bg-muted/10 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-xs text-muted-foreground">{description}</div>
+        </div>
+        <Badge variant="outline">{assets.length} linked</Badge>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Badge variant="secondary" className="max-w-[260px] truncate px-3 py-1 text-xs font-medium text-muted-foreground">{entityLabel}</Badge>
+        <Badge variant="secondary" className="max-w-[280px] truncate px-3 py-1 text-xs font-medium text-muted-foreground">{contextLabel}</Badge>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(event) => void onUpload(event.target.files)}
+      />
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={onOpenPicker} disabled={isUploading}>
+          {isUploading ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Upload className="mr-1.5 size-4" />}
+          Upload images
+        </Button>
+      </div>
+
+      {assets.length ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {assets.slice(0, 3).map((asset) => (
+            <div key={asset.id} className="overflow-hidden rounded-2xl border bg-background">
+              <div className="relative">
+                <img src={asset.url} alt={asset.filename} className="h-28 w-full object-cover" />
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute right-2 top-2 size-8"
+                  onClick={() => void onRemove(asset.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+              <div className="space-y-1 p-3">
+                <div className="truncate text-sm font-medium">{asset.entityLabel}</div>
+                <div className="line-clamp-2 text-xs text-muted-foreground">{asset.contextLabel}</div>
+                <div className="text-[11px] text-muted-foreground">{asset.filename} · {formatFileSize(asset.size)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-dashed bg-background/60 p-4">
+          <ImagePlus className="mt-0.5 size-4 text-muted-foreground" />
+          <div>
+            <div className="text-sm font-medium">No image inputs yet</div>
+            <div className="text-xs text-muted-foreground">Attach JPG, PNG, WebP, or GIF files that help explain this recommendation.</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LinkedDecisionAssetLane({
+  title,
+  description,
+  assets,
+  emptyHref,
+  emptyLabel,
+}: {
+  title: string;
+  description: string;
+  assets: IntelligenceAsset[];
+  emptyHref: string;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-background p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-xs text-muted-foreground">{description}</div>
+        </div>
+        <Badge variant="outline">{assets.length} images</Badge>
+      </div>
+
+      {assets.length ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {assets.slice(0, 3).map((asset) => (
+            <div key={asset.id} className="overflow-hidden rounded-2xl border bg-muted/20">
+              <img src={asset.url} alt={asset.filename} className="h-28 w-full object-cover" />
+              <div className="space-y-1 p-3">
+                <div className="truncate text-sm font-medium">{asset.entityLabel}</div>
+                <div className="line-clamp-2 text-xs text-muted-foreground">{asset.contextLabel}</div>
+                <div className="text-[11px] text-muted-foreground">{asset.filename}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-dashed bg-muted/10 p-4">
+          <div className="text-sm font-medium">No linked visuals yet</div>
+          <div className="mt-1 text-xs text-muted-foreground">This source has not uploaded any images into the decision flow yet.</div>
+          <div className="mt-3">
+            <Button asChild variant="outline" size="sm">
+              <Link to={emptyHref}>{emptyLabel}</Link>
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EvidenceMeter({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="text-muted-foreground">{value}%</span>
+      </div>
+      <Progress value={value} className="h-2" />
+      <div className="text-[11px] text-muted-foreground">{hint}</div>
+    </div>
+  );
+}
+
+function EvidenceCard({
+  label,
+  value,
+  meta,
+}: {
+  label: string;
+  value: string;
+  meta: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/20 p-3">
+      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-sm font-medium">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
+    </div>
+  );
+}
+
+function CreatorEvidenceBoard({
+  creator,
+  platformFilter,
+  marketFilter,
+}: {
+  creator: CreatorProfile;
+  platformFilter: string;
+  marketFilter: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-background p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Prime evidence board</div>
+          <div className="text-xs text-muted-foreground">Why this creator is surfacing as the strongest fit right now.</div>
+        </div>
+        <Badge variant="outline">{creator.fitScore}% confidence</Badge>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">ER &gt; 5.0%</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">Fit Score &gt; 80%</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{platformFilter === 'all' ? 'Multi-platform' : platformFilter}</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{marketFilter === 'all' ? 'Global market' : marketFilter}</Badge>
+      </div>
+
+      <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime readout</div>
+        <div className="mt-2 text-sm font-medium">{creator.summary}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{creator.recommendation}</div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <EvidenceCard label="Audience overlap" value={creator.topFollowerSegment} meta={`${creator.country} · ${creator.channel}`} />
+        <EvidenceCard label="Commerce proof" value={`${creator.matchedPosts} matched posts`} meta={`${(creator.avgViews / 1000).toFixed(0)}K avg views on recent content`} />
+        <EvidenceCard label="Trust quality" value={`${creator.authenticityScore}% authenticity`} meta={`${creator.audienceQualityScore}% audience quality`} />
+        <EvidenceCard label="Bench position" value={`Index ${creator.benchmarkIndex}`} meta={`${creator.engagementRate.toFixed(1)}% engagement vs platform benchmark`} />
+      </div>
+
+      <div className="mt-4 space-y-3 rounded-2xl border bg-muted/10 p-4">
+        <EvidenceMeter label="Product fit" value={creator.fitScore} hint={`${creator.product} is the strongest SKU match for this creator.`} />
+        <EvidenceMeter label="Audience quality" value={creator.audienceQualityScore} hint="Follower mix and platform signal quality remain healthy." />
+        <EvidenceMeter label="Conversion trust" value={Math.round((creator.authenticityScore + creator.audienceQualityScore) / 2)} hint="Prime prefers creators with proof-first credibility, not just reach." />
+      </div>
+    </div>
+  );
+}
+
+function CustomerEvidenceBoard({
+  customer,
+  lifecycleFilter,
+  channelFilter,
+  activationReadiness,
+}: {
+  customer: CustomerProfile;
+  lifecycleFilter: string;
+  channelFilter: string;
+  activationReadiness: number;
+}) {
+  return (
+    <div className="rounded-2xl border bg-background p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Prime evidence board</div>
+          <div className="text-xs text-muted-foreground">Why this segment is moving up the priority stack now.</div>
+        </div>
+        <Badge variant="outline">{customer.potentialScore}% confidence</Badge>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{lifecycleFilter === 'all' ? 'Mixed lifecycle' : lifecycleFilter}</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{channelFilter === 'all' ? 'Multi-channel' : channelFilter}</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">Readiness {activationReadiness}%</Badge>
+        <Badge variant="secondary" className="max-w-[220px] truncate px-3 py-1 text-xs font-medium text-muted-foreground">{customer.segmentLabel}</Badge>
+      </div>
+
+      <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime readout</div>
+        <div className="mt-2 text-sm font-medium">{customer.signalSummary}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{customer.reasoning}</div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <EvidenceCard label="Lifecycle window" value={customer.lifecycle} meta={`${customer.totalOrders} orders · ${customer.momentum}`} />
+        <EvidenceCard label="Next category" value={customer.nextCategory} meta={`Lead SKU: ${customer.recommendedProduct}`} />
+        <EvidenceCard label="Channel path" value={customer.recommendedChannels.join(' + ')} meta="Prime AI prefers sequencing, not a single-channel blast." />
+        <EvidenceCard label="Revenue contribution" value={`${customer.revenueContribution}%`} meta={`${currency.format(customer.totalRevenue)} currently sits in this segment.`} />
+      </div>
+
+      <div className="mt-4 space-y-3 rounded-2xl border bg-muted/10 p-4">
+        <EvidenceMeter label="Potential score" value={customer.potentialScore} hint="Fit between lifecycle, product need, and response readiness." />
+        <EvidenceMeter label="Conversion likelihood" value={customer.conversionLikelihood} hint="Expected chance of a positive action if this segment is activated next." />
+        <EvidenceMeter label="Churn watch" value={customer.churnRisk} hint="Higher values mean Prime is seeing urgency or reactivation pressure." />
+      </div>
+    </div>
+  );
+}
+
+function LaunchDecisionBoard({
+  plan,
+  channelFilter,
+  readinessFilter,
+  averageMatch,
+  linkedCreatorAssets,
+  linkedCustomerAssets,
+}: {
+  plan: LaunchDecisionPlan;
+  channelFilter: string;
+  readinessFilter: string;
+  averageMatch: number;
+  linkedCreatorAssets: IntelligenceAsset[];
+  linkedCustomerAssets: IntelligenceAsset[];
+}) {
+  return (
+    <div className="rounded-2xl border bg-background p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Decision thesis</div>
+          <div className="text-xs text-muted-foreground">Why Prime believes this should be the next approved launch.</div>
+        </div>
+        <Badge variant="outline">{plan.outcomeScore}% match</Badge>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{channelFilter === 'all' ? 'Omni-channel mix' : channelFilter}</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{readinessFilter === 'all' ? 'Mixed readiness' : readinessFilter.replace('-', ' ')}</Badge>
+        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">Avg match {averageMatch}%</Badge>
+      </div>
+
+      <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime readout</div>
+        <div className="mt-2 text-sm font-medium">{plan.whyItWins}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{plan.nextBestAction}</div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <EvidenceCard label="Product" value={plan.productLabel} meta={`${plan.skuCode} · ${plan.offerHook}`} />
+        <EvidenceCard label="Creator lead" value={plan.creatorName} meta={`${plan.creatorHandle} · fit ${plan.creatorFit}%`} />
+        <EvidenceCard label="Customer target" value={plan.customerSegment} meta={`${plan.customerName} · fit ${plan.customerFit}%`} />
+        <EvidenceCard label="Visual inputs" value={`${linkedCreatorAssets.length + linkedCustomerAssets.length} linked`} meta={`${linkedCreatorAssets.length} creator + ${linkedCustomerAssets.length} customer inputs`} />
+      </div>
+
+      <div className="mt-4 space-y-3 rounded-2xl border bg-muted/10 p-4">
+        <EvidenceMeter label="Creator fit" value={plan.creatorFit} hint="Measures whether the creator can carry this message credibly." />
+        <EvidenceMeter label="Customer fit" value={plan.customerFit} hint="Measures intent, lifecycle timing, and product relevance." />
+        <EvidenceMeter label="Launch readiness" value={plan.launchReadiness} hint={`Risk watch sits at ${plan.riskLevel}% while the system checks execution readiness.`} />
+      </div>
+    </div>
+  );
+}
+
 function CreatorIntelligencePanel() {
   const snapshot = getPrimeSnapshot();
+  const { toast } = useToast();
   const creatorProfiles = useMemo<CreatorProfile[]>(() => snapshot.campaigns.map((campaign, index) => {
     const stream = snapshot.socialStreams[index % snapshot.socialStreams.length];
     const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
@@ -350,6 +741,9 @@ function CreatorIntelligencePanel() {
   const [sortBy, setSortBy] = useState('engagement');
   const [selectedCreatorId, setSelectedCreatorId] = useState(creatorProfiles[0]?.id ?? '');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [creatorAssets, setCreatorAssets] = useState<IntelligenceAsset[]>(() => getIntelligenceAssets('creators'));
+  const [isUploadingAssets, setIsUploadingAssets] = useState(false);
+  const creatorAssetInputRef = useRef<HTMLInputElement>(null);
 
   const filteredCreators = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -383,6 +777,51 @@ function CreatorIntelligencePanel() {
     ? filteredCreators.reduce((sum, creator) => sum + creator.engagementRate, 0) / filteredCreators.length
     : 0;
   const shortlistCount = filteredCreators.filter((creator) => creator.fitScore >= 82).length;
+
+  async function handleCreatorAssetUpload(files: FileList | null) {
+    if (!files?.length || !selectedCreator) return;
+
+    setIsUploadingAssets(true);
+    try {
+      const uploaded = [];
+      for (const file of Array.from(files)) {
+        const asset = await uploadIntelligenceAsset({
+          file,
+          source: 'creators',
+          entityId: selectedCreator.id,
+          entityLabel: selectedCreator.name,
+          contextLabel: `${selectedCreator.product} · ${selectedCreator.recommendation}`,
+        });
+        uploaded.push(asset);
+      }
+
+      setCreatorAssets(getIntelligenceAssets('creators'));
+      toast({
+        title: uploaded.length > 1 ? 'Creator images linked' : 'Creator image linked',
+        description: `${uploaded.length} image is now ready inside Launch Decisions.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Creator image upload failed',
+        description: error instanceof Error ? error.message : 'Could not upload the selected image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingAssets(false);
+      if (creatorAssetInputRef.current) {
+        creatorAssetInputRef.current.value = '';
+      }
+    }
+  }
+
+  async function handleRemoveCreatorAsset(assetId: string) {
+    await removeIntelligenceAsset(assetId);
+    setCreatorAssets(getIntelligenceAssets('creators'));
+    toast({
+      title: 'Creator image removed',
+      description: 'The linked image has been removed from Launch Decisions.',
+    });
+  }
 
   return (
     <>
@@ -495,30 +934,47 @@ function CreatorIntelligencePanel() {
               </div>
             </div>
             <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <CreatorEvidenceBoard creator={selectedCreator} platformFilter={platformFilter} marketFilter={marketFilter} />
               <div className="rounded-2xl border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold">Active filters</div>
-                    <div className="text-xs text-muted-foreground">Applying strict logic to candidate pool.</div>
+                    <div className="text-sm font-semibold">Prime recommendation strip</div>
+                    <div className="text-xs text-muted-foreground">Pick the strongest creator, confirm the SKU story, attach visual proof, then hand off into Launch Decisions.</div>
                   </div>
-                  <Badge variant="outline">{filteredCreators.length} matches</Badge>
+                  {selectedCreator ? <Badge>{selectedCreator.fitScore}% fit</Badge> : null}
                 </div>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground">ER &gt; 5.0%</Badge>
-                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground">Fit Score &gt; 80%</Badge>
-                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground capitalize">{platformFilter === 'all' ? 'Multi-platform' : platformFilter}</Badge>
-                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground capitalize">{marketFilter === 'all' ? 'Global market' : marketFilter}</Badge>
-                  <Badge variant="secondary" className="px-3 py-1 font-medium text-xs text-muted-foreground truncate max-w-[200px]">Audience: {selectedCreator?.topFollowerSegment || 'High-intent'}</Badge>
-                </div>
-              </div>
-              <div className="rounded-2xl border bg-background p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold">Visual review strip</div>
-                    <div className="text-xs text-muted-foreground">Preview the content feel before opening the full profile.</div>
-                  </div>
-                  {selectedCreator ? <Badge>{selectedCreator.matchedPosts} matched posts</Badge> : null}
-                </div>
+                {selectedCreator ? (
+                  <>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border bg-muted/20 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended creator</div>
+                        <div className="mt-2 text-sm font-medium">{selectedCreator.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.handle} · {selectedCreator.category}</div>
+                      </div>
+                      <div className="rounded-2xl border bg-muted/20 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Matched SKU</div>
+                        <div className="mt-2 text-sm font-medium">{selectedCreator.product}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.topFollowerSegment}</div>
+                      </div>
+                      <div className="rounded-2xl border bg-muted/20 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
+                        <div className="mt-2 text-sm font-medium">{selectedCreator.recommendation}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.matchedPosts} matched posts ready for review.</div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(true)}>
+                        Open profile
+                      </Button>
+                      <Button asChild size="sm">
+                        <Link to={INTELLIGENCE_DECISIONS_HREF}>
+                          Send to Launch Decisions
+                          <ArrowRight className="size-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {(selectedCreator?.contentPreview || []).map((preview: string, index: number) => (
                     <div key={`${selectedCreator?.id || 'preview'}-${preview}`} className="overflow-hidden rounded-2xl border bg-muted/20">
@@ -530,6 +986,18 @@ function CreatorIntelligencePanel() {
                     </div>
                   ))}
                 </div>
+                <LinkedIntelligenceAssetCard
+                  title="Creator image inputs"
+                  description="Attach screenshots or reference frames that explain why this creator should move forward."
+                  entityLabel={selectedCreator ? `${selectedCreator.name} · ${selectedCreator.handle}` : 'Current creator'}
+                  contextLabel={selectedCreator?.product || 'Attach image proof for this creator fit.'}
+                  assets={selectedCreator ? creatorAssets.filter((asset) => asset.entityLabel === selectedCreator.name) : creatorAssets}
+                  isUploading={isUploadingAssets}
+                  inputRef={creatorAssetInputRef}
+                  onOpenPicker={() => creatorAssetInputRef.current?.click()}
+                  onUpload={handleCreatorAssetUpload}
+                  onRemove={handleRemoveCreatorAsset}
+                />
               </div>
             </div>
           </CardHeader>
@@ -782,6 +1250,7 @@ function creatorProfilesHandle(index: number, channel: 'instagram' | 'youtube' |
 
 function CustomerIntelligencePanel() {
   const snapshot = getPrimeSnapshot();
+  const { toast } = useToast();
   const recommendedChannels = [
     ['TikTok', 'WhatsApp'],
     ['Facebook', 'Email'],
@@ -832,6 +1301,9 @@ function CustomerIntelligencePanel() {
   const [sortBy, setSortBy] = useState('potential');
   const [selectedCustomerId, setSelectedCustomerId] = useState(customerProfiles[0]?.id ?? '');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [customerAssets, setCustomerAssets] = useState<IntelligenceAsset[]>(() => getIntelligenceAssets('customers'));
+  const [isUploadingAssets, setIsUploadingAssets] = useState(false);
+  const customerAssetInputRef = useRef<HTMLInputElement>(null);
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -864,8 +1336,53 @@ function CustomerIntelligencePanel() {
     ?? filteredCustomers[0]
     ?? customerProfiles[0];
 
-  const atRiskValue = filteredCustomers
-    .filter((customer) => customer.lifecycle === 'at-risk')
+  async function handleCustomerAssetUpload(files: FileList | null) {
+    if (!files?.length || !selectedCustomer) return;
+
+    setIsUploadingAssets(true);
+    try {
+      const uploaded = [];
+      for (const file of Array.from(files)) {
+        const asset = await uploadIntelligenceAsset({
+          file,
+          source: 'customers',
+          entityId: selectedCustomer.id,
+          entityLabel: selectedCustomer.name,
+          contextLabel: `${selectedCustomer.segmentLabel} · ${selectedCustomer.recommendedProduct}`,
+        });
+        uploaded.push(asset);
+      }
+
+      setCustomerAssets(getIntelligenceAssets('customers'));
+      toast({
+        title: uploaded.length > 1 ? 'Customer images linked' : 'Customer image linked',
+        description: `${uploaded.length} image is now ready inside Launch Decisions.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Customer image upload failed',
+        description: error instanceof Error ? error.message : 'Could not upload the selected image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingAssets(false);
+      if (customerAssetInputRef.current) {
+        customerAssetInputRef.current.value = '';
+      }
+    }
+  }
+
+  async function handleRemoveCustomerAsset(assetId: string) {
+    await removeIntelligenceAsset(assetId);
+    setCustomerAssets(getIntelligenceAssets('customers'));
+    toast({
+      title: 'Customer image removed',
+      description: 'The linked image has been removed from Launch Decisions.',
+    });
+  }
+
+  const revenueOnWatch = filteredCustomers
+    .filter((customer) => customer.churnRisk >= 48)
     .reduce((sum, customer) => sum + customer.totalRevenue, 0);
   const activationReadiness = filteredCustomers.length
     ? Math.round(filteredCustomers.reduce((sum, customer) => sum + customer.potentialScore, 0) / filteredCustomers.length)
@@ -879,7 +1396,7 @@ function CustomerIntelligencePanel() {
         <div className="grid gap-3 md:grid-cols-4">
           <SummaryMetricCard label="Tracked segments" value={filteredCustomers.length} meta="Compact customer discovery view with shortlist-ready segment rows." icon={<CircleUserRound className="size-5" />} tone="info" />
           <SummaryMetricCard label="Reachable revenue" value={currency.format(totalReachableRevenue)} meta="Revenue currently inside the filtered customer opportunity set." icon={<TrendingUp className="size-5" />} tone="success" />
-          <SummaryMetricCard label="At-risk value" value={currency.format(atRiskValue)} meta="Revenue exposed if fragile cohorts are not reactivated in time." icon={<BellRing className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Revenue on watch" value={currency.format(revenueOnWatch)} meta="Revenue tied to cohorts already showing churn or reactivation pressure." icon={<BellRing className="size-5" />} tone="warning" />
           <SummaryMetricCard label="Activation readiness" value={`${activationReadiness}%`} meta={`${repeatPurchasePotential} segments already show repeat-order or replenishment behavior.`} icon={<Bot className="size-5" />} tone="purple" />
         </div>
 
@@ -959,49 +1476,68 @@ function CustomerIntelligencePanel() {
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <CustomerEvidenceBoard customer={selectedCustomer} lifecycleFilter={lifecycleFilter} channelFilter={channelFilter} activationReadiness={activationReadiness} />
               <div className="rounded-2xl border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold">Active filters</div>
-                    <div className="text-xs text-muted-foreground">Shortlist logic applied to the customer universe.</div>
-                  </div>
-                  <Badge variant="outline">{filteredCustomers.length} matches</Badge>
-                </div>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{lifecycleFilter === 'all' ? 'Mixed lifecycle' : lifecycleFilter}</Badge>
-                  <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{channelFilter === 'all' ? 'Multi-channel' : channelFilter}</Badge>
-                  <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">Readiness {activationReadiness}%</Badge>
-                  <Badge variant="secondary" className="max-w-[220px] truncate px-3 py-1 text-xs font-medium text-muted-foreground">Prime focus: {selectedCustomer?.segmentLabel || 'Highest-fit segment'}</Badge>
-                </div>
-              </div>
-              <div className="rounded-2xl border bg-background p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold">Prime signal strip</div>
-                    <div className="text-xs text-muted-foreground">A tight snapshot before you open the full segment profile.</div>
+                    <div className="text-sm font-semibold">Prime recommendation strip</div>
+                    <div className="text-xs text-muted-foreground">Turn the highest-fit segment into one clear activation move, add proof visuals, then hand off into Launch Decisions.</div>
                   </div>
                   {selectedCustomer ? <Badge>{selectedCustomer.potentialScore}% fit</Badge> : null}
                 </div>
                 {selectedCustomer ? (
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl border bg-muted/20 p-3">
-                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next category</div>
-                      <div className="mt-2 text-sm font-medium">{selectedCustomer.nextCategory}</div>
-                    </div>
-                    <div className="rounded-2xl border bg-muted/20 p-3">
-                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best channels</div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {selectedCustomer.recommendedChannels.map((channel) => (
-                          <Badge key={`${selectedCustomer.id}-${channel}-signal`} variant={channelTone(channel)}>{channel}</Badge>
-                        ))}
+                  <>
+                    <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended move</div>
+                      <div className="mt-2 text-sm font-medium">{selectedCustomer.nextBestAction}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Lead with {selectedCustomer.recommendedProduct}, then sequence {selectedCustomer.recommendedChannels.join(' + ')} around the {selectedCustomer.nextCategory.toLowerCase()} window.
                       </div>
                     </div>
-                    <div className="rounded-2xl border bg-muted/20 p-3">
-                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Momentum</div>
-                      <div className="mt-2 text-sm font-medium">{selectedCustomer.momentum}</div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border bg-muted/20 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended SKU</div>
+                        <div className="mt-2 text-sm font-medium">{selectedCustomer.recommendedProduct}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{selectedCustomer.segmentLabel}</div>
+                      </div>
+                      <div className="rounded-2xl border bg-muted/20 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best channels</div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {selectedCustomer.recommendedChannels.map((channel) => (
+                            <Badge key={`${selectedCustomer.id}-${channel}-signal`} variant={channelTone(channel)}>{channel}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border bg-muted/20 p-3">
+                        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Momentum</div>
+                        <div className="mt-2 text-sm font-medium">{selectedCustomer.momentum}</div>
+                      </div>
                     </div>
-                  </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(true)}>
+                        Open profile
+                      </Button>
+                      <Button asChild size="sm">
+                        <Link to={INTELLIGENCE_DECISIONS_HREF}>
+                          Send to Launch Decisions
+                          <ArrowRight className="size-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </>
                 ) : null}
+                <LinkedIntelligenceAssetCard
+                  title="Customer image inputs"
+                  description="Attach CRM screenshots, persona notes, or proof that explains why this segment should be targeted now."
+                  entityLabel={selectedCustomer ? `${selectedCustomer.name} · ${selectedCustomer.segmentLabel}` : 'Current customer'}
+                  contextLabel={selectedCustomer?.recommendedProduct || 'Attach image proof for this customer segment.'}
+                  assets={selectedCustomer ? customerAssets.filter((asset) => asset.entityLabel === selectedCustomer.name) : customerAssets}
+                  isUploading={isUploadingAssets}
+                  inputRef={customerAssetInputRef}
+                  onOpenPicker={() => customerAssetInputRef.current?.click()}
+                  onUpload={handleCustomerAssetUpload}
+                  onRemove={handleRemoveCustomerAsset}
+                />
               </div>
             </div>
           </CardHeader>
@@ -1188,6 +1724,336 @@ function CustomerIntelligencePanel() {
                     <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime AI recommendation</div>
                     <div className="mt-2 font-medium">{selectedCustomer.nextBestAction}</div>
                     <p className="mt-2 text-sm text-muted-foreground">Lead with {selectedCustomer.recommendedProduct}, sequence {selectedCustomer.recommendedChannels.join(' + ')}, and time the message around the {selectedCustomer.nextCategory.toLowerCase()} window.</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
+function LaunchDecisionPanel() {
+  const snapshot = getPrimeSnapshot();
+  const creatorNames = ['Linh Dao', 'Minh Chau', 'Ha An', 'Quynh My'] as const;
+  const creatorHandles = ['@linhdesk', '@minhmarkets', '@haan.live', '@quynhchoice'] as const;
+  const extraChannels = [
+    ['TikTok Spark', 'Retargeting'],
+    ['Instagram Reels', 'Email'],
+    ['YouTube Shorts', 'Marketplace CRM'],
+    ['Creator Live', 'WhatsApp'],
+  ] as const;
+
+  const campaignPlans = useMemo<LaunchDecisionPlan[]>(() => snapshot.campaigns.map((campaign, index) => {
+    const customer = snapshot.customers[index % snapshot.customers.length];
+    const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
+    const recommendation = snapshot.recommendations[index % snapshot.recommendations.length];
+    const alert = snapshot.alerts[index % snapshot.alerts.length];
+    const productLabel = getSkuLabel(campaign.skuCode);
+    const creatorFit = Math.min(96, 74 + index * 5 + Math.round(play.projectedLift / 4));
+    const customerFit = Math.min(94, 69 + customer.totalOrders * 5 + index * 4);
+    const launchReadiness = Math.min(97, 72 + index * 6 + (campaign.status === 'active' ? 8 : 0));
+    const outcomeScore = Math.round((creatorFit + customerFit + launchReadiness) / 3);
+    const riskLevel = Math.max(18, 58 - index * 9 + (campaign.status === 'paused' ? 14 : 0));
+    const channels = [campaign.channel, ...extraChannels[index % extraChannels.length]] as const;
+
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      skuCode: campaign.skuCode,
+      productLabel,
+      creatorName: creatorNames[index] || `Creator ${index + 1}`,
+      creatorHandle: creatorHandles[index] || `@creator${index + 1}`,
+      creatorFit,
+      customerName: customer.name,
+      customerCompany: customer.company,
+      customerSegment: customer.segment,
+      customerLifecycle: customer.lifecycle,
+      customerFit,
+      channel: campaign.channel,
+      channels,
+      angle: ['Product proof for first-touch demand', 'Value comparison for high-intent buyers', 'Bundle upsell for repeat purchase cohorts', 'Creator-led urgency push for warm demand'][index] || 'Product-to-demand match narrative',
+      budget: campaign.spend,
+      revenue: campaign.revenue,
+      launchReadiness,
+      outcomeScore,
+      riskLevel,
+      executionRisk: alert?.title || 'No material execution risk detected.',
+      nextBestAction: play.nextBestAction,
+      narrative: recommendation?.reasoning || 'Prime AI sees a high-confidence product, audience, and creator overlap for this launch.',
+      whyItWins: `${productLabel} fits ${customer.segment.toLowerCase()} demand, while ${creatorNames[index] || `Creator ${index + 1}`} gives the campaign credible reach on ${campaign.channel}.`,
+      offerHook: ['Lead with hero SKU + starter incentive', 'Show ROI proof before price framing', 'Bundle the refill path into one offer', 'Use creator credibility to compress trust time'][index] || 'Lead with product clarity and proof.',
+      messageHook: recommendation?.target || customer.segment,
+      optimization: ['Scale creator spend only after creator-led CTR stabilizes.', 'Pair paid retargeting with creator proof assets.', 'Use CRM follow-up after first high-intent touch.', 'Open with creator content, then switch to conversion-led remarketing.'][index] || 'Preserve match quality before adding spend.',
+      timing: ['Launch this week', 'Wait for inventory confirmation', 'Best in next 72 hours', 'Sync with creator posting window'][index] || 'Ready now',
+    };
+  }), [snapshot]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [channelFilter, setChannelFilter] = useState('all');
+  const [readinessFilter, setReadinessFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('match');
+  const [selectedCampaignId, setSelectedCampaignId] = useState(campaignPlans[0]?.id ?? '');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const creatorAssets = useMemo(() => getIntelligenceAssets('creators'), []);
+  const customerAssets = useMemo(() => getIntelligenceAssets('customers'), []);
+
+  const filteredPlans = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const next = campaignPlans.filter((plan) => {
+      const matchesQuery = !normalizedQuery || [plan.name, plan.productLabel, plan.skuCode, plan.creatorName, plan.customerName, plan.customerSegment, plan.angle, plan.narrative].join(' ').toLowerCase().includes(normalizedQuery);
+      const matchesChannel = channelFilter === 'all' || plan.channels.some((channel) => channel.toLowerCase().includes(channelFilter));
+      const matchesReadiness = readinessFilter === 'all'
+        || (readinessFilter === 'launch-now' && plan.launchReadiness >= 84)
+        || (readinessFilter === 'warm-up' && plan.launchReadiness >= 70 && plan.launchReadiness < 84)
+        || (readinessFilter === 'at-risk' && plan.riskLevel >= 45);
+      return matchesQuery && matchesChannel && matchesReadiness;
+    });
+
+    next.sort((left, right) => {
+      if (sortBy === 'revenue') return right.revenue - left.revenue;
+      if (sortBy === 'readiness') return right.launchReadiness - left.launchReadiness;
+      if (sortBy === 'risk') return right.riskLevel - left.riskLevel;
+      return right.outcomeScore - left.outcomeScore;
+    });
+
+    return next;
+  }, [campaignPlans, channelFilter, readinessFilter, searchQuery, sortBy]);
+
+  const selectedPlan = filteredPlans.find((plan) => plan.id === selectedCampaignId)
+    ?? campaignPlans.find((plan) => plan.id === selectedCampaignId)
+    ?? filteredPlans[0]
+    ?? campaignPlans[0];
+
+  const launchNowCount = filteredPlans.filter((plan) => plan.launchReadiness >= 84 && plan.riskLevel < 45).length;
+  const averageMatch = filteredPlans.length ? Math.round(filteredPlans.reduce((sum, plan) => sum + plan.outcomeScore, 0) / filteredPlans.length) : 0;
+  const forecastRevenue = filteredPlans.reduce((sum, plan) => sum + plan.revenue, 0);
+  const avgRisk = filteredPlans.length ? Math.round(filteredPlans.reduce((sum, plan) => sum + plan.riskLevel, 0) / filteredPlans.length) : 0;
+  const linkedCreatorAssets = selectedPlan ? creatorAssets.filter((asset) => asset.entityLabel === selectedPlan.creatorName) : [];
+  const linkedCustomerAssets = selectedPlan ? customerAssets.filter((asset) => asset.entityLabel === selectedPlan.customerName) : [];
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Matched decisions" value={filteredPlans.length} meta="Each row scores product, buyer intent, creator fit, and visual context in one compact decision view." icon={<PanelsTopLeft className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Average match" value={`${averageMatch}%`} meta="Blended score across product-customer-creator alignment." icon={<Sparkles className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Forecast revenue" value={currency.format(forecastRevenue)} meta="Projected outcome from the currently filtered launch set." icon={<TrendingUp className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Ready to approve" value={launchNowCount} meta={`Avg risk ${avgRisk}% across the current decision stack.`} icon={<Megaphone className="size-5" />} tone="purple" />
+        </div>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <CardTitle>Launch decision workspace</CardTitle>
+                  <Badge variant="outline" className="gap-1"><Sparkles className="size-3" />Compact decision workspace</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">See which product, creator, customer cohort, and uploaded source visuals should move forward, then approve the strongest launch without leaving the table.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="gap-1"><ScanSearch className="size-3" /> Match scoring</Badge>
+                <Badge variant="outline" className="gap-1"><HeartHandshake className="size-3" /> Product x buyer fit</Badge>
+                <Badge variant="outline" className="gap-1"><CircleUserRound className="size-3" /> Creator x message fit</Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Search query</div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="pl-9" placeholder="Search product, customer, creator, or launch angle" />
+                </div>
+              </div>
+              <div className="space-y-2"><div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Channel lane</div><Select value={channelFilter} onValueChange={setChannelFilter}><SelectTrigger><SelectValue placeholder="Choose channel" /></SelectTrigger><SelectContent><SelectItem value="all">All channels</SelectItem><SelectItem value="tiktok">TikTok</SelectItem><SelectItem value="instagram">Instagram</SelectItem><SelectItem value="youtube">YouTube</SelectItem><SelectItem value="email">Email</SelectItem><SelectItem value="whatsapp">WhatsApp</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2"><div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Decision state</div><Select value={readinessFilter} onValueChange={setReadinessFilter}><SelectTrigger><SelectValue placeholder="Choose readiness" /></SelectTrigger><SelectContent><SelectItem value="all">All plans</SelectItem><SelectItem value="launch-now">Launch now</SelectItem><SelectItem value="warm-up">Warm-up needed</SelectItem><SelectItem value="at-risk">At risk</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2"><div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sort by</div><Select value={sortBy} onValueChange={setSortBy}><SelectTrigger><SelectValue placeholder="Sort plans" /></SelectTrigger><SelectContent><SelectItem value="match">Overall match</SelectItem><SelectItem value="readiness">Launch readiness</SelectItem><SelectItem value="revenue">Revenue</SelectItem><SelectItem value="risk">Risk</SelectItem></SelectContent></Select></div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <LaunchDecisionBoard
+                plan={selectedPlan}
+                channelFilter={channelFilter}
+                readinessFilter={readinessFilter}
+                averageMatch={averageMatch}
+                linkedCreatorAssets={linkedCreatorAssets}
+                linkedCustomerAssets={linkedCustomerAssets}
+              />
+              <div className="rounded-2xl border bg-background p-4">
+                <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold">Prime approval strip</div><div className="text-xs text-muted-foreground">A compressed answer for how creators, customers, and visuals should converge before execution.</div></div>{selectedPlan ? <Badge>{selectedPlan.outcomeScore}% match</Badge> : null}</div>
+                {selectedPlan ? <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Product</div><div className="mt-2 text-sm font-medium">{selectedPlan.productLabel}</div><div className="mt-1 text-xs text-muted-foreground">{selectedPlan.skuCode}</div></div><div className="rounded-2xl border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Buyer + creator</div><div className="mt-2 text-sm font-medium">{selectedPlan.customerSegment}</div><div className="mt-1 text-xs text-muted-foreground">via {selectedPlan.creatorName}</div></div><div className="rounded-2xl border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended move</div><div className="mt-2 text-sm font-medium">{selectedPlan.offerHook}</div></div></div> : null}
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <LinkedDecisionAssetLane
+                title="Creator inputs in this decision"
+                description="Images attached on the Creators screen now support this approval."
+                assets={linkedCreatorAssets.length ? linkedCreatorAssets : creatorAssets}
+                emptyHref="/intelligence/creators"
+                emptyLabel="Upload on Creators"
+              />
+              <LinkedDecisionAssetLane
+                title="Customer inputs in this decision"
+                description="Images attached on the Customers screen stay with this segment during approval."
+                assets={linkedCustomerAssets.length ? linkedCustomerAssets : customerAssets}
+                emptyHref="/intelligence/customers"
+                emptyLabel="Upload on Customers"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader><TableRow><TableHead>Decision</TableHead><TableHead>Product</TableHead><TableHead>Customer fit</TableHead><TableHead>Creator fit</TableHead><TableHead>Channels</TableHead><TableHead>Approval recommendation</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {filteredPlans.map((plan) => (
+                  <TableRow key={plan.id} className={selectedPlan?.id === plan.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium"><button type="button" className="flex items-start gap-3 text-left" onClick={() => { setSelectedCampaignId(plan.id); setIsDialogOpen(true); }}><div className="flex size-12 items-center justify-center rounded-2xl border bg-gradient-to-br from-amber-500/15 to-orange-500/10 text-sm font-semibold text-foreground shadow-sm">{initials(plan.name)}</div><div className="min-w-0 space-y-1"><div className="font-semibold text-foreground">{plan.name}</div><div className="text-xs text-muted-foreground">{plan.angle}</div><div className="text-[11px] text-muted-foreground">{plan.timing} · readiness {plan.launchReadiness}%</div></div></button></TableCell>
+                    <TableCell><div className="space-y-1"><div className="font-medium">{plan.productLabel}</div><div className="text-xs text-muted-foreground">{plan.skuCode}</div></div></TableCell>
+                    <TableCell><div className="space-y-1"><div className="font-medium">{plan.customerName}</div><div className="text-xs text-muted-foreground">{plan.customerSegment} · {plan.customerLifecycle}</div><div className="text-xs text-primary">Fit {plan.customerFit}%</div></div></TableCell>
+                    <TableCell><div className="space-y-1"><div className="font-medium">{plan.creatorName}</div><div className="text-xs text-muted-foreground">{plan.creatorHandle}</div><div className="text-xs text-primary">Fit {plan.creatorFit}%</div></div></TableCell>
+                    <TableCell><div className="flex flex-wrap gap-1.5">{plan.channels.map((channel) => <Badge key={`${plan.id}-${channel}`} variant={channelTone(channel)}>{channel}</Badge>)}</div></TableCell>
+                    <TableCell className="max-w-[340px]"><div className="space-y-2"><p className="line-clamp-2 text-sm text-muted-foreground">{plan.whyItWins}</p><div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"><Badge variant="outline" className="rounded-full">{plan.outcomeScore}% match</Badge><span>{plan.offerHook}</span></div></div></TableCell>
+                    <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => { setSelectedCampaignId(plan.id); setIsDialogOpen(true); }}>Open decision</Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {selectedPlan ? (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-5xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedPlan.name}</DialogTitle>
+              <DialogDescription>Compact launch decision profile across creator fit, customer fit, linked visuals, and the final go-to-market recommendation.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex gap-4">
+                      <div className="flex size-24 items-center justify-center rounded-3xl border bg-gradient-to-br from-amber-500/15 to-orange-500/10 text-2xl font-semibold shadow-sm">
+                        {initials(selectedPlan.productLabel)}
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-3xl font-semibold">{selectedPlan.productLabel}</h3>
+                          <Badge variant="outline">{selectedPlan.skuCode}</Badge>
+                          <Badge variant="outline">{selectedPlan.channel}</Badge>
+                        </div>
+                        <p className="max-w-2xl text-sm text-muted-foreground">{selectedPlan.narrative}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">Customer fit {selectedPlan.customerFit}%</Badge>
+                          <Badge variant="outline">Creator fit {selectedPlan.creatorFit}%</Badge>
+                          <Badge variant="outline">Launch readiness {selectedPlan.launchReadiness}%</Badge>
+                          <Badge variant="outline">Outcome score {selectedPlan.outcomeScore}%</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Button asChild>
+                      <Link to="/demand/campaign-ops">Send to Campaign Ops</Link>
+                    </Button>
+                  </div>
+                </div>
+                <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Decision snapshot</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best move</div>
+                      <div className="mt-2 font-medium">{selectedPlan.nextBestAction}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Offer framing</div>
+                      <div className="mt-2 font-medium">{selectedPlan.offerHook}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Risk watch</div>
+                      <div className="mt-2 font-medium">{selectedPlan.executionRisk}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Tabs defaultValue="overview" className="space-y-4">
+                <TabsList className="h-auto flex-wrap gap-2 bg-transparent p-0">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="audience">Audience</TabsTrigger>
+                  <TabsTrigger value="channels">Channels</TabsTrigger>
+                  <TabsTrigger value="playbook">Playbook</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricPill label="Budget" value={currency.format(selectedPlan.budget)} />
+                    <MetricPill label="Revenue" value={currency.format(selectedPlan.revenue)} />
+                    <MetricPill label="Match" value={`${selectedPlan.outcomeScore}%`} />
+                    <MetricPill label="Risk" value={`${selectedPlan.riskLevel}%`} />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Creator visuals linked</div>
+                      <div className="mt-2 font-medium text-foreground">{linkedCreatorAssets.length}</div>
+                      <p className="mt-2 text-sm text-muted-foreground">Images uploaded from the Creators screen that match this decision.</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Customer visuals linked</div>
+                      <div className="mt-2 font-medium text-foreground">{linkedCustomerAssets.length}</div>
+                      <p className="mt-2 text-sm text-muted-foreground">Images uploaded from the Customers screen that stay attached here.</p>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="audience" className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best customer</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedPlan.customerName}</div>
+                      <p className="mt-2 text-sm text-muted-foreground">{selectedPlan.customerCompany} · {selectedPlan.customerSegment} · {selectedPlan.customerLifecycle}</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best creator</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedPlan.creatorName}</div>
+                      <p className="mt-2 text-sm text-muted-foreground">{selectedPlan.creatorHandle} · strongest trust carrier for this product story.</p>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="channels" className="space-y-3">
+                  {selectedPlan.channels.map((channel) => (
+                    <div key={`${selectedPlan.id}-${channel}-detail`} className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
+                      <div>
+                        <div className="font-medium">{channel}</div>
+                        <div className="text-xs text-muted-foreground">Use this lane to sequence the product story into conversion.</div>
+                      </div>
+                      <Badge variant={channelTone(channel)}>{channel}</Badge>
+                    </div>
+                  ))}
+                </TabsContent>
+
+                <TabsContent value="playbook" className="space-y-3">
+                  <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">How to run this launch</div>
+                    <div className="mt-2 font-medium">{selectedPlan.offerHook}</div>
+                    <p className="mt-2 text-sm text-muted-foreground">Message to {selectedPlan.messageHook.toLowerCase()}, let {selectedPlan.creatorName} open the trust layer, then follow with {selectedPlan.channels.slice(1).join(' + ')} to close demand.</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Optimization</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedPlan.optimization}</div>
+                    </div>
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Timing</div>
+                      <div className="mt-2 font-medium text-foreground">{selectedPlan.timing}</div>
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -1464,15 +2330,19 @@ function StrategicNarrativeBanner({ towerId }: { towerId: PrimeTowerId }) {
     },
     capital: {
       label: 'Narrative role',
-      detail: 'Finance turns operating proof into capital readiness, showing how PrimeOS can support larger strategic expansion.',
+      detail: 'Capital readiness turns launch, CRM, demand, and ops proof into a simple answer: is this business route strong enough to justify more capital?',
     },
-    lending: {
+    offers: {
       label: 'Narrative role',
-      detail: 'This area frames how CR could connect manufacturers and SMBs to financial partners using platform signals.',
+      detail: 'Capital offers make funding concrete by showing the amount, provider, fee, and repayment model tied to a real launch path.',
     },
     risk: {
       label: 'Narrative role',
-      detail: 'Risk and trust make finance explainable by tying lending confidence back to inventory, service, and transaction health.',
+      detail: 'Risk and trust explain what a lender would worry about, what PrimeOS still trusts, and what the team should fix before scale.',
+    },
+    settlement: {
+      label: 'Narrative role',
+      detail: 'Settlement and repayment keep the capital loop closed by showing where money went, how it comes back, and whether collection is healthy.',
     },
   };
 
@@ -1784,6 +2654,95 @@ function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
   );
 }
 
+function IntelligenceRuntimeLoadingState({ label }: { label: string }) {
+  return (
+    <Card className="rounded-lg border">
+      <CardContent className="flex min-h-48 items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        <span>Loading {label} from the admin control plane...</span>
+      </CardContent>
+    </Card>
+  );
+}
+
+function IntelligenceRuntimeErrorState({ title }: { title: string }) {
+  return (
+    <Card className="rounded-lg border">
+      <CardContent className="space-y-2 p-6">
+        <div className="text-sm font-semibold">{title}</div>
+        <p className="text-sm text-muted-foreground">
+          PrimeOS expects admin-managed control-plane data here. Bring the backend control plane back online to restore this runtime view.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function IntelligenceRuntimeEmptyState({ title, description }: { title: string; description: string }) {
+  return (
+    <Card className="rounded-lg border">
+      <CardContent className="space-y-2 p-6">
+        <div className="text-sm font-semibold">{title}</div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatCompactCount(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'Not set';
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: value >= 1000 ? 1 : 0,
+  }).format(value);
+}
+
+function humanizeIntelligenceValue(value?: string) {
+  if (!value) return 'Not set';
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function normalizeRuntimeText(value?: string) {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizeRuntimeSku(value?: string) {
+  return (value ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
+}
+
+function findCampaignBySku(snapshot: PrimeSnapshot, skuCode?: string) {
+  const normalizedSku = normalizeRuntimeSku(skuCode);
+  if (!normalizedSku) return null;
+  return snapshot.campaigns.find((campaign) => normalizeRuntimeSku(campaign.skuCode) === normalizedSku) ?? null;
+}
+
+function findForecastBySku(snapshot: PrimeSnapshot, skuCode?: string) {
+  const normalizedSku = normalizeRuntimeSku(skuCode);
+  if (!normalizedSku) return null;
+  return snapshot.forecasts.find((forecast) => normalizeRuntimeSku(forecast.skuCode) === normalizedSku) ?? null;
+}
+
+function RuntimeContextCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/20 p-3">
+      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-sm font-medium">{value}</div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
 function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
 
@@ -1929,285 +2888,1546 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
   );
 }
 
-function FinancePanel({ towerId }: { towerId: PrimeTowerId }) {
-  const snapshot = getPrimeSnapshot();
-  const totalRevenue = snapshot.metrics.revenue;
-  const repeatRevenue = snapshot.customers.reduce((sum, customer) => sum + customer.totalRevenue, 0);
-  const serviceRisk = snapshot.tickets.filter((ticket) => ticket.priority === 'high').length;
-  const repaymentReadiness = snapshot.customers.length
-    ? Math.min(96, 62 + snapshot.customers.filter((customer) => customer.totalOrders > 0).length * 4)
-    : 0;
+function formatFinanceDate(value?: string) {
+  if (!value) return 'Not scheduled';
 
-  if (towerId === 'capital') {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function formatFinanceCurrency(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'Not set';
+  }
+
+  return currency.format(value);
+}
+
+function readinessStatusPriority(status: string) {
+  if (status === 'active') return 0;
+  if (status === 'watch') return 1;
+  if (status === 'paused') return 2;
+  return 3;
+}
+
+function offerStatusPriority(status: string) {
+  if (status === 'active') return 0;
+  if (status === 'onboarding') return 1;
+  if (status === 'watch') return 2;
+  return 3;
+}
+
+function riskSeverityPriority(severity: string) {
+  if (severity === 'high') return 0;
+  if (severity === 'medium') return 1;
+  if (severity === 'low') return 2;
+  return 3;
+}
+
+function settlementStatusPriority(status: string) {
+  if (status === 'overdue') return 0;
+  if (status === 'collecting') return 1;
+  if (status === 'scheduled') return 2;
+  if (status === 'closed') return 3;
+  return 4;
+}
+
+function matchFinanceRecordByMarket<T extends { market: string }>(records: T[], market?: string) {
+  if (!market) return null;
+
+  return records.find(
+    (record) => normalizeRuntimeText(record.market) === normalizeRuntimeText(market)
+  ) ?? null;
+}
+
+function matchRiskRecordByKeyword(records: RiskTrustRecord[], keyword?: string) {
+  const normalizedKeyword = normalizeRuntimeText(keyword);
+  if (!normalizedKeyword) return null;
+
+  return records.find((record) =>
+    [record.profileName, record.signalSource, record.topRisk].some((value) => {
+      const normalizedValue = normalizeRuntimeText(value);
+      return normalizedValue.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedValue);
+    })
+  ) ?? null;
+}
+
+function matchFinanceRecordByKeyword<T>(
+  records: T[],
+  keyword: string | undefined,
+  selectors: Array<(record: T) => string | undefined>
+) {
+  const normalizedKeyword = normalizeRuntimeText(keyword);
+  if (!normalizedKeyword) return null;
+
+  return records.find((record) =>
+    selectors.some((selector) => {
+      const normalizedValue = normalizeRuntimeText(selector(record));
+      return normalizedValue.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedValue);
+    })
+  ) ?? null;
+}
+
+function CompactCapitalReadinessRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: FinanceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const readinessRows = useMemo(
+    () => [...(data?.capitalReadiness ?? [])].sort((left, right) => {
+      const priorityDelta = readinessStatusPriority(left.status) - readinessStatusPriority(right.status);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+      return right.readinessScore - left.readinessScore;
+    }),
+    [data]
+  );
+  const topRow = readinessRows[0] ?? null;
+  const [selectedRowId, setSelectedRowId] = useState('');
+
+  useEffect(() => {
+    if (!topRow) {
+      if (selectedRowId) {
+        setSelectedRowId('');
+      }
+      return;
+    }
+
+    if (!readinessRows.some((row) => row.id === selectedRowId)) {
+      setSelectedRowId(topRow.id);
+    }
+  }, [readinessRows, selectedRowId, topRow]);
+
+  if (isLoading) {
+    return <IntelligenceRuntimeLoadingState label="finance readiness" />;
+  }
+
+  if (error) {
+    return <IntelligenceRuntimeErrorState title="Capital readiness is unavailable" />;
+  }
+
+  if (!topRow) {
     return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Revenue proof" value={currency.format(totalRevenue)} meta="Live order and transaction context is the base input for capital readiness." icon={<CircleDollarSign className="size-5" />} tone="success" />
-          <SummaryMetricCard label="RFQ pipeline" value={currency.format(snapshot.metrics.opportunityValue)} meta="Open commercial opportunity helps explain future working capital need." icon={<ClipboardList className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Repeat revenue" value={currency.format(repeatRevenue)} meta="Customer retention quality improves financing confidence." icon={<HeartHandshake className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Readiness score" value={`${repaymentReadiness}%`} meta="A simplified lender-facing summary built from operating proof." icon={<TrendingUp className="size-5" />} tone="purple" />
-        </div>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Capital readiness summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Signal</TableHead>
-                  <TableHead>Meaning</TableHead>
-                  <TableHead className="text-right">Current value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Revenue stability</TableCell>
-                  <TableCell>Observed sales and order flow in PrimeOS</TableCell>
-                  <TableCell className="text-right">{currency.format(totalRevenue)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Commercial pipeline</TableCell>
-                  <TableCell>Qualified opportunity likely to convert into transaction</TableCell>
-                  <TableCell className="text-right">{currency.format(snapshot.metrics.opportunityValue)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Customer quality</TableCell>
-                  <TableCell>Active customer base with repeat purchase context</TableCell>
-                  <TableCell className="text-right">{snapshot.customers.length}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Fulfillment proof</TableCell>
-                  <TableCell>Execution confidence tied to shipment and service outcomes</TableCell>
-                  <TableCell className="text-right">{snapshot.fulfillmentJobsCount}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+      <IntelligenceRuntimeEmptyState
+        title="No capital readiness rows are available yet"
+        description="Admin has not published any capital readiness programs into the finance control plane."
+      />
     );
   }
 
-  if (towerId === 'lending') {
-    const signalCompleteness = Math.min(98, 58 + snapshot.orders.length * 6);
-    const lendingSteps = [
-      { step: 1, title: 'Operating proof collected', done: snapshot.orders.length > 0, detail: `${snapshot.orders.length} orders, ${snapshot.customers.length} customers, ${snapshot.fulfillmentJobsCount} fulfillment jobs tracked in PrimeOS.` },
-      { step: 2, title: 'Capital need identified', done: snapshot.campaigns.length > 0, detail: `${snapshot.campaigns.length} campaigns running require budget. RFQ pipeline shows ${currency.format(snapshot.metrics.opportunityValue)} in open opportunity.` },
-      { step: 3, title: 'Risk profile assessed', done: serviceRisk <= 2, detail: `${serviceRisk} high-priority issues. Inventory pressure on ${snapshot.forecasts.filter((f) => f.risk !== 'low').length} SKUs. Trust score: ${Math.max(38, 84 - serviceRisk * 8)}%.` },
-      { step: 4, title: 'Partner matched', done: false, detail: 'Ready to route application package to SMB bank, lender, or embedded finance partner.' },
-    ];
+  const selectedRow = readinessRows.find((row) => row.id === selectedRowId) ?? topRow;
+  const readyCount = readinessRows.filter((row) => row.status === 'active' || row.readinessScore >= 80).length;
+  const totalFundingNeed = readinessRows.reduce((sum, row) => sum + (row.fundingNeed ?? 0), 0);
+  const averageReadiness = Math.round(readinessRows.reduce((sum, row) => sum + row.readinessScore, 0) / readinessRows.length);
+  const matchingCampaign = findCampaignBySku(snapshot, selectedRow.linkedSku);
+  const matchingForecast = findForecastBySku(snapshot, selectedRow.linkedSku);
+  const relatedRisk = matchRiskRecordByKeyword(data?.riskTrust ?? [], selectedRow.market);
 
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Signal completeness" value={`${signalCompleteness}%`} meta="How close the data is to a finance-grade application." icon={<TrendingUp className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Merchants in scope" value={snapshot.customers.length} meta="Profiles with operating and transaction evidence." icon={<HeartHandshake className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Capital need" value={currency.format(snapshot.metrics.opportunityValue)} meta="Open pipeline that requires working capital to convert." icon={<CircleDollarSign className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Application-ready" value={Math.min(snapshot.customers.length, 4)} meta="Cases that can be routed into partner discussion." icon={<ClipboardList className="size-5" />} tone="purple" />
-        </div>
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Capital programs" value={readinessRows.length} meta="Finance runtime reads only the readiness routes prepared in admin." icon={<CircleDollarSign className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Ready to fund" value={readyCount} meta="These rows already look strong enough to move into concrete offers." icon={<Sparkles className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Funding need" value={formatFinanceCurrency(totalFundingNeed)} meta="PrimeOS keeps the amount tied to a real launch instead of a generic loan request." icon={<TrendingUp className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Average readiness" value={`${averageReadiness}%`} meta={`${topRow.programName} is the strongest current finance route.`} icon={<Gauge className="size-5" />} tone="purple" />
+      </div>
 
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
         <Card className="rounded-lg border">
           <CardHeader>
-            <CardTitle>Lending flow</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative space-y-0">
-              {lendingSteps.map((item, index) => (
-                <div key={item.step} className="relative pb-6 last:pb-0">
-                  {index < lendingSteps.length - 1 ? (
-                    <span className={`absolute left-5 top-10 -ml-px h-full w-px ${item.done ? 'bg-primary/40' : 'bg-border'}`} />
-                  ) : null}
-                  <div className="flex gap-3">
-                    <div className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${item.done ? 'border-primary/40 bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground'}`}>
-                      {item.step}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.title}</span>
-                        {item.done ? <Badge variant="outline" className="text-emerald-600 dark:text-emerald-300">done</Badge> : <Badge variant="outline">pending</Badge>}
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Capital readiness roster</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">A compact runtime readout of launch routes that finance could credibly back.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Partner routing</CardTitle>
           </CardHeader>
           <CardContent>
             <Table variant="embedded">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Merchant / brand</TableHead>
-                  <TableHead>Use case</TableHead>
-                  <TableHead>Partner fit</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Program</TableHead>
+                  <TableHead>Market</TableHead>
+                  <TableHead>Linked launch</TableHead>
+                  <TableHead className="text-right">Need</TableHead>
+                  <TableHead className="text-right">Readiness</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {snapshot.customers.slice(0, 4).map((customer, index) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.company}</TableCell>
-                    <TableCell>{['Inventory expansion', 'Campaign financing', 'Cross-border launch', 'Working capital buffer'][index] || 'Growth financing'}</TableCell>
-                    <TableCell>{['SMB bank', 'Lender', 'Strategic partner', 'Embedded finance'][index] || 'Finance partner'}</TableCell>
-                    <TableCell className={statusTone(index === 1 ? 'open' : 'active')}>{index === 0 ? 'ready' : index === 1 ? 'review' : 'prepared'}</TableCell>
+                {readinessRows.slice(0, 6).map((row) => (
+                  <TableRow key={row.id} className={selectedRow.id === row.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedRowId(row.id)}>
+                        <span>{row.programName}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(row.status)}</span>
+                      </button>
+                    </TableCell>
+                    <TableCell>{row.market}</TableCell>
+                    <TableCell>{row.linkedLaunch || 'Launch route pending'}</TableCell>
+                    <TableCell className="text-right">{formatFinanceCurrency(row.fundingNeed)}</TableCell>
+                    <TableCell className="text-right">{row.readinessScore}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime finance thesis</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS keeps finance simple here: why this route is fundable, which systems support it, and what should happen next.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended readiness lane</div>
+              <div className="mt-2 text-lg font-semibold">{selectedRow.programName}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {selectedRow.linkedLaunch || 'Launch route pending'} · {selectedRow.market}
+              </div>
+              <p className="mt-3 text-sm font-medium">{selectedRow.readinessReason || 'This row already has enough operating proof to move into offer review.'}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Launch decision"
+                value={selectedRow.linkedLaunch || 'Launch link missing'}
+                detail="Finance only becomes useful when the capital need is tied to a real launch rather than a vague business goal."
+              />
+              <RuntimeContextCard
+                label="Funding need"
+                value={formatFinanceCurrency(selectedRow.fundingNeed)}
+                detail={`Next review ${formatFinanceDate(selectedRow.nextReview)} with ${selectedRow.owner}.`}
+              />
+              <RuntimeContextCard
+                label="Demand proof"
+                value={matchingCampaign ? `${matchingCampaign.leads} leads / ${matchingCampaign.orders} orders` : 'Demand proof still light'}
+                detail={
+                  matchingCampaign
+                    ? `${matchingCampaign.name} already shows response against ${selectedRow.linkedSku || 'this route'}, so the capital ask is grounded in market activity.`
+                    : 'Campaign Ops has not attached enough commercial proof to this route yet.'
+                }
+              />
+              <RuntimeContextCard
+                label="Ecom / COS"
+                value={matchingForecast ? `${matchingForecast.ats} ATS / ${matchingForecast.demand7d} 7d demand` : selectedRow.linkedSku || 'SKU not linked'}
+                detail={
+                  matchingForecast
+                    ? matchingForecast.risk === 'high'
+                      ? 'Inventory is still the key guardrail before this route should absorb more capital.'
+                      : 'Stock and projected demand are aligned enough for finance to take this route seriously.'
+                    : 'Inventory proof has not been attached yet.'
+                }
+              />
+              <RuntimeContextCard
+                label="CRM + Customer"
+                value={`${snapshot.customers.length} customer profiles`}
+                detail={`${currency.format(snapshot.customers.reduce((sum, customer) => sum + customer.totalRevenue, 0))} in CRM revenue gives finance a retention and repayment quality read, not just a one-time launch view.`}
+              />
+              <RuntimeContextCard
+                label="Risk & trust"
+                value={relatedRisk ? `${relatedRisk.trustScore}% trust score` : 'Risk review pending'}
+                detail={relatedRisk?.topRisk || 'PrimeOS still needs a clearer risk lane before this route should scale.'}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">
+                {readyCount > 0
+                  ? `${readyCount} capital routes are strong enough to move into Capital Offers, and ${selectedRow.programName} is the clearest one to price now.`
+                  : `${topRow.programName} is the strongest finance route, but it still needs more proof before a clean offer can be shown.`}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to="/finance/capital-offers">Open Capital Offers</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/intelligence/launch-decisions">Open Launch Decisions</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function CompactCapitalOffersRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: FinanceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const offers = useMemo(
+    () => [...(data?.capitalOffers ?? [])].sort((left, right) => {
+      const priorityDelta = offerStatusPriority(left.status) - offerStatusPriority(right.status);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+      return (right.amount ?? 0) - (left.amount ?? 0);
+    }),
+    [data]
+  );
+  const topOffer = offers[0] ?? null;
+  const [selectedOfferId, setSelectedOfferId] = useState('');
+
+  useEffect(() => {
+    if (!topOffer) {
+      if (selectedOfferId) {
+        setSelectedOfferId('');
+      }
+      return;
+    }
+
+    if (!offers.some((offer) => offer.id === selectedOfferId)) {
+      setSelectedOfferId(topOffer.id);
+    }
+  }, [offers, selectedOfferId, topOffer]);
+
+  if (isLoading) {
+    return <IntelligenceRuntimeLoadingState label="capital offers" />;
+  }
+
+  if (error) {
+    return <IntelligenceRuntimeErrorState title="Capital offers are unavailable" />;
+  }
+
+  if (!topOffer) {
+    return (
+      <IntelligenceRuntimeEmptyState
+        title="No capital offers are available yet"
+        description="Admin has not published partner offers into the finance control plane."
+      />
+    );
+  }
+
+  const selectedOffer = offers.find((offer) => offer.id === selectedOfferId) ?? topOffer;
+  const activeOffers = offers.filter((offer) => offer.status === 'active').length;
+  const totalOfferAmount = offers.reduce((sum, offer) => sum + (offer.amount ?? 0), 0);
+  const averageFeeRate = offers.length
+    ? (offers.reduce((sum, offer) => sum + (offer.feeRate ?? 0), 0) / offers.length).toFixed(1)
+    : '0.0';
+  const splitSettlementOffers = offers.filter((offer) => offer.repaymentModel === 'split_settlement').length;
+  const relatedReadiness = matchFinanceRecordByMarket(data?.capitalReadiness ?? [], selectedOffer.market);
+  const relatedRisk = matchRiskRecordByKeyword(data?.riskTrust ?? [], selectedOffer.market);
+  const relatedSettlement = (data?.settlementRepayment ?? []).find(
+    (facility) => normalizeRuntimeText(facility.collectionMode) === normalizeRuntimeText(selectedOffer.repaymentModel)
+      || normalizeRuntimeText(facility.market) === normalizeRuntimeText(selectedOffer.market)
+  ) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Active offers" value={activeOffers} meta="PrimeOS only shows priced routes that admin has already curated." icon={<ClipboardList className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Offer capacity" value={formatFinanceCurrency(totalOfferAmount)} meta="The amount stays tied to concrete launch routes and repayment logic." icon={<CircleDollarSign className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Average fee rate" value={`${averageFeeRate}%`} meta="Sellers can understand the cost of scale without opening an admin tool." icon={<TrendingUp className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Split-settlement lanes" value={splitSettlementOffers} meta="PrimeOS highlights offers that can repay directly from commerce flows." icon={<HeartHandshake className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Capital offers roster</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">A runtime view of which funding packages are actually on the table.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Offer</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Repayment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {offers.slice(0, 6).map((offer) => (
+                  <TableRow key={offer.id} className={selectedOffer.id === offer.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedOfferId(offer.id)}>
+                        <span>{offer.offerName}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(offer.status)}</span>
+                      </button>
+                    </TableCell>
+                    <TableCell>{offer.providerName}</TableCell>
+                    <TableCell>{humanizeIntelligenceValue(offer.capitalType)}</TableCell>
+                    <TableCell className="text-right">{formatFinanceCurrency(offer.amount)}</TableCell>
+                    <TableCell>{humanizeIntelligenceValue(offer.repaymentModel)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime offer strip</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS shows the financing option in plain operating terms: what it funds, who provides it, what it costs, and how repayment will work.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended offer</div>
+              <div className="mt-2 text-lg font-semibold">{selectedOffer.offerName}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {selectedOffer.providerName} · {humanizeIntelligenceValue(selectedOffer.capitalType)}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Amount"
+                value={formatFinanceCurrency(selectedOffer.amount)}
+                detail={`${selectedOffer.termDays ?? 0} day term with ${selectedOffer.feeRate ?? 0}% fee rate.`}
+              />
+              <RuntimeContextCard
+                label="Repayment"
+                value={humanizeIntelligenceValue(selectedOffer.repaymentModel)}
+                detail={relatedSettlement ? `${relatedSettlement.facilityName} already shows how this collection path will look after funding.` : 'Settlement configuration is still being attached in admin.'}
+              />
+              <RuntimeContextCard
+                label="Linked launch"
+                value={selectedOffer.linkedLaunch || 'Launch route pending'}
+                detail="Offers stay grounded in a launch plan so finance feels like an operating tool, not a generic banking form."
+              />
+              <RuntimeContextCard
+                label="Capital readiness"
+                value={relatedReadiness ? `${relatedReadiness.readinessScore}% readiness` : 'Readiness lane pending'}
+                detail={relatedReadiness?.readinessReason || 'PrimeOS still needs a stronger readiness thesis before this offer should be pushed harder.'}
+              />
+              <RuntimeContextCard
+                label="Risk & trust"
+                value={relatedRisk ? `${relatedRisk.trustScore}% trust score` : 'Risk review pending'}
+                detail={relatedRisk?.topRisk || 'No risk lane is attached yet, so PrimeOS cannot fully explain the downside on this offer.'}
+              />
+              <RuntimeContextCard
+                label="Commerce proof"
+                value={`${currency.format(snapshot.metrics.revenue)} revenue`}
+                detail={`${snapshot.metrics.leadToOrderRate}% lead-to-order and ${currency.format(snapshot.metrics.opportunityValue)} of open opportunity help explain why this financing path exists now.`}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">
+                PrimeOS should move this offer into settlement review only after the team agrees the repayment path is realistic for the launch it is funding.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to="/finance/settlement-repayment">Open Settlement &amp; Repayment</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/finance/risk-trust">Open Risk &amp; Trust</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function CompactRiskTrustRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: FinanceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const riskRows = useMemo(
+    () => [...(data?.riskTrust ?? [])].sort((left, right) => {
+      const priorityDelta = riskSeverityPriority(left.severity) - riskSeverityPriority(right.severity);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+      return left.trustScore - right.trustScore;
+    }),
+    [data]
+  );
+  const topRisk = riskRows[0] ?? null;
+  const [selectedRiskId, setSelectedRiskId] = useState('');
+
+  useEffect(() => {
+    if (!topRisk) {
+      if (selectedRiskId) {
+        setSelectedRiskId('');
+      }
+      return;
+    }
+
+    if (!riskRows.some((row) => row.id === selectedRiskId)) {
+      setSelectedRiskId(topRisk.id);
+    }
+  }, [riskRows, selectedRiskId, topRisk]);
+
+  if (isLoading) {
+    return <IntelligenceRuntimeLoadingState label="risk and trust" />;
+  }
+
+  if (error) {
+    return <IntelligenceRuntimeErrorState title="Risk & trust is unavailable" />;
+  }
+
+  if (!topRisk) {
+    return (
+      <IntelligenceRuntimeEmptyState
+        title="No risk lanes are available yet"
+        description="Admin has not published any risk and trust rows into the finance control plane."
+      />
+    );
+  }
+
+  const selectedRisk = riskRows.find((row) => row.id === selectedRiskId) ?? topRisk;
+  const averageTrust = Math.round(riskRows.reduce((sum, row) => sum + row.trustScore, 0) / riskRows.length);
+  const highSeverityCount = riskRows.filter((row) => row.severity === 'high').length;
+  const activeFixes = riskRows.filter((row) => ['active', 'watch'].includes(row.status)).length;
+  const relatedReadiness = matchFinanceRecordByKeyword(data?.capitalReadiness ?? [], selectedRisk.profileName, [
+    (record) => record.programName,
+    (record) => record.linkedLaunch,
+    (record) => record.linkedSku,
+    (record) => record.market,
+  ]);
+  const relatedOffer = matchFinanceRecordByKeyword(data?.capitalOffers ?? [], selectedRisk.profileName, [
+    (record) => record.offerName,
+    (record) => record.providerName,
+    (record) => record.linkedLaunch,
+    (record) => record.market,
+  ]);
+  const relatedSettlement = matchFinanceRecordByKeyword(data?.settlementRepayment ?? [], selectedRisk.profileName, [
+    (record) => record.facilityName,
+    (record) => record.disbursementTarget,
+    (record) => record.repaymentSource,
+    (record) => record.market,
+  ]);
+  const openServiceCases = snapshot.tickets.filter((ticket) => ticket.status !== 'resolved').length;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Average trust" value={`${averageTrust}%`} meta="PrimeOS makes the finance trust posture visible without exposing admin CRUD." icon={<HeartHandshake className="size-5" />} tone="success" />
+        <SummaryMetricCard label="High-severity lanes" value={highSeverityCount} meta="These are the finance routes most likely to make a lender pause." icon={<Gauge className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Fixes in motion" value={activeFixes} meta="Risk only helps if the team can see what needs to change next." icon={<ClipboardList className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Service pressure" value={openServiceCases} meta="Customer recovery quality still influences whether finance feels safe to scale." icon={<BellRing className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Risk &amp; trust roster</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">A simple seller-facing view of what finance still trusts and what would block scale.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Profile</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead className="text-right">Trust</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Owner</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {riskRows.slice(0, 6).map((row) => (
+                  <TableRow key={row.id} className={selectedRisk.id === row.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedRiskId(row.id)}>
+                        <span>{row.profileName}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(row.status)}</span>
+                      </button>
+                    </TableCell>
+                    <TableCell>{row.signalSource || 'Finance source pending'}</TableCell>
+                    <TableCell className="text-right">{row.trustScore}%</TableCell>
+                    <TableCell className="capitalize">{humanizeIntelligenceValue(row.severity)}</TableCell>
+                    <TableCell>{row.owner}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime trust strip</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS turns finance risk into plain language: what could break, why it matters, and which team should clear it.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Top finance concern</div>
+              <div className="mt-2 text-lg font-semibold">{selectedRisk.profileName}</div>
+              <div className="mt-1 text-sm text-muted-foreground">{selectedRisk.signalSource || 'Signal source pending'} · {humanizeIntelligenceValue(selectedRisk.severity)} severity</div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Trust score"
+                value={`${selectedRisk.trustScore}%`}
+                detail={selectedRisk.topRisk || 'The main lender-facing risk has not been written yet.'}
+              />
+              <RuntimeContextCard
+                label="Recommended fix"
+                value={selectedRisk.owner}
+                detail={selectedRisk.recommendedFix || 'Admin still needs to attach the clearest fix for this risk lane.'}
+              />
+              <RuntimeContextCard
+                label="Capital readiness"
+                value={relatedReadiness ? `${relatedReadiness.readinessScore}% readiness` : 'Readiness route pending'}
+                detail={relatedReadiness?.linkedLaunch || 'Once readiness is linked, the seller can see which launch this risk is blocking.'}
+              />
+              <RuntimeContextCard
+                label="Capital offers"
+                value={relatedOffer ? relatedOffer.offerName : 'Offer route pending'}
+                detail={relatedOffer ? `${formatFinanceCurrency(relatedOffer.amount)} at ${relatedOffer.feeRate ?? 0}% fee could move once this risk clears.` : 'No concrete offer is tied to this risk lane yet.'}
+              />
+              <RuntimeContextCard
+                label="Settlement"
+                value={relatedSettlement ? relatedSettlement.collectionMode || relatedSettlement.facilityName : 'Collection route pending'}
+                detail={relatedSettlement ? `${formatFinanceCurrency(relatedSettlement.outstandingBalance)} is already exposed to this repayment path.` : 'No facility has been linked to this risk lane yet.'}
+              />
+              <RuntimeContextCard
+                label="Customer + Service"
+                value={`${openServiceCases} open service cases`}
+                detail={`${snapshot.returnsCount} returns and ${openServiceCases} unresolved cases still shape how safe this business looks to finance.`}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">
+                PrimeOS should push the seller back to the fix, not straight to funding, whenever the trust lane still has a high-severity blocker attached.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to="/finance/capital-readiness">Open Capital Readiness</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/finance/settlement-repayment">Open Settlement &amp; Repayment</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function CompactSettlementRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: FinanceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const settlementRows = useMemo(
+    () => [...(data?.settlementRepayment ?? [])].sort((left, right) => {
+      const priorityDelta = settlementStatusPriority(left.status) - settlementStatusPriority(right.status);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+      return (right.outstandingBalance ?? 0) - (left.outstandingBalance ?? 0);
+    }),
+    [data]
+  );
+  const topFacility = settlementRows[0] ?? null;
+  const [selectedFacilityId, setSelectedFacilityId] = useState('');
+
+  useEffect(() => {
+    if (!topFacility) {
+      if (selectedFacilityId) {
+        setSelectedFacilityId('');
+      }
+      return;
+    }
+
+    if (!settlementRows.some((row) => row.id === selectedFacilityId)) {
+      setSelectedFacilityId(topFacility.id);
+    }
+  }, [settlementRows, selectedFacilityId, topFacility]);
+
+  if (isLoading) {
+    return <IntelligenceRuntimeLoadingState label="settlement and repayment" />;
+  }
+
+  if (error) {
+    return <IntelligenceRuntimeErrorState title="Settlement & repayment is unavailable" />;
+  }
+
+  if (!topFacility) {
+    return (
+      <IntelligenceRuntimeEmptyState
+        title="No settlement facilities are available yet"
+        description="Admin has not published any settlement or repayment lanes into the finance control plane."
+      />
+    );
+  }
+
+  const selectedFacility = settlementRows.find((row) => row.id === selectedFacilityId) ?? topFacility;
+  const totalOutstanding = settlementRows.reduce((sum, row) => sum + (row.outstandingBalance ?? 0), 0);
+  const totalNextDue = settlementRows.reduce((sum, row) => sum + (row.nextDueAmount ?? 0), 0);
+  const collectingCount = settlementRows.filter((row) => row.status === 'collecting').length;
+  const overdueCount = settlementRows.filter((row) => row.status === 'overdue').length;
+  const relatedOffer = (data?.capitalOffers ?? []).find(
+    (offer) => normalizeRuntimeText(offer.repaymentModel) === normalizeRuntimeText(selectedFacility.collectionMode)
+      || normalizeRuntimeText(offer.market) === normalizeRuntimeText(selectedFacility.market)
+  ) ?? null;
+  const relatedRisk = matchRiskRecordByKeyword(data?.riskTrust ?? [], selectedFacility.market);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Outstanding" value={formatFinanceCurrency(totalOutstanding)} meta="PrimeOS keeps the active finance exposure visible next to the operating system." icon={<CircleDollarSign className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Next due" value={formatFinanceCurrency(totalNextDue)} meta="The next repayment moment is explicit so finance does not feel hidden from operators." icon={<ClipboardList className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Collecting lanes" value={collectingCount} meta="These facilities are already repaying through live commerce or invoice flows." icon={<HeartHandshake className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Overdue lanes" value={overdueCount} meta="PrimeOS should surface collection stress before it becomes a trust problem." icon={<BellRing className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Settlement &amp; repayment roster</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">A compact runtime view of where capital was deployed and how PrimeOS expects it to come back.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Facility</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead>Collection mode</TableHead>
+                  <TableHead className="text-right">Next due</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {settlementRows.slice(0, 6).map((row) => (
+                  <TableRow key={row.id} className={selectedFacility.id === row.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedFacilityId(row.id)}>
+                        <span>{row.facilityName}</span>
+                        <span className="text-xs text-muted-foreground">{row.market}</span>
+                      </button>
+                    </TableCell>
+                    <TableCell>{row.disbursementTarget || 'Target pending'}</TableCell>
+                    <TableCell>{humanizeIntelligenceValue(row.collectionMode)}</TableCell>
+                    <TableCell className="text-right">{formatFinanceCurrency(row.nextDueAmount)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">{humanizeIntelligenceValue(row.status)}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime repayment strip</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS makes the money loop visible: where funds went, what repays them, and which connected systems support the collection story.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Selected facility</div>
+              <div className="mt-2 text-lg font-semibold">{selectedFacility.facilityName}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {selectedFacility.market} · {humanizeIntelligenceValue(selectedFacility.status)}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Disbursement target"
+                value={selectedFacility.disbursementTarget || 'Target pending'}
+                detail="Finance only works as an operating product when the seller can see exactly where the capital went."
+              />
+              <RuntimeContextCard
+                label="Repayment source"
+                value={selectedFacility.repaymentSource || 'Source pending'}
+                detail={`${formatFinanceCurrency(selectedFacility.nextDueAmount)} due next on ${formatFinanceDate(selectedFacility.nextDueDate)}.`}
+              />
+              <RuntimeContextCard
+                label="Collection mode"
+                value={humanizeIntelligenceValue(selectedFacility.collectionMode)}
+                detail={relatedOffer ? `${relatedOffer.offerName} already set this repayment model upstream.` : 'The pricing offer still needs to be linked more clearly to this collection path.'}
+              />
+              <RuntimeContextCard
+                label="Outstanding balance"
+                value={formatFinanceCurrency(selectedFacility.outstandingBalance)}
+                detail="PrimeOS keeps the exposure visible so repayment is not treated as an invisible back-office issue."
+              />
+              <RuntimeContextCard
+                label="Demand + revenue"
+                value={`${currency.format(snapshot.metrics.revenue)} commerce revenue`}
+                detail={`${snapshot.campaigns.length} campaigns, ${snapshot.leads.length} leads, and ${snapshot.orders.length} orders explain whether this facility can realistically collect on time.`}
+              />
+              <RuntimeContextCard
+                label="Risk & trust"
+                value={relatedRisk ? `${relatedRisk.trustScore}% trust score` : 'Risk lane pending'}
+                detail={relatedRisk?.recommendedFix || 'Risk review should confirm this collection path still looks healthy.'}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">
+                PrimeOS should treat repayment health as part of the same commerce loop, not as a separate finance dashboard the seller never understands.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to="/demand/campaign-ops">Open Campaign Ops</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/customer/crm-compact">Open CRM Compact</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function FinancePanel({ towerId }: { towerId: PrimeTowerId }) {
+  const snapshot = getPrimeSnapshot();
+  const financeControlQuery = useQuery({
+    queryKey: ['prime-finance-control-plane'],
+    queryFn: fetchFinanceControlPlane,
+    staleTime: 5 * 1000,
+    refetchInterval: 5 * 1000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: 1,
+    enabled: financeTowerIds.includes(towerId),
+  });
+
+  if (towerId === 'capital') {
+    return (
+      <CompactCapitalReadinessRuntimePanel
+        data={financeControlQuery.data}
+        isLoading={financeControlQuery.isLoading}
+        error={financeControlQuery.error}
+        snapshot={snapshot}
+      />
+    );
+  }
+
+  if (towerId === 'offers') {
+    return (
+      <CompactCapitalOffersRuntimePanel
+        data={financeControlQuery.data}
+        isLoading={financeControlQuery.isLoading}
+        error={financeControlQuery.error}
+        snapshot={snapshot}
+      />
+    );
+  }
+
+  if (towerId === 'risk') {
+    return (
+      <CompactRiskTrustRuntimePanel
+        data={financeControlQuery.data}
+        isLoading={financeControlQuery.isLoading}
+        error={financeControlQuery.error}
+        snapshot={snapshot}
+      />
+    );
+  }
+
+  if (towerId === 'settlement') {
+    return (
+      <CompactSettlementRuntimePanel
+        data={financeControlQuery.data}
+        isLoading={financeControlQuery.isLoading}
+        error={financeControlQuery.error}
+        snapshot={snapshot}
+      />
+    );
+  }
+
+  return null;
+}
+
+function creatorStatusPriority(status: string) {
+  if (status === 'approved') return 0;
+  if (status === 'shortlisted') return 1;
+  if (status === 'watchlist') return 2;
+  if (status === 'archived') return 3;
+  return 4;
+}
+
+function launchDecisionPriority(status: string) {
+  if (status === 'approved') return 0;
+  if (status === 'review') return 1;
+  if (status === 'hold') return 2;
+  if (status === 'rejected') return 3;
+  return 4;
+}
+
+function runtimeStatusVariant(status: string): 'default' | 'secondary' | 'outline' {
+  if (['approved', 'active', 'published', 'shortlisted'].includes(status)) return 'default';
+  if (['review', 'testing', 'watchlist', 'watch', 'hold'].includes(status)) return 'secondary';
+  return 'outline';
+}
+
+function RuntimeCreatorAvatar({
+  creator,
+  size = 'sm',
+}: {
+  creator: IntelligenceCreatorRecord;
+  size?: 'sm' | 'lg';
+}) {
+  const dimension = size === 'lg' ? 'size-14 text-base' : 'size-8 text-[10px]';
+
+  if (creator.imageUrl) {
+    return (
+      <div className={`${dimension} overflow-hidden rounded-full border bg-muted/20 shadow-sm`}>
+        <img src={creator.imageUrl} alt={creator.creatorName} className="h-full w-full object-cover" />
       </div>
     );
   }
 
   return (
+    <div className={`${dimension} flex items-center justify-center rounded-full border bg-gradient-to-br from-fuchsia-500/15 to-violet-500/10 font-semibold text-foreground shadow-sm`}>
+      {creator.creatorName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
+    </div>
+  );
+}
+
+function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
+  if (plan.approvalStatus === 'approved') {
+    return {
+      href: '/demand/campaign-ops',
+      label: 'Send approved launch to Campaign Ops',
+      detail: 'This launch is already approved and ready for demand execution.',
+    };
+  }
+
+  if (plan.approvalStatus === 'review') {
+    return {
+      href: '/demand/content-creator-ops',
+      label: 'Open Content & Creator Ops',
+      detail: 'This launch still needs execution context before it can move live.',
+    };
+  }
+
+  if (plan.approvalStatus === 'hold') {
+    return {
+      href: '/customer/crm-compact',
+      label: 'Re-check customer signal',
+      detail: 'This launch is on hold, so the best next step is validating the customer side again.',
+    };
+  }
+
+  return {
+    href: '/intelligence/creators',
+    label: 'Inspect creator signal again',
+    detail: 'This launch is not approved, so PrimeOS routes the user back to the strongest upstream signal.',
+  };
+}
+
+function CompactCreatorsRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: IntelligenceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const creators = useMemo(
+    () => [...(data?.creators ?? [])].sort((left, right) => {
+      const priorityDelta = creatorStatusPriority(left.status) - creatorStatusPriority(right.status);
+      if (priorityDelta !== 0) return priorityDelta;
+      return right.fitScore - left.fitScore;
+    }),
+    [data]
+  );
+  const topCreator = creators[0] ?? null;
+  const [selectedCreatorId, setSelectedCreatorId] = useState('');
+
+  useEffect(() => {
+    if (!topCreator) {
+      if (selectedCreatorId) setSelectedCreatorId('');
+      return;
+    }
+
+    if (!creators.some((creator) => creator.id === selectedCreatorId)) {
+      setSelectedCreatorId(topCreator.id);
+    }
+  }, [creators, selectedCreatorId, topCreator]);
+
+  if (isLoading) return <IntelligenceRuntimeLoadingState label="creator intelligence" />;
+  if (error) return <IntelligenceRuntimeErrorState title="Creator intelligence is unavailable" />;
+  if (!topCreator) {
+    return (
+      <IntelligenceRuntimeEmptyState
+        title="No creator rows are available yet"
+        description="Admin has not published creator records into the control plane, so PrimeOS has no creator intelligence to read."
+      />
+    );
+  }
+
+  const selectedCreator = creators.find((creator) => creator.id === selectedCreatorId) ?? topCreator;
+  const readyCount = creators.filter((creator) => ['shortlisted', 'approved'].includes(creator.status)).length;
+  const averageFit = Math.round(creators.reduce((sum, creator) => sum + creator.fitScore, 0) / creators.length);
+  const linkedSkuCount = new Set(creators.map((creator) => normalizeRuntimeSku(creator.linkedSku)).filter(Boolean)).size;
+  const matchingCampaign = findCampaignBySku(snapshot, selectedCreator.linkedSku);
+  const matchingForecast = findForecastBySku(snapshot, selectedCreator.linkedSku);
+
+  return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="High-risk issues" value={serviceRisk} meta="Service and operational friction directly affect financial trust." icon={<BellRing className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Inventory watch" value={snapshot.forecasts.filter((forecast) => forecast.risk !== 'low').length} meta="Stock pressure is a finance signal, not only an ops signal." icon={<Gauge className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Open alerts" value={snapshot.alerts.length} meta="Cross-area alerts act as explainable guardrails for capital decisions." icon={<ClipboardList className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Trust score" value={`${Math.max(38, 84 - serviceRisk * 8)}%`} meta="A simplified trust layer built from transaction, service, and fulfillment behavior." icon={<TrendingUp className="size-5" />} tone="purple" />
+        <SummaryMetricCard label="Admin-managed creators" value={creators.length} meta="PrimeOS reads this creator pool in read-only mode from the control plane." icon={<CircleUserRound className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Launch-ready creators" value={readyCount} meta={`${topCreator.creatorName} currently leads the stack.`} icon={<Sparkles className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Average fit" value={`${averageFit}%`} meta="Creator fit stays visible without exposing admin CRUD." icon={<TrendingUp className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Linked SKUs" value={linkedSkuCount} meta={`${selectedCreator.linkedSku || 'No SKU linked yet'} is the current proof route on this screen.`} icon={<Globe className="size-5" />} tone="purple" />
       </div>
 
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <CardTitle>Risk and trust explanation</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            `Inventory pressure cases: ${snapshot.forecasts.filter((forecast) => forecast.risk !== 'low').length}`,
-            `Open customer/service issues: ${snapshot.tickets.filter((ticket) => ticket.status !== 'resolved').length}`,
-            `Fulfillment proof points: ${snapshot.fulfillmentJobsCount} jobs / ${snapshot.shipmentsCount} shipments`,
-            `Repeat customer context: ${snapshot.customers.filter((customer) => customer.totalOrders > 0).length} profiles with order history`,
-          ].map((line) => (
-            <div key={line} className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{line}</div>
-          ))}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Creator intelligence roster</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Compact runtime view over the admin-managed creator source.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Creator</TableHead>
+                  <TableHead>Market</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead className="text-right">Fit</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {creators.slice(0, 6).map((creator) => (
+                  <TableRow key={creator.id} className={selectedCreator.id === creator.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex items-center gap-3 text-left" onClick={() => setSelectedCreatorId(creator.id)}>
+                        <RuntimeCreatorAvatar creator={creator} />
+                        <div className="flex flex-col">
+                          <span>{creator.creatorName}</span>
+                          <span className="text-xs text-muted-foreground">{creator.linkedSku}</span>
+                        </div>
+                      </button>
+                    </TableCell>
+                    <TableCell>{creator.market}</TableCell>
+                    <TableCell className="capitalize">{creator.primaryChannel}</TableCell>
+                    <TableCell className="text-right">{creator.fitScore}%</TableCell>
+                    <TableCell>
+                      <Badge variant={runtimeStatusVariant(creator.status)} className="capitalize">
+                        {humanizeIntelligenceValue(creator.status)}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime recommendation strip</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS shows why this creator surfaced and what the seller should do next.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended creator</div>
+              <div className="mt-3 flex items-center gap-3">
+                <RuntimeCreatorAvatar creator={selectedCreator} size="lg" />
+                <div>
+                  <div className="text-lg font-semibold">{selectedCreator.creatorName}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {selectedCreator.linkedSku} on {selectedCreator.primaryChannel} in {selectedCreator.market}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <RuntimeContextCard
+                label="Audience fit"
+                value={`${selectedCreator.fitScore}% creator fit`}
+                detail={selectedCreator.audienceFit || 'Audience proof has not been attached yet.'}
+              />
+              <RuntimeContextCard
+                label="Market fit"
+                value={`${selectedCreator.market} launch route`}
+                detail={selectedCreator.marketFit || 'Market proof has not been attached yet.'}
+              />
+              <RuntimeContextCard
+                label="Recent proof"
+                value={matchingCampaign ? `${matchingCampaign.orders} orders` : 'Proof pending'}
+                detail={selectedCreator.recentProof || (matchingForecast ? `${matchingForecast.ats} ATS currently covers ${matchingForecast.demand7d} projected 7-day demand for this SKU.` : 'Recent proof has not been attached yet.')}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">
+                {readyCount > 0
+                  ? `${readyCount} creator rows are already strong enough to feed Launch Decisions, while ${selectedCreator.creatorName} is the clearest current pick.`
+                  : `${selectedCreator.creatorName} is the best available creator signal right now.`}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to={INTELLIGENCE_DECISIONS_HREF}>Open Launch Decisions</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/demand/content-creator-ops">Open Content &amp; Creator Ops</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function CompactCustomersRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: IntelligenceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const customers = useMemo(
+    () => [...(data?.customers ?? [])].sort((left, right) => right.potentialScore - left.potentialScore),
+    [data]
+  );
+  const topCustomer = customers[0] ?? null;
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+
+  useEffect(() => {
+    if (!topCustomer) {
+      if (selectedCustomerId) setSelectedCustomerId('');
+      return;
+    }
+
+    if (!customers.some((customer) => customer.id === selectedCustomerId)) {
+      setSelectedCustomerId(topCustomer.id);
+    }
+  }, [customers, selectedCustomerId, topCustomer]);
+
+  if (isLoading) return <IntelligenceRuntimeLoadingState label="customer intelligence" />;
+  if (error) return <IntelligenceRuntimeErrorState title="Customer intelligence is unavailable" />;
+  if (!topCustomer) {
+    return (
+      <IntelligenceRuntimeEmptyState
+        title="No customer segments are available yet"
+        description="Admin has not published customer segment rows into the control plane, so PrimeOS has nothing to activate here."
+      />
+    );
+  }
+
+  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId) ?? topCustomer;
+  const activeCount = customers.filter((customer) => ['active', 'testing'].includes(customer.status)).length;
+  const totalSegmentSize = customers.reduce((sum, customer) => sum + (customer.segmentSize ?? 0), 0);
+  const matchingCampaign = findCampaignBySku(snapshot, selectedCustomer.recommendedProduct);
+  const matchingForecast = findForecastBySku(snapshot, selectedCustomer.recommendedProduct);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Admin-managed segments" value={customers.length} meta="PrimeOS reads customer segments from admin without exposing edit controls." icon={<HeartHandshake className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Profiles in play" value={formatCompactCount(totalSegmentSize || customers.length)} meta="Customer scale is explicit here so the seller knows this is actionable." icon={<UserRoundCheck className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Activation-ready" value={activeCount} meta={`${topCustomer.segmentName} is the strongest current customer signal.`} icon={<Sparkles className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Best potential" value={`${topCustomer.potentialScore}%`} meta={`${selectedCustomer.recommendedProduct} is the current product route tied to this stack.`} icon={<Globe className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Customer intelligence roster</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">A compact runtime readout of the customer segments prepared in admin.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Segment</TableHead>
+                  <TableHead>Lifecycle</TableHead>
+                  <TableHead>Recommended SKU</TableHead>
+                  <TableHead className="text-right">Profiles</TableHead>
+                  <TableHead className="text-right">Potential</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers.slice(0, 6).map((customer) => (
+                  <TableRow key={customer.id} className={selectedCustomer.id === customer.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedCustomerId(customer.id)}>
+                        <span>{customer.segmentName}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(customer.status)}</span>
+                      </button>
+                    </TableCell>
+                    <TableCell className="capitalize">{humanizeIntelligenceValue(customer.lifecycle)}</TableCell>
+                    <TableCell>{customer.recommendedProduct}</TableCell>
+                    <TableCell className="text-right">{formatCompactCount(customer.segmentSize ?? 0)}</TableCell>
+                    <TableCell className="text-right">{customer.potentialScore}%</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime action strip</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS turns segment data into a clear next move, with CRM, Demand, Ecom, and Finance context kept visible.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Do this now</div>
+              <div className="mt-2 text-lg font-semibold">{selectedCustomer.segmentName}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {selectedCustomer.recommendedProduct} for {selectedCustomer.market} · {humanizeIntelligenceValue(selectedCustomer.lifecycle)} lifecycle
+              </div>
+              <p className="mt-3 text-sm font-medium">{selectedCustomer.nextMove || 'Push this segment into Launch Decisions before budget moves.'}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Profiles"
+                value={formatCompactCount(selectedCustomer.segmentSize)}
+                detail={`This segment sits in ${selectedCustomer.market} and PrimeOS makes the size explicit before the seller acts.`}
+              />
+              <RuntimeContextCard
+                label="Best channel"
+                value={selectedCustomer.bestChannel || 'CRM Compact + Campaign Ops'}
+                detail="This is the cleanest runtime route for the seller team to activate next."
+              />
+              <RuntimeContextCard
+                label="Recent intent"
+                value={`${selectedCustomer.potentialScore}% potential`}
+                detail={selectedCustomer.recentIntent || 'Recent intent proof has not been attached yet.'}
+              />
+              <RuntimeContextCard
+                label="Business benefit"
+                value="Why this matters"
+                detail={selectedCustomer.benefit || 'Makes the next commercial move explicit for the seller team.'}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Campaign Ops"
+                value={matchingCampaign ? matchingCampaign.name : 'Route pending'}
+                detail={matchingCampaign ? `${matchingCampaign.leads} leads and ${matchingCampaign.orders} orders already sit on this SKU route.` : 'No live campaign has been linked to this product yet.'}
+              />
+              <RuntimeContextCard
+                label="Ecom / COS"
+                value={matchingForecast ? `${matchingForecast.ats} ATS / ${matchingForecast.demand7d} 7d demand` : selectedCustomer.recommendedProduct}
+                detail={matchingForecast ? (matchingForecast.risk === 'high' ? 'Inventory is the main guardrail before this segment should scale harder.' : 'Stock and demand look compatible enough for a controlled activation.') : 'Ecom has not attached a live stock signal to this segment yet.'}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">
+                {activeCount > 0
+                  ? `${activeCount} segments are ready to flow into Launch Decisions, and ${selectedCustomer.segmentName} is the clearest one to move now.`
+                  : `${selectedCustomer.segmentName} is the best available customer signal right now.`}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to={INTELLIGENCE_DECISIONS_HREF}>Open Launch Decisions</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/customer/crm-compact">Open CRM Compact</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function CompactLaunchDecisionsRuntimePanel({
+  data,
+  isLoading,
+  error,
+  snapshot,
+}: {
+  data: IntelligenceControlPlaneSnapshot | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  snapshot: PrimeSnapshot;
+}) {
+  const creatorLookup = useMemo(
+    () => new Map((data?.creators ?? []).map((creator) => [normalizeRuntimeText(creator.creatorName), creator])),
+    [data]
+  );
+  const launchDecisions = useMemo(() => [...(data?.launchDecisions ?? [])].sort((left, right) => {
+    const leftPriority = launchDecisionPriority(left.approvalStatus);
+    const rightPriority = launchDecisionPriority(right.approvalStatus);
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+    return right.confidence - left.confidence;
+  }), [data]);
+  const topDecision = launchDecisions[0] ?? null;
+  const [selectedDecisionId, setSelectedDecisionId] = useState('');
+
+  useEffect(() => {
+    if (!topDecision) {
+      if (selectedDecisionId) setSelectedDecisionId('');
+      return;
+    }
+
+    if (!launchDecisions.some((decision) => decision.id === selectedDecisionId)) {
+      setSelectedDecisionId(topDecision.id);
+    }
+  }, [launchDecisions, selectedDecisionId, topDecision]);
+
+  if (isLoading) return <IntelligenceRuntimeLoadingState label="launch decisions" />;
+  if (error) return <IntelligenceRuntimeErrorState title="Launch decisions are unavailable" />;
+  if (!topDecision) {
+    return (
+      <IntelligenceRuntimeEmptyState
+        title="No launch decisions are available yet"
+        description="Admin has not prepared any launch decision rows, so PrimeOS has no approval stack to show."
+      />
+    );
+  }
+
+  const selectedDecision = launchDecisions.find((decision) => decision.id === selectedDecisionId) ?? topDecision;
+  const approvedCount = launchDecisions.filter((decision) => decision.approvalStatus === 'approved').length;
+  const reviewCount = launchDecisions.filter((decision) => decision.approvalStatus === 'review').length;
+  const blockerCount = launchDecisions.filter((decision) => decision.blocker?.trim()).length;
+  const averageConfidence = Math.round(launchDecisions.reduce((sum, decision) => sum + decision.confidence, 0) / launchDecisions.length);
+  const launchCta = getLaunchRuntimeCta(selectedDecision);
+  const selectedDecisionCreator = creatorLookup.get(normalizeRuntimeText(selectedDecision.creatorName)) ?? null;
+  const matchingCampaign = findCampaignBySku(snapshot, selectedDecision.skuCode);
+  const matchingForecast = findForecastBySku(snapshot, selectedDecision.skuCode);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Decision rows" value={launchDecisions.length} meta="PrimeOS reads the admin-managed launch approval stack in read-only mode." icon={<PanelsTopLeft className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Approved" value={approvedCount} meta={`${reviewCount} launch decisions are still waiting review.`} icon={<Sparkles className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Average confidence" value={`${averageConfidence}%`} meta={`${topDecision.decisionName} is the strongest decision right now.`} icon={<TrendingUp className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Open blockers" value={blockerCount} meta="PrimeOS keeps blockers visible so launch approval feels operational." icon={<Megaphone className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Launch decision stack</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Compact runtime approval view over the admin-managed launch table.</p>
+              </div>
+              <Badge variant="outline">Admin-managed source</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Decision</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Creator</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-right">Confidence</TableHead>
+                  <TableHead>Approval</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {launchDecisions.slice(0, 6).map((decision) => (
+                  <TableRow key={decision.id} className={selectedDecision.id === decision.id ? 'bg-primary/5' : ''}>
+                    <TableCell className="font-medium">
+                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedDecisionId(decision.id)}>
+                        <span>{decision.decisionName}</span>
+                        <span className="text-xs text-muted-foreground">{decision.creatorName} x {decision.customerSegment}</span>
+                      </button>
+                    </TableCell>
+                    <TableCell>{decision.skuCode}</TableCell>
+                    <TableCell>{decision.creatorName}</TableCell>
+                    <TableCell>{decision.customerSegment}</TableCell>
+                    <TableCell className="text-right">{decision.confidence}%</TableCell>
+                    <TableCell>
+                      <Badge variant={runtimeStatusVariant(decision.approvalStatus)} className="capitalize">
+                        {humanizeIntelligenceValue(decision.approvalStatus)}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Prime approval strip</CardTitle>
+            <p className="text-sm text-muted-foreground">PrimeOS keeps the launch thesis, blocker, owner, and next move visible so this feels like a real operating decision.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Top decision</div>
+              <div className="mt-3 flex items-center gap-3">
+                {selectedDecisionCreator ? <RuntimeCreatorAvatar creator={selectedDecisionCreator} /> : null}
+                <div>
+                  <div className="text-lg font-semibold">{selectedDecision.decisionName}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {selectedDecision.skuCode} · {selectedDecision.creatorName} x {selectedDecision.customerSegment}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Why this launch"
+                value={`${selectedDecision.confidence}% confidence`}
+                detail={selectedDecision.whyThisLaunch || `${selectedDecision.creatorName} and ${selectedDecision.customerSegment} currently form the clearest commercial route into ${selectedDecision.skuCode}.`}
+              />
+              <RuntimeContextCard
+                label="Blocker"
+                value={humanizeIntelligenceValue(selectedDecision.approvalStatus)}
+                detail={selectedDecision.blocker || 'No blocker is attached. PrimeOS can move this launch into execution.'}
+              />
+              <RuntimeContextCard
+                label="Owner"
+                value={selectedDecision.owner || 'Launch review owner'}
+                detail="PrimeOS keeps ownership explicit so the seller team knows who should move the launch next."
+              />
+              <RuntimeContextCard
+                label="Expected response"
+                value={selectedDecision.approvalStatus === 'approved' ? 'Expected after go-live' : 'Expected after review clears'}
+                detail={selectedDecision.expectedResponse || launchCta.detail}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RuntimeContextCard
+                label="Campaign Ops"
+                value={matchingCampaign ? matchingCampaign.name : launchCta.label}
+                detail={matchingCampaign ? `${matchingCampaign.leads} leads, ${matchingCampaign.rfqs} RFQs, and ${matchingCampaign.orders} orders already sit on this SKU route.` : launchCta.detail}
+              />
+              <RuntimeContextCard
+                label="Ecom / COS"
+                value={matchingForecast ? `${matchingForecast.ats} ATS / ${matchingForecast.demand7d} 7d demand` : selectedDecision.skuCode}
+                detail={matchingForecast ? (matchingForecast.risk === 'high' ? 'Inventory is the main guardrail before approving more scale on this launch.' : 'Ecom can currently support this launch without obvious stock pressure.') : 'No live inventory guardrail has been linked yet.'}
+              />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
+              <div className="mt-2 text-sm font-medium">{launchCta.detail}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to={launchCta.href}>{launchCta.label}</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/customer/crm-compact">Open CRM Compact</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
+  const intelligenceControlQuery = useQuery({
+    queryKey: ['prime-intelligence-control-plane'],
+    queryFn: fetchIntelligenceControlPlane,
+    staleTime: 5 * 1000,
+    refetchInterval: 5 * 1000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: 1,
+    enabled: towerId === 'creators' || towerId === 'customers' || towerId === 'campaigns',
+  });
 
   if (towerId === 'creators') {
-    return <CreatorIntelligencePanel />;
+    return (
+      <CompactCreatorsRuntimePanel
+        data={intelligenceControlQuery.data}
+        isLoading={intelligenceControlQuery.isLoading}
+        error={intelligenceControlQuery.error}
+        snapshot={snapshot}
+      />
+    );
   }
 
   if (towerId === 'customers') {
-    return <CustomerIntelligencePanel />;
+    return (
+      <CompactCustomersRuntimePanel
+        data={intelligenceControlQuery.data}
+        isLoading={intelligenceControlQuery.isLoading}
+        error={intelligenceControlQuery.error}
+        snapshot={snapshot}
+      />
+    );
   }
 
   if (towerId === 'campaigns') {
-    const plannedCampaigns = snapshot.campaigns.map((campaign, index) => {
-      const customer = snapshot.customers[index % snapshot.customers.length];
-      const play = snapshot.activationPlays[index % snapshot.activationPlays.length];
-      const alert = snapshot.alerts[index % snapshot.alerts.length];
-      const creatorName = ['Linh Dao', 'Minh Chau', 'Ha An', 'Quynh My'][index] || `Creator ${index + 1}`;
-      const budgetFocus = Math.round(campaign.spend / 1000);
-
-      return {
-        ...campaign,
-        creatorName,
-        audience: customer.segment,
-        nextBestAction: play.nextBestAction,
-        executionRisk: alert?.title || 'No major execution risk detected.',
-        budgetFocus,
-      };
-    });
-
     return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Planned campaigns" value={plannedCampaigns.length} meta="Each plan links a product, audience, channel, and creator." icon={<PanelsTopLeft className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Forecast revenue" value={currency.format(plannedCampaigns.reduce((sum, campaign) => sum + campaign.revenue, 0))} meta="Projected GMV from current campaign recommendations." icon={<TrendingUp className="size-5" />} tone="success" className="md:col-span-2" />
-          <SummaryMetricCard label="Active risks" value={snapshot.alerts.length} meta="Execution alerts stay attached to campaign planning." icon={<BellRing className="size-5" />} tone="warning" />
-        </div>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Campaign planner</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Audience</TableHead>
-                  <TableHead>Channel / creator</TableHead>
-                  <TableHead className="text-right">Budget</TableHead>
-                  <TableHead>Next action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {plannedCampaigns.map((campaign) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">{campaign.name}</TableCell>
-                    <TableCell>{campaign.skuCode}</TableCell>
-                    <TableCell>{campaign.audience}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{campaign.channel}</span>
-                        <span className="text-xs text-muted-foreground">{campaign.creatorName}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">{campaign.budgetFocus}k JPY</TableCell>
-                    <TableCell className="text-sm text-primary">{campaign.nextBestAction}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Channel mix and product mapping</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {plannedCampaigns.slice(0, 4).map((campaign) => (
-                <div key={`mix-${campaign.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{campaign.skuCode}</span>
-                    <Badge variant="outline">{campaign.channel}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">Best audience: {campaign.audience}</p>
-                  <p className="mt-2 text-sm text-primary">Creator lead: {campaign.creatorName}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Execution alerts and optimization</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {plannedCampaigns.slice(0, 4).map((campaign) => (
-                <div key={`risk-${campaign.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{campaign.name}</span>
-                    <Badge variant="outline">{campaign.status}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm">{campaign.executionRisk}</p>
-                  <p className="mt-2 text-xs text-primary">Optimization: re-check budget pacing and keep the creator-product match intact before scaling.</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <CompactLaunchDecisionsRuntimePanel
+        data={intelligenceControlQuery.data}
+        isLoading={intelligenceControlQuery.isLoading}
+        error={intelligenceControlQuery.error}
+        snapshot={snapshot}
+      />
     );
   }
 
@@ -2479,11 +4699,11 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
 }
 
 const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; handoff: string; handoffHref: string }>> = {
-  creators: { decide: 'Which creators fit my products and are worth booking?', handoff: 'Shortlisted creators go to Content & Creator Ops for execution.', handoffHref: '/demand/content-creator-ops' },
-  customers: { decide: 'Which customer segments should I target next and through which channel?', handoff: 'Selected segments go to Retargeting & Outreach for follow-up.', handoffHref: '/demand/retargeting-outreach' },
-  campaigns: { decide: 'Which campaign plan should I launch first?', handoff: 'Approved plans go to Campaign Ops for live execution.', handoffHref: '/demand/campaign-ops' },
-  analytics: { decide: 'Where is my funnel breaking and what is working?', handoff: 'Findings feed into Campaign Planner and AI Operator.', handoffHref: '/intelligence/campaigns' },
-  attribution: { decide: 'Which channel is actually driving orders, not just clicks?', handoff: 'Attribution data guides budget decisions in Campaign Planner.', handoffHref: '/intelligence/campaigns' },
+  creators: { decide: 'Which admin-managed creators fit my products and have enough proof to move forward?', handoff: 'PrimeOS keeps creator proof, CRM fit, Ecom guardrails, and launch CTA visible without exposing CRUD.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
+  customers: { decide: 'Which admin-managed customer segment should I activate now, and why?', handoff: 'PrimeOS turns segment size, intent, channel, CRM context, and Ecom readiness into one next move.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
+  campaigns: { decide: 'Which launch decision is strong enough to move into Demand with the right owner and blocker context?', handoff: 'Approved launches carry CRM, Ecom, and Finance context into Campaign Ops for execution.', handoffHref: '/demand/campaign-ops' },
+  analytics: { decide: 'Where is my funnel breaking and what is working?', handoff: 'Findings feed into Launch Decisions and AI Operator.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
+  attribution: { decide: 'Which channel is actually driving orders, not just clicks?', handoff: 'Attribution data guides approval inside Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: '/demand/campaign-ops' },
   voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: '/demand/campaign-ops' },
   alerts: { decide: 'What needs my attention right now across the entire system?', handoff: 'Each alert links to the responsible tower for resolution.', handoffHref: '/intelligence/ai-operator' },
@@ -2494,9 +4714,10 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   'retargeting-outreach': { decide: 'Who should I follow up with and through which channel?', handoff: 'Converted contacts enter CRM Compact as retained customers.', handoffHref: '/customer/crm-compact' },
   'crm-compact': { decide: 'What do I know about this customer and what should I do next?', handoff: 'Customer history feeds Intelligence for smarter targeting.', handoffHref: '/intelligence/customers' },
   service: { decide: 'Is this issue resolved and did it affect customer trust?', handoff: 'Resolution updates the CRM Compact timeline.', handoffHref: '/customer/crm-compact' },
-  capital: { decide: 'Is my operating performance strong enough to approach a finance partner?', handoff: 'Readiness data goes to Lending & Partner Flow.', handoffHref: '/finance/lending' },
-  lending: { decide: 'Which finance partner fits my growth need?', handoff: 'Application packages are backed by Risk & Trust scoring.', handoffHref: '/finance/risk' },
-  risk: { decide: 'What are the risks a lender would see in my business?', handoff: 'Trust scores feed back into Capital Readiness for the full picture.', handoffHref: '/finance/capital' },
+  capital: { decide: 'Is this launch route operationally strong enough to justify capital?', handoff: 'PrimeOS turns the strongest readiness lane into a concrete offer review.', handoffHref: '/finance/capital-offers' },
+  offers: { decide: 'Which capital package best fits the launch I want to scale?', handoff: 'PrimeOS checks repayment logic next so the offer stays realistic inside the commerce loop.', handoffHref: '/finance/settlement-repayment' },
+  risk: { decide: 'What would make finance pause on this seller, launch, or repayment path?', handoff: 'The seller should fix trust blockers before pushing harder into funding.', handoffHref: '/finance/capital-readiness' },
+  settlement: { decide: 'Where did the money go, how will it come back, and is collection healthy?', handoff: 'Repayment health flows back into Demand, CRM, and the next finance cycle.', handoffHref: '/demand/campaign-ops' },
 };
 
 export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {

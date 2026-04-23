@@ -91,7 +91,7 @@ const HERO_SCENARIOS = [
   {
     productCode: 'CR-NTB-BLK-A5',
     skuHint: 'A5',
-    orderNumber: 'ECH-NB-1001',
+    orderNumber: 'PRIME-NB-1001',
     jobCode: 'FUL-NB-1001',
     channel: 'amazon' as const,
     status: 'ready_to_ship' as OrderStatus,
@@ -108,7 +108,7 @@ const HERO_SCENARIOS = [
   {
     productCode: 'CR-SKB-MDN-A5',
     skuHint: 'PB',
-    orderNumber: 'ECH-SKB-1002',
+    orderNumber: 'PRIME-SKB-1002',
     jobCode: 'FUL-SKB-1002',
     channel: 'rakuten' as const,
     status: 'shipping' as OrderStatus,
@@ -124,7 +124,7 @@ const HERO_SCENARIOS = [
   },
   {
     productCode: 'CR-BSH-SET-12',
-    orderNumber: 'ECH-BSH-1003',
+    orderNumber: 'PRIME-BSH-1003',
     jobCode: 'FUL-BSH-1003',
     channel: 'shopee' as const,
     status: 'completed' as OrderStatus,
@@ -140,7 +140,7 @@ const HERO_SCENARIOS = [
   },
   {
     productCode: 'CR-ART-MYTH-10',
-    orderNumber: 'ECH-MYTH-1004',
+    orderNumber: 'PRIME-MYTH-1004',
     jobCode: 'FUL-MYTH-1004',
     channel: 'amazon' as const,
     status: 'shipping' as OrderStatus,
@@ -156,7 +156,7 @@ const HERO_SCENARIOS = [
   },
   {
     productCode: 'CR-TAI-BSZ',
-    orderNumber: 'ECH-TAI-1005',
+    orderNumber: 'PRIME-TAI-1005',
     channel: 'manual' as const,
     status: 'pending' as OrderStatus,
     lifecycle: 'captured' as LifecycleStage,
@@ -256,7 +256,7 @@ function pickChannel(): Channel {
 
 function orderIdForIdx(idx: number): string {
   const suffixes = ['JP', 'JP', 'JP', 'VN', 'SG', 'MY', 'KR', 'CN', 'TW', 'JP'];
-  return `ECH-${suffixes[idx % suffixes.length]}-${String(idx + 1).padStart(4, '0')}`;
+  return `PRIME-${suffixes[idx % suffixes.length]}-${String(idx + 1).padStart(4, '0')}`;
 }
 
 // Deterministic SKU pick from seed
@@ -788,7 +788,7 @@ function seedFulfillmentJobs() {
 function seedReturns() {
   const returnScenarios = [
     {
-      orderNumber: 'ECH-BSH-1003',
+      orderNumber: 'PRIME-BSH-1003',
       status: 'completed',
       reason: 'Brush tip bent on arrival',
       refundAmount: 4900,
@@ -800,7 +800,7 @@ function seedReturns() {
       completedAt: daysAgo(2),
     },
     {
-      orderNumber: 'ECH-MYTH-1004',
+      orderNumber: 'PRIME-MYTH-1004',
       status: 'qc',
       reason: 'Outer pack damaged during FBA inbound review',
       refundAmount: 1980,
@@ -812,7 +812,7 @@ function seedReturns() {
       completedAt: null,
     },
     {
-      orderNumber: 'ECH-TAI-1005',
+      orderNumber: 'PRIME-TAI-1005',
       status: 'authorized',
       reason: 'Customer changed mind before launch allocation',
       refundAmount: null,
