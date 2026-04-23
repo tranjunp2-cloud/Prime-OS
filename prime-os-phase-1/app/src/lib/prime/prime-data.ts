@@ -291,10 +291,10 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   'crm-compact': {
     id: 'crm-compact',
     area: 'Customer Area',
-    tower: 'CRM Compact Tower',
-    promise: 'Keep identity, profile, timeline, segmentation, lifecycle, notes, follow-up, communication history, loyalty, and B2B account context in one compact tower.',
+    tower: 'CRM Compact',
+    promise: 'Manage customer records, ownership, follow-up, timeline, service memory, and B2B context in one compact workbench.',
     reuseSource: 'New Prime OS wrapper, derived from COS orders, returns, and generated leads.',
-    floors: ['Identity', 'Profile', 'Timeline', 'Segmentation', 'Lifecycle', 'Notes', 'Follow-up', 'Communication history', 'Loyalty lite', 'B2B account extension'],
+    floors: ['Record list', 'Owner', 'Follow-up queue', 'Timeline', 'Notes', 'Service memory', 'B2B account extension'],
   },
   service: {
     id: 'service',
@@ -315,18 +315,18 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   customers: {
     id: 'customers',
     area: 'Intelligence Area',
-    tower: 'Customer Intelligence',
-    promise: 'Show which customer segments matter now, what action to take, and how CRM, Ecom, and Demand support that move.',
+    tower: 'Trends Intelligence',
+    promise: 'Show which customer trends matter now, why they matter, and what the seller should activate next to grow revenue.',
     reuseSource: 'New Prime OS wrapper, combining CRM compact, forecasting, and activation guidance.',
-    floors: ['Segment list', 'Affinity model', 'Channel fit', 'Next best action'],
+    floors: ['Trend board', 'Signal evidence', 'Recommended route', 'Next best action'],
   },
   campaigns: {
     id: 'campaigns',
     area: 'Intelligence Area',
     tower: 'Launch Decisions',
-    promise: 'Turn creator proof, customer intent, Ecom guardrails, and finance context into one executable launch decision.',
+    promise: 'Turn creator proof, customer trends, Ecom guardrails, and finance context into one executable launch package.',
     reuseSource: 'New Prime OS wrapper, combining demand performance, recommendations, and risk alerts.',
-    floors: ['Decision stack', 'Visual inputs', 'Recommended launches', 'Ops handoff'],
+    floors: ['Launch package board', 'Decision thesis', 'Recommended launches', 'Ops handoff'],
   },
   analytics: {
     id: 'analytics',
@@ -929,7 +929,35 @@ export function getPrimeSnapshot(): PrimeSnapshot {
   };
 }
 
-export function getSkuLabel(skuId: string) {
-  const resolved = getResolvedProductSkuById(skuId);
-  return resolved ? `${resolved.sku.sku_code} · ${resolved.product.name}` : skuId;
+function resolvePrimeSku(skuCodeOrId: string) {
+  const resolvedById = getResolvedProductSkuById(skuCodeOrId);
+  if (resolvedById) return resolvedById;
+
+  const products = getProducts();
+  for (const product of products) {
+    const matchedSku = product.skus.find((sku) => sku.sku_code === skuCodeOrId);
+    if (matchedSku) {
+      return {
+        product,
+        sku: matchedSku,
+      };
+    }
+  }
+
+  return null;
+}
+
+export function getSkuProductName(skuCodeOrId: string) {
+  const resolved = resolvePrimeSku(skuCodeOrId);
+  return resolved ? resolved.product.name : skuCodeOrId;
+}
+
+export function getSkuCodeValue(skuCodeOrId: string) {
+  const resolved = resolvePrimeSku(skuCodeOrId);
+  return resolved ? resolved.sku.sku_code : skuCodeOrId;
+}
+
+export function getSkuLabel(skuCodeOrId: string) {
+  const resolved = resolvePrimeSku(skuCodeOrId);
+  return resolved ? `${resolved.product.name} · ${resolved.sku.sku_code}` : skuCodeOrId;
 }

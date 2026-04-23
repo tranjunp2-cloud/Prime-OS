@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
-import { getPrimeSnapshot } from '@/lib/prime/prime-data';
+import { getPrimeSnapshot, getSkuLabel, getSkuProductName } from '@/lib/prime/prime-data';
 
 const currency = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -217,7 +217,7 @@ export function PrimeOverview() {
                     <Badge variant="outline">{topCreator.status}</Badge>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Running on {topCreator.channel} · SKU {topCreator.skuCode} · {topCreator.traffic.toLocaleString()} traffic · {topCreator.leads} leads · {topCreator.rfqs} RFQs · {currency.format(topCreator.revenue)} revenue
+                    Running on {topCreator.channel} · {getSkuLabel(topCreator.skuCode)} · {topCreator.traffic.toLocaleString()} traffic · {topCreator.leads} leads · {topCreator.rfqs} RFQs · {currency.format(topCreator.revenue)} revenue
                   </p>
                 </div>
               ) : null}
@@ -225,7 +225,7 @@ export function PrimeOverview() {
               {snapshot.forecasts.filter((f) => f.risk !== 'low').slice(0, 2).map((forecast) => (
                 <div key={forecast.id} className="rounded-lg border bg-muted/20 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">Inventory watch: {forecast.skuCode}</span>
+                    <span className="font-medium">Inventory watch: {getSkuProductName(forecast.skuCode)}</span>
                     <Badge variant={forecast.risk === 'high' ? 'destructive' : 'outline'}>{forecast.risk} risk</Badge>
                   </div>
                   <Progress value={forecast.ats ? Math.min(100, Math.round((forecast.demand7d / Math.max(forecast.ats, 1)) * 100)) : 100} className="mt-2 h-2" />
