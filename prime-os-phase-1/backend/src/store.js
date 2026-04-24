@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -8,6 +8,65 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataDir = path.resolve(__dirname, '../data');
 const dbPath = path.join(dataDir, 'admin-db.json');
+const dbTmpPath = path.join(dataDir, 'admin-db.tmp.json');
+let writeQueue = Promise.resolve();
+const requiredFieldsByResource = {
+  intelligenceCreators: ['creatorName'],
+  intelligenceCustomers: ['segmentName'],
+  launchDecisions: ['decisionName', 'skuCode'],
+  products: ['name', 'skuCode'],
+  listings: ['title', 'skuCode'],
+  inventoryBrain: ['signalName', 'skuCode', 'warehouseCode'],
+  warehouses: ['code', 'name'],
+  omsOrders: ['orderCode', 'customerName'],
+  fulfillmentControl: ['jobCode', 'warehouseCode', 'carrier'],
+  policies: ['name'],
+  eventAudit: ['eventName', 'entityRef'],
+  campaignOps: ['campaignName'],
+  contentCreatorOps: ['briefName'],
+  leadResponseCapture: ['flowName'],
+  retargetingOutreach: ['audienceName'],
+  capitalReadiness: ['programName'],
+  capitalOffers: ['offerName', 'providerName'],
+  riskTrust: ['profileName'],
+  settlementRepayment: ['facilityName'],
+  financePortfolio: ['portfolioName'],
+  crmCompact: ['segmentName'],
+  serviceDesk: ['queueName'],
+  admins: ['fullName', 'email'],
+  users: ['fullName', 'email']
+};
+const numericFields = new Set([
+  'amount',
+  'ats',
+  'budget',
+  'cadenceDays',
+  'capabilityCount',
+  'channelCount',
+  'confidence',
+  'customerCount',
+  'defaultDays',
+  'feeRate',
+  'fitScore',
+  'fundingNeed',
+  'inventoryCount',
+  'nextDueAmount',
+  'openCases',
+  'outstandingBalance',
+  'overdueRate',
+  'potentialScore',
+  'price',
+  'readinessScore',
+  'recoveryRate',
+  'reserved',
+  'retailPrice',
+  'roiPercent',
+  'slaHours',
+  'termDays',
+  'totalFunded',
+  'totalOutstanding',
+  'trustScore'
+]);
 export const resourceKeys = [
   'intelligenceCreators',
   'intelligenceCustomers',
@@ -83,7 +142,42 @@ async function readDatabase() {
 
 async function writeDatabase(nextDatabase) {
   await ensureDatabase();
-  await writeFile(dbPath, JSON.stringify(nextDatabase, null, 2));
+  await writeFile(dbTmpPath, JSON.stringify(nextDatabase, null, 2));
+  await rename(dbTmpPath, dbPath);
+}
+
+function withWriteLock(operation) {
+  const runOperation = () => operation();
+  const nextWrite = writeQueue.then(runOperation, runOperation);
+  writeQueue = nextWrite.catch(() => undefined);
+  return nextWrite;
+}
+
+function createValidationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
+function assertValidResourceItem(resource, record) {
+  const missingFields = (requiredFieldsByResource[resource] ?? []).filter((field) => {
+    const value = record[field];
+    return value === undefined || value === null || String(value).trim() === '';
+  });
+
+  if (missingFields.length > 0) {
+    throw createValidationError(`Missing required field${missingFields.length > 1 ? 's' : ''}: ${missingFields.join(', ')}`);
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    if (!numericFields.has(key) || value === undefined || value === null || value === '') {
+      continue;
+    }
+
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw createValidationError(`Invalid number field: ${key}`);
+    }
+  }
 }
 
 export function isSupportedResource(resource) {
@@ -101,54 +195,62 @@ export async function getResourceItem(resource, id) {
 }
 
 export async function createResourceItem(resource, payload) {
-  const database = await readDatabase();
-  const now = new Date().toISOString();
-  const record = {
-    ...payload,
-    id: payload.id ?? randomUUID(),
-    updatedAt: now,
-    createdAt: payload.createdAt ?? now
-  };
+  return withWriteLock(async () => {
+    const database = await readDatabase();
+    const now = new Date().toISOString();
+    const record = {
+      ...payload,
+      id: payload.id ?? randomUUID(),
+      updatedAt: now,
+      createdAt: payload.createdAt ?? now
+    };
+    assertValidResourceItem(resource, record);
 
-  database[resource] = [record, ...(database[resource] ?? [])];
-  await writeDatabase(database);
-  return record;
+    database[resource] = [record, ...(database[resource] ?? [])];
+    await writeDatabase(database);
+    return record;
+  });
 }
 
 export async function updateResourceItem(resource, id, payload) {
-  const database = await readDatabase();
-  const items = database[resource] ?? [];
-  const targetIndex = items.findIndex((item) => item.id === id);
+  return withWriteLock(async () => {
+    const database = await readDatabase();
+    const items = database[resource] ?? [];
+    const targetIndex = items.findIndex((item) => item.id === id);
 
-  if (targetIndex === -1) {
-    return null;
-  }
+    if (targetIndex === -1) {
+      return null;
+    }
 
-  const updatedRecord = {
-    ...items[targetIndex],
-    ...payload,
-    id,
-    updatedAt: new Date().toISOString()
-  };
+    const updatedRecord = {
+      ...items[targetIndex],
+      ...payload,
+      id,
+      updatedAt: new Date().toISOString()
+    };
+    assertValidResourceItem(resource, updatedRecord);
 
-  items[targetIndex] = updatedRecord;
-  database[resource] = items;
-  await writeDatabase(database);
-  return updatedRecord;
+    items[targetIndex] = updatedRecord;
+    database[resource] = items;
+    await writeDatabase(database);
+    return updatedRecord;
+  });
 }
 
 export async function deleteResourceItem(resource, id) {
-  const database = await readDatabase();
-  const items = database[resource] ?? [];
-  const target = items.find((item) => item.id === id) ?? null;
+  return withWriteLock(async () => {
+    const database = await readDatabase();
+    const items = database[resource] ?? [];
+    const target = items.find((item) => item.id === id) ?? null;
 
-  if (!target) {
-    return null;
-  }
+    if (!target) {
+      return null;
+    }
 
-  database[resource] = items.filter((item) => item.id !== id);
-  await writeDatabase(database);
-  return target;
+    database[resource] = items.filter((item) => item.id !== id);
+    await writeDatabase(database);
+    return target;
+  });
 }
 
 export async function getAdminMeta() {
@@ -167,7 +269,9 @@ export async function getAdminMeta() {
 }
 
 export async function resetDatabase() {
-  const nextDatabase = cloneSeedDatabase();
-  await writeDatabase(nextDatabase);
-  return nextDatabase;
+  return withWriteLock(async () => {
+    const nextDatabase = cloneSeedDatabase();
+    await writeDatabase(nextDatabase);
+    return nextDatabase;
+  });
 }

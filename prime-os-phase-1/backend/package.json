@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "PORT=8180 node --watch src/server.js",
+    "dev": "PRIME_DEMO_ADMIN_ENABLED=true PORT=8180 node --watch src/server.js",
     "start": "PORT=8180 node src/server.js"
   },
   "dependencies": {

@@ -198,7 +198,7 @@ const resourceGroups: ResourceGroup[] = [
 const intelligenceAdminResources: ResourceKey[] = ['intelligenceCreators', 'intelligenceCustomers', 'launchDecisions'];
 const runtimePreviewHrefs: Partial<Record<ResourceKey, string>> = {
   intelligenceCreators: 'http://127.0.0.1:5173/intelligence/creators',
-  intelligenceCustomers: 'http://127.0.0.1:5173/intelligence/customers',
+  intelligenceCustomers: 'http://127.0.0.1:5173/intelligence/trends',
   launchDecisions: 'http://127.0.0.1:5173/intelligence/launch-decisions',
   capitalReadiness: 'http://127.0.0.1:5173/finance/capital-readiness',
   capitalOffers: 'http://127.0.0.1:5173/finance/capital-offers',
@@ -1907,6 +1907,38 @@ function getStatusLabel(resource: ResourceKey, record: AdminRecord) {
   return value ? String(value) : null;
 }
 
+function isBlankAdminValue(value: AdminValue) {
+  return value === undefined || value === null || String(value).trim() === '';
+}
+
+function validateDraft(resource: ResourceKey, record: AdminRecord) {
+  const config = resourceConfig[resource];
+
+  for (const field of config.fields) {
+    const value = record[field.key];
+
+    if (field.required && isBlankAdminValue(value)) {
+      return `${field.label} is required.`;
+    }
+
+    if (field.type === 'number' && !isBlankAdminValue(value)) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return `${field.label} must be a valid number.`;
+      }
+
+      if (field.min !== undefined && value < field.min) {
+        return `${field.label} must be at least ${field.min}.`;
+      }
+    }
+
+    if (field.type === 'email' && !isBlankAdminValue(value) && !String(value).includes('@')) {
+      return `${field.label} must be a valid email.`;
+    }
+  }
+
+  return null;
+}
+
 async function requestJson<T>(path: string, role: ViewerRole, init?: RequestInit) {
   const headers = new Headers(init?.headers);
   headers.set('x-prime-role', role);
@@ -2089,7 +2121,7 @@ function App() {
 
   function updateDraftField(field: FieldConfig, rawValue: string | boolean) {
     const nextValue = field.type === 'number'
-      ? Number(rawValue)
+      ? rawValue === '' ? undefined : Number(rawValue)
       : rawValue;
 
     setDraft((current) => ({
@@ -2119,6 +2151,13 @@ function App() {
   async function saveRecord() {
     if (!currentPermission?.write) {
       setError('This role is read-only for the current table.');
+      return;
+    }
+
+    const validationMessage = validateDraft(activeResource, currentDraft);
+    if (validationMessage) {
+      setError(validationMessage);
+      setBackendMessage(`Save blocked • ${validationMessage}`);
       return;
     }
 
@@ -2842,7 +2881,7 @@ function App() {
                         <input
                           className="input"
                           type="number"
-                          value={String(currentDraft[field.key] ?? 0)}
+                          value={String(currentDraft[field.key] ?? '')}
                           min={field.min}
                           step={field.step}
                           onChange={(event) => updateDraftField(field, event.target.value)}

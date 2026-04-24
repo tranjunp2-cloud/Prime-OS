@@ -23,6 +23,7 @@ services:
     container_name: prime-os-backend
     environment:
       PORT: 8080
+      PRIME_DEMO_ADMIN_ENABLED: "true"
     ports:
       - "8180:8080"
     volumes:

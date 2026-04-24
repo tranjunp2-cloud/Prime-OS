@@ -100,7 +100,8 @@ const App = () => {
                     <Route path="/intelligence/voc" element={<PrimeTowerPage towerId="voc" />} />
                     <Route path="/intelligence/alerts" element={<PrimeTowerPage towerId="alerts" />} />
                     <Route path="/intelligence/creators" element={<PrimeTowerPage towerId="creators" />} />
-                    <Route path="/intelligence/customers" element={<PrimeTowerPage towerId="customers" />} />
+                    <Route path="/intelligence/trends" element={<PrimeTowerPage towerId="customers" />} />
+                    <Route path="/intelligence/customers" element={<Navigate to="/intelligence/trends" replace />} />
                     <Route path="/intelligence/launch-decisions" element={<PrimeTowerPage towerId="campaigns" />} />
                     <Route path="/intelligence/campaigns" element={<Navigate to="/intelligence/launch-decisions" replace />} />
 

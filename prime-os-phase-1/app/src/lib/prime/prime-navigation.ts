@@ -63,8 +63,8 @@ export const primeNavigation: PrimeNavNode[] = [
         id: 'customers',
         label: 'Trends',
         kind: 'tower',
-        href: '/intelligence/customers',
-        matchPaths: ['/intelligence/forecasting', '/intelligence/ai-operator'],
+        href: '/intelligence/trends',
+        matchPaths: ['/intelligence/customers', '/intelligence/forecasting', '/intelligence/ai-operator'],
         icon: HeartHandshake,
       },
       {

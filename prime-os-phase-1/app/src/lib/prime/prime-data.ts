@@ -7,7 +7,7 @@ import { getReturns } from '@/lib/return-store';
 import { getWarehouses } from '@/lib/warehouse-store';
 import type { InventoryPosition } from '@/lib/inventory-store';
 import type { Order, OrderEvent, OrderItem } from '@/lib/oms-types';
-import type { Product } from '@/lib/product-store';
+import type { Product, Sku } from '@/lib/product-store';
 
 export type PrimeArea = 'Demand Area' | 'Customer Area' | 'Ecom Area' | 'Intelligence Area' | 'Finance Area';
 
@@ -402,6 +402,23 @@ function allOrderItems(orders: Order[]) {
 
 function allOrderEvents(orders: Order[]) {
   return orders.flatMap((order) => getOrderEvents(order.id));
+}
+
+function normalizePrimeSku(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9]+/g, '');
+}
+
+function getProductIdentitySku(product: Product): Sku {
+  const primarySku = product.skus[0];
+
+  return {
+    id: `${product.id}_identity_sku`,
+    sku_code: product.sku_code,
+    variation_name: primarySku?.variation_name ?? 'Product master',
+    weight_g: product.prod_weight,
+    units_per_carton: primarySku?.units_per_carton ?? 1,
+    status: product.status === 'archived' ? 'inactive' : 'active',
+  };
 }
 
 function resolveOrderCustomer(order: Order, index: number) {
@@ -934,14 +951,36 @@ function resolvePrimeSku(skuCodeOrId: string) {
   if (resolvedById) return resolvedById;
 
   const products = getProducts();
+  const normalizedInput = normalizePrimeSku(skuCodeOrId);
+
+  const matchedProduct = products.find((product) => normalizePrimeSku(product.sku_code) === normalizedInput);
+  if (matchedProduct) {
+    return {
+      product: matchedProduct,
+      sku: getProductIdentitySku(matchedProduct),
+    };
+  }
+
   for (const product of products) {
-    const matchedSku = product.skus.find((sku) => sku.sku_code === skuCodeOrId);
+    const matchedSku = product.skus.find((sku) => normalizePrimeSku(sku.sku_code) === normalizedInput);
     if (matchedSku) {
       return {
         product,
         sku: matchedSku,
       };
     }
+  }
+
+  const matchedByFamily = products.find((product) => {
+    const productSku = normalizePrimeSku(product.sku_code);
+    return normalizedInput.startsWith(productSku) || productSku.startsWith(normalizedInput);
+  });
+
+  if (matchedByFamily) {
+    return {
+      product: matchedByFamily,
+      sku: getProductIdentitySku(matchedByFamily),
+    };
   }
 
   return null;

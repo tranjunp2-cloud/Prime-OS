@@ -22,6 +22,8 @@ cd prime-os-phase-1/admin-web && npm install && npm run dev
 cd prime-os-phase-1/app && npm install && npm run dev
 ```
 
+`backend` dev mode enables `PRIME_DEMO_ADMIN_ENABLED=true` so the local admin web can exercise CRUD flows. Production `npm start` keeps header-selected admin privileges disabled unless that demo flag is set explicitly.
+
 ## Docker
 
 From `prime-os-phase-1`:

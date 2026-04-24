@@ -14,6 +14,7 @@ import {
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
+const demoAdminEnabled = process.env.PRIME_DEMO_ADMIN_ENABLED === 'true';
 const allowedRoles = ['admin', 'user'];
 const accessModel = {
   admin: {
@@ -40,7 +41,15 @@ app.use(express.json({ limit: '15mb' }));
 
 function resolveRole(request) {
   const rawRole = String(request.header('x-prime-role') || 'user').toLowerCase();
-  return allowedRoles.includes(rawRole) ? rawRole : 'user';
+  if (!allowedRoles.includes(rawRole)) {
+    return 'user';
+  }
+
+  if (rawRole === 'admin' && !demoAdminEnabled) {
+    return 'user';
+  }
+
+  return rawRole;
 }
 
 function buildSession(role) {
@@ -228,7 +237,7 @@ app.delete('/api/:resource/:id', async (request, response, next) => {
 
 app.use((error, _request, response, _next) => {
   const message = error instanceof Error ? error.message : 'Unknown backend error';
-  response.status(500).json({ message });
+  response.status(error.statusCode || 500).json({ message });
 });
 
 app.listen(port, () => {
