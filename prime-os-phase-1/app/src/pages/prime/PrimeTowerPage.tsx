@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -2739,6 +2739,32 @@ function findForecastBySku(snapshot: PrimeSnapshot, skuCode?: string) {
   return snapshot.forecasts.find((forecast) => normalizeRuntimeSku(forecast.skuCode) === normalizedSku) ?? null;
 }
 
+function runtimeSkuMatches(left?: string, right?: string) {
+  const normalizedLeft = normalizeRuntimeSku(left);
+  const normalizedRight = normalizeRuntimeSku(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  return normalizedLeft === normalizedRight || normalizedLeft.startsWith(normalizedRight) || normalizedRight.startsWith(normalizedLeft);
+}
+
+function findProductBySku(snapshot: PrimeSnapshot, skuCode?: string) {
+  if (!skuCode) return null;
+  return snapshot.products.find((product) => (
+    runtimeSkuMatches(product.sku_code, skuCode)
+    || product.skus.some((sku) => runtimeSkuMatches(sku.sku_code, skuCode))
+  )) ?? null;
+}
+
+function findCreatorBySku(creators: IntelligenceCreatorRecord[] | undefined, skuCode?: string) {
+  if (!skuCode) return null;
+  return (creators ?? []).find((creator) => runtimeSkuMatches(creator.linkedSku, skuCode)) ?? null;
+}
+
+function extractRuntimeNumbers(value?: string) {
+  return (value?.match(/\d[\d,.]*/g) ?? [])
+    .map((item) => Number(item.replace(/,/g, '')))
+    .filter((item) => Number.isFinite(item));
+}
+
 function RuntimeContextCard({
   label,
   value,
@@ -3854,9 +3880,9 @@ function RuntimeCreatorAvatar({
   size = 'sm',
 }: {
   creator: IntelligenceCreatorRecord;
-  size?: 'sm' | 'lg';
+  size?: 'sm' | 'lg' | 'xl';
 }) {
-  const dimension = size === 'lg' ? 'size-14 text-base' : 'size-8 text-[10px]';
+  const dimension = size === 'xl' ? 'size-20 text-xl' : size === 'lg' ? 'size-14 text-base' : 'size-8 text-[10px]';
 
   if (creator.imageUrl) {
     return (
@@ -3870,6 +3896,387 @@ function RuntimeCreatorAvatar({
     <div className={`${dimension} flex items-center justify-center rounded-full border bg-gradient-to-br from-fuchsia-500/15 to-violet-500/10 font-semibold text-foreground shadow-sm`}>
       {creator.creatorName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
     </div>
+  );
+}
+
+function RuntimeRecommendationVisual({
+  creator,
+  product,
+  productLabel,
+  variant,
+  eyebrow,
+  decisionMode,
+  className = '',
+}: {
+  creator: IntelligenceCreatorRecord | null;
+  product: PrimeSnapshot['products'][number] | null;
+  productLabel: string;
+  variant: 'creator' | 'launch';
+  eyebrow: string;
+  decisionMode?: string;
+  className?: string;
+}) {
+  const productImage = product?.images?.[0];
+  const displayProduct = product?.name || productLabel;
+  const creatorName = creator?.creatorName || 'Creator proof';
+  const channelLabel = creator ? humanizeIntelligenceValue(creator.primaryChannel) : 'PrimeOS route';
+
+  if (variant === 'creator') {
+    return (
+      <div className={`${className} relative min-h-[210px] overflow-hidden rounded-3xl border bg-gradient-to-br from-rose-500/10 via-background to-amber-500/10 p-4 shadow-sm`}>
+        <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-rose-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 left-8 size-28 rounded-full bg-amber-300/20 blur-3xl" />
+        <div className="relative flex items-start gap-3">
+          {creator ? (
+            <RuntimeCreatorAvatar creator={creator} size="xl" />
+          ) : (
+            <div className="flex size-20 items-center justify-center rounded-full border bg-background/80 shadow-sm">
+              <CircleUserRound className="size-7 text-muted-foreground" />
+            </div>
+          )}
+          <div className="min-w-0 pt-1">
+            <Badge variant="secondary" className="rounded-full bg-background/75">
+              {eyebrow}
+            </Badge>
+            <div className="mt-3 truncate text-lg font-semibold">{creatorName}</div>
+            <div className="text-xs text-muted-foreground">{channelLabel} proof source</div>
+          </div>
+        </div>
+        <div className="relative mt-4 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
+          <div className="flex items-center gap-3 p-3">
+            <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl border bg-muted/30">
+              {productImage ? (
+                <img src={productImage} alt={displayProduct} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                  <ImagePlus className="size-5" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Product route</div>
+              <div className="mt-1 line-clamp-2 text-sm font-semibold">{displayProduct}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} relative min-h-[210px] overflow-hidden rounded-3xl border bg-gradient-to-br from-emerald-500/10 via-background to-primary/10 p-4 shadow-sm`}>
+      <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-emerald-300/20 blur-3xl" />
+      <div className="flex items-center justify-between gap-3">
+        <Badge variant="secondary" className="relative rounded-full bg-background/75">
+          {eyebrow}
+        </Badge>
+        <div className="relative rounded-full border bg-primary/10 px-4 py-1 text-sm font-semibold text-primary">
+          {decisionMode || 'Review'}
+        </div>
+      </div>
+      <div className="relative mt-4 flex items-center gap-3">
+        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
+          {productImage ? (
+            <img src={productImage} alt={displayProduct} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <ImagePlus className="size-6" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Product to launch</div>
+          <div className="mt-2 line-clamp-3 text-base font-semibold">{displayProduct}</div>
+        </div>
+      </div>
+      <div className="relative mt-4 rounded-2xl border bg-background/80 p-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          {creator ? (
+            <RuntimeCreatorAvatar creator={creator} />
+          ) : (
+            <div className="flex size-8 items-center justify-center rounded-full border bg-muted/30">
+              <CircleUserRound className="size-4 text-muted-foreground" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">{creatorName}</div>
+            <div className="text-xs text-muted-foreground">{channelLabel} creator proof</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RuntimeTrendKpiCard({
+  label,
+  value,
+  detail,
+  tone,
+  icon,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: 'emerald' | 'rose' | 'sky' | 'amber';
+  icon: ReactNode;
+}) {
+  const toneClass = {
+    emerald: 'from-emerald-400 to-lime-400 text-emerald-950',
+    rose: 'from-rose-500 to-red-500 text-white',
+    sky: 'from-sky-400 to-blue-500 text-sky-950',
+    amber: 'from-amber-300 to-yellow-400 text-amber-950',
+  }[tone];
+
+  return (
+    <div className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${toneClass} p-4 shadow-sm`}>
+      <div className="absolute -right-8 -top-8 size-24 rounded-full bg-white/20" />
+      <div className="relative flex items-start justify-between gap-3">
+        <div>
+          <div className="text-2xl font-bold leading-none">{value}</div>
+          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] opacity-80">{label}</div>
+          <div className="mt-3 max-w-[15rem] text-xs font-medium opacity-85">{detail}</div>
+        </div>
+        <div className="rounded-2xl bg-white/25 p-2">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RuntimeTrendForecastChart({
+  actualIntent,
+  conversionIntent,
+  forecastDemand,
+  momentum,
+  productRoute,
+  risk,
+}: {
+  actualIntent: number;
+  conversionIntent: number;
+  forecastDemand: number;
+  momentum: number;
+  productRoute: string;
+  risk?: string;
+}) {
+  const chartData = [
+    { label: 'D-6', actual: Math.round(actualIntent * 0.48) },
+    { label: 'D-4', actual: Math.round(actualIntent * 0.64) },
+    { label: 'D-2', actual: Math.round(actualIntent * 0.82) },
+    { label: 'Now', actual: actualIntent },
+    { label: '+2d', forecast: Math.round((actualIntent + forecastDemand) * 0.52) },
+    { label: '+5d', forecast: Math.round(forecastDemand * 0.88) },
+    { label: '+7d', forecast: forecastDemand },
+  ];
+  const maxValue = Math.max(1, ...chartData.map((point) => point.actual ?? point.forecast ?? 0), conversionIntent);
+  const points = chartData.map((point, index) => {
+    const value = point.actual ?? point.forecast ?? 0;
+    return {
+      ...point,
+      value,
+      x: 28 + index * 48,
+      y: 130 - (value / maxValue) * 92,
+      barHeight: Math.max(8, (value / maxValue) * 88),
+    };
+  });
+  const actualPath = points.slice(0, 4).map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  const forecastPath = points.slice(3).map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+
+  return (
+    <Card className="overflow-hidden rounded-lg border">
+      <CardHeader className="border-b">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Market pulse + forecast</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Actual demand signals against PrimeOS 7-day prediction.</p>
+          </div>
+          <Badge variant="outline" className="w-fit capitalize">{risk || 'forecast ready'}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 p-4">
+        <div className="rounded-2xl border bg-muted/20 p-3">
+          <svg viewBox="0 0 340 160" className="h-56 w-full">
+            <line x1="24" y1="130" x2="324" y2="130" stroke="hsl(var(--border))" />
+            <line x1="24" y1="84" x2="324" y2="84" stroke="hsl(var(--border))" strokeDasharray="4 6" opacity="0.7" />
+            <line x1="172" y1="24" x2="172" y2="130" stroke="hsl(var(--border))" strokeDasharray="3 5" />
+            {points.map((point) => (
+              <g key={point.label}>
+                <rect
+                  x={point.x - 11}
+                  y={130 - point.barHeight}
+                  width="22"
+                  height={point.barHeight}
+                  rx="6"
+                  fill={point.actual ? 'hsl(var(--primary))' : 'hsl(var(--chart-2))'}
+                  opacity={point.actual ? '0.72' : '0.36'}
+                />
+                <text x={point.x} y="150" textAnchor="middle" className="fill-muted-foreground text-[10px]">{point.label}</text>
+              </g>
+            ))}
+            <path d={actualPath} fill="none" stroke="hsl(var(--primary))" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+            <path d={forecastPath} fill="none" stroke="hsl(var(--chart-2))" strokeDasharray="7 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+            {points.map((point) => (
+              <circle key={`${point.label}-dot`} cx={point.x} cy={point.y} r="4.5" fill="hsl(var(--background))" stroke={point.actual ? 'hsl(var(--primary))' : 'hsl(var(--chart-2))'} strokeWidth="3" />
+            ))}
+          </svg>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <RuntimeContextCard label="Actual now" value={formatCompactCount(actualIntent)} detail={`${formatCompactCount(conversionIntent)} conversion signals attached.`} />
+          <RuntimeContextCard label="Predicted 7d" value={formatCompactCount(forecastDemand)} detail="Demand forecast from current market pulse." />
+          <RuntimeContextCard label="Momentum" value={`${momentum}%`} detail={productRoute} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RuntimeTrendGeoMap({
+  customers,
+  selectedCustomer,
+  onSelectCustomer,
+}: {
+  customers: IntelligenceCustomerRecord[];
+  selectedCustomer: IntelligenceCustomerRecord;
+  onSelectCustomer: (customerId: string) => void;
+}) {
+  const regionPositions: Record<string, { x: number; y: number; label: string }> = {
+    JP: { x: 238, y: 56, label: 'Japan' },
+    VN: { x: 176, y: 104, label: 'Vietnam' },
+    SEA: { x: 182, y: 126, label: 'SEA' },
+    KR: { x: 214, y: 58, label: 'Korea' },
+    US: { x: 48, y: 76, label: 'United States' },
+    EU: { x: 112, y: 58, label: 'Europe' },
+  };
+  const fallbackPositions = [
+    { x: 142, y: 92 },
+    { x: 210, y: 116 },
+    { x: 82, y: 112 },
+  ];
+  const marketGroups = customers.reduce<Record<string, {
+    market: string;
+    label: string;
+    segmentSize: number;
+    momentum: number;
+    primaryCustomer: IntelligenceCustomerRecord;
+  }>>((groups, customer) => {
+    const market = customer.market || 'Global';
+    const existing = groups[market];
+    const segmentSize = customer.segmentSize ?? 0;
+
+    if (!existing) {
+      groups[market] = {
+        market,
+        label: regionPositions[market]?.label || market,
+        segmentSize,
+        momentum: customer.potentialScore,
+        primaryCustomer: customer,
+      };
+      return groups;
+    }
+
+    const nextSize = existing.segmentSize + segmentSize;
+    groups[market] = {
+      ...existing,
+      segmentSize: nextSize,
+      momentum: Math.round(((existing.momentum * existing.segmentSize) + (customer.potentialScore * segmentSize)) / Math.max(nextSize, 1)),
+      primaryCustomer: customer.potentialScore > existing.primaryCustomer.potentialScore ? customer : existing.primaryCustomer,
+    };
+    return groups;
+  }, {});
+  const regions = Object.values(marketGroups)
+    .sort((left, right) => right.momentum - left.momentum)
+    .map((region, index) => ({
+      ...region,
+      ...(regionPositions[region.market] || fallbackPositions[index % fallbackPositions.length]),
+    }));
+  const maxSegmentSize = Math.max(1, ...regions.map((region) => region.segmentSize));
+
+  return (
+    <Card className="overflow-hidden rounded-lg border">
+      <CardHeader className="border-b bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Geo demand map</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Regional heat behind the selected trend lane.</p>
+          </div>
+          <Badge variant="outline">{selectedCustomer.market}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 p-4">
+        <div className="relative overflow-hidden rounded-2xl border bg-muted/20">
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: 'radial-gradient(circle at 70% 30%, hsl(var(--primary) / 0.14), transparent 32%), radial-gradient(circle at 34% 70%, hsl(var(--chart-2) / 0.16), transparent 28%)',
+            }}
+          />
+          <svg viewBox="0 0 320 180" className="relative h-64 w-full">
+            <defs>
+              <linearGradient id="runtime-trend-map-land" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--muted))" stopOpacity="0.55" />
+                <stop offset="100%" stopColor="hsl(var(--muted))" stopOpacity="0.15" />
+              </linearGradient>
+            </defs>
+            <path d="M117 35 C151 17 207 28 236 57 C259 80 255 111 225 125 C187 143 141 128 111 103 C84 81 84 52 117 35Z" fill="url(#runtime-trend-map-land)" stroke="hsl(var(--border))" />
+            <path d="M171 104 C191 101 208 112 209 130 C198 143 174 143 160 128 C153 118 157 108 171 104Z" fill="url(#runtime-trend-map-land)" stroke="hsl(var(--border))" />
+            <path d="M48 58 C70 42 98 45 111 66 C113 91 90 107 64 100 C42 94 32 72 48 58Z" fill="url(#runtime-trend-map-land)" stroke="hsl(var(--border))" opacity="0.65" />
+            <path d="M231 41 C242 48 250 64 247 82" fill="none" stroke="hsl(var(--border))" strokeLinecap="round" strokeWidth="5" />
+            {[44, 84, 124, 164].map((x) => (
+              <line key={x} x1={x} y1="18" x2={x} y2="162" stroke="hsl(var(--border))" strokeDasharray="2 8" opacity="0.38" />
+            ))}
+            {[42, 82, 122].map((y) => (
+              <line key={y} x1="24" y1={y} x2="292" y2={y} stroke="hsl(var(--border))" strokeDasharray="2 8" opacity="0.38" />
+            ))}
+            {regions.map((region) => {
+              const selected = region.market === selectedCustomer.market;
+              const radius = 8 + Math.round((region.segmentSize / maxSegmentSize) * 14);
+
+              return (
+                <g key={region.market}>
+                  {selected ? (
+                    <>
+                      <circle cx={region.x} cy={region.y} r={radius + 18} fill="hsl(var(--primary))" opacity="0.08" />
+                      <circle cx={region.x} cy={region.y} r={radius + 9} fill="none" stroke="hsl(var(--primary))" strokeDasharray="4 5" strokeWidth="2" opacity="0.75" />
+                    </>
+                  ) : null}
+                  <circle cx={region.x} cy={region.y} r={radius} fill={selected ? 'hsl(var(--primary))' : 'hsl(var(--chart-2))'} opacity={selected ? '0.9' : '0.55'} />
+                  <circle cx={region.x} cy={region.y} r="4" fill="hsl(var(--background))" />
+                  <text x={region.x} y={region.y - radius - 8} textAnchor="middle" className="fill-foreground text-[11px] font-semibold">{region.market}</text>
+                  <text x={region.x} y={region.y + radius + 16} textAnchor="middle" className="fill-muted-foreground text-[10px]">{region.momentum}%</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <div className="space-y-2">
+          {regions.map((region) => {
+            const selected = region.market === selectedCustomer.market;
+
+            return (
+              <button
+                key={region.market}
+                type="button"
+                onClick={() => onSelectCustomer(region.primaryCustomer.id)}
+                className={`w-full rounded-xl border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${selected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">{region.label}</div>
+                    <div className="text-xs text-muted-foreground">{formatCompactCount(region.segmentSize)} buyers in play</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold">{region.momentum}%</div>
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">heat</div>
+                  </div>
+                </div>
+                <Progress value={region.momentum} className="mt-2 h-1.5" />
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -4442,20 +4849,29 @@ function CompactCreatorsRuntimePanel({
   const linkedSkuCount = new Set(creators.map((creator) => normalizeRuntimeSku(creator.linkedSku)).filter(Boolean)).size;
   const matchingCampaign = findCampaignBySku(snapshot, selectedCreator.linkedSku);
   const matchingForecast = findForecastBySku(snapshot, selectedCreator.linkedSku);
+  const selectedCreatorProduct = findProductBySku(snapshot, selectedCreator.linkedSku);
 
   return (
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border">
         <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
+          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_170px] xl:items-stretch">
+            <div className="min-w-0 xl:order-2">
               <Badge variant="outline">PrimeOS recommends</Badge>
               <CardTitle className="mt-3 text-2xl">Use {selectedCreator.creatorName} for {runtimeSkuName(selectedCreator.linkedSku)}</CardTitle>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 Best creator fit right now: {humanizeIntelligenceValue(selectedCreator.primaryChannel)} proof, {selectedCreator.market} market relevance, and a clear route into the product already in focus.
               </p>
             </div>
-            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm">
+            <RuntimeRecommendationVisual
+              creator={selectedCreator}
+              product={selectedCreatorProduct}
+              productLabel={runtimeSkuLabel(selectedCreator.linkedSku)}
+              variant="creator"
+              eyebrow="Creator pick"
+              className="xl:order-1"
+            />
+            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm xl:order-3">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Creator fit</div>
               <div className="mt-1 text-3xl font-semibold">{selectedCreator.fitScore}%</div>
               <Badge variant={runtimeStatusVariant(selectedCreator.status)} className="mt-2 capitalize">
@@ -4642,151 +5058,262 @@ function CompactCustomersRuntimePanel({
   }
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId) ?? topCustomer;
-  const activeCount = customers.filter((customer) => ['active', 'testing'].includes(customer.status)).length;
   const totalSegmentSize = customers.reduce((sum, customer) => sum + (customer.segmentSize ?? 0), 0);
   const matchingCampaign = findCampaignBySku(snapshot, selectedCustomer.recommendedProduct);
   const matchingForecast = findForecastBySku(snapshot, selectedCustomer.recommendedProduct);
   const selectedSegmentSize = selectedCustomer.segmentSize ?? 0;
   const selectedShare = totalSegmentSize ? Math.round((selectedSegmentSize / totalSegmentSize) * 100) : 0;
   const productRoute = runtimeSkuLabel(selectedCustomer.recommendedProduct);
+  const selectedCustomerProduct = findProductBySku(snapshot, selectedCustomer.recommendedProduct);
+  const selectedTrendCreator = findCreatorBySku(data?.creators, selectedCustomer.recommendedProduct);
+  const intentNumbers = extractRuntimeNumbers(selectedCustomer.recentIntent);
+  const actualIntent = intentNumbers[0] ?? Math.max(1, Math.round(selectedSegmentSize * 0.16));
+  const conversionIntent = intentNumbers[1] ?? Math.max(1, Math.round(actualIntent * 0.18));
+  const forecastDemand = matchingForecast?.demand7d ?? Math.max(1, Math.round(actualIntent * (selectedCustomer.potentialScore / 100)));
   const stockSignal = matchingForecast
     ? matchingForecast.risk === 'high'
       ? 'Stock guardrail'
       : 'Stock ready'
     : 'Stock pending';
+  const selectedTrendProductName = selectedCustomerProduct?.name || runtimeSkuName(selectedCustomer.recommendedProduct);
+  const selectedTrendProductImage = selectedCustomerProduct?.images?.[0];
+  const stockCover = matchingForecast
+    ? Math.min(100, Math.round((matchingForecast.ats / Math.max(matchingForecast.demand7d, 1)) * 100))
+    : selectedCustomer.potentialScore;
+  const visibleTrendLanes = customers.slice(0, 4);
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden rounded-lg border">
-        <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <Badge variant="outline">PrimeOS recommends</Badge>
-              <CardTitle className="mt-3 text-2xl">Activate {selectedCustomer.segmentName}</CardTitle>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Strongest demand signal right now: {formatCompactCount(selectedSegmentSize)} reachable profiles, {selectedCustomer.potentialScore}% momentum, and a product route tied to {productRoute}.
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Trend momentum</div>
-              <div className="mt-1 text-3xl font-semibold">{selectedCustomer.potentialScore}%</div>
-              <Badge variant={runtimeStatusVariant(selectedCustomer.status)} className="mt-2 capitalize">
-                {humanizeIntelligenceValue(selectedCustomer.status)}
-              </Badge>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4">
-          <div className="grid gap-3 lg:grid-cols-4">
-            <RuntimeContextCard
-              label="Product route"
-              value={productRoute}
-              detail={`${selectedCustomer.market} demand is pointing to this product now.`}
-            />
-            <RuntimeContextCard
-              label="Buyer signal"
-              value={formatCompactCount(selectedSegmentSize)}
-              detail={`${selectedShare}% of tracked buyer volume sits in this selected trend lane.`}
-            />
-            <RuntimeContextCard
-              label="Why now"
-              value={`${selectedCustomer.potentialScore}% momentum`}
-              detail={selectedCustomer.recentIntent || 'PrimeOS is waiting for stronger trend evidence on this segment.'}
-            />
-            <RuntimeContextCard
-              label="Guardrail"
-              value={stockSignal}
-              detail={matchingForecast ? `${matchingForecast.ats} ATS vs ${matchingForecast.demand7d} projected 7-day demand.` : 'Stock signal is not linked yet.'}
-            />
-          </div>
-          <div className="rounded-2xl border bg-muted/20 p-3">
-            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
-            <div className="mt-2 text-sm font-medium">{selectedCustomer.nextMove || 'Push this trend into Launch Decisions before budget moves.'}</div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link to={INTELLIGENCE_DECISIONS_HREF}>
-                Send to Launch Decisions
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/customer/crm-compact">Open CRM Compact</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryMetricCard label="Trend signals" value={customers.length} meta={`${activeCount} ready to test or launch.`} icon={<HeartHandshake className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Buyers in play" value={formatCompactCount(totalSegmentSize || customers.length)} meta={`${selectedShare}% in the selected lane.`} icon={<UserRoundCheck className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Ready now" value={activeCount} meta="Trends that can move into launch planning." icon={<Sparkles className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Top momentum" value={`${topCustomer.potentialScore}%`} meta={productRoute} icon={<Globe className="size-5" />} tone="purple" />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <RuntimeTrendKpiCard
+          label="Live intent"
+          value={formatCompactCount(actualIntent)}
+          detail={`${selectedCustomer.market} buyers are actively revisiting or saving this lane.`}
+          tone="emerald"
+          icon={<ScanSearch className="size-6" />}
+        />
+        <RuntimeTrendKpiCard
+          label="Conversion signals"
+          value={formatCompactCount(conversionIntent)}
+          detail="Carts, quote asks, and high-intent product returns."
+          tone="rose"
+          icon={<Sparkles className="size-6" />}
+        />
+        <RuntimeTrendKpiCard
+          label="7d forecast"
+          value={formatCompactCount(forecastDemand)}
+          detail={matchingForecast ? `${matchingForecast.ats} ATS available right now.` : 'Projected from current signal velocity.'}
+          tone="sky"
+          icon={<TrendingUp className="size-6" />}
+        />
+        <RuntimeTrendKpiCard
+          label="Stock cover"
+          value={`${stockCover}%`}
+          detail={matchingForecast ? `${matchingForecast.risk} inventory risk before scale.` : 'No stock guardrail linked yet.'}
+          tone="amber"
+          icon={<Gauge className="size-6" />}
+        />
       </div>
 
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle>Explore trend options</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Switch lanes only if another trend has stronger demand, clearer stock cover, or a cleaner CRM route.</p>
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card className="overflow-hidden rounded-lg border">
+          <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 gap-4">
+                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
+                  {selectedTrendProductImage ? (
+                    <img src={selectedTrendProductImage} alt={selectedTrendProductName} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <ImagePlus className="size-7" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <Badge variant="outline">PrimeOS market read</Badge>
+                  <CardTitle className="mt-3 text-2xl">{selectedCustomer.segmentName}</CardTitle>
+                  <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                    PrimeOS sees this trend as the clearest demand lane now: {formatCompactCount(actualIntent)} live intent signals, {formatCompactCount(conversionIntent)} conversion signals, and a 7-day forecast of {formatCompactCount(forecastDemand)}.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Badge variant={runtimeStatusVariant(selectedCustomer.status)} className="capitalize">{humanizeIntelligenceValue(selectedCustomer.status)}</Badge>
+                <Badge variant="outline">{selectedCustomer.potentialScore}% momentum</Badge>
+              </div>
             </div>
-            <Badge variant="outline">{customers.length} trend signals</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-            <div className="space-y-2">
-              {customers.map((customer) => {
-                const isSelected = selectedCustomer.id === customer.id;
+          </CardHeader>
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{selectedCustomer.market}</Badge>
+              <Badge variant="outline">{humanizeIntelligenceValue(selectedCustomer.lifecycle)}</Badge>
+              <Badge variant="outline">Product {productRoute}</Badge>
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Intelligence readout</div>
+              <p className="mt-3 text-lg font-semibold">
+                Activate {selectedCustomer.segmentName.toLowerCase()} around {selectedTrendProductName.toLowerCase()}.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {selectedCustomer.recentIntent || 'PrimeOS is waiting for stronger trend evidence on this segment.'}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <RuntimeContextCard label="Buyer pool" value={formatCompactCount(selectedSegmentSize)} detail={`${selectedShare}% of tracked buyer volume.`} />
+              <RuntimeContextCard label="Creator proof" value={selectedTrendCreator?.creatorName || 'Pending'} detail={selectedTrendCreator ? `${humanizeIntelligenceValue(selectedTrendCreator.primaryChannel)} proof layer is available.` : 'Attach creator proof before launch.'} />
+              <RuntimeContextCard label="Next move" value="Launch route" detail={selectedCustomer.nextMove || 'Push this trend into Launch Decisions before budget moves.'} />
+            </div>
+          </CardContent>
+        </Card>
 
-                return (
-                  <button
-                    key={customer.id}
-                    type="button"
-                    onClick={() => setSelectedCustomerId(customer.id)}
-                    className={`w-full rounded-xl border px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{customer.segmentName}</div>
-                        <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{runtimeSkuLabel(customer.recommendedProduct)}</div>
+        <RuntimeTrendForecastChart
+          actualIntent={actualIntent}
+          conversionIntent={conversionIntent}
+          forecastDemand={forecastDemand}
+          momentum={selectedCustomer.potentialScore}
+          productRoute={productRoute}
+          risk={matchingForecast?.risk}
+        />
+      </div>
+
+      <Tabs defaultValue="signals" className="space-y-4">
+        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-3 rounded-2xl border bg-background p-1">
+          <TabsTrigger value="signals" className="rounded-xl">Market signals</TabsTrigger>
+          <TabsTrigger value="forecast" className="rounded-xl">Forecast</TabsTrigger>
+          <TabsTrigger value="activation" className="rounded-xl">Activation guidance</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="signals" className="mt-0">
+          <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
+            <Card className="rounded-lg border">
+              <CardHeader>
+                <CardTitle>Trend lanes</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Choose a lane only if it has stronger market heat or a cleaner launch route.</p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {visibleTrendLanes.map((customer) => {
+                  const isSelected = selectedCustomer.id === customer.id;
+
+                  return (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => setSelectedCustomerId(customer.id)}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold">{customer.segmentName}</div>
+                          <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{runtimeSkuLabel(customer.recommendedProduct)}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-sm font-semibold">{customer.potentialScore}%</div>
+                          <div className="text-[11px] text-muted-foreground">{formatCompactCount(customer.segmentSize)}</div>
+                        </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-sm font-semibold">{customer.potentialScore}%</div>
-                        <div className="text-[11px] text-muted-foreground">{formatCompactCount(customer.segmentSize)}</div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Progress value={customer.potentialScore} className="h-1.5 flex-1" />
+                        <Badge variant={runtimeStatusVariant(customer.status)} className="shrink-0 capitalize">
+                          {humanizeIntelligenceValue(customer.status)}
+                        </Badge>
                       </div>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Progress value={customer.potentialScore} className="h-1.5 flex-1" />
-                      <Badge variant={runtimeStatusVariant(customer.status)} className="shrink-0 capitalize">
-                        {humanizeIntelligenceValue(customer.status)}
-                      </Badge>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <RuntimeContextCard
-                label="Campaign signal"
-                value={matchingCampaign ? matchingCampaign.name : 'Route pending'}
-                detail={matchingCampaign ? `${matchingCampaign.leads} leads and ${matchingCampaign.orders} orders already sit on this SKU route.` : 'No live campaign has been linked to this trend yet.'}
+                    </button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <RuntimeTrendGeoMap
+                customers={customers}
+                selectedCustomer={selectedCustomer}
+                onSelectCustomer={setSelectedCustomerId}
               />
-              <RuntimeContextCard
-                label="Ecom / COS"
-                value={matchingForecast ? `${matchingForecast.ats} ATS / ${matchingForecast.demand7d} 7d demand` : runtimeSkuLabel(selectedCustomer.recommendedProduct)}
-                detail={matchingForecast ? (matchingForecast.risk === 'high' ? 'Inventory is the main guardrail before this trend should scale harder.' : 'Stock and demand look compatible enough for a controlled activation.') : 'Ecom has not attached a live stock signal to this trend yet.'}
-              />
-              <RuntimeContextCard
-                label="CRM handoff"
-                value="Memory + ownership"
-                detail="CRM should hold the people, owner, and follow-up once this trend is chosen."
-              />
+              <div className="grid gap-3 md:grid-cols-3">
+                <RuntimeContextCard label="Market reality" value={formatCompactCount(actualIntent)} detail={`${formatCompactCount(conversionIntent)} of those signals are close to conversion.`} />
+                <RuntimeContextCard label="Campaign signal" value={matchingCampaign ? matchingCampaign.name : 'Route pending'} detail={matchingCampaign ? `${matchingCampaign.leads} leads and ${matchingCampaign.orders} orders already sit on this SKU route.` : 'No live campaign has been linked to this trend yet.'} />
+                <RuntimeContextCard label="CRM memory" value="Audience owned" detail="CRM Compact should hold the segment, owner, and next follow-up once this trend moves forward." />
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="forecast" className="mt-0">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="rounded-lg border lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Forecast guardrail</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">PrimeOS checks whether the trend can scale without breaking stock or campaign quality.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <RuntimeContextCard label="Projected 7d demand" value={formatCompactCount(forecastDemand)} detail="Expected demand if this lane is activated now." />
+                  <RuntimeContextCard label="ATS available" value={matchingForecast ? formatCompactCount(matchingForecast.ats) : 'Pending'} detail={stockSignal} />
+                  <RuntimeContextCard label="Coverage" value={`${stockCover}%`} detail={matchingForecast ? `${matchingForecast.risk} risk before broader scale.` : 'Attach inventory to confirm scale.'} />
+                </div>
+                <div className="rounded-2xl border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Stock cover</div>
+                      <div className="mt-1 text-sm font-medium">{matchingForecast ? `${matchingForecast.ats} ATS vs ${matchingForecast.demand7d} forecast demand` : 'No live stock signal attached yet.'}</div>
+                    </div>
+                    <Badge variant={matchingForecast?.risk === 'high' ? 'destructive' : 'outline'} className="capitalize">{matchingForecast?.risk || 'pending'}</Badge>
+                  </div>
+                  <Progress value={stockCover} className="mt-4 h-2" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg border">
+              <CardHeader>
+                <CardTitle>Product route</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="h-36 overflow-hidden rounded-2xl border bg-muted/20">
+                  {selectedTrendProductImage ? (
+                    <img src={selectedTrendProductImage} alt={selectedTrendProductName} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <ImagePlus className="size-8" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{selectedTrendProductName}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{productRoute}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="activation" className="mt-0">
+          <Card className="rounded-lg border">
+            <CardContent className="grid gap-4 p-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl border bg-muted/20 p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">PrimeOS recommendation</div>
+                <p className="mt-3 text-xl font-semibold">Move this trend into Launch Decisions.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{selectedCustomer.nextMove || 'Push this trend into Launch Decisions before budget moves.'}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button asChild size="sm">
+                    <Link to={INTELLIGENCE_DECISIONS_HREF}>
+                      Send to Launch Decisions
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/customer/crm-compact">Open CRM Compact</Link>
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <RuntimeContextCard label="Creator proof" value={selectedTrendCreator?.creatorName || 'Creator pending'} detail={selectedTrendCreator ? `${selectedTrendCreator.fitScore}% fit on ${humanizeIntelligenceValue(selectedTrendCreator.primaryChannel)}.` : 'Attach a creator before campaign execution.'} />
+                <RuntimeContextCard label="Demand handoff" value="Campaign Ops" detail="Campaign Ops receives the product route, buyer lane, forecast guardrail, and CRM audience memory." />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -4851,6 +5378,7 @@ function CompactLaunchDecisionsRuntimePanel({
   const selectedDecisionCustomer = customerLookup.get(normalizeRuntimeText(selectedDecision.customerSegment)) ?? null;
   const matchingCampaign = findCampaignBySku(snapshot, selectedDecision.skuCode);
   const matchingForecast = findForecastBySku(snapshot, selectedDecision.skuCode);
+  const selectedDecisionProduct = findProductBySku(snapshot, selectedDecision.skuCode);
   const creatorProofScore = selectedDecisionCreator?.fitScore ?? selectedDecision.confidence;
   const trendHeatScore = selectedDecisionCustomer?.potentialScore ?? Math.max(58, selectedDecision.confidence - 8);
   const skuReadinessScore = matchingForecast
@@ -4911,15 +5439,24 @@ function CompactLaunchDecisionsRuntimePanel({
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border">
         <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
+          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_170px] xl:items-stretch">
+            <div className="min-w-0 xl:order-2">
               <Badge variant="outline">PrimeOS recommends</Badge>
               <CardTitle className="mt-3 text-2xl">{decisionMode}: {selectedDecision.decisionName}</CardTitle>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {selectedDecision.whyThisLaunch || `${selectedDecision.creatorName} and ${selectedDecision.customerSegment} are the clearest current route into ${runtimeSkuName(selectedDecision.skuCode).toLowerCase()}.`}
               </p>
             </div>
-            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm">
+            <RuntimeRecommendationVisual
+              creator={selectedDecisionCreator}
+              product={selectedDecisionProduct}
+              productLabel={runtimeSkuLabel(selectedDecision.skuCode)}
+              variant="launch"
+              eyebrow="Launch route"
+              decisionMode={decisionMode}
+              className="xl:order-1"
+            />
+            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm xl:order-3">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Decision confidence</div>
               <div className="mt-1 text-3xl font-semibold">{selectedDecision.confidence}%</div>
               <Badge variant={runtimeStatusVariant(selectedDecision.approvalStatus)} className="mt-2 capitalize">
