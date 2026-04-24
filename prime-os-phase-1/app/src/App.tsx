@@ -66,11 +66,12 @@ const App = () => {
                     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
                     <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />
 
-                    <Route path="/finance/capital-readiness" element={<PrimeTowerPage towerId="capital" />} />
+                    <Route path="/finance/health" element={<PrimeTowerPage towerId="settlement" />} />
                     <Route path="/finance/capital-offers" element={<PrimeTowerPage towerId="offers" />} />
                     <Route path="/finance/risk-trust" element={<PrimeTowerPage towerId="risk" />} />
-                    <Route path="/finance/settlement-repayment" element={<PrimeTowerPage towerId="settlement" />} />
-                    <Route path="/finance/capital" element={<Navigate to="/finance/capital-readiness" replace />} />
+                    <Route path="/finance/capital-readiness" element={<Navigate to="/finance/capital-offers" replace />} />
+                    <Route path="/finance/settlement-repayment" element={<Navigate to="/finance/health" replace />} />
+                    <Route path="/finance/capital" element={<Navigate to="/finance/capital-offers" replace />} />
                     <Route path="/finance/lending" element={<Navigate to="/finance/capital-offers" replace />} />
                     <Route path="/finance/risk" element={<Navigate to="/finance/risk-trust" replace />} />
 

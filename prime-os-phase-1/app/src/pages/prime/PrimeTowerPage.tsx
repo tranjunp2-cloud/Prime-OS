@@ -84,8 +84,11 @@ import {
 } from '@/lib/prime/prime-data';
 import {
   fetchFinanceControlPlane,
+  type CapitalOffersRecord,
+  type CapitalReadinessRecord,
   type FinanceControlPlaneSnapshot,
   type RiskTrustRecord,
+  type SettlementRepaymentRecord,
 } from '@/lib/prime/finance-control-plane';
 import {
   fetchIntelligenceControlPlane,
@@ -207,7 +210,7 @@ const currency = new Intl.NumberFormat('ja-JP', {
 
 const demandTowerIds: PrimeTowerId[] = ['campaign-ops', 'content-creator-ops', 'lead-response-capture', 'retargeting-outreach'];
 const intelligenceTowerIds: PrimeTowerId[] = ['creators', 'customers', 'campaigns', 'analytics', 'attribution', 'forecasting', 'ai-operator', 'voc', 'alerts'];
-const financeTowerIds: PrimeTowerId[] = ['capital', 'offers', 'risk', 'settlement'];
+const financeTowerIds: PrimeTowerId[] = ['offers', 'risk', 'settlement'];
 
 function statusTone(status: string) {
   if (['active', 'qualified', 'converted', 'resolved', 'positive', 'low'].includes(status)) return 'text-emerald-600 dark:text-emerald-300';
@@ -2340,15 +2343,15 @@ function StrategicNarrativeBanner({ towerId }: { towerId: PrimeTowerId }) {
     },
     offers: {
       label: 'Narrative role',
-      detail: 'Capital offers make funding concrete by showing the amount, provider, fee, and repayment model tied to a real launch path.',
+      detail: 'Capital Offers analyzes sales momentum, demand quality, trust, and repayment capacity to suggest realistic funding for the seller.',
     },
     risk: {
       label: 'Narrative role',
-      detail: 'Risk and trust explain what a lender would worry about, what PrimeOS still trusts, and what the team should fix before scale.',
+      detail: 'Risk & Eligibility explains what blocks a seller from funding and what must be fixed to unlock the next offer.',
     },
     settlement: {
       label: 'Narrative role',
-      detail: 'Settlement and repayment keep the capital loop closed by showing where money went, how it comes back, and whether collection is healthy.',
+      detail: 'Finance Health keeps cashflow, settlement, repayment, and seller financial health visible in one simple operating view.',
     },
   };
 
@@ -3356,6 +3359,53 @@ function RuntimeContextCard({
 
 function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
+  const crmCustomers = useMemo(() => snapshot.customers.map((customer, index) => {
+    const lead = snapshot.leads.find((candidate) => candidate.customerId === customer.id) ?? null;
+    const rfq = snapshot.rfqs.find((candidate) => candidate.customerId === customer.id) ?? null;
+    const ticket = snapshot.tickets.find((candidate) => candidate.customerId === customer.id) ?? null;
+    const campaign = lead
+      ? snapshot.campaigns.find((candidate) => candidate.id === lead.campaignId) ?? null
+      : snapshot.campaigns[index % Math.max(snapshot.campaigns.length, 1)] ?? null;
+    const product = snapshot.products.find((candidate) => candidate.id === lead?.productId || candidate.id === campaign?.productId)
+      ?? snapshot.products[index % Math.max(snapshot.products.length, 1)]
+      ?? null;
+    const owner = ['Hana Lee', 'Daisuke Ito', 'Mika Sato', 'Ken Mori', 'Aiko Tanaka'][index % 5];
+    const score = Math.min(
+      96,
+      Math.max(42, 64 + customer.totalOrders * 7 + (customer.lifecycle === 'retention' ? 10 : 0) - (customer.lifecycle === 'at-risk' ? 18 : 0) + index * 3)
+    );
+    const nextFollowUp = customer.lifecycle === 'lead'
+      ? 'Create RFQ reply'
+      : customer.lifecycle === 'at-risk'
+        ? 'Start recovery follow-up'
+        : customer.totalOrders > 1
+          ? 'Send replenishment offer'
+          : 'Assign next order check';
+    const segmentLabel = customer.segment || campaign?.targetSegment || 'Customer memory';
+    const channel = lead?.source || campaign?.channel || (customer.lifecycle === 'at-risk' ? 'Email + LINE' : 'CRM Compact');
+    const recommendedSku = campaign?.skuCode || lead?.skuId || getPrimarySkuCodeFromSnapshot(snapshot, product?.id) || 'SKU pending';
+
+    return {
+      customer,
+      index,
+      owner,
+      lead,
+      rfq,
+      ticket,
+      campaign,
+      product,
+      score,
+      nextFollowUp,
+      segmentLabel,
+      channel,
+      recommendedSku,
+      imageUrl: crmCustomerImageUrl(index),
+    };
+  }), [snapshot]);
+  const topCustomer = crmCustomers[0] ?? null;
+  const [selectedCustomerId, setSelectedCustomerId] = useState(topCustomer?.customer.id ?? '');
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const selectedCustomer = crmCustomers.find((record) => record.customer.id === selectedCustomerId) ?? topCustomer;
 
   if (towerId === 'service') {
     return (
@@ -3400,126 +3450,440 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
     );
   }
 
+  const followUpCount = crmCustomers.filter((record) => record.customer.lifecycle !== 'retention').length;
+  const atRiskCount = crmCustomers.filter((record) => record.customer.lifecycle === 'at-risk').length;
+  const averageScore = crmCustomers.length ? Math.round(crmCustomers.reduce((sum, record) => sum + record.score, 0) / crmCustomers.length) : 0;
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="CRM records" value={snapshot.customers.length} meta="Built from orders, leads, returns, and customer memory." icon={<HeartHandshake className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Revenue under memory" value={currency.format(snapshot.metrics.revenue)} meta="OMS revenue stays visible next to follow-up and lifecycle context." icon={<UserRoundCheck className="size-5" />} tone="info" className="md:col-span-2" />
-        <SummaryMetricCard label="Open follow-up lanes" value={snapshot.customers.filter((customer) => customer.lifecycle !== 'retention').length} meta="These records still need attention, ownership, or service follow-up." icon={<ClipboardList className="size-5" />} tone="purple" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>CRM workbench</CardTitle>
+      {selectedCustomer ? (
+        <Card className="overflow-hidden rounded-lg border">
+          <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
+            <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_170px] xl:items-stretch">
+              <CrmCustomerVisual record={selectedCustomer} className="xl:order-1" />
+              <div className="min-w-0 xl:order-2">
+                <Badge variant="outline">PrimeOS recommends</Badge>
+                <CardTitle className="mt-3 text-2xl">Follow up with {selectedCustomer.customer.name}</CardTitle>
+                <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                  CRM Compact turns buyer memory into one next action: {selectedCustomer.nextFollowUp.toLowerCase()} for {selectedCustomer.segmentLabel.toLowerCase()}, with owner, product route, service context, and demand source attached.
+                </p>
+              </div>
+              <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm xl:order-3">
+                <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Customer fit</div>
+                <div className="mt-1 text-3xl font-semibold">{selectedCustomer.score}%</div>
+                <Badge variant={runtimeStatusVariant(selectedCustomer.customer.lifecycle)} className="mt-2 capitalize">
+                  {selectedCustomer.customer.lifecycle}
+                </Badge>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Record</TableHead>
-                  <TableHead>Lifecycle</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Next follow-up</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {snapshot.customers.map((customer, index) => {
-                  const owner = ['Mika Sato', 'Emi Tan', 'Bao Nguyen', 'Ken Mori'][index % 4];
-                  const nextFollowUp = customer.lifecycle === 'lead'
-                    ? 'Qualify for RFQ'
-                    : customer.lifecycle === 'at-risk'
-                      ? 'Recovery outreach'
-                      : customer.totalOrders > 1
-                        ? 'Repeat offer check'
-                        : 'Lifecycle review';
-
-                  return (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{customer.name}</span>
-                        <span className="text-xs text-muted-foreground">{customer.company} · {customer.segment}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className={statusTone(customer.lifecycle)}>{customer.lifecycle}</TableCell>
-                    <TableCell>{owner}</TableCell>
-                    <TableCell>{nextFollowUp}</TableCell>
-                    <TableCell className="text-right">{currency.format(customer.totalRevenue)}</TableCell>
-                  </TableRow>
-                )})}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Relationship memory</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative space-y-0">
-              {snapshot.customers.slice(0, 4).map((customer, ci) => {
-                const owner = ['Mika Sato', 'Emi Tan', 'Bao Nguyen', 'Ken Mori'][ci % 4];
-                const nextFollowUp = customer.lifecycle === 'lead'
-                  ? 'Qualify for RFQ'
-                  : customer.lifecycle === 'at-risk'
-                    ? 'Recovery outreach'
-                    : customer.totalOrders > 1
-                      ? 'Repeat offer check'
-                      : 'Lifecycle review';
-
-                return (
-                <div key={customer.id} className="relative pb-6 last:pb-0">
-                  {ci < Math.min(snapshot.customers.length, 4) - 1 ? (
-                    <span className="absolute left-5 top-10 -ml-px h-full w-px bg-border" />
-                  ) : null}
-                  <div className="flex gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full border bg-muted/40 text-xs font-semibold">
-                      {customer.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{customer.name}</span>
-                        <Badge variant="outline">{customer.lifecycle}</Badge>
-                        <span className="text-xs text-muted-foreground">{customer.company}</span>
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        {customer.timeline.slice(0, 4).map((entry, ei) => (
-                          <div key={`${customer.id}-t-${ei}`} className="flex items-start gap-2 text-sm">
-                            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
-                            <span className="text-muted-foreground">{entry}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {customer.notes[0] ? (
-                        <p className="mt-2 text-xs text-primary">{customer.notes[0]}</p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{customer.totalOrders} orders</span>
-                        <span>·</span>
-                        <span>{currency.format(customer.totalRevenue)}</span>
-                        <span>·</span>
-                        <span>Owner: {owner}</span>
-                        <span>·</span>
-                        <span>Next: {nextFollowUp}</span>
-                        {customer.b2bAccount ? (
-                          <>
-                            <span>·</span>
-                            <span>B2B: {customer.b2bAccount}</span>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )})}
+          <CardContent className="space-y-4 p-4">
+            <div className="grid gap-3 lg:grid-cols-4">
+              <RuntimeContextCard label="Buyer memory" value={selectedCustomer.customer.company} detail={`${selectedCustomer.customer.totalOrders} orders · ${currency.format(selectedCustomer.customer.totalRevenue)}`} />
+              <RuntimeContextCard label="Next action" value={selectedCustomer.nextFollowUp} detail={`Owner: ${selectedCustomer.owner}`} />
+              <RuntimeContextCard label="Product route" value={getSkuLabel(selectedCustomer.recommendedSku)} detail={selectedCustomer.campaign?.name || selectedCustomer.customer.notes[0] || 'Product interest from CRM.'} />
+              <RuntimeContextCard label="Channel" value={selectedCustomer.channel} detail={selectedCustomer.ticket ? `Service watch: ${selectedCustomer.ticket.subject}` : 'Ready for seller follow-up.'} />
+            </div>
+            <div className="rounded-2xl border bg-muted/20 p-3">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
+              <div className="mt-2 text-sm font-medium">Open the customer profile, confirm the latest timeline, then create the follow-up or hand this customer back into Trends Intelligence.</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setIsCustomerDialogOpen(true)}>
+                Open customer profile
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/intelligence/trends">
+                  Send to Trends Intelligence
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/demand/lead-response-capture">
+                  Create follow-up
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="CRM records" value={crmCustomers.length} meta={`${followUpCount} records need a next touch.`} icon={<HeartHandshake className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Best customer fit" value={`${selectedCustomer?.score ?? 0}%`} meta={selectedCustomer?.customer.name || 'No customer selected'} icon={<Sparkles className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Average fit" value={`${averageScore}%`} meta="Blended lifecycle, revenue, order, and lead context." icon={<TrendingUp className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Risk watch" value={atRiskCount} meta="At-risk memories should trigger recovery, not another dashboard review." icon={<BellRing className="size-5" />} tone="purple" />
+      </div>
+
+      <Card className="rounded-lg border">
+        <CardHeader>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle>Compare customer records</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Pick the buyer memory that needs action now. Profile opens the full customer context, like Creators.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setIsCustomerDialogOpen(true)}>
+              Open recommended customer
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table variant="embedded">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Lifecycle</TableHead>
+                <TableHead>Product route</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead className="text-right">Fit</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {crmCustomers.map((record) => (
+                <TableRow key={record.customer.id} className={selectedCustomer?.customer.id === record.customer.id ? 'bg-primary/5' : ''}>
+                  <TableCell className="font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center gap-3 text-left"
+                      onClick={() => {
+                        setSelectedCustomerId(record.customer.id);
+                        setIsCustomerDialogOpen(true);
+                      }}
+                    >
+                      <CrmCustomerAvatar record={record} />
+                      <div className="flex min-w-0 flex-col">
+                        <span>{record.customer.name}</span>
+                        <span className="text-xs text-muted-foreground">{record.customer.company}</span>
+                      </div>
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={runtimeStatusVariant(record.customer.lifecycle)} className="capitalize">{record.customer.lifecycle}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="font-medium">{getSkuLabel(record.recommendedSku)}</div>
+                      <div className="text-xs text-muted-foreground">{record.segmentLabel}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{record.owner}</TableCell>
+                  <TableCell className="text-right">{record.score}%</TableCell>
+                  <TableCell className="text-right">{currency.format(record.customer.totalRevenue)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCustomerId(record.customer.id);
+                        setIsCustomerDialogOpen(true);
+                      }}
+                    >
+                      Open profile
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {selectedCustomer ? (
+        <CrmCustomerProfileDialog
+          record={selectedCustomer}
+          open={isCustomerDialogOpen}
+          onOpenChange={setIsCustomerDialogOpen}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function getPrimarySkuCodeFromSnapshot(snapshot: PrimeSnapshot, productId?: string) {
+  const campaign = snapshot.campaigns.find((candidate) => candidate.productId === productId);
+  if (campaign?.skuCode) return campaign.skuCode;
+
+  const forecast = snapshot.forecasts.find((candidate) => candidate.productId === productId);
+  return forecast?.skuCode;
+}
+
+function crmCustomerImageUrl(index: number) {
+  const images = [
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80',
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=240&q=80',
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=240&q=80',
+    'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=240&q=80',
+    'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?auto=format&fit=crop&w=240&q=80',
+  ];
+
+  return images[index % images.length];
+}
+
+function CrmCustomerAvatar({
+  record,
+  size = 'sm',
+}: {
+  record: {
+    customer: PrimeSnapshot['customers'][number];
+    imageUrl: string;
+  };
+  size?: 'sm' | 'lg' | 'xl';
+}) {
+  const dimension = size === 'xl' ? 'size-20' : size === 'lg' ? 'size-14' : 'size-8';
+
+  return (
+    <div className={`${dimension} overflow-hidden rounded-full border bg-muted/20 shadow-sm`}>
+      <img src={record.imageUrl} alt={record.customer.name} className="h-full w-full object-cover" />
+    </div>
+  );
+}
+
+function CrmCustomerVisual({
+  record,
+  className = '',
+}: {
+  record: {
+    customer: PrimeSnapshot['customers'][number];
+    product: PrimeSnapshot['products'][number] | null;
+    imageUrl: string;
+    owner: string;
+    nextFollowUp: string;
+    recommendedSku: string;
+  };
+  className?: string;
+}) {
+  const productImage = record.product?.images?.[0];
+  const productLabel = getSkuLabel(record.recommendedSku);
+
+  return (
+    <div className={`${className} relative min-h-[210px] overflow-hidden rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-4 shadow-sm`}>
+      <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-sky-300/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-12 left-8 size-28 rounded-full bg-emerald-300/20 blur-3xl" />
+      <div className="relative flex items-start gap-3">
+        <CrmCustomerAvatar record={record} size="xl" />
+        <div className="min-w-0 pt-1">
+          <Badge variant="secondary" className="rounded-full bg-background/75">
+            Customer memory
+          </Badge>
+          <div className="mt-3 truncate text-lg font-semibold">{record.customer.name}</div>
+          <div className="text-xs text-muted-foreground">{record.owner} owns next touch</div>
+        </div>
+      </div>
+      <div className="relative mt-4 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
+        <div className="flex items-center gap-3 p-3">
+          <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl border bg-muted/30">
+            {productImage ? (
+              <img src={productImage} alt={productLabel} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <ImagePlus className="size-5" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Product route</div>
+            <div className="mt-1 line-clamp-2 text-sm font-semibold">{productLabel}</div>
+          </div>
+        </div>
+      </div>
+      <div className="relative mt-3 rounded-2xl border bg-background/80 p-3 text-xs text-muted-foreground shadow-sm">
+        <span className="font-medium text-foreground">{record.nextFollowUp}</span> from CRM memory.
       </div>
     </div>
+  );
+}
+
+function CrmCustomerProfileDialog({
+  record,
+  open,
+  onOpenChange,
+}: {
+  record: {
+    customer: PrimeSnapshot['customers'][number];
+    product: PrimeSnapshot['products'][number] | null;
+    campaign: PrimeSnapshot['campaigns'][number] | null;
+    lead: PrimeSnapshot['leads'][number] | null;
+    rfq: PrimeSnapshot['rfqs'][number] | null;
+    ticket: PrimeSnapshot['tickets'][number] | null;
+    imageUrl: string;
+    owner: string;
+    nextFollowUp: string;
+    segmentLabel: string;
+    channel: string;
+    recommendedSku: string;
+    score: number;
+  };
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const productImage = record.product?.images?.[0];
+  const productLabel = getSkuLabel(record.recommendedSku);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-hidden rounded-3xl p-0">
+        <DialogHeader className="sticky top-0 z-10 border-b bg-background/95 px-5 py-4 backdrop-blur sm:px-6">
+          <DialogTitle>{record.customer.name}</DialogTitle>
+          <DialogDescription>Customer profile, CRM memory, buyer context, and next-best follow-up guidance.</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[calc(100dvh-8rem)] space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:space-y-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:items-start">
+            <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+              <div className="flex flex-col gap-5">
+                <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
+                  <CrmCustomerAvatar record={record} size="lg" />
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="min-w-0 break-words text-2xl font-semibold sm:text-3xl">{record.customer.name}</h3>
+                      <Badge variant="outline">{record.customer.company}</Badge>
+                      <Badge variant="outline" className="capitalize">{record.customer.lifecycle}</Badge>
+                      <Badge variant="outline">{record.customer.b2bAccount}</Badge>
+                    </div>
+                    <p className="max-w-2xl text-sm text-muted-foreground">
+                      CRM Compact keeps the buyer memory, service history, demand source, and next follow-up together so the seller knows exactly what to do next.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{record.segmentLabel}</Badge>
+                      <Badge variant="outline">Customer fit {record.score}%</Badge>
+                      <Badge variant="outline">Owner {record.owner}</Badge>
+                      <Badge variant="outline">Product {productLabel}</Badge>
+                    </div>
+                    <div className="rounded-2xl border bg-muted/20 p-3 text-sm">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best next action</div>
+                      <div className="mt-2 font-medium">{record.nextFollowUp}</div>
+                      <div className="mt-1 text-muted-foreground">Use {record.channel} and keep the buyer attached to {productLabel.toLowerCase()} before the next Demand or Intelligence handoff.</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid w-full gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
+                  <Button asChild className="w-full whitespace-nowrap sm:w-auto">
+                    <Link to="/demand/lead-response-capture">Create follow-up</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full whitespace-nowrap sm:w-auto">
+                    <Link to="/intelligence/trends">Send to Trends</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Customer snapshot</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="overflow-hidden rounded-2xl border bg-background">
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-muted/30">
+                      {productImage ? (
+                        <img src={productImage} alt={productLabel} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <ImagePlus className="size-5" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Product route</div>
+                      <div className="mt-1 line-clamp-2 text-sm font-semibold">{productLabel}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{record.recommendedSku}</div>
+                    </div>
+                  </div>
+                </div>
+                <RuntimeContextCard label="Revenue" value={currency.format(record.customer.totalRevenue)} detail={`${record.customer.totalOrders} orders in CRM memory`} />
+                <RuntimeContextCard label="Lead / RFQ" value={record.lead?.status || record.rfq?.status || 'No open RFQ'} detail={record.rfq ? `${record.rfq.quantity} units · ${currency.format(record.rfq.value)}` : record.lead?.lastTouch || 'No RFQ attached yet'} />
+                <RuntimeContextCard label="Service" value={record.ticket?.status || 'No open ticket'} detail={record.ticket?.subject || 'No service blocker on this customer.'} />
+              </CardContent>
+            </Card>
+          </div>
+
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList className="h-auto max-w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="route">Demand route</TabsTrigger>
+              <TabsTrigger value="service">Service / RFQ</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <MetricPill label="Customer fit" value={`${record.score}%`} />
+                <MetricPill label="Revenue" value={currency.format(record.customer.totalRevenue)} />
+                <MetricPill label="Orders" value={`${record.customer.totalOrders}`} />
+                <MetricPill label="Lifecycle" value={record.customer.lifecycle} />
+              </div>
+              <Card className="rounded-lg border">
+                <CardHeader>
+                  <CardTitle className="text-base">Customer memory</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-3">
+                  <RuntimeContextCard label="Company" value={record.customer.company} detail={record.customer.email} />
+                  <RuntimeContextCard label="Segment" value={record.segmentLabel} detail={record.customer.b2bAccount} />
+                  <RuntimeContextCard label="Owner" value={record.owner} detail={record.nextFollowUp} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="timeline" className="space-y-3">
+              <Card className="rounded-lg border">
+                <CardHeader>
+                  <CardTitle className="text-base">Relationship timeline</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {record.customer.timeline.slice(0, 6).map((entry, index) => (
+                    <div key={`${record.customer.id}-timeline-${entry}`} className="flex items-start gap-3 rounded-2xl border bg-muted/20 p-3">
+                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold">{index + 1}</div>
+                      <div className="text-sm text-muted-foreground">{entry}</div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="route" className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-3">
+                <RuntimeContextCard label="Channel" value={record.channel} detail={record.campaign?.name || 'CRM-owned follow-up route'} />
+                <RuntimeContextCard label="Product" value={productLabel} detail={record.recommendedSku} />
+                <RuntimeContextCard label="Next action" value={record.nextFollowUp} detail={`Owner: ${record.owner}`} />
+              </div>
+              <Card className="rounded-lg border">
+                <CardHeader>
+                  <CardTitle className="text-base">Recommended message</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm leading-6 text-muted-foreground">
+                  Start from the latest CRM memory, reference {productLabel.toLowerCase()}, then ask whether {record.customer.company} wants replenishment, RFQ support, or a service recovery follow-up.
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="service" className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <Card className="rounded-lg border">
+                  <CardHeader>
+                    <CardTitle className="text-base">RFQ / lead context</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <RuntimeContextCard label="Lead status" value={record.lead?.status || 'No lead'} detail={record.lead?.source || 'No lead source attached'} />
+                    <RuntimeContextCard label="RFQ" value={record.rfq?.status || 'No RFQ'} detail={record.rfq ? `${record.rfq.quantity} units · ${currency.format(record.rfq.value)}` : 'Create RFQ from Demand if buyer replies.'} />
+                  </CardContent>
+                </Card>
+                <Card className="rounded-lg border">
+                  <CardHeader>
+                    <CardTitle className="text-base">Service memory</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <RuntimeContextCard label="Ticket" value={record.ticket?.status || 'Clear'} detail={record.ticket?.subject || 'No service blocker.'} />
+                    <RuntimeContextCard label="SLA" value={record.ticket?.sla || 'Normal'} detail={record.ticket?.priority || 'No priority escalation.'} />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -3610,6 +3974,189 @@ function matchFinanceRecordByKeyword<T>(
   ) ?? null;
 }
 
+function financePercent(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function FinanceScoreRing({
+  value,
+  label,
+  caption,
+  tone = 'primary',
+}: {
+  value: number;
+  label: string;
+  caption: string;
+  tone?: 'primary' | 'success' | 'warning' | 'danger';
+}) {
+  const score = financePercent(value);
+  const stroke = {
+    primary: 'hsl(var(--primary))',
+    success: 'hsl(var(--chart-2))',
+    warning: 'hsl(var(--chart-4))',
+    danger: 'hsl(var(--destructive))',
+  }[tone];
+  const circumference = 2 * Math.PI * 44;
+  const dash = (score / 100) * circumference;
+
+  return (
+    <div className="rounded-3xl border bg-background/80 p-4 shadow-sm">
+      <div className="flex items-center gap-4">
+        <div className="relative size-28 shrink-0">
+          <svg viewBox="0 0 112 112" className="size-28 -rotate-90">
+            <circle cx="56" cy="56" r="44" fill="none" stroke="hsl(var(--muted))" strokeWidth="12" />
+            <circle
+              cx="56"
+              cy="56"
+              r="44"
+              fill="none"
+              stroke={stroke}
+              strokeDasharray={`${dash} ${circumference - dash}`}
+              strokeLinecap="round"
+              strokeWidth="12"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold">{score}%</div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{caption}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FinanceBarStack({
+  title,
+  subtitle,
+  items,
+}: {
+  title: string;
+  subtitle: string;
+  items: Array<{ label: string; value: number; detail: string; tone?: 'primary' | 'success' | 'warning' | 'danger' }>;
+}) {
+  const toneClass = {
+    primary: 'bg-primary',
+    success: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    danger: 'bg-rose-500',
+  };
+
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader className="pb-3">
+        <CardTitle>{title}</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {items.map((item) => (
+          <div key={item.label} className="space-y-2">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium">{item.label}</span>
+              <span className="font-semibold">{financePercent(item.value)}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-muted">
+              <div className={`h-full rounded-full ${toneClass[item.tone ?? 'primary']}`} style={{ width: `${financePercent(item.value)}%` }} />
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">{item.detail}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function FinanceMiniFlow({
+  title,
+  steps,
+}: {
+  title: string;
+  steps: Array<{ label: string; value: string; icon?: ReactNode }>;
+}) {
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader className="pb-3">
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-4">
+          {steps.map((step, index) => (
+            <div key={`${step.label}-${index}`} className="rounded-3xl border bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex size-10 items-center justify-center rounded-2xl border bg-background text-primary">
+                  {step.icon ?? <CircleDollarSign className="size-5" />}
+                </div>
+                <Badge variant="outline" className="rounded-full">{index + 1}</Badge>
+              </div>
+              <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{step.label}</div>
+              <div className="mt-2 text-sm font-semibold leading-6">{step.value}</div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FinanceRouteSelector<T extends { id: string }>({
+  title,
+  description,
+  rows,
+  selectedId,
+  onSelect,
+  getTitle,
+  getMeta,
+  getScore,
+  getStatus,
+}: {
+  title: string;
+  description: string;
+  rows: T[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  getTitle: (row: T) => string;
+  getMeta: (row: T) => string;
+  getScore: (row: T) => number;
+  getStatus: (row: T) => string;
+}) {
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader className="pb-3">
+        <CardTitle>{title}</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-2">
+        {rows.slice(0, 4).map((row) => {
+          const isSelected = row.id === selectedId;
+          const score = financePercent(getScore(row));
+          return (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => onSelect(row.id)}
+              className={`rounded-3xl border p-4 text-left transition hover:border-primary/40 ${isSelected ? 'bg-primary/10 ring-1 ring-primary/40' : 'bg-background'}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="line-clamp-1 font-semibold">{getTitle(row)}</div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{getMeta(row)}</p>
+                </div>
+                <Badge variant={isSelected ? 'default' : 'outline'} className="shrink-0 capitalize">{humanizeIntelligenceValue(getStatus(row))}</Badge>
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                <Progress value={score} className="h-2" />
+                <span className="w-10 text-right text-sm font-semibold">{score}%</span>
+              </div>
+            </button>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompactCapitalReadinessRuntimePanel({
   data,
   isLoading,
@@ -3672,131 +4219,71 @@ function CompactCapitalReadinessRuntimePanel({
   const matchingForecast = findForecastBySku(snapshot, selectedRow.linkedSku);
   const relatedRisk = matchRiskRecordByKeyword(data?.riskTrust ?? [], selectedRow.market);
 
+  const inventoryScore = matchingForecast
+    ? financePercent(100 - Math.max(0, ((matchingForecast.demand7d - matchingForecast.ats) / Math.max(matchingForecast.demand7d, 1)) * 100))
+    : 45;
+  const demandScore = matchingCampaign ? financePercent(58 + matchingCampaign.orders * 4 + matchingCampaign.rfqs * 2) : 42;
+  const crmScore = financePercent(Math.min(95, snapshot.metrics.leadToOrderRate + 52));
+  const trustScore = relatedRisk?.trustScore ?? 68;
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="Capital programs" value={readinessRows.length} meta="Finance runtime reads only the readiness routes prepared in admin." icon={<CircleDollarSign className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Ready to fund" value={readyCount} meta="These rows already look strong enough to move into concrete offers." icon={<Sparkles className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Funding need" value={formatFinanceCurrency(totalFundingNeed)} meta="PrimeOS keeps the amount tied to a real launch instead of a generic loan request." icon={<TrendingUp className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Average readiness" value={`${averageReadiness}%`} meta={`${topRow.programName} is the strongest current finance route.`} icon={<Gauge className="size-5" />} tone="purple" />
+      <Card className="overflow-hidden rounded-lg border">
+        <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
+          <div className="rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-emerald-500/10 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">PrimeOS recommends</Badge>
+              <Badge variant={selectedRow.readinessScore >= 80 ? 'default' : 'outline'} className="capitalize">{humanizeIntelligenceValue(selectedRow.status)}</Badge>
+            </div>
+            <h2 className="mt-5 text-3xl font-bold tracking-tight">Fund readiness: {selectedRow.programName}</h2>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">{selectedRow.readinessReason || 'This route has enough operating proof to move into offer review.'}</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <RuntimeContextCard label="Funding need" value={formatFinanceCurrency(selectedRow.fundingNeed)} detail={`Owner: ${selectedRow.owner}`} />
+              <RuntimeContextCard label="Launch route" value={selectedRow.linkedLaunch || 'Pending'} detail={runtimeSkuLabel(selectedRow.linkedSku)} />
+              <RuntimeContextCard label="Next review" value={formatFinanceDate(selectedRow.nextReview)} detail="Finance checkpoint before offer pricing." />
+            </div>
+          </div>
+          <FinanceScoreRing value={selectedRow.readinessScore} label="Capital readiness" caption="One score from launch proof, demand signal, inventory guardrail, and trust posture." tone={selectedRow.readinessScore >= 80 ? 'success' : 'warning'} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <FinanceRouteSelector<CapitalReadinessRecord>
+          title="Routes to finance"
+          description="Pick the launch route. The chart updates to show whether money should scale it now."
+          rows={readinessRows}
+          selectedId={selectedRow.id}
+          onSelect={setSelectedRowId}
+          getTitle={(row) => row.programName}
+          getMeta={(row) => `${row.market} · ${formatFinanceCurrency(row.fundingNeed)} · ${row.linkedLaunch || 'Launch pending'}`}
+          getScore={(row) => row.readinessScore}
+          getStatus={(row) => row.status}
+        />
+        <FinanceBarStack
+          title="Funding proof chart"
+          subtitle="Simple enough for the seller: green means finance can trust the route, amber means fix before scaling."
+          items={[
+            { label: 'Demand proof', value: demandScore, detail: matchingCampaign ? `${matchingCampaign.leads} leads, ${matchingCampaign.rfqs} RFQs, ${matchingCampaign.orders} orders attached.` : 'Demand proof still needs Campaign Ops data.', tone: 'success' },
+            { label: 'Inventory guardrail', value: inventoryScore, detail: matchingForecast ? `${matchingForecast.ats} ATS vs ${matchingForecast.demand7d} forecast demand.` : 'No inventory forecast is attached yet.', tone: inventoryScore < 55 ? 'warning' : 'success' },
+            { label: 'CRM repayment quality', value: crmScore, detail: `${currency.format(snapshot.metrics.revenue)} revenue and ${snapshot.metrics.leadToOrderRate}% lead-to-order context.`, tone: 'primary' },
+            { label: 'Risk trust', value: trustScore, detail: relatedRisk?.topRisk || 'Risk lane still needs clearer lender-facing proof.', tone: trustScore < 75 ? 'warning' : 'success' },
+          ]}
+        />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Capital readiness roster</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">A compact runtime readout of launch routes that finance could credibly back.</p>
-              </div>
-              <Badge variant="outline">Admin-managed source</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Program</TableHead>
-                  <TableHead>Market</TableHead>
-                  <TableHead>Linked launch</TableHead>
-                  <TableHead className="text-right">Need</TableHead>
-                  <TableHead className="text-right">Readiness</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {readinessRows.slice(0, 6).map((row) => (
-                  <TableRow key={row.id} className={selectedRow.id === row.id ? 'bg-primary/5' : ''}>
-                    <TableCell className="font-medium">
-                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedRowId(row.id)}>
-                        <span>{row.programName}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(row.status)}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell>{row.market}</TableCell>
-                    <TableCell>{row.linkedLaunch || 'Launch route pending'}</TableCell>
-                    <TableCell className="text-right">{formatFinanceCurrency(row.fundingNeed)}</TableCell>
-                    <TableCell className="text-right">{row.readinessScore}%</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <FinanceMiniFlow
+        title="Why this can move"
+        steps={[
+          { label: 'Intelligence', value: selectedRow.linkedLaunch || 'Approved launch route', icon: <Sparkles className="size-5" /> },
+          { label: 'Demand', value: matchingCampaign ? `${matchingCampaign.name} is producing buyer proof` : 'Demand proof pending', icon: <Megaphone className="size-5" /> },
+          { label: 'Finance', value: `${formatFinanceCurrency(totalFundingNeed)} total need across ${readinessRows.length} routes`, icon: <CircleDollarSign className="size-5" /> },
+          { label: 'Next', value: readyCount > 0 ? 'Price the cleanest offer' : 'Clear the biggest blocker first', icon: <ArrowRight className="size-5" /> },
+        ]}
+      />
 
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Prime finance thesis</CardTitle>
-            <p className="text-sm text-muted-foreground">PrimeOS keeps finance simple here: why this route is fundable, which systems support it, and what should happen next.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended readiness lane</div>
-              <div className="mt-2 text-lg font-semibold">{selectedRow.programName}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {selectedRow.linkedLaunch || 'Launch route pending'} · {selectedRow.market}
-              </div>
-              <p className="mt-3 text-sm font-medium">{selectedRow.readinessReason || 'This row already has enough operating proof to move into offer review.'}</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <RuntimeContextCard
-                label="Launch decision"
-                value={selectedRow.linkedLaunch || 'Launch link missing'}
-                detail="Finance only becomes useful when the capital need is tied to a real launch rather than a vague business goal."
-              />
-              <RuntimeContextCard
-                label="Funding need"
-                value={formatFinanceCurrency(selectedRow.fundingNeed)}
-                detail={`Next review ${formatFinanceDate(selectedRow.nextReview)} with ${selectedRow.owner}.`}
-              />
-              <RuntimeContextCard
-                label="Demand proof"
-                value={matchingCampaign ? `${matchingCampaign.leads} leads / ${matchingCampaign.orders} orders` : 'Demand proof still light'}
-                detail={
-                  matchingCampaign
-                    ? `${matchingCampaign.name} already shows response against ${runtimeSkuName(selectedRow.linkedSku).toLowerCase()}, so the capital ask is grounded in market activity.`
-                    : 'Campaign Ops has not attached enough commercial proof to this route yet.'
-                }
-              />
-              <RuntimeContextCard
-                label="Ecom / COS"
-                value={matchingForecast ? `${matchingForecast.ats} ATS / ${matchingForecast.demand7d} 7d demand` : runtimeSkuLabel(selectedRow.linkedSku)}
-                detail={
-                  matchingForecast
-                    ? matchingForecast.risk === 'high'
-                      ? 'Inventory is still the key guardrail before this route should absorb more capital.'
-                      : 'Stock and projected demand are aligned enough for finance to take this route seriously.'
-                    : 'Inventory proof has not been attached yet.'
-                }
-              />
-              <RuntimeContextCard
-                label="CRM + Customer"
-                value={`${snapshot.customers.length} customer profiles`}
-                detail={`${currency.format(snapshot.customers.reduce((sum, customer) => sum + customer.totalRevenue, 0))} in CRM revenue gives finance a retention and repayment quality read, not just a one-time launch view.`}
-              />
-              <RuntimeContextCard
-                label="Risk & trust"
-                value={relatedRisk ? `${relatedRisk.trustScore}% trust score` : 'Risk review pending'}
-                detail={relatedRisk?.topRisk || 'PrimeOS still needs a clearer risk lane before this route should scale.'}
-              />
-            </div>
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
-              <div className="mt-2 text-sm font-medium">
-                {readyCount > 0
-                  ? `${readyCount} capital routes are strong enough to move into Capital Offers, and ${selectedRow.programName} is the clearest one to price now.`
-                  : `${topRow.programName} is the strongest finance route, but it still needs more proof before a clean offer can be shown.`}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
-                <Link to="/finance/capital-offers">Open Capital Offers</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/intelligence/launch-decisions">Open Launch Decisions</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild><Link to="/finance/capital-offers">Open Capital Offers</Link></Button>
+        <Button asChild variant="outline"><Link to="/finance/risk-trust">Open Risk &amp; Trust</Link></Button>
       </div>
     </div>
   );
@@ -3825,6 +4312,8 @@ function CompactCapitalOffersRuntimePanel({
   );
   const topOffer = offers[0] ?? null;
   const [selectedOfferId, setSelectedOfferId] = useState('');
+  const [fundingRequest, setFundingRequest] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!topOffer) {
@@ -3857,7 +4346,6 @@ function CompactCapitalOffersRuntimePanel({
   }
 
   const selectedOffer = offers.find((offer) => offer.id === selectedOfferId) ?? topOffer;
-  const activeOffers = offers.filter((offer) => offer.status === 'active').length;
   const totalOfferAmount = offers.reduce((sum, offer) => sum + (offer.amount ?? 0), 0);
   const averageFeeRate = offers.length
     ? (offers.reduce((sum, offer) => sum + (offer.feeRate ?? 0), 0) / offers.length).toFixed(1)
@@ -3870,119 +4358,98 @@ function CompactCapitalOffersRuntimePanel({
       || normalizeRuntimeText(facility.market) === normalizeRuntimeText(selectedOffer.market)
   ) ?? null;
 
+  const maxOffer = Math.max(1, ...offers.map((offer) => offer.amount ?? 0));
+  const offerFit = relatedReadiness?.readinessScore ?? (selectedOffer.status === 'active' ? 82 : 68);
+  const canRequestFunding = offerFit >= 80 && selectedOffer.status === 'active';
+  const createFundingRequest = () => {
+    const nextRequest = canRequestFunding
+      ? `Funding request prepared for ${formatFinanceCurrency(selectedOffer.amount)} from ${selectedOffer.providerName}. Use of funds: scale ${selectedOffer.linkedLaunch || 'the approved launch route'} while repayment runs through ${humanizeIntelligenceValue(selectedOffer.repaymentModel)}.`
+      : `Eligibility prep created before funding request. Clear ${relatedRisk?.topRisk || 'the main trust blocker'} and confirm repayment route before applying for ${selectedOffer.offerName}.`;
+    setFundingRequest(nextRequest);
+    toast({
+      title: canRequestFunding ? 'Funding request prepared' : 'Eligibility prep created',
+      description: canRequestFunding ? 'Local mock request is ready for seller review.' : 'PrimeOS created the steps needed before asking for capital.',
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="Active offers" value={activeOffers} meta="PrimeOS only shows priced routes that admin has already curated." icon={<ClipboardList className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Offer capacity" value={formatFinanceCurrency(totalOfferAmount)} meta="The amount stays tied to concrete launch routes and repayment logic." icon={<CircleDollarSign className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Average fee rate" value={`${averageFeeRate}%`} meta="Sellers can understand the cost of scale without opening an admin tool." icon={<TrendingUp className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Split-settlement lanes" value={splitSettlementOffers} meta="PrimeOS highlights offers that can repay directly from commerce flows." icon={<HeartHandshake className="size-5" />} tone="purple" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Capital offers roster</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">A runtime view of which funding packages are actually on the table.</p>
-              </div>
-              <Badge variant="outline">Admin-managed source</Badge>
+      <Card className="overflow-hidden rounded-lg border">
+        <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
+          <div className="rounded-3xl border bg-gradient-to-br from-emerald-500/10 via-background to-primary/10 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">PrimeOS recommends</Badge>
+              <Badge variant={selectedOffer.status === 'active' ? 'default' : 'outline'} className="capitalize">{humanizeIntelligenceValue(selectedOffer.status)}</Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Offer</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Repayment</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {offers.slice(0, 6).map((offer) => (
-                  <TableRow key={offer.id} className={selectedOffer.id === offer.id ? 'bg-primary/5' : ''}>
-                    <TableCell className="font-medium">
-                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedOfferId(offer.id)}>
-                        <span>{offer.offerName}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(offer.status)}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell>{offer.providerName}</TableCell>
-                    <TableCell>{humanizeIntelligenceValue(offer.capitalType)}</TableCell>
-                    <TableCell className="text-right">{formatFinanceCurrency(offer.amount)}</TableCell>
-                    <TableCell>{humanizeIntelligenceValue(offer.repaymentModel)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Prime offer strip</CardTitle>
-            <p className="text-sm text-muted-foreground">PrimeOS shows the financing option in plain operating terms: what it funds, who provides it, what it costs, and how repayment will work.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended offer</div>
-              <div className="mt-2 text-lg font-semibold">{selectedOffer.offerName}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {selectedOffer.providerName} · {humanizeIntelligenceValue(selectedOffer.capitalType)}
-              </div>
+            <h2 className="mt-5 text-3xl font-bold tracking-tight">{canRequestFunding ? 'Eligible for capital' : 'Prepare before capital'}: {selectedOffer.offerName}</h2>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
+              PrimeOS analyzes sales momentum, launch proof, repayment clarity, and trust before recommending whether the seller should request funding.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <RuntimeContextCard label="Amount" value={formatFinanceCurrency(selectedOffer.amount)} detail={`${selectedOffer.termDays ?? 0} day term`} />
+              <RuntimeContextCard label="Fee" value={`${selectedOffer.feeRate ?? 0}%`} detail={`${averageFeeRate}% average across offers`} />
+              <RuntimeContextCard label="Repayment" value={humanizeIntelligenceValue(selectedOffer.repaymentModel)} detail={`${splitSettlementOffers} split-settlement lanes`} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <RuntimeContextCard
-                label="Amount"
-                value={formatFinanceCurrency(selectedOffer.amount)}
-                detail={`${selectedOffer.termDays ?? 0} day term with ${selectedOffer.feeRate ?? 0}% fee rate.`}
-              />
-              <RuntimeContextCard
-                label="Repayment"
-                value={humanizeIntelligenceValue(selectedOffer.repaymentModel)}
-                detail={relatedSettlement ? `${relatedSettlement.facilityName} already shows how this collection path will look after funding.` : 'Settlement configuration is still being attached in admin.'}
-              />
-              <RuntimeContextCard
-                label="Linked launch"
-                value={selectedOffer.linkedLaunch || 'Launch route pending'}
-                detail="Offers stay grounded in a launch plan so finance feels like an operating tool, not a generic banking form."
-              />
-              <RuntimeContextCard
-                label="Capital readiness"
-                value={relatedReadiness ? `${relatedReadiness.readinessScore}% readiness` : 'Readiness lane pending'}
-                detail={relatedReadiness?.readinessReason || 'PrimeOS still needs a stronger readiness thesis before this offer should be pushed harder.'}
-              />
-              <RuntimeContextCard
-                label="Risk & trust"
-                value={relatedRisk ? `${relatedRisk.trustScore}% trust score` : 'Risk review pending'}
-                detail={relatedRisk?.topRisk || 'No risk lane is attached yet, so PrimeOS cannot fully explain the downside on this offer.'}
-              />
-              <RuntimeContextCard
-                label="Commerce proof"
-                value={`${currency.format(snapshot.metrics.revenue)} revenue`}
-                detail={`${snapshot.metrics.leadToOrderRate}% lead-to-order and ${currency.format(snapshot.metrics.opportunityValue)} of open opportunity help explain why this financing path exists now.`}
-              />
-            </div>
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
-              <div className="mt-2 text-sm font-medium">
-                PrimeOS should move this offer into settlement review only after the team agrees the repayment path is realistic for the launch it is funding.
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
-                <Link to="/finance/settlement-repayment">Open Settlement &amp; Repayment</Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button onClick={createFundingRequest}>
+                {canRequestFunding ? 'Request funding' : 'Prepare eligibility'}
+                <ArrowRight className="size-4" />
               </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/finance/risk-trust">Open Risk &amp; Trust</Link>
+              <Button asChild variant="outline">
+                <Link to="/finance/health">Check Finance Health</Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <FinanceScoreRing value={offerFit} label="Offer fit" caption="Fit is based on readiness proof, repayment route, fee, and trust lane." tone={offerFit >= 80 ? 'success' : 'warning'} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <FinanceRouteSelector<CapitalOffersRecord>
+          title="Offers to compare"
+          description="Pick one package. Amount and repayment logic should stay understandable at a glance."
+          rows={offers}
+          selectedId={selectedOffer.id}
+          onSelect={setSelectedOfferId}
+          getTitle={(offer) => offer.offerName}
+          getMeta={(offer) => `${offer.providerName} · ${formatFinanceCurrency(offer.amount)} · ${humanizeIntelligenceValue(offer.repaymentModel)}`}
+          getScore={(offer) => Math.round(((offer.amount ?? 0) / maxOffer) * 100)}
+          getStatus={(offer) => offer.status}
+        />
+        <FinanceBarStack
+          title="Offer economics chart"
+          subtitle="The seller should see the tradeoff: money received, cost, repayment clarity, and trust."
+          items={[
+            { label: 'Funding size', value: Math.round(((selectedOffer.amount ?? 0) / maxOffer) * 100), detail: `${formatFinanceCurrency(totalOfferAmount)} total available across ${offers.length} offers.`, tone: 'success' },
+            { label: 'Fee comfort', value: financePercent(100 - (selectedOffer.feeRate ?? 0) * 12), detail: `${selectedOffer.feeRate ?? 0}% fee rate over ${selectedOffer.termDays ?? 0} days.`, tone: (selectedOffer.feeRate ?? 0) > 3 ? 'warning' : 'success' },
+            { label: 'Repayment clarity', value: relatedSettlement ? 88 : 58, detail: relatedSettlement ? `${relatedSettlement.facilityName} shows the collection path.` : 'Settlement route is not fully linked yet.', tone: relatedSettlement ? 'success' : 'warning' },
+            { label: 'Trust posture', value: relatedRisk?.trustScore ?? 70, detail: relatedRisk?.topRisk || 'Risk lane pending.', tone: (relatedRisk?.trustScore ?? 70) < 75 ? 'warning' : 'success' },
+          ]}
+        />
       </div>
+
+      <Dialog open={Boolean(fundingRequest)} onOpenChange={(open) => !open && setFundingRequest(null)}>
+        <DialogContent className="max-w-2xl rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{canRequestFunding ? 'Funding request draft' : 'Eligibility prep plan'}</DialogTitle>
+            <DialogDescription>
+              PrimeOS creates a local seller-ready action. Nothing is sent externally until the seller approves it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-3">
+            <RuntimeContextCard label="Offer" value={formatFinanceCurrency(selectedOffer.amount)} detail={selectedOffer.providerName} />
+            <RuntimeContextCard label="Repayment" value={humanizeIntelligenceValue(selectedOffer.repaymentModel)} detail={relatedSettlement?.facilityName || 'Settlement route pending'} />
+            <RuntimeContextCard label="Readiness" value={`${offerFit}%`} detail={canRequestFunding ? 'Eligible now' : 'Needs prep first'} />
+          </div>
+          <div className="rounded-2xl border bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
+            {fundingRequest}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setFundingRequest(null)}>Close</Button>
+            <Button>{canRequestFunding ? 'Keep funding request' : 'Keep prep plan'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -4010,6 +4477,8 @@ function CompactRiskTrustRuntimePanel({
   );
   const topRisk = riskRows[0] ?? null;
   const [selectedRiskId, setSelectedRiskId] = useState('');
+  const [avoidancePlan, setAvoidancePlan] = useState<string[] | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!topRisk) {
@@ -4025,7 +4494,7 @@ function CompactRiskTrustRuntimePanel({
   }, [riskRows, selectedRiskId, topRisk]);
 
   if (isLoading) {
-    return <IntelligenceRuntimeLoadingState label="risk and trust" />;
+    return <IntelligenceRuntimeLoadingState label="risk and eligibility" />;
   }
 
   if (error) {
@@ -4036,7 +4505,7 @@ function CompactRiskTrustRuntimePanel({
     return (
       <IntelligenceRuntimeEmptyState
         title="No risk lanes are available yet"
-        description="Admin has not published any risk and trust rows into the finance control plane."
+        description="Admin has not published any risk and eligibility rows into the finance control plane."
       />
     );
   }
@@ -4065,117 +4534,104 @@ function CompactRiskTrustRuntimePanel({
   ]);
   const openServiceCases = snapshot.tickets.filter((ticket) => ticket.status !== 'resolved').length;
 
+  const riskScore = 100 - selectedRisk.trustScore;
+  const severityScore = selectedRisk.severity === 'high' ? 92 : selectedRisk.severity === 'medium' ? 62 : 32;
+  const createAvoidancePlan = () => {
+    const plan = [
+      `Do not request more capital until ${selectedRisk.recommendedFix || 'the main eligibility blocker is cleared'}.`,
+      relatedSettlement
+        ? `Do not increase paid demand while ${formatFinanceCurrency(relatedSettlement.outstandingBalance)} remains exposed in ${relatedSettlement.facilityName}.`
+        : 'Do not scale paid demand until repayment exposure is attached to a clear collection lane.',
+      `Do not hide the risk: keep "${selectedRisk.topRisk || 'finance blocker'}" visible to the seller and owner ${selectedRisk.owner}.`,
+    ];
+    setAvoidancePlan(plan);
+    toast({
+      title: 'Eligibility guardrails created',
+      description: 'PrimeOS listed what the seller should avoid before requesting more capital.',
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="Average trust" value={`${averageTrust}%`} meta="PrimeOS makes the finance trust posture visible without exposing admin CRUD." icon={<HeartHandshake className="size-5" />} tone="success" />
-        <SummaryMetricCard label="High-severity lanes" value={highSeverityCount} meta="These are the finance routes most likely to make a lender pause." icon={<Gauge className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Fixes in motion" value={activeFixes} meta="Risk only helps if the team can see what needs to change next." icon={<ClipboardList className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Service pressure" value={openServiceCases} meta="Customer recovery quality still influences whether finance feels safe to scale." icon={<BellRing className="size-5" />} tone="purple" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Risk &amp; trust roster</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">A simple seller-facing view of what finance still trusts and what would block scale.</p>
-              </div>
-              <Badge variant="outline">Admin-managed source</Badge>
+      <Card className="overflow-hidden rounded-lg border">
+        <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
+          <div className="rounded-3xl border bg-gradient-to-br from-amber-500/10 via-background to-rose-500/10 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">Watch first</Badge>
+              <Badge variant={selectedRisk.severity === 'high' ? 'destructive' : 'outline'} className="capitalize">{humanizeIntelligenceValue(selectedRisk.severity)}</Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Profile</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead className="text-right">Trust</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Owner</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {riskRows.slice(0, 6).map((row) => (
-                  <TableRow key={row.id} className={selectedRisk.id === row.id ? 'bg-primary/5' : ''}>
-                    <TableCell className="font-medium">
-                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedRiskId(row.id)}>
-                        <span>{row.profileName}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{humanizeIntelligenceValue(row.status)}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell>{row.signalSource || 'Finance source pending'}</TableCell>
-                    <TableCell className="text-right">{row.trustScore}%</TableCell>
-                    <TableCell className="capitalize">{humanizeIntelligenceValue(row.severity)}</TableCell>
-                    <TableCell>{row.owner}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Prime trust strip</CardTitle>
-            <p className="text-sm text-muted-foreground">PrimeOS turns finance risk into plain language: what could break, why it matters, and which team should clear it.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Top finance concern</div>
-              <div className="mt-2 text-lg font-semibold">{selectedRisk.profileName}</div>
-              <div className="mt-1 text-sm text-muted-foreground">{selectedRisk.signalSource || 'Signal source pending'} · {humanizeIntelligenceValue(selectedRisk.severity)} severity</div>
+            <h2 className="mt-5 text-3xl font-bold tracking-tight">Eligibility blocker: {selectedRisk.profileName}</h2>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">This tab explains what could make the seller ineligible for capital, what to avoid, and which fix unlocks the next offer.</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <RuntimeContextCard label="Fix owner" value={selectedRisk.owner} detail={selectedRisk.recommendedFix || 'Fix task pending.'} />
+              <RuntimeContextCard label="Signal source" value={selectedRisk.signalSource || 'Pending'} detail="Where the concern came from." />
+              <RuntimeContextCard label="Service pressure" value={`${openServiceCases} open`} detail={`${snapshot.returnsCount} returns also affect trust.`} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <RuntimeContextCard
-                label="Trust score"
-                value={`${selectedRisk.trustScore}%`}
-                detail={selectedRisk.topRisk || 'The main lender-facing risk has not been written yet.'}
-              />
-              <RuntimeContextCard
-                label="Recommended fix"
-                value={selectedRisk.owner}
-                detail={selectedRisk.recommendedFix || 'Admin still needs to attach the clearest fix for this risk lane.'}
-              />
-              <RuntimeContextCard
-                label="Capital readiness"
-                value={relatedReadiness ? `${relatedReadiness.readinessScore}% readiness` : 'Readiness route pending'}
-                detail={relatedReadiness?.linkedLaunch || 'Once readiness is linked, the seller can see which launch this risk is blocking.'}
-              />
-              <RuntimeContextCard
-                label="Capital offers"
-                value={relatedOffer ? relatedOffer.offerName : 'Offer route pending'}
-                detail={relatedOffer ? `${formatFinanceCurrency(relatedOffer.amount)} at ${relatedOffer.feeRate ?? 0}% fee could move once this risk clears.` : 'No concrete offer is tied to this risk lane yet.'}
-              />
-              <RuntimeContextCard
-                label="Settlement"
-                value={relatedSettlement ? relatedSettlement.collectionMode || relatedSettlement.facilityName : 'Collection route pending'}
-                detail={relatedSettlement ? `${formatFinanceCurrency(relatedSettlement.outstandingBalance)} is already exposed to this repayment path.` : 'No facility has been linked to this risk lane yet.'}
-              />
-              <RuntimeContextCard
-                label="Customer + Service"
-                value={`${openServiceCases} open service cases`}
-                detail={`${snapshot.returnsCount} returns and ${openServiceCases} unresolved cases still shape how safe this business looks to finance.`}
-              />
-            </div>
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
-              <div className="mt-2 text-sm font-medium">
-                PrimeOS should push the seller back to the fix, not straight to funding, whenever the trust lane still has a high-severity blocker attached.
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
-                <Link to="/finance/capital-readiness">Open Capital Readiness</Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button onClick={createAvoidancePlan}>
+                Recommend what to avoid
+                <ArrowRight className="size-4" />
               </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/finance/settlement-repayment">Open Settlement &amp; Repayment</Link>
+              <Button asChild variant="outline">
+                <Link to="/finance/capital-offers">Recheck offers</Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <FinanceScoreRing value={selectedRisk.trustScore} label="Eligibility score" caption="If eligibility is low, Finance should route the seller to fixes before more capital." tone={selectedRisk.trustScore >= 80 ? 'success' : selectedRisk.trustScore >= 70 ? 'warning' : 'danger'} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <FinanceRouteSelector<RiskTrustRecord>
+          title="Risk lanes"
+          description="Pick a lane to see what blocks funding and who must clear it."
+          rows={riskRows}
+          selectedId={selectedRisk.id}
+          onSelect={setSelectedRiskId}
+          getTitle={(row) => row.profileName}
+          getMeta={(row) => `${row.signalSource || 'Source pending'} · ${row.owner}`}
+          getScore={(row) => row.trustScore}
+          getStatus={(row) => row.severity}
+        />
+        <FinanceBarStack
+          title="Risk pressure chart"
+          subtitle="The point is not a scary score. It is knowing exactly which blocker to clear."
+          items={[
+            { label: 'Risk pressure', value: riskScore, detail: selectedRisk.topRisk || 'Top risk is not attached yet.', tone: riskScore > 35 ? 'danger' : 'success' },
+            { label: 'Severity', value: severityScore, detail: `${highSeverityCount} high-severity lane(s) in Finance.`, tone: selectedRisk.severity === 'high' ? 'danger' : 'warning' },
+            { label: 'Fix readiness', value: selectedRisk.recommendedFix ? 82 : 35, detail: selectedRisk.recommendedFix || 'Recommended fix still missing.', tone: selectedRisk.recommendedFix ? 'success' : 'warning' },
+            { label: 'Operating proof', value: averageTrust, detail: `${averageTrust}% average trust across ${riskRows.length} lanes; ${activeFixes} fixes in motion.`, tone: averageTrust >= 80 ? 'success' : 'warning' },
+          ]}
+        />
       </div>
+
+      <Dialog open={Boolean(avoidancePlan)} onOpenChange={(open) => !open && setAvoidancePlan(null)}>
+        <DialogContent className="max-w-3xl rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>What to avoid before funding</DialogTitle>
+            <DialogDescription>
+              These are simple guardrails Finance should keep visible before the seller asks for more capital.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-3">
+            <RuntimeContextCard label="Main blocker" value={selectedRisk.topRisk || 'Risk pending'} detail={selectedRisk.profileName} />
+            <RuntimeContextCard label="Fix owner" value={selectedRisk.owner} detail={selectedRisk.recommendedFix || 'Fix task pending'} />
+            <RuntimeContextCard label="Unlocks" value={relatedOffer?.offerName || relatedReadiness?.linkedLaunch || 'Capital route'} detail={`${selectedRisk.trustScore}% eligibility score`} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {(avoidancePlan ?? []).map((item, index) => (
+              <div key={item} className="rounded-2xl border bg-amber-500/10 p-4 text-sm leading-6">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Avoid {index + 1}</div>
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAvoidancePlan(null)}>Close</Button>
+            <Button>Keep guardrails</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -4203,6 +4659,8 @@ function CompactSettlementRuntimePanel({
   );
   const topFacility = settlementRows[0] ?? null;
   const [selectedFacilityId, setSelectedFacilityId] = useState('');
+  const [healthPlan, setHealthPlan] = useState<string[] | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!topFacility) {
@@ -4222,7 +4680,7 @@ function CompactSettlementRuntimePanel({
   }
 
   if (error) {
-    return <IntelligenceRuntimeErrorState title="Settlement & repayment is unavailable" />;
+    return <IntelligenceRuntimeErrorState title="Finance health is unavailable" />;
   }
 
   if (!topFacility) {
@@ -4245,121 +4703,104 @@ function CompactSettlementRuntimePanel({
   ) ?? null;
   const relatedRisk = matchRiskRecordByKeyword(data?.riskTrust ?? [], selectedFacility.market);
 
+  const repaymentProgress = financePercent(100 - ((selectedFacility.outstandingBalance ?? 0) / Math.max((selectedFacility.outstandingBalance ?? 0) + (selectedFacility.nextDueAmount ?? 0), 1)) * 100);
+  const collectionHealth = selectedFacility.status === 'overdue' ? 35 : selectedFacility.status === 'collecting' ? 86 : 70;
+  const createHealthPlan = () => {
+    const plan = [
+      `Protect cashflow: reserve ${formatFinanceCurrency(selectedFacility.nextDueAmount)} for the next due date on ${formatFinanceDate(selectedFacility.nextDueDate)}.`,
+      `Improve settlement health: keep ${selectedFacility.repaymentSource || 'repayment source'} attached to every funded campaign/order lane.`,
+      relatedRisk?.recommendedFix || 'Reduce finance risk by clearing service, refund, stock, or overdue blockers before requesting more capital.',
+    ];
+    setHealthPlan(plan);
+    toast({
+      title: 'Finance health recommendations created',
+      description: 'PrimeOS generated a local plan to improve seller finance health.',
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="Outstanding" value={formatFinanceCurrency(totalOutstanding)} meta="PrimeOS keeps the active finance exposure visible next to the operating system." icon={<CircleDollarSign className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Next due" value={formatFinanceCurrency(totalNextDue)} meta="The next repayment moment is explicit so finance does not feel hidden from operators." icon={<ClipboardList className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Collecting lanes" value={collectingCount} meta="These facilities are already repaying through live commerce or invoice flows." icon={<HeartHandshake className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Overdue lanes" value={overdueCount} meta="PrimeOS should surface collection stress before it becomes a trust problem." icon={<BellRing className="size-5" />} tone="purple" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Settlement &amp; repayment roster</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">A compact runtime view of where capital was deployed and how PrimeOS expects it to come back.</p>
-              </div>
-              <Badge variant="outline">Admin-managed source</Badge>
+      <Card className="overflow-hidden rounded-lg border">
+        <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
+          <div className="rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">Finance Health</Badge>
+              <Badge variant={selectedFacility.status === 'overdue' ? 'destructive' : 'default'} className="capitalize">{humanizeIntelligenceValue(selectedFacility.status)}</Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Facility</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Collection mode</TableHead>
-                  <TableHead className="text-right">Next due</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {settlementRows.slice(0, 6).map((row) => (
-                  <TableRow key={row.id} className={selectedFacility.id === row.id ? 'bg-primary/5' : ''}>
-                    <TableCell className="font-medium">
-                      <button type="button" className="flex flex-col text-left" onClick={() => setSelectedFacilityId(row.id)}>
-                        <span>{row.facilityName}</span>
-                        <span className="text-xs text-muted-foreground">{row.market}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell>{row.disbursementTarget || 'Target pending'}</TableCell>
-                    <TableCell>{humanizeIntelligenceValue(row.collectionMode)}</TableCell>
-                    <TableCell className="text-right">{formatFinanceCurrency(row.nextDueAmount)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">{humanizeIntelligenceValue(row.status)}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Prime repayment strip</CardTitle>
-            <p className="text-sm text-muted-foreground">PrimeOS makes the money loop visible: where funds went, what repays them, and which connected systems support the collection story.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Selected facility</div>
-              <div className="mt-2 text-lg font-semibold">{selectedFacility.facilityName}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {selectedFacility.market} · {humanizeIntelligenceValue(selectedFacility.status)}
-              </div>
+            <h2 className="mt-5 text-3xl font-bold tracking-tight">Seller finance health: {selectedFacility.facilityName}</h2>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
+              Track cashflow, settlement, repayment, outstanding exposure, and whether this seller is financially healthy enough to scale.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <RuntimeContextCard label="Outstanding" value={formatFinanceCurrency(selectedFacility.outstandingBalance)} detail={`${formatFinanceCurrency(totalOutstanding)} total exposed`} />
+              <RuntimeContextCard label="Next due" value={formatFinanceCurrency(selectedFacility.nextDueAmount)} detail={formatFinanceDate(selectedFacility.nextDueDate)} />
+              <RuntimeContextCard label="Collection" value={humanizeIntelligenceValue(selectedFacility.collectionMode)} detail={`${collectingCount} collecting / ${overdueCount} overdue`} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <RuntimeContextCard
-                label="Disbursement target"
-                value={selectedFacility.disbursementTarget || 'Target pending'}
-                detail="Finance only works as an operating product when the seller can see exactly where the capital went."
-              />
-              <RuntimeContextCard
-                label="Repayment source"
-                value={selectedFacility.repaymentSource || 'Source pending'}
-                detail={`${formatFinanceCurrency(selectedFacility.nextDueAmount)} due next on ${formatFinanceDate(selectedFacility.nextDueDate)}.`}
-              />
-              <RuntimeContextCard
-                label="Collection mode"
-                value={humanizeIntelligenceValue(selectedFacility.collectionMode)}
-                detail={relatedOffer ? `${relatedOffer.offerName} already set this repayment model upstream.` : 'The pricing offer still needs to be linked more clearly to this collection path.'}
-              />
-              <RuntimeContextCard
-                label="Outstanding balance"
-                value={formatFinanceCurrency(selectedFacility.outstandingBalance)}
-                detail="PrimeOS keeps the exposure visible so repayment is not treated as an invisible back-office issue."
-              />
-              <RuntimeContextCard
-                label="Demand + revenue"
-                value={`${currency.format(snapshot.metrics.revenue)} commerce revenue`}
-                detail={`${snapshot.campaigns.length} campaigns, ${snapshot.leads.length} leads, and ${snapshot.orders.length} orders explain whether this facility can realistically collect on time.`}
-              />
-              <RuntimeContextCard
-                label="Risk & trust"
-                value={relatedRisk ? `${relatedRisk.trustScore}% trust score` : 'Risk lane pending'}
-                detail={relatedRisk?.recommendedFix || 'Risk review should confirm this collection path still looks healthy.'}
-              />
-            </div>
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Runtime CTA</div>
-              <div className="mt-2 text-sm font-medium">
-                PrimeOS should treat repayment health as part of the same commerce loop, not as a separate finance dashboard the seller never understands.
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
-                <Link to="/demand/campaign-ops">Open Campaign Ops</Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button onClick={createHealthPlan}>
+                Recommend health actions
+                <ArrowRight className="size-4" />
               </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/customer/crm-compact">Open CRM Compact</Link>
+              <Button asChild variant="outline">
+                <Link to="/finance/capital-offers">Check capital eligibility</Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <FinanceScoreRing value={collectionHealth} label="Collection health" caption="Repayment is healthy when money, route, due date, and demand source stay connected." tone={collectionHealth >= 80 ? 'success' : selectedFacility.status === 'overdue' ? 'danger' : 'warning'} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <FinanceRouteSelector<SettlementRepaymentRecord>
+          title="Finance health lanes"
+          description="Pick a money lane. The visual answers what is healthy, what is due, and what needs attention."
+          rows={settlementRows}
+          selectedId={selectedFacility.id}
+          onSelect={setSelectedFacilityId}
+          getTitle={(row) => row.facilityName}
+          getMeta={(row) => `${row.market} · ${row.disbursementTarget || 'Target pending'} · ${formatFinanceCurrency(row.nextDueAmount)} next due`}
+          getScore={(row) => row.status === 'overdue' ? 35 : row.status === 'collecting' ? 86 : 70}
+          getStatus={(row) => row.status}
+        />
+        <FinanceBarStack
+          title="Seller finance health chart"
+          subtitle="A compact health read: outstanding exposure, next due, collection clarity, and eligibility risk."
+          items={[
+            { label: 'Repayment progress', value: repaymentProgress, detail: `${formatFinanceCurrency(selectedFacility.outstandingBalance)} still outstanding.`, tone: repaymentProgress > 50 ? 'success' : 'warning' },
+            { label: 'Next due readiness', value: selectedFacility.nextDueAmount ? 78 : 35, detail: `${formatFinanceCurrency(totalNextDue)} due across all lanes.`, tone: selectedFacility.nextDueAmount ? 'primary' : 'warning' },
+            { label: 'Collection clarity', value: selectedFacility.collectionMode ? 88 : 42, detail: selectedFacility.repaymentSource || 'Repayment source pending.', tone: selectedFacility.collectionMode ? 'success' : 'warning' },
+            { label: 'Risk trust', value: relatedRisk?.trustScore ?? 72, detail: relatedRisk?.recommendedFix || 'Risk review should confirm this lane stays healthy.', tone: (relatedRisk?.trustScore ?? 72) < 75 ? 'warning' : 'success' },
+          ]}
+        />
       </div>
+
+      <Dialog open={Boolean(healthPlan)} onOpenChange={(open) => !open && setHealthPlan(null)}>
+        <DialogContent className="max-w-3xl rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Recommended finance health actions</DialogTitle>
+            <DialogDescription>
+              A compact action plan to improve cashflow, repayment clarity, and capital readiness.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-3">
+            <RuntimeContextCard label="Outstanding" value={formatFinanceCurrency(selectedFacility.outstandingBalance)} detail={`${formatFinanceCurrency(totalOutstanding)} total exposed`} />
+            <RuntimeContextCard label="Next due" value={formatFinanceCurrency(selectedFacility.nextDueAmount)} detail={formatFinanceDate(selectedFacility.nextDueDate)} />
+            <RuntimeContextCard label="Collection health" value={`${collectionHealth}%`} detail={humanizeIntelligenceValue(selectedFacility.collectionMode)} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {(healthPlan ?? []).map((item, index) => (
+              <div key={item} className="rounded-2xl border bg-emerald-500/10 p-4 text-sm leading-6">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Action {index + 1}</div>
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setHealthPlan(null)}>Close</Button>
+            <Button>Keep health plan</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -6524,9 +6965,9 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   'crm-compact': { decide: 'Which customer record needs follow-up, ownership, or service attention next?', handoff: 'Customer memory feeds Trends Intelligence for smarter targeting.', handoffHref: '/intelligence/trends' },
   service: { decide: 'Is this issue resolved and did it affect customer trust?', handoff: 'Resolution updates the CRM Compact timeline.', handoffHref: '/customer/crm-compact' },
   capital: { decide: 'Is this launch route operationally strong enough to justify capital?', handoff: 'PrimeOS turns the strongest readiness lane into a concrete offer review.', handoffHref: '/finance/capital-offers' },
-  offers: { decide: 'Which capital package best fits the launch I want to scale?', handoff: 'PrimeOS checks repayment logic next so the offer stays realistic inside the commerce loop.', handoffHref: '/finance/settlement-repayment' },
-  risk: { decide: 'What would make finance pause on this seller, launch, or repayment path?', handoff: 'The seller should fix trust blockers before pushing harder into funding.', handoffHref: '/finance/capital-readiness' },
-  settlement: { decide: 'Where did the money go, how will it come back, and is collection healthy?', handoff: 'Repayment health flows back into Demand, CRM, and the next finance cycle.', handoffHref: '/demand/campaign-ops' },
+  offers: { decide: 'Is this seller eligible for capital, and which offer should they request?', handoff: 'Approved requests flow back into Finance Health so repayment stays visible.', handoffHref: '/finance/health' },
+  risk: { decide: 'What should this seller avoid or fix before asking for more capital?', handoff: 'Cleared eligibility blockers unlock safer Capital Offers.', handoffHref: '/finance/capital-offers' },
+  settlement: { decide: 'Is seller finance healthy enough to keep scaling?', handoff: 'Health recommendations feed Demand, CRM, and the next capital decision.', handoffHref: '/finance/capital-offers' },
 };
 
 export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {

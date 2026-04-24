@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BrainCircuit, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getPrimeNavPath,
@@ -183,17 +183,6 @@ export function AppSidebar() {
         <div className="hidden md:block">
           <LanguageToggle className="w-full justify-center" />
         </div>
-        <NavLink
-          to="/intelligence/ai-operator"
-          aria-label="AI Operator"
-          title="AI Operator"
-          className={cn(
-            'flex min-h-11 items-center justify-center gap-2.5 rounded-lg border border-primary/20 bg-primary/10 px-2 py-2 text-sm font-medium text-primary outline-none transition-colors hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-primary/70 md:justify-start'
-          )}
-        >
-          <BrainCircuit className="size-4 shrink-0" />
-          <span className="hidden md:inline">Open operator</span>
-        </NavLink>
       </div>
     </aside>
   );

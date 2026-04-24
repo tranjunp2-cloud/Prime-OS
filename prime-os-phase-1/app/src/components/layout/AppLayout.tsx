@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Search, Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
 import { GlobalCopilotWorkspace } from '@/components/copilot/GlobalCopilotWorkspace';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
@@ -71,10 +70,6 @@ export function AppLayout() {
                 placeholder="Search product, SKU, order, lead, customer, alert..."
               />
             </div>
-            <Badge variant="outline" className="hidden gap-1.5 whitespace-nowrap md:inline-flex">
-              <Sparkles className="size-3.5 text-primary" />
-              AI Operator reads PrimeOS live context
-            </Badge>
           </header>
           <main
             id="main-content"

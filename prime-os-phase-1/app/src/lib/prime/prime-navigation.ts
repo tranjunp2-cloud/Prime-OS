@@ -90,15 +90,15 @@ export const primeNavigation: PrimeNavNode[] = [
         href: 'https://client-portal.bdskhudong.com/auth',
         external: true,
         icon: Store,
+        badge: 'core',
       },
       {
         id: 'cos',
-        label: 'COS Analysis',
+        label: 'COS Ops',
         kind: 'tower',
         href: '/ecom/cos/product-master',
         matchPaths: ['/ecom/cos'],
         icon: Boxes,
-        badge: 'core',
         children: [
           {
             id: 'product-master',
@@ -178,10 +178,11 @@ export const primeNavigation: PrimeNavNode[] = [
     icon: CircleDollarSign,
     children: [
       {
-        id: 'capital',
-        label: 'Capital Readiness',
+        id: 'settlement',
+        label: 'Finance Health',
         kind: 'tower',
-        href: '/finance/capital-readiness',
+        href: '/finance/health',
+        matchPaths: ['/finance/settlement-repayment'],
         icon: CircleDollarSign,
       },
       {
@@ -189,21 +190,16 @@ export const primeNavigation: PrimeNavNode[] = [
         label: 'Capital Offers',
         kind: 'tower',
         href: '/finance/capital-offers',
+        matchPaths: ['/finance/capital-readiness', '/finance/capital'],
         icon: ClipboardList,
       },
       {
         id: 'risk',
-        label: 'Risk & Trust',
+        label: 'Risk & Eligibility',
         kind: 'tower',
         href: '/finance/risk-trust',
+        matchPaths: ['/finance/risk'],
         icon: Gauge,
-      },
-      {
-        id: 'settlement',
-        label: 'Settlement & Repayment',
-        kind: 'tower',
-        href: '/finance/settlement-repayment',
-        icon: Workflow,
       },
     ],
   },
