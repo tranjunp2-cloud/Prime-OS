@@ -1,6 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import {
+  authenticatePassword,
+  createSessionToken,
+  toSafeAccount,
+  verifySessionToken
+} from './auth.js';
+import {
   createResourceItem,
   deleteResourceItem,
   getAdminMeta,
@@ -14,8 +20,24 @@ import {
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
-const demoAdminEnabled = process.env.PRIME_DEMO_ADMIN_ENABLED === 'true';
-const allowedRoles = ['admin', 'user'];
+const configuredAllowedOrigins = String(process.env.PRIME_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const localDevOrigins = [
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+  'http://127.0.0.1:5174',
+  'http://localhost:5174'
+];
+const allowedOrigins = new Set(
+  process.env.PRIME_ALLOW_DEMO_CREDENTIALS === 'true'
+    ? [...localDevOrigins, ...configuredAllowedOrigins]
+    : configuredAllowedOrigins
+);
+const loginWindowMs = Number(process.env.PRIME_LOGIN_RATE_LIMIT_WINDOW_MS || 1000 * 60 * 10);
+const loginMaxAttempts = Number(process.env.PRIME_LOGIN_RATE_LIMIT_MAX || 8);
+const loginAttempts = new Map();
 const accessModel = {
   admin: {
     roleLabel: 'Admin control room',
@@ -26,33 +48,91 @@ const accessModel = {
   },
   user: {
     roleLabel: 'User read-only view',
-    description: 'Read-only access across PrimeOS control surfaces, including mirrored Ecom/COS lanes. Admin authority stays hidden.',
-    visibleResources: resourceKeys.filter((resource) => resource !== 'admins'),
+    description: 'Read-only access across PrimeOS control surfaces. Identity and mutation authority stay hidden.',
+    visibleResources: resourceKeys.filter((resource) => !['admins', 'users'].includes(resource)),
     writableResources: [],
     canReset: false
   }
 };
 
+app.disable('x-powered-by');
+app.use((_request, response, next) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origin is not allowed by PrimeOS CORS policy.'));
+  },
+  credentials: false,
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: process.env.PRIME_JSON_LIMIT || '1mb' }));
 
-function resolveRole(request) {
-  const rawRole = String(request.header('x-prime-role') || 'user').toLowerCase();
-  if (!allowedRoles.includes(rawRole)) {
-    return 'user';
-  }
-
-  if (rawRole === 'admin' && !demoAdminEnabled) {
-    return 'user';
-  }
-
-  return rawRole;
+function getClientAddress(request) {
+  return request.ip || request.socket?.remoteAddress || 'unknown';
 }
 
-function buildSession(role) {
+function getLoginAttemptKey(request, email) {
+  return `${getClientAddress(request)}:${String(email || '').trim().toLowerCase()}`;
+}
+
+function isLoginRateLimited(request, email) {
+  if (!Number.isFinite(loginWindowMs) || !Number.isFinite(loginMaxAttempts) || loginMaxAttempts <= 0) {
+    return false;
+  }
+
+  const now = Date.now();
+  const key = getLoginAttemptKey(request, email);
+  const current = loginAttempts.get(key);
+
+  if (!current || now > current.resetAt) {
+    loginAttempts.set(key, { count: 1, resetAt: now + loginWindowMs });
+    return false;
+  }
+
+  current.count += 1;
+  return current.count > loginMaxAttempts;
+}
+
+function clearLoginAttempts(request, email) {
+  loginAttempts.delete(getLoginAttemptKey(request, email));
+}
+
+function getBearerToken(request) {
+  const authorization = String(request.header('authorization') || '');
+  const [scheme, token] = authorization.split(' ');
+
+  if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    return null;
+  }
+
+  return token;
+}
+
+function requireAuthenticatedSession(request, response, next) {
+  const token = getBearerToken(request);
+  const account = token ? verifySessionToken(token) : null;
+
+  if (!account) {
+    response.status(401).json({ message: 'Login required. Please sign in again.' });
+    return;
+  }
+
+  request.primeAccount = account;
+  next();
+}
+
+function buildSession(account) {
+  const role = account?.role === 'admin' ? 'admin' : 'user';
   const model = accessModel[role];
   const hiddenResources = resourceKeys.filter((resource) => !model.visibleResources.includes(resource));
   const resourcePermissions = Object.fromEntries(resourceKeys.map((resource) => ([
@@ -72,13 +152,13 @@ function buildSession(role) {
     visibleResources: model.visibleResources,
     writableResources: model.writableResources,
     hiddenResources,
-    resourcePermissions
+    resourcePermissions,
+    account: toSafeAccount(account)
   };
 }
 
 function checkResourcePermission(request, response, action) {
-  const role = resolveRole(request);
-  const session = buildSession(role);
+  const session = buildSession(request.primeAccount);
   const { resource } = request.params;
 
   if (!isSupportedResource(resource)) {
@@ -108,15 +188,42 @@ app.get('/health', async (_request, response) => {
   });
 });
 
+app.post('/api/auth/login', async (request, response) => {
+  const { email, password } = request.body ?? {};
+
+  if (isLoginRateLimited(request, email)) {
+    response.status(429).json({ message: 'Too many login attempts. Please try again later.' });
+    return;
+  }
+
+  const account = authenticatePassword(email, password);
+
+  if (!account) {
+    response.status(401).json({ message: 'Invalid email or password.' });
+    return;
+  }
+
+  clearLoginAttempts(request, email);
+  const token = createSessionToken(account);
+  response.json({
+    ...token,
+    session: buildSession(account)
+  });
+});
+
+app.post('/api/auth/logout', async (_request, response) => {
+  response.json({ ok: true });
+});
+
+app.use('/api', requireAuthenticatedSession);
+
 app.get('/api/session', async (request, response) => {
-  const role = resolveRole(request);
-  response.json(buildSession(role));
+  response.json(buildSession(request.primeAccount));
 });
 
 app.get('/api/meta', async (request, response, next) => {
   try {
-    const role = resolveRole(request);
-    const session = buildSession(role);
+    const session = buildSession(request.primeAccount);
     const meta = await getAdminMeta();
     const visibleCounts = Object.fromEntries(
       session.visibleResources.map((resource) => [resource, meta.resourceCounts[resource] ?? 0])
@@ -129,7 +236,7 @@ app.get('/api/meta', async (request, response, next) => {
         0
       ),
       adminCount: session.resourcePermissions.admins.read ? meta.adminCount : 0,
-      userCount: meta.userCount,
+      userCount: session.resourcePermissions.users.read ? meta.userCount : 0,
       writableResourceCount: session.writableResources.length,
       updatedAt: meta.updatedAt
     });
@@ -140,8 +247,7 @@ app.get('/api/meta', async (request, response, next) => {
 
 app.post('/api/admin/reset', async (request, response, next) => {
   try {
-    const role = resolveRole(request);
-    const session = buildSession(role);
+    const session = buildSession(request.primeAccount);
     if (!session.canReset) {
       response.status(403).json({ message: `${session.roleLabel} cannot reset backend seed data.` });
       return;
@@ -236,8 +342,21 @@ app.delete('/api/:resource/:id', async (request, response, next) => {
 });
 
 app.use((error, _request, response, _next) => {
+  if (error.message?.includes('CORS')) {
+    response.status(403).json({ message: 'Origin is not allowed.' });
+    return;
+  }
+
   const message = error instanceof Error ? error.message : 'Unknown backend error';
-  response.status(error.statusCode || 500).json({ message });
+  const statusCode = error.statusCode || 500;
+
+  if (statusCode >= 500) {
+    console.error('[PrimeOS backend]', error);
+  }
+
+  response.status(statusCode).json({
+    message: statusCode >= 500 ? 'Backend error.' : message
+  });
 });
 
 app.listen(port, () => {

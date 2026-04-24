@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:5177": "vite --port 5177",
-    "build": "vite build",
+    "build": "node scripts/validate-frontend-env.mjs && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

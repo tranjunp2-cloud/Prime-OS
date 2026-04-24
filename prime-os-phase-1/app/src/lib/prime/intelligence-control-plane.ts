@@ -1,3 +1,5 @@
+import { createPrimeAuthHeaders, resolvePrimeBackendBase } from './backend-auth';
+
 export interface IntelligenceCreatorRecord {
   id: string;
   creatorName: string;
@@ -53,18 +55,9 @@ export interface IntelligenceControlPlaneSnapshot {
   launchDecisions: IntelligenceLaunchDecisionRecord[];
 }
 
-const defaultControlPlaneBase = 'http://127.0.0.1:8180';
-
-function resolveControlPlaneBase() {
-  const configured = import.meta.env.VITE_PRIME_ADMIN_API_BASE?.trim();
-  return (configured || defaultControlPlaneBase).replace(/\/$/, '');
-}
-
 async function fetchControlResource<T>(resource: string): Promise<T[]> {
-  const response = await fetch(`${resolveControlPlaneBase()}/api/${resource}`, {
-    headers: {
-      'x-prime-role': 'user',
-    },
+  const response = await fetch(`${resolvePrimeBackendBase()}/api/${resource}`, {
+    headers: createPrimeAuthHeaders(),
   });
 
   if (!response.ok) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   BarChart3,
   BrainCircuit,
@@ -10,6 +10,8 @@ import {
   HeartHandshake,
   ImagePlus,
   LayoutGrid,
+  LogOut,
+  LockKeyhole,
   Megaphone,
   MessageSquareText,
   MoonStar,
@@ -24,7 +26,6 @@ import {
   ShieldCheck,
   ShieldUser,
   ShoppingCart,
-  Sparkles,
   SquarePen,
   Store,
   Target,
@@ -101,6 +102,15 @@ interface ResourceConfig {
   columns: Array<{ key: string; label: string }>;
 }
 
+interface AuthAccount {
+  id: string;
+  role: ViewerRole;
+  fullName: string;
+  email: string;
+  workspace?: string;
+  seatType?: string;
+}
+
 interface SessionResponse {
   role: ViewerRole;
   roleLabel: string;
@@ -111,6 +121,13 @@ interface SessionResponse {
   writableResources: ResourceKey[];
   hiddenResources: ResourceKey[];
   resourcePermissions: Record<ResourceKey, { read: boolean; write: boolean }>;
+  account: AuthAccount | null;
+}
+
+interface LoginResponse {
+  token: string;
+  expiresAt: string;
+  session: SessionResponse;
 }
 
 interface MetaResponse {
@@ -129,7 +146,7 @@ interface ResourceGroup {
   resources: ResourceKey[];
 }
 
-const roleStorageKey = 'prime-os-admin-role';
+const authTokenStorageKey = 'prime-os-admin-token';
 const resourceOrder: ResourceKey[] = [
   'intelligenceCreators',
   'intelligenceCustomers',
@@ -1939,10 +1956,25 @@ function validateDraft(resource: ResourceKey, record: AdminRecord) {
   return null;
 }
 
-async function requestJson<T>(path: string, role: ViewerRole, init?: RequestInit) {
+class RequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function requestJson<T>(path: string, token: string | null, init?: RequestInit) {
   const headers = new Headers(init?.headers);
-  headers.set('x-prime-role', role);
-  headers.set('Content-Type', 'application/json');
+
+  if (init?.body) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   const response = await fetch(path, {
     ...init,
@@ -1951,18 +1983,101 @@ async function requestJson<T>(path: string, role: ViewerRole, init?: RequestInit
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || `Request failed: ${response.status}`);
+    throw new RequestError(errorBody.message || `Request failed: ${response.status}`, response.status);
   }
 
   return response.json() as Promise<T>;
 }
 
+function LoginScreen({
+  busy,
+  error,
+  onLogin
+}: {
+  busy: boolean;
+  error: string | null;
+  onLogin: (email: string, password: string) => Promise<void>;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onLogin(email, password);
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-card">
+        <div className="login-visual">
+          <img src="/brand-logo.svg" alt="Prime OS logo" className="login-logo" />
+          <div className="login-kicker">PrimeOS staging control room</div>
+          <h1>Sign in to manage backend data safely.</h1>
+          <p>
+            Admin can create, edit, delete, and reset control-plane records. User can review runtime data only.
+          </p>
+        </div>
+
+        <form className="login-form" onSubmit={submitLogin}>
+          <div className="login-form-head">
+            <span className="login-lock">
+              <LockKeyhole className="glyph-icon" />
+            </span>
+            <div>
+              <div className="card-label">Protected admin</div>
+              <h2>Login</h2>
+            </div>
+          </div>
+
+          <label className="field">
+            <span className="field-label">Email</span>
+            <input
+              className="input"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="username"
+              placeholder="admin@company.com"
+              required
+            />
+          </label>
+
+          <label className="field">
+            <span className="field-label">Password</span>
+            <input
+              className="input"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              placeholder="Enter staging password"
+              required
+            />
+          </label>
+
+          {error ? <div className="error-banner">{error}</div> : null}
+
+          <button type="submit" className="button button-primary login-submit" disabled={busy}>
+            <LockKeyhole className="button-icon" />
+            <span>{busy ? 'Signing in...' : 'Sign in'}</span>
+          </button>
+
+          <p className="login-note">
+            Use the staging account configured through the server environment.
+          </p>
+        </form>
+      </section>
+    </main>
+  );
+}
+
 function App() {
-  const [viewerRole, setViewerRole] = useState<ViewerRole>(() => {
-    if (typeof window === 'undefined') return 'admin';
-    const storedRole = window.localStorage.getItem(roleStorageKey);
-    return storedRole === 'user' ? 'user' : 'admin';
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.sessionStorage.getItem(authTokenStorageKey);
   });
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [activeResource, setActiveResource] = useState<ResourceKey>('intelligenceCreators');
   const [records, setRecords] = useState<Record<ResourceKey, AdminRecord[]>>(createEmptyRecordsState);
   const [selectedId, setSelectedId] = useState<Record<ResourceKey, string | null>>(createEmptySelectedState);
@@ -2006,31 +2121,67 @@ function App() {
   );
 
   useEffect(() => {
-    window.localStorage.setItem(roleStorageKey, viewerRole);
-  }, [viewerRole]);
-
-  useEffect(() => {
     setOpenGroups((current) => ({
       ...current,
       [currentGroup.key]: true
     }));
   }, [currentGroup.key]);
 
-  async function loadAll(role: ViewerRole = viewerRole) {
+  async function handleLogin(email: string, password: string) {
+    setLoginBusy(true);
+    setLoginError(null);
+
+    try {
+      const loginResponse = await requestJson<LoginResponse>('/api/auth/login', null, {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+
+      window.sessionStorage.setItem(authTokenStorageKey, loginResponse.token);
+      setAuthToken(loginResponse.token);
+      setSession(loginResponse.session);
+      setBackendMessage(`${loginResponse.session.roleLabel} signed in`);
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : 'Login failed';
+      setLoginError(message);
+      setBackendMessage('Login required');
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  function handleLogout() {
+    window.sessionStorage.removeItem(authTokenStorageKey);
+    setAuthToken(null);
+    setSession(null);
+    setMeta(null);
+    setRecords(createEmptyRecordsState());
+    setSelectedId(createEmptySelectedState());
+    setDraft(createEmptyDraftState());
+    setBackendMessage('Signed out');
+    setLoginError(null);
+  }
+
+  async function loadAll(token: string | null = authToken) {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       const [sessionResponse, metaResponse] = await Promise.all([
-        requestJson<SessionResponse>('/api/session', role),
-        requestJson<MetaResponse>('/api/meta', role)
+        requestJson<SessionResponse>('/api/session', token),
+        requestJson<MetaResponse>('/api/meta', token)
       ]);
 
       const nextRecords = createEmptyRecordsState();
       const visibleResourceEntries = await Promise.all(
         sessionResponse.visibleResources.map(async (resource) => [
           resource,
-          await requestJson<AdminRecord[]>(`/api/${resource}`, role)
+          await requestJson<AdminRecord[]>(`/api/${resource}`, token)
         ] as const)
       );
 
@@ -2059,6 +2210,12 @@ function App() {
       ));
       setBackendMessage(`${sessionResponse.roleLabel} synced • ${formatRelativeTime(metaResponse.updatedAt)}`);
     } catch (nextError) {
+      if (nextError instanceof RequestError && nextError.status === 401) {
+        window.sessionStorage.removeItem(authTokenStorageKey);
+        setAuthToken(null);
+        setLoginError('Session expired. Please sign in again.');
+      }
+
       setError(nextError instanceof Error ? nextError.message : 'Failed to load admin workspace');
       setBackendMessage('Backend unavailable');
       setSession(null);
@@ -2069,8 +2226,8 @@ function App() {
   }
 
   useEffect(() => {
-    loadAll(viewerRole).catch(() => undefined);
-  }, [viewerRole]);
+    loadAll(authToken).catch(() => undefined);
+  }, [authToken]);
 
   useEffect(() => {
     if (!currentSelectedId) {
@@ -2174,12 +2331,12 @@ function App() {
         delete payload.id;
       }
 
-      const savedRecord = await requestJson<AdminRecord>(path, viewerRole, {
+      const savedRecord = await requestJson<AdminRecord>(path, authToken, {
         method,
         body: JSON.stringify(payload)
       });
 
-      await loadAll(viewerRole);
+      await loadAll(authToken);
       setActiveResource(activeResource);
       setSelectedId((current) => ({
         ...current,
@@ -2214,10 +2371,10 @@ function App() {
     setError(null);
 
     try {
-      await requestJson(`/api/${activeResource}/${currentSelectedId}`, viewerRole, {
+      await requestJson(`/api/${activeResource}/${currentSelectedId}`, authToken, {
         method: 'DELETE'
       });
-      await loadAll(viewerRole);
+      await loadAll(authToken);
       setBackendMessage(`${currentConfig.singular} deleted successfully`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Delete failed');
@@ -2239,8 +2396,8 @@ function App() {
     setError(null);
 
     try {
-      await requestJson('/api/admin/reset', viewerRole, { method: 'POST' });
-      await loadAll(viewerRole);
+      await requestJson('/api/admin/reset', authToken, { method: 'POST' });
+      await loadAll(authToken);
       setBackendMessage('Backend seed data reset');
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Reset failed');
@@ -2337,6 +2494,16 @@ function App() {
       tone: 'metric-card-amber'
     }
   ];
+
+  if (!authToken) {
+    return (
+      <LoginScreen
+        busy={loginBusy}
+        error={loginError}
+        onLogin={handleLogin}
+      />
+    );
+  }
 
   return (
     <div className="admin-shell">
@@ -2441,15 +2608,6 @@ function App() {
               ))}
             </div>
           </div>
-          <a
-            className="sidebar-link"
-            href="http://127.0.0.1:5173/intelligence/ai-operator"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <BrainCircuit className="glyph-icon" />
-            <span>Open operator</span>
-          </a>
         </div>
       </aside>
 
@@ -2464,10 +2622,14 @@ function App() {
               onChange={(event) => setSearchQuery(event.target.value)}
             />
           </label>
-          <div className="topbar-badge">
-            <Sparkles className="glyph-icon" />
-            <span>AI Operator reads PrimeOS live context</span>
+          <div className="topbar-account">
+            <span>{session?.account?.fullName || 'PrimeOS account'}</span>
+            <strong>{session?.roleLabel || 'Checking session'}</strong>
           </div>
+          <button type="button" className="button button-secondary topbar-logout" onClick={handleLogout}>
+            <LogOut className="button-icon" />
+            <span>Logout</span>
+          </button>
         </header>
 
         <main className="workspace">
@@ -2489,7 +2651,7 @@ function App() {
                 {backendMessage}
               </div>
               <div className="button-row">
-                <button type="button" className="button button-secondary" onClick={() => loadAll(viewerRole)} disabled={loading || saving}>
+                <button type="button" className="button button-secondary" onClick={() => loadAll(authToken)} disabled={loading || saving}>
                   <RefreshCcw className="button-icon" />
                   <span>Refresh</span>
                 </button>
@@ -2636,15 +2798,13 @@ function App() {
                 </label>
 
                 <label className="filter-field">
-                  <span className="field-label">Access mode</span>
-                  <select
+                  <span className="field-label">Signed in as</span>
+                  <input
                     className="input"
-                    value={viewerRole}
-                    onChange={(event) => setViewerRole(event.target.value as ViewerRole)}
-                  >
-                    <option value="admin">Admin operator</option>
-                    <option value="user">User preview</option>
-                  </select>
+                    value={session?.account?.email || 'Checking session...'}
+                    disabled
+                    readOnly
+                  />
                 </label>
 
                 <label className="filter-field">
@@ -2978,15 +3138,6 @@ function App() {
         </main>
       </div>
 
-      <a
-        className="prime-ai-fab"
-        href="http://127.0.0.1:5173/intelligence/ai-operator"
-        target="_blank"
-        rel="noreferrer"
-      >
-        <BrainCircuit className="glyph-icon" />
-        <span>Prime AI</span>
-      </a>
     </div>
   );
 }

@@ -1,70 +1,143 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  clearPrimeAuthToken,
+  createPrimeAuthHeaders,
+  getPrimeAuthToken,
+  PrimeAccount,
+  PrimeLoginResponse,
+  PrimeSession,
+  resolvePrimeBackendBase,
+  setPrimeAuthToken
+} from '@/lib/prime/backend-auth';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: PrimeAccount | null;
+  session: PrimeSession | null;
+  token: string | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; session: PrimeSession | null }>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function parseError(response: Response, fallback: string) {
+  const body = await response.json().catch(() => null);
+  return new Error(body?.message || fallback);
+}
+
+function withToken(session: PrimeSession, token: string, expiresAt?: string): PrimeSession {
+  return {
+    ...session,
+    token,
+    expiresAt,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<PrimeAccount | null>(null);
+  const [session, setSession] = useState<PrimeSession | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    let cancelled = false;
+
+    async function restoreSession() {
+      const storedToken = getPrimeAuthToken();
+
+      if (!storedToken) {
         setLoading(false);
+        return;
       }
-    );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+      try {
+        const response = await fetch(`${resolvePrimeBackendBase()}/api/session`, {
+          headers: createPrimeAuthHeaders(storedToken),
+        });
 
-    return () => subscription.unsubscribe();
+        if (!response.ok) {
+          throw await parseError(response, 'Session expired. Please sign in again.');
+        }
+
+        const restoredSession = withToken(await response.json() as PrimeSession, storedToken);
+
+        if (!cancelled) {
+          setToken(storedToken);
+          setSession(restoredSession);
+          setUser(restoredSession.account);
+        }
+      } catch {
+        clearPrimeAuthToken();
+
+        if (!cancelled) {
+          setToken(null);
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    return { error };
-  };
-
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const response = await fetch(`${resolvePrimeBackendBase()}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw await parseError(response, 'Invalid email or password.');
+      }
+
+      const login = await response.json() as PrimeLoginResponse;
+      const nextSession = withToken(login.session, login.token, login.expiresAt);
+
+      setPrimeAuthToken(login.token);
+      setToken(login.token);
+      setSession(nextSession);
+      setUser(nextSession.account);
+
+      return { error: null, session: nextSession };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error : new Error('Unable to sign in. Please try again.'),
+        session: null,
+      };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const currentToken = token;
+
+    clearPrimeAuthToken();
+    setToken(null);
+    setSession(null);
+    setUser(null);
+
+    if (currentToken) {
+      await fetch(`${resolvePrimeBackendBase()}/api/auth/logout`, {
+        method: 'POST',
+        headers: createPrimeAuthHeaders(currentToken),
+      }).catch(() => undefined);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, token, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

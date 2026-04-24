@@ -816,6 +816,17 @@
   ],
   "admins": [
     {
+      "id": "adm_login_001",
+      "fullName": "PrimeOS Admin",
+      "email": "admin@primeos.local",
+      "accessLevel": "super_admin",
+      "workspace": "Global control room",
+      "status": "active",
+      "lastSeenAt": "2026-04-24T07:00:00.000Z",
+      "createdAt": "2026-04-24T07:00:00.000Z",
+      "updatedAt": "2026-04-24T07:00:00.000Z"
+    },
+    {
       "id": "adm_001",
       "fullName": "Aiko Tanaka",
       "email": "aiko.tanaka@primeos.jp",
@@ -850,6 +861,17 @@
     }
   ],
   "users": [
+    {
+      "id": "usr_login_001",
+      "fullName": "PrimeOS User",
+      "email": "user@primeos.local",
+      "company": "PrimeOS staging seller",
+      "market": "JP",
+      "seatType": "seller_viewer",
+      "status": "active",
+      "createdAt": "2026-04-24T07:00:00.000Z",
+      "updatedAt": "2026-04-24T07:00:00.000Z"
+    },
     {
       "id": "usr_001",
       "fullName": "Emma Thompson",

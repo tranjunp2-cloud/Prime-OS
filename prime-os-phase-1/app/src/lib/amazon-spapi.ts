@@ -18,6 +18,8 @@
  * - throttlingRetry: auto-retry with exponential backoff
  */
 
+import { SpApiError } from './sp-api-error';
+
 export interface SpApiConfig {
   clientId: string;
   clientSecret: string;
@@ -128,17 +130,7 @@ function sleep(ms: number): Promise<void> {
 
 // ─── Error Types ─────────────────────────────────────────────────────────────
 
-export class SpApiError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode: number,
-    public readonly errorCode?: string,
-    public readonly details?: unknown,
-  ) {
-    super(message);
-    this.name = 'SpApiError';
-  }
-}
+export { SpApiError } from './sp-api-error';
 
 // ─── API Client ───────────────────────────────────────────────────────────────
 

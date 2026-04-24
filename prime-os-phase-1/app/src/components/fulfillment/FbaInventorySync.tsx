@@ -20,7 +20,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { SpApiError } from '@/lib/amazon-spapi';
+import { SpApiError } from '@/lib/sp-api-error';
 
 export interface FbaInventoryRecord {
   sku: string;

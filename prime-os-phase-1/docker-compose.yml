@@ -2,7 +2,13 @@ services:
   prime-web:
     build:
       context: ./app
+      args:
+        VITE_SUPABASE_URL: "${VITE_SUPABASE_URL:?Set Supabase project URL for the PrimeOS frontend build}"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "${VITE_SUPABASE_PUBLISHABLE_KEY:?Set Supabase anon/publishable key for the PrimeOS frontend build}"
+        VITE_PRIME_ADMIN_API_BASE: "${VITE_PRIME_ADMIN_API_BASE:-}"
     container_name: prime-os-prime-web
+    depends_on:
+      - backend
     ports:
       - "5173:80"
     restart: unless-stopped
@@ -22,10 +28,17 @@ services:
       context: ./backend
     container_name: prime-os-backend
     environment:
+      NODE_ENV: production
       PORT: 8080
-      PRIME_DEMO_ADMIN_ENABLED: "true"
-    ports:
-      - "8180:8080"
+      PRIME_ALLOW_DEMO_CREDENTIALS: "${PRIME_ALLOW_DEMO_CREDENTIALS:-false}"
+      PRIME_ALLOWED_ORIGINS: "${PRIME_ALLOWED_ORIGINS:?Set comma-separated frontend origins, for example https://prime.example.com,https://admin-prime.example.com}"
+      PRIME_SESSION_SECRET: "${PRIME_SESSION_SECRET:?Set a unique secret of at least 32 characters}"
+      PRIME_ADMIN_EMAIL: "${PRIME_ADMIN_EMAIL:?Set staging admin email}"
+      PRIME_ADMIN_PASSWORD: "${PRIME_ADMIN_PASSWORD:?Set staging admin password}"
+      PRIME_USER_EMAIL: "${PRIME_USER_EMAIL:?Set staging user email}"
+      PRIME_USER_PASSWORD: "${PRIME_USER_PASSWORD:?Set staging user password}"
+    expose:
+      - "8080"
     volumes:
       - ./backend/data:/app/data
     restart: unless-stopped

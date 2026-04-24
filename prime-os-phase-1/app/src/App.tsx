@@ -2,9 +2,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import Auth from "./pages/Auth";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import ProductCreatePage from "./pages/ProductCreatePage";
@@ -38,6 +40,24 @@ const queryClient = new QueryClient({
   },
 });
 
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm font-medium text-muted-foreground">
+        Loading PrimeOS...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -48,9 +68,16 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <Routes>
+                  <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
-                  <Route element={<AppLayout />}>
+                  <Route
+                    element={
+                      <RequireAuth>
+                        <AppLayout />
+                      </RequireAuth>
+                    }
+                  >
                     <Route path="/overview" element={<PrimeOverview />} />
 
                     <Route path="/demand/campaign-ops" element={<PrimeTowerPage towerId="campaign-ops" />} />

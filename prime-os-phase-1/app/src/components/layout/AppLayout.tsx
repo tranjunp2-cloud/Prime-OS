@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { LogOut, Search } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
 import { GlobalCopilotWorkspace } from '@/components/copilot/GlobalCopilotWorkspace';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 
 export function AppLayout() {
   const [bootstrapping, setBootstrapping] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +38,17 @@ export function AppLayout() {
       cancelled = true;
     };
   }, []);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+      navigate('/auth', { replace: true });
+    }
+  }
 
   if (bootstrapping) {
     return (
@@ -70,6 +86,23 @@ export function AppLayout() {
                 placeholder="Search product, SKU, order, lead, customer, alert..."
               />
             </div>
+            <div className="hidden min-w-0 flex-col text-right md:flex">
+              <span className="text-[11px] font-medium text-muted-foreground">PrimeOS session</span>
+              <span className="max-w-[180px] truncate text-xs font-semibold text-foreground">
+                {user?.email || 'Demo workspace'}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="shrink-0 rounded-lg"
+            >
+              <LogOut className="size-4" />
+              <span className="hidden sm:inline">{signingOut ? 'Signing out...' : 'Logout'}</span>
+            </Button>
           </header>
           <main
             id="main-content"
