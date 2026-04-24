@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BellRing,
   Bot,
+  CalendarCheck,
   ClipboardList,
   ChevronDown,
   ChevronUp,
@@ -19,11 +20,14 @@ import {
   Mail,
   Megaphone,
   MessageCircle,
+  PackagePlus,
   PanelsTopLeft,
+  PenLine,
   Phone,
   RadioTower,
   ScanSearch,
   Search,
+  Send,
   SlidersHorizontal,
   Sparkles,
   Target,
@@ -2365,293 +2369,860 @@ function StrategicNarrativeBanner({ towerId }: { towerId: PrimeTowerId }) {
 }
 
 function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
+  return <DemandExecutionPanel towerId={towerId} />;
+}
+
+function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
+  const { toast } = useToast();
   const primaryCampaign = snapshot.campaigns[0];
   const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
   const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
   const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
+  const totalOrders = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.orders, 0);
+  const totalSpend = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.spend, 0);
+  const totalRevenue = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.revenue, 0);
+  const socialReach = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
+  const totalReach = totalTraffic + socialReach;
+  const qualifiedLeads = snapshot.leads.filter((lead) => ['qualified', 'rfq_sent', 'converted'].includes(lead.status)).length;
+  const openRfqs = snapshot.rfqs.filter((rfq) => rfq.status !== 'converted');
+  const topPlay = snapshot.activationPlays[0];
+  const sortedLeads = [...snapshot.leads].sort((left, right) => right.score - left.score);
+  const topLead = sortedLeads[0];
+  const topRfq = openRfqs[0];
+  const primaryProduct = findProductBySku(snapshot, primaryCampaign?.skuCode);
+  const primaryProductImage = primaryProduct?.images?.[0];
+  const primaryForecast = findForecastBySku(snapshot, primaryCampaign?.skuCode);
+  const roas = totalSpend ? `${(totalRevenue / totalSpend).toFixed(1)}x` : '0x';
+  const launchRoute = primaryCampaign ? getSkuLabel(primaryCampaign.skuCode) : 'Launch route pending';
+  const launchProductName = primaryCampaign ? getSkuProductName(primaryCampaign.skuCode) : 'Product route pending';
+  const stockGuardrail = primaryForecast
+    ? `${primaryForecast.ats} ATS / ${primaryForecast.demand7d} forecast`
+    : 'Stock guardrail pending';
+  const replenishmentUnits = primaryForecast ? Math.max(48, primaryForecast.demand7d - primaryForecast.ats + 40) : 120;
+  const projectedLift = snapshot.activationPlays.reduce((sum, play) => sum + play.projectedLift, 0);
 
-  if (towerId === 'campaign-ops') {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Active campaigns" value={snapshot.campaigns.length} meta="Execution view across live GTM programs." icon={<Megaphone className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Traffic live" value={totalTraffic.toLocaleString()} meta="Current channel deployment across active campaigns." icon={<RadioTower className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Budget in market" value={currency.format(snapshot.campaigns.reduce((sum, campaign) => sum + campaign.spend, 0))} meta="Allocated spend already pushed into campaign execution." icon={<Target className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Primary product" value={primaryCampaign ? getSkuLabel(primaryCampaign.skuCode) : 'COS product'} meta="Campaign ops stays anchored to real product and SKU context." icon={<ClipboardList className="size-5" />} tone="purple" />
+  type DemandActionStatus = 'ready' | 'drafted' | 'queued' | 'assigned';
+  type DemandExecutionAction = {
+    id: string;
+    stage: string;
+    kind: string;
+    title: string;
+    plainGoal: string;
+    channel: string;
+    audience: string;
+    owner: string;
+    signal: string;
+    setup: Array<{ label: string; value: string }>;
+    previewTitle: string;
+    previewBody: string;
+    checklist: string[];
+    buttonLabel: string;
+    doneLabel: string;
+    result: string;
+    statusAfter: DemandActionStatus;
+    icon: ReactNode;
+    nextSystem: string;
+  };
+
+  const [actionStatuses, setActionStatuses] = useState<Record<string, DemandActionStatus>>({});
+  const [executionLog, setExecutionLog] = useState<Array<{ id: string; title: string; result: string; at: string; owner: string }>>([]);
+  const [selectedAction, setSelectedAction] = useState<DemandExecutionAction | null>(null);
+
+  const statusLabel: Record<DemandActionStatus, string> = {
+    ready: 'Ready',
+    drafted: 'Drafted',
+    queued: 'Queued',
+    assigned: 'Assigned',
+  };
+
+  const statusToneMap: Record<DemandActionStatus, 'default' | 'outline'> = {
+    ready: 'outline',
+    drafted: 'default',
+    queued: 'default',
+    assigned: 'default',
+  };
+
+  const runDemandAction = (action: DemandExecutionAction) => {
+    setActionStatuses((current) => ({ ...current, [action.id]: action.statusAfter }));
+    setExecutionLog((current) => [
+      {
+        id: action.id,
+        title: action.title,
+        result: action.result,
+        at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        owner: action.owner,
+      },
+      ...current.filter((item) => item.id !== action.id),
+    ].slice(0, 5));
+    setSelectedAction(null);
+    toast({ title: action.doneLabel, description: action.result });
+  };
+
+  const campaignActions: DemandExecutionAction[] = [
+    {
+      id: 'campaign-message-repeat-buyers',
+      stage: '01',
+      kind: 'Buyer message',
+      title: 'Send campaign message to repeat buyers',
+      plainGoal: 'Create one approved email/LINE/SMS draft for the warmest buyer lane.',
+      channel: 'LINE + Email + SMS',
+      audience: topPlay?.audience || 'Dormant repeat buyers',
+      owner: 'CRM Ops - Hana Lee',
+      signal: topPlay?.trigger || 'Dormant refill buyers came back to this product route.',
+      setup: [
+        { label: 'Product', value: launchProductName },
+        { label: 'Audience size', value: formatCompactCount(totalLeads) },
+        { label: 'Offer', value: 'Refill bundle + quote support' },
+      ],
+      previewTitle: 'Message draft preview',
+      previewBody: `Subject: Restock ${launchProductName}\n\nYour team can restock ${launchProductName} this week with creator proof, bundle pricing, and fast RFQ support.\n\nCTA: Request bundle quote`,
+      checklist: ['Seller reviews copy', 'CRM suppresses converted buyers', 'Send window: today 15:00 JST'],
+      buttonLabel: 'Create draft',
+      doneLabel: 'Message draft created',
+      result: 'Local message draft created for seller approval. Nothing was sent externally.',
+      statusAfter: 'drafted',
+      icon: <Send className="size-5" />,
+      nextSystem: 'CRM Compact',
+    },
+    {
+      id: 'campaign-paid-social-adset',
+      stage: '02',
+      kind: 'Ad set',
+      title: 'Queue paid ad set for social + marketplace',
+      plainGoal: 'Create a ready-to-review ad set from the approved launch route.',
+      channel: 'TikTok + Instagram + Rakuten',
+      audience: primaryCampaign?.targetSegment || 'JP stationery buyers',
+      owner: 'Performance - Ken Mori',
+      signal: `${formatCompactCount(totalReach)} reachable signals are available now.`,
+      setup: [
+        { label: 'Budget', value: currency.format(Math.round(totalSpend * 0.32)) },
+        { label: 'CTA', value: 'Ask for quote / View product' },
+        { label: 'Guardrail', value: stockGuardrail },
+      ],
+      previewTitle: 'Ad set setup',
+      previewBody: `Creative hook: Premium notebook refill bundle for teams that reorder monthly.\nAudience: ${primaryCampaign?.targetSegment || 'B2B buyers'}\nPlacement: TikTok feed, Instagram Reels, Rakuten sponsored slot.`,
+      checklist: ['Use creator proof image', 'Cap budget until stock task is clear', 'Track leads, RFQs, orders'],
+      buttonLabel: 'Queue ad set',
+      doneLabel: 'Ad set queued',
+      result: 'Local ad set queued with budget, audience, hook, and stock guardrail.',
+      statusAfter: 'queued',
+      icon: <Megaphone className="size-5" />,
+      nextSystem: 'Campaign Ops',
+    },
+    {
+      id: 'campaign-seo-marketplace-content',
+      stage: '03',
+      kind: 'SEO content',
+      title: 'Create SEO + marketplace content brief',
+      plainGoal: 'Turn the trend route into searchable content and marketplace copy.',
+      channel: 'SEO + marketplace content',
+      audience: 'Search buyers comparing premium stationery',
+      owner: 'Content - Mai Sato',
+      signal: `${launchProductName} is the clearest product route from Intelligence and live demand.`,
+      setup: [
+        { label: 'Primary keyword', value: 'premium notebook refill Japan' },
+        { label: 'Content type', value: 'Article + marketplace module' },
+        { label: 'CTA', value: 'Request bundle quote' },
+      ],
+      previewTitle: 'Content brief',
+      previewBody: `Title: Best premium desk refill bundle for Japanese office teams\nKeywords: black hardcover notebook, craft paper refill, B2B stationery Japan\nSections: problem, product proof, creator proof, RFQ CTA.`,
+      checklist: ['Attach product images', 'Mention creator proof', 'Link to marketplace listing'],
+      buttonLabel: 'Create brief',
+      doneLabel: 'Content brief created',
+      result: 'SEO and marketplace content brief drafted locally.',
+      statusAfter: 'drafted',
+      icon: <PenLine className="size-5" />,
+      nextSystem: 'Content Ops',
+    },
+    {
+      id: 'campaign-inventory-topup',
+      stage: '04',
+      kind: 'Stock task',
+      title: 'Create stock top-up task for trend SKU',
+      plainGoal: 'Make Ecom increase stock before paid demand scales further.',
+      channel: 'Ecom inventory handoff',
+      audience: 'Ecom Ops + Warehouse',
+      owner: 'Ecom Ops - Mika Sato',
+      signal: `Forecast guardrail: ${stockGuardrail}.`,
+      setup: [
+        { label: 'SKU', value: launchRoute },
+        { label: 'Request', value: `Add ${replenishmentUnits} units` },
+        { label: 'Reason', value: 'Trend + campaign route ready' },
+      ],
+      previewTitle: 'Inventory task',
+      previewBody: `Create replenishment task for ${launchRoute}.\nRequested units: ${replenishmentUnits}.\nReason: Intelligence trend is ready, but stock risk must stay visible before broader paid scale.`,
+      checklist: ['Assign warehouse owner', 'Confirm inbound date', 'Notify Campaign Ops if delayed'],
+      buttonLabel: 'Create task',
+      doneLabel: 'Stock task assigned',
+      result: 'Stock top-up task assigned locally to Ecom Ops.',
+      statusAfter: 'assigned',
+      icon: <PackagePlus className="size-5" />,
+      nextSystem: 'Ecom Inventory',
+    },
+  ];
+
+  const creatorActions: DemandExecutionAction[] = [
+    {
+      id: 'creator-book-kol-akira',
+      stage: '01',
+      kind: 'KOL booking',
+      title: 'Book Akira Fujimoto for product proof',
+      plainGoal: 'Reserve the creator slot that Intelligence says fits this product route.',
+      channel: 'Instagram + short video',
+      audience: 'JP premium stationery audience',
+      owner: 'Creator Ops - Rina Kato',
+      signal: 'Creator Intelligence shows strong JP relevance for the notebook route.',
+      setup: [
+        { label: 'Creator', value: 'Akira Fujimoto' },
+        { label: 'Fee placeholder', value: currency.format(180000) },
+        { label: 'Deliverables', value: '1 reel, 1 carousel, 1 story' },
+      ],
+      previewTitle: 'KOL booking setup',
+      previewBody: `Book Akira Fujimoto for ${launchProductName}.\nDeliverables: reel demo, carousel proof, story CTA.\nUsage: paid ad whitelisting and marketplace proof.`,
+      checklist: ['Confirm availability', 'Send product sample', 'Attach usage rights'],
+      buttonLabel: 'Open booking setup',
+      doneLabel: 'KOL booking assigned',
+      result: 'KOL booking task assigned locally with deliverables and product route.',
+      statusAfter: 'assigned',
+      icon: <CalendarCheck className="size-5" />,
+      nextSystem: 'Creator Ops',
+    },
+    {
+      id: 'creator-brief-proof-script',
+      stage: '02',
+      kind: 'Creator brief',
+      title: 'Generate creator brief and proof script',
+      plainGoal: 'Give the creator a concrete angle, shot list, CTA, and guardrail.',
+      channel: 'Creator brief',
+      audience: primaryCampaign?.targetSegment || 'B2B office teams',
+      owner: 'Content Lead - Emi Kuroda',
+      signal: 'Launch route needs creator proof before broader paid scale.',
+      setup: [
+        { label: 'Angle', value: 'Premium desk refill without overbuying' },
+        { label: 'CTA', value: 'Ask seller for bundle pricing' },
+        { label: 'Do not say', value: 'No unrealistic discount promise' },
+      ],
+      previewTitle: 'Creator brief',
+      previewBody: `Shot list: cover close-up, paper texture, desk setup, refill bundle, RFQ CTA.\nMessage: professional desk upgrade with practical replenishment logic.`,
+      checklist: ['Include product close-ups', 'Include RFQ CTA', 'Approve brand-safe wording'],
+      buttonLabel: 'Create brief',
+      doneLabel: 'Creator brief created',
+      result: 'Creator proof brief drafted locally.',
+      statusAfter: 'drafted',
+      icon: <MessageCircle className="size-5" />,
+      nextSystem: 'Creator Ops',
+    },
+    {
+      id: 'creator-schedule-live',
+      stage: '03',
+      kind: 'Live commerce',
+      title: 'Schedule livestream demo for the trend product',
+      plainGoal: 'Convert creator attention into live buyer questions and RFQs.',
+      channel: 'TikTok Live + marketplace link',
+      audience: 'Desk setup buyers + procurement viewers',
+      owner: 'Live Ops - Kenji Mori',
+      signal: `${snapshot.socialStreams.length} live/social streams are already feeding buyer signals.`,
+      setup: [
+        { label: 'Slot', value: 'Friday 20:00 JST' },
+        { label: 'Demo', value: 'Texture, bundle, RFQ flow' },
+        { label: 'CTA', value: 'Save product + request quote' },
+      ],
+      previewTitle: 'Livestream plan',
+      previewBody: `Run 20-minute product demo.\nSegments: product texture, desk setup, bundle economics, quote request.\nModerator captures RFQ questions into Lead Capture.`,
+      checklist: ['Prepare sample kit', 'Pin marketplace link', 'Route chat questions to CRM'],
+      buttonLabel: 'Queue livestream',
+      doneLabel: 'Livestream queued',
+      result: 'Livestream plan queued locally.',
+      statusAfter: 'queued',
+      icon: <Youtube className="size-5" />,
+      nextSystem: 'Live Ops',
+    },
+    {
+      id: 'creator-approve-asset-kit',
+      stage: '04',
+      kind: 'Asset kit',
+      title: 'Approve product photos and ad captions',
+      plainGoal: 'Package creator/product visuals so Campaign Ops can reuse them.',
+      channel: 'Asset library',
+      audience: 'Campaign Ops + marketplace team',
+      owner: 'Creative QA - Yuna Park',
+      signal: 'Demand needs reusable proof assets, not one-off creator posts.',
+      setup: [
+        { label: 'Assets', value: '6 stills, 3 creator frames, 2 banners' },
+        { label: 'Caption', value: 'Premium notebook refill for teams' },
+        { label: 'Usage', value: 'Ads + marketplace + SEO' },
+      ],
+      previewTitle: 'Asset approval kit',
+      previewBody: `Approve visual kit for ${launchProductName}.\nIncludes product stills, creator proof frames, marketplace banners, and short captions for ads.`,
+      checklist: ['Check cropping', 'Check SKU naming', 'Approve paid usage'],
+      buttonLabel: 'Approve kit',
+      doneLabel: 'Asset kit approved',
+      result: 'Asset kit marked ready locally for Campaign Ops.',
+      statusAfter: 'queued',
+      icon: <Upload className="size-5" />,
+      nextSystem: 'Asset Library',
+    },
+  ];
+
+  const leadActions: DemandExecutionAction[] = [
+    {
+      id: 'lead-rfq-reply-draft',
+      stage: '01',
+      kind: 'RFQ reply',
+      title: `Draft quote reply for ${topRfq?.requestedBy || topLead?.company || 'top buyer'}`,
+      plainGoal: 'Create the reply while buyer intent is still hot.',
+      channel: 'Email + RFQ portal',
+      audience: topLead?.contact || 'Qualified buyer',
+      owner: 'Sales Ops - Daisuke Ito',
+      signal: topLead ? `${topLead.score} lead score from ${topLead.source}.` : 'Qualified RFQ is waiting for response.',
+      setup: [
+        { label: 'Buyer', value: topLead?.company || topRfq?.requestedBy || 'Qualified buyer' },
+        { label: 'Quantity', value: String(topRfq?.quantity || 24) },
+        { label: 'Product', value: launchProductName },
+      ],
+      previewTitle: 'RFQ reply draft',
+      previewBody: `Thanks for your interest in ${launchProductName}.\nWe can support a ${topRfq?.quantity || 24}-unit quote with bundle pricing and delivery window confirmation.\nNext: confirm quantity and ship date.`,
+      checklist: ['Attach price', 'Confirm delivery date', 'Assign sales owner'],
+      buttonLabel: 'Create reply',
+      doneLabel: 'RFQ reply drafted',
+      result: 'RFQ reply draft created locally for seller review.',
+      statusAfter: 'drafted',
+      icon: <Mail className="size-5" />,
+      nextSystem: 'RFQ Flow',
+    },
+    {
+      id: 'lead-assign-sales-owner',
+      stage: '02',
+      kind: 'Owner assignment',
+      title: 'Assign hot leads to sales owner',
+      plainGoal: 'Give qualified intent one owner and one SLA.',
+      channel: 'CRM Compact',
+      audience: `${qualifiedLeads} qualified leads`,
+      owner: 'Sales Lead - Mika Sato',
+      signal: `${totalLeads} leads and ${totalRfqs} RFQs came from live Demand routes.`,
+      setup: [
+        { label: 'Owner', value: 'Mika Sato' },
+        { label: 'SLA', value: 'First response within 2 hours' },
+        { label: 'Priority', value: 'Score above 80 / RFQ sent' },
+      ],
+      previewTitle: 'Lead assignment',
+      previewBody: `Assign qualified leads to Mika Sato.\nSLA: respond within 2 hours.\nPriority order: RFQ sent, repeat buyer, lead score above 80.`,
+      checklist: ['Assign owner', 'Set SLA reminder', 'Send CRM handoff'],
+      buttonLabel: 'Assign owner',
+      doneLabel: 'Owner assigned',
+      result: 'Qualified lead ownership assigned locally.',
+      statusAfter: 'assigned',
+      icon: <UserRoundCheck className="size-5" />,
+      nextSystem: 'CRM Compact',
+    },
+    {
+      id: 'lead-phone-followup',
+      stage: '03',
+      kind: 'Human follow-up',
+      title: 'Queue phone/LINE follow-up for top buyer',
+      plainGoal: 'Use human follow-up when intent is high enough.',
+      channel: 'Phone + LINE',
+      audience: topLead?.contact || 'Highest score buyer',
+      owner: 'BDR - Mina Sato',
+      signal: topLead?.lastTouch || 'Buyer visited pricing and product route.',
+      setup: [
+        { label: 'Talk track', value: 'Use case, quantity, delivery window' },
+        { label: 'Fallback', value: 'Send LINE quote link' },
+        { label: 'Source', value: topLead?.source || 'Campaign response' },
+      ],
+      previewTitle: 'Call task',
+      previewBody: `Call buyer to confirm use case, quantity, delivery window, and whether creator proof helped.\nIf no answer, send LINE note with quote link and product route.`,
+      checklist: ['Queue call', 'Prepare LINE fallback', 'Attach campaign source'],
+      buttonLabel: 'Queue follow-up',
+      doneLabel: 'Follow-up queued',
+      result: 'Phone/LINE follow-up queued locally.',
+      statusAfter: 'queued',
+      icon: <Phone className="size-5" />,
+      nextSystem: 'CRM Compact',
+    },
+    {
+      id: 'lead-crm-sync',
+      stage: '04',
+      kind: 'CRM memory',
+      title: 'Sync buyer context into CRM Compact',
+      plainGoal: 'Save the demand context so the next touch is smarter.',
+      channel: 'CRM Compact',
+      audience: 'CRM customer memory',
+      owner: 'CRM Ops - Hana Lee',
+      signal: 'Demand gets smarter only if response history flows back into CRM memory.',
+      setup: [
+        { label: 'Fields', value: 'Source, product, RFQ, score, owner' },
+        { label: 'Next SLA', value: '2-hour owner response' },
+        { label: 'Customer record', value: topLead?.company || 'Qualified buyer' },
+      ],
+      previewTitle: 'CRM sync payload',
+      previewBody: `Sync campaign source, product route, RFQ quantity, lead score, last touch, owner, and next SLA into CRM Compact.`,
+      checklist: ['Create/update CRM record', 'Attach RFQ', 'Set next follow-up'],
+      buttonLabel: 'Sync CRM',
+      doneLabel: 'CRM sync queued',
+      result: 'CRM sync task queued locally.',
+      statusAfter: 'queued',
+      icon: <HeartHandshake className="size-5" />,
+      nextSystem: 'CRM Compact',
+    },
+  ];
+
+  const retargetingActions: DemandExecutionAction[] = [
+    {
+      id: 'retarget-abandoned-cart-sequence',
+      stage: '01',
+      kind: 'Recovery sequence',
+      title: 'Create abandoned-cart email/SMS sequence',
+      plainGoal: 'Bring warm buyers back with proof and urgency.',
+      channel: 'Email + SMS',
+      audience: topPlay?.audience || 'Warm cart abandoners',
+      owner: 'Lifecycle - Aiko Tanaka',
+      signal: topPlay?.trigger || 'Cart and refill behavior is reappearing around the trend SKU.',
+      setup: [
+        { label: 'Step 1', value: 'Creator proof + reminder' },
+        { label: 'Step 2', value: 'RFQ/help prompt' },
+        { label: 'Step 3', value: 'Limited bundle incentive' },
+      ],
+      previewTitle: 'Recovery sequence',
+      previewBody: `Email/SMS sequence for warm cart abandoners.\nStep 1: creator proof.\nStep 2: quote/help prompt.\nStep 3: bundle incentive.\nSuppress converted buyers and open service cases.`,
+      checklist: ['Review copy', 'Set suppression', 'Queue 3-step cadence'],
+      buttonLabel: 'Create sequence',
+      doneLabel: 'Sequence created',
+      result: 'Abandoned-cart sequence drafted locally with suppression rules.',
+      statusAfter: 'drafted',
+      icon: <Mail className="size-5" />,
+      nextSystem: 'Lifecycle CRM',
+    },
+    {
+      id: 'retarget-paid-audience',
+      stage: '02',
+      kind: 'Retargeting ad',
+      title: 'Queue retargeting audience from product viewers',
+      plainGoal: 'Use paid reach only on buyers who already showed intent.',
+      channel: 'Meta + TikTok + Rakuten ads',
+      audience: 'Product viewers + RFQ visitors',
+      owner: 'Performance - Ken Mori',
+      signal: `${formatCompactCount(totalTraffic)} product visits exist; recover the warmest slice first.`,
+      setup: [
+        { label: 'Audience', value: 'Viewed product, no order' },
+        { label: 'Budget cap', value: currency.format(Math.round(totalSpend * 0.18)) },
+        { label: 'Creative', value: 'Creator proof + quote CTA' },
+      ],
+      previewTitle: 'Retargeting setup',
+      previewBody: `Build audience from ${launchProductName} viewers with no order and no open service case.\nCreative: creator proof plus stock/quote CTA.`,
+      checklist: ['Import audience', 'Attach creative', 'Apply suppression'],
+      buttonLabel: 'Queue audience',
+      doneLabel: 'Retargeting queued',
+      result: 'Paid retargeting audience queued locally with guardrails.',
+      statusAfter: 'queued',
+      icon: <Target className="size-5" />,
+      nextSystem: 'Ads Manager',
+    },
+    {
+      id: 'retarget-promo-push',
+      stage: '03',
+      kind: 'Offer',
+      title: 'Create bundle incentive for repeat buyers',
+      plainGoal: 'Close repeat demand without training buyers to wait for discounts.',
+      channel: 'Owned promo push',
+      audience: 'Repeat replenishment customers',
+      owner: 'Growth - Yuki Mori',
+      signal: `${projectedLift}% projected lift from available activation plays.`,
+      setup: [
+        { label: 'Offer', value: 'Bundle shipping support above 24 units' },
+        { label: 'Window', value: '7 days' },
+        { label: 'Guardrail', value: 'Hide from converted buyers' },
+      ],
+      previewTitle: 'Promo setup',
+      previewBody: `Create 7-day bundle incentive for repeat replenishment customers.\nOffer: shipping support above 24 units.\nGuardrail: no blast to converted or high-risk service cases.`,
+      checklist: ['Approve margin', 'Apply audience filters', 'Send to CRM'],
+      buttonLabel: 'Create offer',
+      doneLabel: 'Promo push created',
+      result: 'Promo push drafted locally for approval.',
+      statusAfter: 'drafted',
+      icon: <BellRing className="size-5" />,
+      nextSystem: 'Lifecycle CRM',
+    },
+    {
+      id: 'retarget-suppression-rules',
+      stage: '04',
+      kind: 'Suppression',
+      title: 'Enable suppression rules before outreach',
+      plainGoal: 'Make retargeting persistent without becoming spammy.',
+      channel: 'CRM + Ads suppression',
+      audience: 'Converted buyers, open cases, live RFQs',
+      owner: 'Ops QA - Sora Ishikawa',
+      signal: 'Outreach should stop when a buyer converts, opens a case, or gets an owner.',
+      setup: [
+        { label: 'Suppress', value: 'Converted, open ticket, assigned owner' },
+        { label: 'Cooldown', value: '7 days after manual reply' },
+        { label: 'Applies to', value: 'Email, SMS, ads, LINE' },
+      ],
+      previewTitle: 'Suppression rule setup',
+      previewBody: `Rules: suppress converted buyers for 14 days, pause buyers with open ticket, stop paid retargeting once sales owner is assigned, cooldown 7 days after manual reply.`,
+      checklist: ['Enable CRM rule', 'Sync ad exclusions', 'Monitor exceptions'],
+      buttonLabel: 'Enable rules',
+      doneLabel: 'Guardrails enabled',
+      result: 'Suppression guardrails enabled locally.',
+      statusAfter: 'queued',
+      icon: <ClipboardList className="size-5" />,
+      nextSystem: 'CRM + Ads',
+    },
+  ];
+
+  const getActionStatus = (action: DemandExecutionAction) => actionStatuses[action.id] ?? 'ready';
+  const activeActions = towerId === 'content-creator-ops'
+    ? creatorActions
+    : towerId === 'lead-response-capture'
+      ? leadActions
+      : towerId === 'retargeting-outreach'
+        ? retargetingActions
+        : campaignActions;
+  const recommendedAction = activeActions[0];
+  const doneCount = activeActions.filter((action) => getActionStatus(action) !== 'ready').length;
+
+  const pageCopy = {
+    'campaign-ops': {
+      eyebrow: 'Campaign command center',
+      title: 'Pick one seller action and open its setup.',
+      description: 'PrimeOS turns the Intelligence route into messages, ads, SEO content, or stock tasks. The details open in a setup popup so this screen stays simple.',
+      actionTitle: 'Demand actions',
+      actionDescription: 'Four complete execution paths generated from the current Intelligence route.',
+      nextHref: '/demand/lead-response-capture',
+      nextLabel: 'Open Lead Capture',
+    },
+    'content-creator-ops': {
+      eyebrow: 'Creator command center',
+      title: 'Book proof, brief it, schedule it, then reuse it.',
+      description: 'The seller can book a KOL, generate the brief, queue a livestream, or approve the asset kit from one compact workspace.',
+      actionTitle: 'Creator actions',
+      actionDescription: 'Creator work becomes reusable proof for ads, marketplace pages, and SEO.',
+      nextHref: '/demand/campaign-ops',
+      nextLabel: 'Send Proof To Campaign Ops',
+    },
+    'lead-response-capture': {
+      eyebrow: 'Lead command center',
+      title: 'Turn every response into a buyer task.',
+      description: 'Draft replies, assign owners, queue phone/LINE follow-up, and sync context into CRM without hunting through a table.',
+      actionTitle: 'Lead actions',
+      actionDescription: 'Each response gets a next action, owner, SLA, and CRM memory.',
+      nextHref: '/customer/crm-compact',
+      nextLabel: 'Open CRM Compact',
+    },
+    'retargeting-outreach': {
+      eyebrow: 'Recovery command center',
+      title: 'Recover warm buyers without spamming them.',
+      description: 'Create sequences, retargeting audiences, offers, and suppression rules from the same Intelligence-backed route.',
+      actionTitle: 'Recovery actions',
+      actionDescription: 'Warm buyer behavior becomes a safe follow-up sequence.',
+      nextHref: '/customer/crm-compact',
+      nextLabel: 'Open CRM Memory',
+    },
+  }[towerId] ?? {
+    eyebrow: 'Demand command center',
+    title: 'Move the Intelligence route into execution.',
+    description: 'Demand coordinates messages, ads, content, creator proof, lead response, retargeting, and stock guardrails.',
+    actionTitle: 'Demand actions',
+    actionDescription: 'Concrete seller actions generated from the current Intelligence route.',
+    nextHref: '/demand/campaign-ops',
+    nextLabel: 'Open Campaign Ops',
+  };
+
+  const renderProductSignal = () => (
+    <div className="rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-4">
+      <div className="flex items-start gap-3">
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
+          {primaryProductImage ? (
+            <img src={primaryProductImage} alt={launchProductName} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <ImagePlus className="size-6" />
+            </div>
+          )}
         </div>
+        <div className="min-w-0">
+          <Badge variant="secondary" className="rounded-full bg-background/80">From Intelligence</Badge>
+          <div className="mt-2 line-clamp-2 text-base font-semibold">{launchProductName}</div>
+          <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{launchRoute}</div>
+        </div>
+      </div>
+      <div className="mt-3 rounded-2xl border bg-background/75 p-3 text-sm">
+        <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Why now</div>
+        <p className="mt-1 font-medium">{topPlay?.trigger || 'Buyer signal and creator proof are aligned.'}</p>
+      </div>
+    </div>
+  );
 
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Campaign calendar and launch status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Objective</TableHead>
-                  <TableHead>Channel deployment</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Launch status</TableHead>
-                  <TableHead className="text-right">Budget</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {snapshot.campaigns.map((campaign, index) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">{campaign.name}</TableCell>
-                    <TableCell>{['Acquire traffic', 'Drive RFQ', 'Launch creator push', 'Reactivate buyers'][index] || 'Market activation'}</TableCell>
-                    <TableCell>{campaign.channel}</TableCell>
-                    <TableCell>{['Growth', 'Performance', 'Creator Ops', 'CRM Ops'][index] || 'Demand Ops'}</TableCell>
-                    <TableCell className={statusTone(campaign.status)}>{campaign.status}</TableCell>
-                    <TableCell className="text-right">{currency.format(campaign.spend)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+  const renderSystemFlow = () => (
+    <div className="grid gap-2 md:grid-cols-4">
+      {[
+        ['1', 'Intelligence finds route', 'Trend, creator proof, SKU guardrail'],
+        ['2', 'Seller picks action', 'Message, ad, KOL, RFQ, stock task'],
+        ['3', 'PrimeOS opens setup', 'Seed copy, owner, audience, channel'],
+        ['4', 'Queue or assign', 'Local task moves to next system'],
+      ].map(([step, title, detail]) => (
+        <div key={step} className="rounded-2xl border bg-muted/20 p-3">
+          <div className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{step}</div>
+          <div className="mt-2 text-sm font-semibold">{title}</div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+        </div>
+      ))}
+    </div>
+  );
 
-        <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Asset readiness and timeline</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {snapshot.campaigns.map((campaign, index) => (
-                <div key={`asset-${campaign.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{campaign.name}</span>
-                    <Badge variant="outline">{['Brief approved', 'Asset in review', 'Ready to launch', 'Monitoring live'][index] || 'In progress'}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">Timeline owner: {['Growth lead', 'Performance lead', 'Creator manager', 'CRM manager'][index] || 'Demand ops'}</p>
+  const renderHero = () => (
+    <Card className="overflow-hidden rounded-lg border shadow-sm">
+      <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-stretch">
+        {renderProductSignal()}
+        <div className="flex min-w-0 flex-col justify-between gap-4">
+          <div>
+            <Badge variant="outline" className="w-fit">{pageCopy.eyebrow}</Badge>
+            <CardTitle className="mt-3 text-3xl leading-tight">{pageCopy.title}</CardTitle>
+            <p className="mt-2 max-w-3xl text-base text-muted-foreground">{pageCopy.description}</p>
+          </div>
+          {renderSystemFlow()}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderRecommendedAction = () => {
+    const status = getActionStatus(recommendedAction);
+    return (
+      <Card className="rounded-lg border shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Recommended now</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Start with this action. Open setup to review seed data before queueing anything.</p>
+            </div>
+            <Badge variant={statusToneMap[status]}>{statusLabel[status]}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 rounded-3xl border bg-primary/5 p-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border bg-background text-primary">{recommendedAction.icon}</div>
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{recommendedAction.kind}</div>
+              <div className="mt-1 text-xl font-semibold">{recommendedAction.title}</div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{recommendedAction.plainGoal}</p>
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            <RuntimeContextCard label="Audience" value={recommendedAction.audience} detail="Who this action reaches." />
+            <RuntimeContextCard label="Channel" value={recommendedAction.channel} detail="Where the action will run." />
+            <RuntimeContextCard label="Owner" value={recommendedAction.owner} detail="Who owns the next step." />
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button className="flex-1 justify-between" onClick={() => setSelectedAction(recommendedAction)}>
+              Open setup
+              <ArrowRight className="size-4" />
+            </Button>
+            <Button asChild variant="outline" className="flex-1 justify-between">
+              <Link to={pageCopy.nextHref}>{pageCopy.nextLabel}<ArrowRight className="size-4" /></Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderActionList = () => (
+    <Card className="rounded-lg border">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <CardTitle>{pageCopy.actionTitle}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">{pageCopy.actionDescription}</p>
+          </div>
+          <Badge variant="outline" className="w-fit rounded-full">{doneCount}/{activeActions.length} queued</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {activeActions.map((action) => {
+          const status = getActionStatus(action);
+          return (
+            <button
+              key={action.id}
+              type="button"
+              className="group flex h-full min-h-[300px] flex-col rounded-3xl border bg-background p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
+              onClick={() => setSelectedAction(action)}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border bg-primary/10 text-primary">{action.icon}</div>
+                <Badge variant={statusToneMap[status]} className="shrink-0 rounded-full px-3">{statusLabel[status]}</Badge>
+              </div>
+              <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{action.stage} · {action.kind}</div>
+              <div className="mt-2 min-h-[3.5rem] text-lg font-semibold leading-tight">
+                <span className="line-clamp-2">{action.title}</span>
+              </div>
+              <p className="mt-2 min-h-[3rem] line-clamp-2 text-sm leading-6 text-muted-foreground">{action.plainGoal}</p>
+              <div className="mt-4 grid gap-2 text-xs">
+                <div className="min-w-0 rounded-2xl border bg-muted/20 px-3 py-2">
+                  <div className="uppercase tracking-[0.12em] text-muted-foreground">Channel</div>
+                  <div className="mt-1 truncate font-medium">{action.channel}</div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Execution handoff into COS</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {snapshot.campaigns.slice(0, 4).map((campaign, index) => (
-                <div key={`handoff-${campaign.id}`} className="rounded-lg border bg-muted/20 p-3">
-                  <p className="font-medium">{getSkuLabel(campaign.skuCode)}</p>
-                  <p className="mt-2 text-muted-foreground">{[
-                    `Live traffic is flowing into this SKU from ${campaign.channel}. ${campaign.leads} leads captured so far.`,
-                    `This SKU has ${campaign.rfqs} open RFQs waiting for follow-up in Lead & Response Capture.`,
-                    `${campaign.orders} orders traced back to this campaign. Fulfillment team can verify via OMS.`,
-                    `Revenue proof: ${currency.format(campaign.revenue)} attributed to this product through demand execution.`,
-                  ][index] || `Campaign is active against ${getSkuProductName(campaign.skuCode)} with ${campaign.traffic.toLocaleString()} traffic.`}</p>
+                <div className="min-w-0 rounded-2xl border bg-muted/20 px-3 py-2">
+                  <div className="uppercase tracking-[0.12em] text-muted-foreground">Owner</div>
+                  <div className="mt-1 truncate font-medium">{action.owner}</div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+              </div>
+              <div className="mt-auto flex items-center justify-between pt-4 text-sm font-medium text-primary">
+                <span>Open setup</span>
+                <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+              </div>
+            </button>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
 
-  if (towerId === 'content-creator-ops') {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Creator briefs" value={snapshot.campaigns.length} meta="One brief per active campaign with SKU and channel context." icon={<MessageCircle className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Publishing queue" value={snapshot.socialStreams.length} meta="Content tasks scheduled across social and marketplace surfaces." icon={<RadioTower className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Assets pending" value={Math.max(1, snapshot.campaigns.length + 2)} meta="Creative and post approvals still in creator ops workflow." icon={<ClipboardList className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Livestream slots" value={Math.max(1, Math.min(snapshot.campaigns.length, 4))} meta="Reserved activation windows for creator-led launches." icon={<Bot className="size-5" />} tone="purple" />
-        </div>
+  const renderQueueAndProof = () => (
+    <div className="grid gap-4 xl:grid-cols-[1fr_0.78fr]">
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <CardTitle>Local execution queue</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">This demo creates local drafts/tasks only. It does not send email, SMS, ads, or social posts externally.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {executionLog.length === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+              Open an action setup, review the mock seed, then queue it. The result will appear here.
+            </div>
+          ) : executionLog.map((item) => (
+            <div key={item.id} className="rounded-2xl border bg-muted/20 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">{item.title}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.result}</p>
+                </div>
+                <Badge variant="outline" className="shrink-0">{item.at}</Badge>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">Owner: {item.owner}</div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Creator booking and post plan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Creator</TableHead>
-                  <TableHead>Brief</TableHead>
-                  <TableHead>Booking</TableHead>
-                  <TableHead>Post plan</TableHead>
-                  <TableHead>Asset approval</TableHead>
-                  <TableHead>Publishing</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {snapshot.campaigns.map((campaign, index) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">{['Linh Dao', 'Minh Chau', 'Ha An', 'Quynh My'][index] || `Creator ${index + 1}`}</TableCell>
-                    <TableCell>{getSkuProductName(campaign.skuCode)} brief</TableCell>
-                    <TableCell>{['Booked', 'Pending contract', 'Booked', 'In review'][index] || 'Booked'}</TableCell>
-                    <TableCell>{['2 posts + 1 live', '1 case study post', '1 live bundle push', 'Email-assisted social post'][index] || 'Scheduled'}</TableCell>
-                    <TableCell>{['Approved', 'Awaiting edits', 'Approved', 'Queued'][index] || 'Approved'}</TableCell>
-                    <TableCell>{['Queued', 'Drafting', 'Scheduled', 'Scheduled'][index] || 'Queued'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (towerId === 'lead-response-capture') {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Inbound leads" value={totalLeads} meta="All market responses captured from active GTM motions." icon={<UserRoundCheck className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Open RFQs" value={totalRfqs} meta="High-intent responses waiting for quote or follow-up." icon={<ClipboardList className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Response channels" value="4" meta="Form, message, RFQ, and campaign replies are routed from one queue." icon={<Mail className="size-5" />} tone="success" />
-          <SummaryMetricCard label="CRM handoffs" value={snapshot.customers.length} meta="Qualified responses are handed into CRM Compact with entity context." icon={<HeartHandshake className="size-5" />} tone="purple" />
-        </div>
-
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Lead and response intake queue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assigned to</TableHead>
-                  <TableHead>Next system</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {snapshot.leads.slice(0, 8).map((lead, index) => (
-                  <TableRow key={lead.id}>
-                    <TableCell className="font-medium">{lead.contact}</TableCell>
-                    <TableCell>{lead.company}</TableCell>
-                    <TableCell>{lead.source}</TableCell>
-                    <TableCell className={statusTone(lead.status)}>{lead.status.replace('_', ' ')}</TableCell>
-                    <TableCell>{['BDR', 'Sales Ops', 'CRM Ops', 'Growth'][index % 4]}</TableCell>
-                    <TableCell>CRM Compact / RFQ</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (towerId === 'retargeting-outreach') {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Retarget pools" value={snapshot.customers.length} meta="Audience sets built from customer lifecycle and campaign response." icon={<Target className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Outreach sequences" value={snapshot.activationPlays.length} meta="Active follow-up plays across owned and paid channels." icon={<Mail className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Promo pushes" value={snapshot.campaigns.filter((c) => c.status === 'active').length} meta="Offer pushes scheduled for recovery and reactivation." icon={<Megaphone className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Suppression rules" value={snapshot.activationPlays.length + 2} meta="Guardrails prevent duplicate or conflicting follow-up." icon={<BellRing className="size-5" />} tone="purple" />
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Retargeting and outreach execution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table variant="embedded">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Audience / flow</TableHead>
-                    <TableHead>Channel</TableHead>
-                    <TableHead>Offer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Rule</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {snapshot.activationPlays.slice(0, 4).map((play, index) => (
-                    <TableRow key={play.id}>
-                      <TableCell className="font-medium">{play.audience}</TableCell>
-                      <TableCell>{play.channelMix.join(', ')}</TableCell>
-                      <TableCell>{['Bundle offer', 'Reminder follow-up', 'WhatsApp outreach', 'Promo refresh'][index] || 'Recovery push'}</TableCell>
-                      <TableCell>{['Active', 'Queued', 'Active', 'Review'][index] || 'Active'}</TableCell>
-                      <TableCell>{['Suppress converted users', '7-day cooldown', 'One-touch per channel', 'Hold after RFQ'][index] || 'Default guardrail'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Follow-up guardrails</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {[
-                'Do not resend paid retargeting to customers already routed into RFQ.',
-                'Pause WhatsApp outreach after live sales ownership is assigned.',
-                'Suppress promo pushes when fulfillment or service cases remain open.',
-                'Use CRM handoff before sending a second manual follow-up.',
-              ].map((rule) => (
-                <div key={rule} className="rounded-lg border bg-muted/20 p-3">{rule}</div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <CardTitle>Execution proof</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Enough proof to act, not a dashboard to interpret.</p>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <RuntimeContextCard label="Reach" value={formatCompactCount(totalReach)} detail="Traffic plus social/content signals." />
+          <RuntimeContextCard label="Lead proof" value={`${totalLeads} / ${totalRfqs}`} detail="Leads and RFQs captured." />
+          <RuntimeContextCard label="Revenue proof" value={`${totalOrders} orders`} detail={`${currency.format(totalRevenue)} at ${roas} ROAS.`} />
+          <RuntimeContextCard label="Stock" value={stockGuardrail} detail="Guardrail before scale." />
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="Traffic" value={totalTraffic.toLocaleString()} meta="Campaign traffic linked to product catalog." icon={<RadioTower className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Leads" value={totalLeads} meta="Lead records hand off to CRM Compact." icon={<UserRoundCheck className="size-5" />} tone="success" />
-        <SummaryMetricCard label="RFQs" value={totalRfqs} meta="Assisted commerce demand signal." icon={<ClipboardList className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Primary product" value={primaryCampaign ? getSkuLabel(primaryCampaign.skuCode) : 'COS product'} meta="Demand is anchored to COS Product Master." icon={<Target className="size-5" />} tone="teal" />
+      {renderHero()}
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        {renderRecommendedAction()}
+        {renderActionList()}
       </div>
+      {renderQueueAndProof()}
 
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <CardTitle>Demand execution board</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table variant="embedded">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead className="text-right">Traffic</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
-                <TableHead className="text-right">RFQs</TableHead>
-                <TableHead className="text-right">Revenue</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {snapshot.campaigns.map((campaign) => (
-                <TableRow key={campaign.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <span>{campaign.name}</span>
-                      <span className="text-xs text-muted-foreground">{campaign.targetSegment}</span>
+      <Dialog open={Boolean(selectedAction)} onOpenChange={(open) => !open && setSelectedAction(null)}>
+        <DialogContent className="max-h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
+          {selectedAction ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedAction.title}</DialogTitle>
+                <DialogDescription>{selectedAction.plainGoal}</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                <Card className="rounded-3xl border bg-muted/20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Setup summary</CardTitle>
+                    <p className="text-sm text-muted-foreground">PrimeOS pre-fills this from Intelligence, COS, CRM, and Demand signals.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-start gap-3 rounded-2xl border bg-background p-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border bg-primary/10 text-primary">{selectedAction.icon}</div>
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{selectedAction.kind}</div>
+                        <div className="mt-1 font-semibold">{selectedAction.channel}</div>
+                        <p className="mt-1 text-xs text-muted-foreground">Next system: {selectedAction.nextSystem}</p>
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell>{campaign.channel}</TableCell>
-                  <TableCell>{getSkuLabel(campaign.skuCode)}</TableCell>
-                  <TableCell className="text-right">{campaign.traffic.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{campaign.leads}</TableCell>
-                  <TableCell className="text-right">{campaign.rfqs}</TableCell>
-                  <TableCell className="text-right">{currency.format(campaign.revenue)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <RuntimeContextCard label="Audience" value={selectedAction.audience} detail="Target selected from current route." />
+                      <RuntimeContextCard label="Owner" value={selectedAction.owner} detail="Person or team accountable." />
+                    </div>
+                    <div className="rounded-2xl border bg-background p-3">
+                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Intelligence signal</div>
+                      <p className="mt-2 text-sm leading-6">{selectedAction.signal}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      {selectedAction.setup.map((item) => (
+                        <div key={`${selectedAction.id}-${item.label}`} className="flex items-start justify-between gap-3 rounded-2xl border bg-background p-3 text-sm">
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <span className="max-w-[65%] text-right font-medium">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-3xl border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">{selectedAction.previewTitle}</CardTitle>
+                    <p className="text-sm text-muted-foreground">Mock sub-screen preview. Seller reviews this before anything goes live.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-14 w-14 overflow-hidden rounded-2xl border bg-background">
+                          {primaryProductImage ? (
+                            <img src={primaryProductImage} alt={launchProductName} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground"><ImagePlus className="size-5" /></div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Route product</div>
+                          <div className="font-semibold">{launchProductName}</div>
+                        </div>
+                      </div>
+                      <p className="mt-4 whitespace-pre-line rounded-2xl border bg-background/75 p-3 text-sm leading-6 text-muted-foreground">{selectedAction.previewBody}</p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      {selectedAction.checklist.map((item, index) => (
+                        <div key={`${selectedAction.id}-check-${item}`} className="flex items-center gap-3 rounded-2xl border bg-muted/20 p-3 text-sm">
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground">
+                      Safety note: this button only creates a local mock draft/task in PrimeOS. It does not send messages, publish ads, book creators, or change inventory externally.
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={() => setSelectedAction(null)}>Close</Button>
+                <Button onClick={() => runDemandAction(selectedAction)}>
+                  {selectedAction.buttonLabel}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -5946,10 +6517,10 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: '/demand/campaign-ops' },
   alerts: { decide: 'What needs my attention right now across the entire system?', handoff: 'Each alert links to the responsible tower for resolution.', handoffHref: '/intelligence/ai-operator' },
   'ai-operator': { decide: 'What should the system do next based on everything it knows?', handoff: 'Recommendations route to the tower that owns the action.', handoffHref: '/overview' },
-  'campaign-ops': { decide: 'Are my campaigns running on schedule with the right assets?', handoff: 'Campaign traffic flows into Lead & Response Capture.', handoffHref: '/demand/lead-response-capture' },
-  'content-creator-ops': { decide: 'Are creator briefs, bookings, and posts on track?', handoff: 'Published content drives traffic that enters Lead Capture.', handoffHref: '/demand/lead-response-capture' },
-  'lead-response-capture': { decide: 'Which inbound responses are worth qualifying?', handoff: 'Qualified leads go to CRM Compact with full context.', handoffHref: '/customer/crm-compact' },
-  'retargeting-outreach': { decide: 'Who should I follow up with and through which channel?', handoff: 'Converted contacts enter CRM Compact as retained customers.', handoffHref: '/customer/crm-compact' },
+  'campaign-ops': { decide: 'What should the seller execute now: message, ad, SEO content, or stock task?', handoff: 'Executed actions create leads, RFQs, creator work, and Ecom guardrails.', handoffHref: '/demand/lead-response-capture' },
+  'content-creator-ops': { decide: 'Which KOL, brief, live slot, or asset kit should be created now?', handoff: 'Approved proof feeds Campaign Ops, ads, SEO, and marketplace content.', handoffHref: '/demand/campaign-ops' },
+  'lead-response-capture': { decide: 'Which buyer needs a reply, owner, phone follow-up, or CRM sync now?', handoff: 'Qualified intent becomes CRM memory, quote work, and repeat outreach.', handoffHref: '/customer/crm-compact' },
+  'retargeting-outreach': { decide: 'Which warm buyer should receive a sequence, retargeting ad, offer, or suppression?', handoff: 'Recovered buyers move into CRM Compact and order loops.', handoffHref: '/customer/crm-compact' },
   'crm-compact': { decide: 'Which customer record needs follow-up, ownership, or service attention next?', handoff: 'Customer memory feeds Trends Intelligence for smarter targeting.', handoffHref: '/intelligence/trends' },
   service: { decide: 'Is this issue resolved and did it affect customer trust?', handoff: 'Resolution updates the CRM Compact timeline.', handoffHref: '/customer/crm-compact' },
   capital: { decide: 'Is this launch route operationally strong enough to justify capital?', handoff: 'PrimeOS turns the strongest readiness lane into a concrete offer review.', handoffHref: '/finance/capital-offers' },
