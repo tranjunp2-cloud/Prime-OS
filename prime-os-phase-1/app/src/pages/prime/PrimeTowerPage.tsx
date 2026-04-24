@@ -4771,6 +4771,7 @@ function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
     return {
       href: '/demand/campaign-ops',
       label: 'Send approved launch to Campaign Ops',
+      shortLabel: 'Send',
       detail: 'This launch is already approved and ready for demand execution.',
     };
   }
@@ -4779,6 +4780,7 @@ function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
     return {
       href: '/demand/content-creator-ops',
       label: 'Open Content & Creator Ops',
+      shortLabel: 'Review',
       detail: 'This launch still needs execution context before it can move live.',
     };
   }
@@ -4787,6 +4789,7 @@ function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
     return {
       href: '/customer/crm-compact',
       label: 'Re-check customer signal',
+      shortLabel: 'Check',
       detail: 'This launch is on hold, so the best next step is validating the customer side again.',
     };
   }
@@ -4794,6 +4797,7 @@ function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
   return {
     href: '/intelligence/creators',
     label: 'Inspect creator signal again',
+    shortLabel: 'Inspect',
     detail: 'This launch is not approved, so PrimeOS routes the user back to the strongest upstream signal.',
   };
 }
@@ -5369,10 +5373,6 @@ function CompactLaunchDecisionsRuntimePanel({
   }
 
   const selectedDecision = launchDecisions.find((decision) => decision.id === selectedDecisionId) ?? topDecision;
-  const approvedCount = launchDecisions.filter((decision) => decision.approvalStatus === 'approved').length;
-  const reviewCount = launchDecisions.filter((decision) => decision.approvalStatus === 'review').length;
-  const blockerCount = launchDecisions.filter((decision) => decision.blocker?.trim()).length;
-  const averageConfidence = Math.round(launchDecisions.reduce((sum, decision) => sum + decision.confidence, 0) / launchDecisions.length);
   const launchCta = getLaunchRuntimeCta(selectedDecision);
   const selectedDecisionCreator = creatorLookup.get(normalizeRuntimeText(selectedDecision.creatorName)) ?? null;
   const selectedDecisionCustomer = customerLookup.get(normalizeRuntimeText(selectedDecision.customerSegment)) ?? null;
@@ -5398,7 +5398,6 @@ function CompactLaunchDecisionsRuntimePanel({
       detail: selectedDecisionCreator
         ? `${selectedDecision.creatorName} is carrying ${selectedDecisionCreator.fitScore}% fit on ${runtimeSkuLabel(selectedDecisionCreator.linkedSku)}.`
         : `${selectedDecision.creatorName} is attached, but PrimeOS has not matched the creator row yet.`,
-      icon: <CircleUserRound className="size-4" />,
     },
     {
       label: 'Trend heat',
@@ -5406,7 +5405,6 @@ function CompactLaunchDecisionsRuntimePanel({
       detail: selectedDecisionCustomer
         ? `${selectedDecision.customerSegment} has ${selectedDecisionCustomer.potentialScore}% momentum in ${selectedDecisionCustomer.market}.`
         : `${selectedDecision.customerSegment} is part of the decision, but trend detail is not linked yet.`,
-      icon: <TrendingUp className="size-4" />,
     },
     {
       label: 'SKU readiness',
@@ -5414,7 +5412,6 @@ function CompactLaunchDecisionsRuntimePanel({
       detail: matchingForecast
         ? `${matchingForecast.ats} ATS vs ${matchingForecast.demand7d} projected 7-day demand, ${matchingForecast.risk} risk.`
         : `${runtimeSkuLabel(selectedDecision.skuCode)} still needs a live COS guardrail.`,
-      icon: <Gauge className="size-4" />,
     },
     {
       label: 'Ops / finance guardrail',
@@ -5422,10 +5419,8 @@ function CompactLaunchDecisionsRuntimePanel({
       detail: matchingCampaign
         ? `${matchingCampaign.orders} orders and ${currency.format(matchingCampaign.revenue)} already trace to adjacent demand.`
         : selectedDecision.blocker || 'PrimeOS is waiting for execution proof before calling this fully operational.',
-      icon: <CircleDollarSign className="size-4" />,
     },
   ];
-  const strongestSignal = signalScores.reduce((best, signal) => (signal.value > best.value ? signal : best), signalScores[0]);
   const weakestSignal = signalScores.reduce((weakest, signal) => (signal.value < weakest.value ? signal : weakest), signalScores[0]);
   const decisionMode = selectedDecision.approvalStatus === 'approved'
     ? 'Go'
@@ -5434,245 +5429,196 @@ function CompactLaunchDecisionsRuntimePanel({
       : selectedDecision.approvalStatus === 'rejected'
         ? 'No-go'
         : 'Review';
+  const decisionVerb = decisionMode === 'Go'
+    ? 'Launch now'
+    : decisionMode === 'Review'
+      ? 'Review first'
+      : decisionMode === 'Hold'
+        ? 'Hold launch'
+        : 'Do not launch';
+  const decisionQuestion = decisionMode === 'Go'
+    ? 'Ready to send into execution.'
+    : decisionMode === 'Review'
+      ? 'One signal needs human review before launch.'
+      : decisionMode === 'Hold'
+        ? 'Wait until the blocker is cleared.'
+        : 'Keep this route out of execution.';
+  const blockerCopy = selectedDecision.blocker || (weakestSignal.value < 75 ? weakestSignal.detail : 'No major blocker. Keep an eye on the weakest signal before scale.');
+  const nextActionCopy = selectedDecision.approvalStatus === 'approved'
+    ? launchCta.detail
+    : selectedDecision.blocker
+      ? `Clear blocker: ${selectedDecision.blocker}`
+      : `Check ${weakestSignal.label.toLowerCase()} before sending to Campaign Ops.`;
+  const evidenceCards = [
+    {
+      label: 'Creator proof',
+      value: selectedDecision.creatorName,
+      detail: selectedDecisionCreator
+        ? `${selectedDecisionCreator.fitScore}% fit on ${humanizeIntelligenceValue(selectedDecisionCreator.primaryChannel)}.`
+        : 'Creator is attached to the launch route.',
+    },
+    {
+      label: 'Demand trend',
+      value: selectedDecision.customerSegment,
+      detail: selectedDecisionCustomer
+        ? `${selectedDecisionCustomer.potentialScore}% momentum in ${selectedDecisionCustomer.market}.`
+        : 'Customer trend is attached to the decision.',
+    },
+    {
+      label: 'SKU guardrail',
+      value: runtimeSkuLabel(selectedDecision.skuCode),
+      detail: matchingForecast
+        ? `${matchingForecast.ats} ATS vs ${matchingForecast.demand7d} forecast, ${matchingForecast.risk} risk.`
+        : 'Inventory forecast is not linked yet.',
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden rounded-lg border">
-        <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_170px] xl:items-stretch">
-            <div className="min-w-0 xl:order-2">
-              <Badge variant="outline">PrimeOS recommends</Badge>
-              <CardTitle className="mt-3 text-2xl">{decisionMode}: {selectedDecision.decisionName}</CardTitle>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                {selectedDecision.whyThisLaunch || `${selectedDecision.creatorName} and ${selectedDecision.customerSegment} are the clearest current route into ${runtimeSkuName(selectedDecision.skuCode).toLowerCase()}.`}
-              </p>
+      <Card className="overflow-hidden rounded-lg border shadow-sm">
+        <CardContent className="grid gap-5 p-4 xl:grid-cols-[280px_minmax(0,1fr)_210px] xl:items-stretch">
+          <RuntimeRecommendationVisual
+            creator={selectedDecisionCreator}
+            product={selectedDecisionProduct}
+            productLabel={runtimeSkuLabel(selectedDecision.skuCode)}
+            variant="launch"
+            eyebrow="Launch route"
+            decisionMode={decisionMode}
+            className="order-2 xl:order-1"
+          />
+
+          <div className="order-1 flex min-w-0 flex-col justify-center xl:order-2">
+            <Badge variant="outline" className="w-fit">PrimeOS recommends</Badge>
+            <CardTitle className="mt-3 text-3xl leading-tight">{decisionVerb}: {selectedDecision.decisionName}</CardTitle>
+            <p className="mt-3 max-w-3xl text-base text-muted-foreground">
+              {selectedDecision.whyThisLaunch || `${selectedDecision.creatorName} and ${selectedDecision.customerSegment} are the clearest current route into ${runtimeSkuName(selectedDecision.skuCode).toLowerCase()}.`}
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {evidenceCards.map((evidence) => (
+                <div key={evidence.label} className="rounded-2xl border bg-muted/20 p-3">
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{evidence.label}</div>
+                  <div className="mt-2 line-clamp-2 text-sm font-semibold">{evidence.value}</div>
+                  <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{evidence.detail}</div>
+                </div>
+              ))}
             </div>
-            <RuntimeRecommendationVisual
-              creator={selectedDecisionCreator}
-              product={selectedDecisionProduct}
-              productLabel={runtimeSkuLabel(selectedDecision.skuCode)}
-              variant="launch"
-              eyebrow="Launch route"
-              decisionMode={decisionMode}
-              className="xl:order-1"
-            />
-            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm xl:order-3">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Decision confidence</div>
-              <div className="mt-1 text-3xl font-semibold">{selectedDecision.confidence}%</div>
-              <Badge variant={runtimeStatusVariant(selectedDecision.approvalStatus)} className="mt-2 capitalize">
+          </div>
+
+          <div className="order-3 flex flex-col justify-between rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-4 text-center shadow-sm">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Decision</div>
+              <div className="mt-3 text-5xl font-semibold leading-none">{selectedDecision.confidence}%</div>
+              <Badge variant={runtimeStatusVariant(selectedDecision.approvalStatus)} className="mt-3 capitalize">
                 {humanizeIntelligenceValue(selectedDecision.approvalStatus)}
               </Badge>
+              <p className="mx-auto mt-4 max-w-[12rem] text-sm text-muted-foreground">{decisionQuestion}</p>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4">
-          <div className="grid gap-3 lg:grid-cols-4">
-            <RuntimeContextCard
-              label="Creator proof"
-              value={selectedDecision.creatorName}
-              detail={selectedDecisionCreator?.recentProof || selectedDecisionCreator?.audienceFit || `${creatorProofScore}% creator signal.`}
-            />
-            <RuntimeContextCard
-              label="Trend heat"
-              value={selectedDecision.customerSegment}
-              detail={selectedDecisionCustomer?.recentIntent || selectedDecisionCustomer?.nextMove || `${trendHeatScore}% trend signal.`}
-            />
-            <RuntimeContextCard
-              label="Weakest signal"
-              value={weakestSignal.label}
-              detail={weakestSignal.detail}
-            />
-            <RuntimeContextCard
-              label="Owner"
-              value={selectedDecision.owner || 'Launch owner needed'}
-              detail={selectedDecision.blocker || selectedDecision.expectedResponse || launchCta.detail}
-            />
-          </div>
-          <div className="rounded-2xl border bg-muted/20 p-3">
-            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
-            <div className="mt-2 text-sm font-medium">{launchCta.detail}</div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link to={launchCta.href}>
-                {launchCta.label}
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/customer/crm-compact">Open CRM Compact</Link>
-            </Button>
+            <div className="mt-5 space-y-2">
+              <Button asChild className="w-full px-3">
+                <Link to={launchCta.href}>
+                  {launchCta.shortLabel}
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
+                <Link to="/customer/crm-compact">Open CRM</Link>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryMetricCard label="Launch choices" value={launchDecisions.length} meta={`${approvedCount} ready to move.`} icon={<PanelsTopLeft className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Go signals" value={approvedCount} meta={`${reviewCount} still need evidence review.`} icon={<Sparkles className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Avg confidence" value={`${averageConfidence}%`} meta={`${strongestSignal.label} leads the signal mix.`} icon={<TrendingUp className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="Guardrails" value={blockerCount} meta={`${weakestSignal.label} needs the most attention.`} icon={<Megaphone className="size-5" />} tone="purple" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="overflow-hidden rounded-lg border">
-          <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <Badge variant="outline">Why PrimeOS chose it</Badge>
-                <CardTitle className="mt-3 text-2xl">Evidence breakdown</CardTitle>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                  PrimeOS checks the launch from four angles before it moves into execution.
-                </p>
-              </div>
-              <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm">
-                <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Weakest signal</div>
-                <div className="mt-1 text-xl font-semibold">{weakestSignal.label}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{weakestSignal.value}% score</div>
-              </div>
-            </div>
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+        <Card className="rounded-lg border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">What to do next</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 p-4">
-            <div className="grid gap-3 md:grid-cols-2">
-              {signalScores.map((signal) => (
-                <div key={signal.label} className="rounded-2xl border bg-muted/20 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="rounded-full border bg-background p-2 text-primary">{signal.icon}</div>
-                      <div>
-                        <div className="text-sm font-semibold">{signal.label}</div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">Evidence score</div>
-                      </div>
-                    </div>
-                    <div className="text-lg font-semibold">{signal.value}%</div>
-                  </div>
-                  <Progress value={signal.value} className="mt-3 h-2" />
-                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{signal.detail}</p>
-                </div>
-              ))}
+          <CardContent className="space-y-3">
+            <div className="rounded-2xl border bg-primary/5 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-primary">Next action</div>
+              <div className="mt-2 text-xl font-semibold">{decisionVerb}</div>
+              <p className="mt-2 text-sm text-muted-foreground">{nextActionCopy}</p>
             </div>
-
-            <div className="rounded-2xl border bg-background p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Signal path</div>
-                <Badge variant="outline">Why this is Intelligence</Badge>
-              </div>
-              <div className="grid gap-2 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] lg:items-center">
-                <RuntimeContextCard
-                  label="Creator proof"
-                  value={selectedDecision.creatorName}
-                  detail={selectedDecisionCreator?.recentProof || selectedDecisionCreator?.audienceFit || 'Creator row is attached to this launch decision.'}
-                />
-                <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
-                <RuntimeContextCard
-                  label="Trend signal"
-                  value={selectedDecision.customerSegment}
-                  detail={selectedDecisionCustomer?.recentIntent || selectedDecisionCustomer?.nextMove || 'Trend row is attached to this launch decision.'}
-                />
-                <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
-                <RuntimeContextCard
-                  label="SKU guardrail"
-                  value={runtimeSkuLabel(selectedDecision.skuCode)}
-                  detail={matchingForecast ? `${matchingForecast.risk} inventory risk before scale.` : 'No live forecast guardrail is linked yet.'}
-                />
-                <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
-                <RuntimeContextCard
-                  label="Decision"
-                  value={decisionMode}
-                  detail={selectedDecision.expectedResponse || launchCta.detail}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border bg-muted/20 p-3">
-              <div className="mb-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Decision queue</div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {launchDecisions.map((decision) => (
-                  <button
-                    key={decision.id}
-                    type="button"
-                    onClick={() => setSelectedDecisionId(decision.id)}
-                    className={`rounded-xl border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${selectedDecision.id === decision.id ? 'border-primary/40 bg-primary/5' : 'bg-background'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{decision.decisionName}</div>
-                        <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{decision.creatorName} x {decision.customerSegment}</div>
-                      </div>
-                      <Badge variant={runtimeStatusVariant(decision.approvalStatus)} className="shrink-0 capitalize">
-                        {humanizeIntelligenceValue(decision.approvalStatus)}
-                      </Badge>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Progress value={decision.confidence} className="h-1.5 flex-1" />
-                      <span className="text-xs font-semibold">{decision.confidence}%</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Owner</div>
+              <div className="mt-2 text-base font-semibold">{selectedDecision.owner || 'Launch owner needed'}</div>
+              <p className="mt-1 text-sm text-muted-foreground">This person owns the next move, not another round of analysis.</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Prime launch thesis</CardTitle>
-            <p className="text-sm text-muted-foreground">PrimeOS keeps the creator, trend, SKU, channel logic, blocker, and owner visible so this feels like a real operating launch package.</p>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Main risk</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Decision memo</div>
-              <div className="mt-3 flex items-center gap-3">
-                {selectedDecisionCreator ? <RuntimeCreatorAvatar creator={selectedDecisionCreator} /> : null}
-                <div>
-                  <div className="text-lg font-semibold">{selectedDecision.decisionName}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {runtimeSkuLabel(selectedDecision.skuCode)} · {selectedDecision.creatorName} x {selectedDecision.customerSegment}
-                  </div>
-                </div>
+          <CardContent className="space-y-3">
+            <div className="flex items-start justify-between gap-3 rounded-2xl border bg-muted/20 p-4">
+              <div>
+                <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Watch first</div>
+                <div className="mt-2 text-xl font-semibold">{weakestSignal.label}</div>
               </div>
+              <div className="text-2xl font-semibold">{weakestSignal.value}%</div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <RuntimeContextCard
-                label="Why this launch"
-                value={`${selectedDecision.confidence}% confidence`}
-                detail={selectedDecision.whyThisLaunch || `${selectedDecision.creatorName} and ${selectedDecision.customerSegment} currently form the clearest commercial route into ${runtimeSkuName(selectedDecision.skuCode).toLowerCase()}.`}
-              />
-              <RuntimeContextCard
-                label="Weakest signal"
-                value={weakestSignal.label}
-                detail={weakestSignal.detail}
-              />
-              <RuntimeContextCard
-                label="Blocker"
-                value={humanizeIntelligenceValue(selectedDecision.approvalStatus)}
-                detail={selectedDecision.blocker || 'No blocker is attached. PrimeOS can move this launch into execution.'}
-              />
-              <RuntimeContextCard
-                label="Owner"
-                value={selectedDecision.owner || 'Launch review owner'}
-                detail="PrimeOS keeps ownership explicit so the seller team knows who should move the launch next."
-              />
-              <RuntimeContextCard
-                label="Expected response"
-                value={selectedDecision.approvalStatus === 'approved' ? 'Expected after go-live' : 'Expected after review clears'}
-                detail={selectedDecision.expectedResponse || launchCta.detail}
-              />
+            <Progress value={weakestSignal.value} className="h-2" />
+            <p className="text-sm text-muted-foreground">{blockerCopy}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Expected result</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">If executed</div>
+              <p className="mt-2 text-base font-semibold">{selectedDecision.expectedResponse || launchCta.detail}</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <RuntimeContextCard
-                label="Campaign Ops"
-                value={matchingCampaign ? matchingCampaign.name : launchCta.label}
-                detail={matchingCampaign ? `${matchingCampaign.leads} leads, ${matchingCampaign.rfqs} RFQs, and ${matchingCampaign.orders} orders already sit on this SKU route.` : launchCta.detail}
-              />
-              <RuntimeContextCard
-                label="Ecom / COS"
-                value={matchingForecast ? `${matchingForecast.ats} ATS / ${matchingForecast.demand7d} 7d demand` : runtimeSkuLabel(selectedDecision.skuCode)}
-                detail={matchingForecast ? (matchingForecast.risk === 'high' ? 'Inventory is the main guardrail before approving more scale on this launch.' : 'Ecom can currently support this launch without obvious stock pressure.') : 'No live inventory guardrail has been linked yet.'}
-              />
+            <div className="rounded-2xl border bg-background p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Campaign route</div>
+              <div className="mt-2 text-sm font-semibold">{matchingCampaign ? matchingCampaign.name : runtimeSkuLabel(selectedDecision.skuCode)}</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {matchingCampaign ? `${matchingCampaign.leads} leads, ${matchingCampaign.rfqs} RFQs, ${matchingCampaign.orders} orders.` : 'Campaign Ops receives the approved route and CRM audience.'}
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="text-lg">Other launch candidates</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Keep the queue visible, but do not make the user hunt for the main answer.</p>
+            </div>
+            <Badge variant="outline">{launchDecisions.length} candidates</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {launchDecisions.map((decision) => (
+            <button
+              key={decision.id}
+              type="button"
+              onClick={() => setSelectedDecisionId(decision.id)}
+              className={`rounded-2xl border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${selectedDecision.id === decision.id ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{decision.decisionName}</div>
+                  <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{decision.creatorName} x {decision.customerSegment}</div>
+                </div>
+                <Badge variant={runtimeStatusVariant(decision.approvalStatus)} className="shrink-0 capitalize">
+                  {humanizeIntelligenceValue(decision.approvalStatus)}
+                </Badge>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <Progress value={decision.confidence} className="h-1.5 flex-1" />
+                <span className="text-xs font-semibold">{decision.confidence}%</span>
+              </div>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -5993,7 +5939,7 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
 const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; handoff: string; handoffHref: string }>> = {
   creators: { decide: 'Which creator should help sell this product?', handoff: 'PrimeOS explains the fit and sends the best route into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   customers: { decide: 'Pick the customer trend to activate now.', handoff: 'Send the trend into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
-  campaigns: { decide: 'Should this become a launch: go, review, hold, or no-go?', handoff: 'PrimeOS explains the evidence, weakest signal, blocker, and next owner before Campaign Ops.', handoffHref: '/demand/campaign-ops' },
+  campaigns: { decide: 'Launch, review, hold, or no-go?', handoff: 'If Go, send it to Campaign Ops. If not, clear the one blocker.', handoffHref: '/demand/campaign-ops' },
   analytics: { decide: 'Where is my funnel breaking and what is working?', handoff: 'Findings feed into Launch Decisions and AI Operator.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   attribution: { decide: 'Which channel is actually driving orders, not just clicks?', handoff: 'Attribution data guides approval inside Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: '/demand/campaign-ops' },
