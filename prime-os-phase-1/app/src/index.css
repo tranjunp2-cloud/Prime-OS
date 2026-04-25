@@ -1,79 +1,99 @@
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 220 23% 98%;
-    --foreground: 224 28% 12%;
+    --background: 0 0% 98%;
+    --foreground: 0 0% 4%;
 
     --card: 0 0% 100%;
-    --card-foreground: 224 28% 12%;
+    --card-foreground: 0 0% 4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 28% 12%;
+    --popover-foreground: 0 0% 4%;
 
-    --primary: 229 86% 62%;
+    --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 243 75% 59%;
+    --primary-soft: 239 84% 96%;
+    --brand-secondary: 112 86% 32%;
 
-    --secondary: 220 24% 94%;
-    --secondary-foreground: 224 28% 16%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
 
-    --muted: 220 22% 94%;
-    --muted-foreground: 223 12% 40%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 42%;
 
-    --accent: 219 25% 92%;
-    --accent-foreground: 224 28% 16%;
+    --accent: 240 12% 96%;
+    --accent-foreground: 0 0% 10%;
 
-    --destructive: 0 72% 54%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 148 63% 43%;
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 52%;
+    --warning: 38 92% 50%;
     --warning-foreground: 0 0% 12%;
 
     --amazon: 35 100% 50%;
     --shopee: 17 100% 55%;
     --rakuten: 350 75% 50%;
 
-    --border: 221 16% 84%;
-    --input: 221 16% 84%;
-    --ring: 229 86% 62%;
-    --ring-accent: 199 94% 62%;
+    --border: 240 12% 92%;
+    --input: 240 12% 92%;
+    --ring: 239 84% 67%;
+    --ring-accent: 239 84% 67%;
 
-    --radius: 0.875rem;
+    --radius: 0.375rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --header-height: 3.5rem;
+    --sidebar-width-compact: 4.75rem;
+    --sidebar-width-expanded: 19.75rem;
+    --row-height-compact: 2.25rem;
+    --row-height-default: 2.75rem;
+    --command-palette-width: 40rem;
 
-    --surface-stage: 222 42% 96%;
+    --surface-stage: 0 0% 98%;
     --surface-sidebar: 0 0% 100%;
     --surface-toolbar: 0 0% 100%;
     --surface-workspace: 0 0% 100%;
     --surface-data: 0 0% 100%;
-    --surface-map: 214 48% 94%;
+    --surface-map: 240 12% 96%;
     --surface-control: 0 0% 100%;
     --surface-overlay: 0 0% 100%;
-    --surface-selected: 229 86% 96%;
-    --surface-hover: 220 32% 95%;
+    --surface-command: 0 0% 100%;
+    --surface-selected: 239 84% 96%;
+    --surface-row-hover: 240 12% 96%;
+    --surface-row-selected: 239 84% 96%;
+    --surface-hover: 240 12% 96%;
     --surface-glass: 0 0% 100%;
+    --surface-highlight: 0 0% 100%;
     --overlay-scrim: 223 40% 8%;
 
-    --border-divider: 220 18% 84%;
+    --border-divider: 240 12% 92%;
     --border-highlight: 0 0% 100%;
-    --border-active: 229 86% 62%;
+    --border-active: 239 84% 67%;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 223 22% 22%;
-    --sidebar-primary: 229 86% 62%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 223 24% 94%;
-    --sidebar-accent-foreground: 223 22% 18%;
-    --sidebar-border: 220 18% 84%;
-    --sidebar-ring: 229 86% 62%;
+    --sidebar-accent: 240 12% 96%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 240 12% 92%;
+    --sidebar-ring: 239 84% 67%;
 
-    --chart-1: 229 86% 62%;
-    --chart-2: 148 63% 43%;
-    --chart-3: 35 100% 50%;
+    --chart-1: 239 84% 67%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 38 92% 50%;
     --chart-4: 17 100% 55%;
     --chart-5: 350 75% 50%;
 
@@ -82,85 +102,145 @@
     --map-border: 211 34% 48%;
     --map-focused: 239 76% 67%;
     --map-hover: 209 55% 38%;
+
+    --text-primary: 0 0% 4%;
+    --text-secondary: 0 0% 42%;
+    --text-tertiary: 0 0% 61%;
+    --text-disabled: 0 0% 68%;
+    --text-metadata: 0 0% 42%;
+    --text-identifier: 0 0% 34%;
+
+    --decision-go: 160 84% 39%;
+    --decision-review: 38 92% 50%;
+    --decision-hold: 33 95% 52%;
+    --decision-no-go: 0 84% 60%;
+
+    --status-active: 160 84% 39%;
+    --status-ready: 239 84% 67%;
+    --status-review: 38 92% 50%;
+    --status-hold: 33 95% 52%;
+    --status-blocked: 0 84% 60%;
+    --status-paused: 0 0% 42%;
+    --status-completed: 160 84% 39%;
+    --status-suppressed: 0 0% 42%;
+
+    --area-intelligence: 239 84% 67%;
+    --area-demand: 38 92% 50%;
+    --area-customer: 160 84% 39%;
+    --area-ecom: 209 85% 52%;
+    --area-finance: 158 64% 39%;
   }
 
   .dark {
-    --background: 223 45% 6%;
-    --foreground: 214 40% 96%;
+    --background: 240 11% 7%;
+    --foreground: 240 12% 95%;
 
-    --card: 224 31% 10%;
-    --card-foreground: 214 40% 96%;
+    --card: 240 16% 13%;
+    --card-foreground: 240 12% 95%;
 
-    --popover: 224 31% 10%;
-    --popover-foreground: 214 40% 96%;
+    --popover: 240 20% 15%;
+    --popover-foreground: 240 12% 95%;
 
-    --primary: 232 92% 66%;
+    --primary: 236 57% 60%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 233 48% 53%;
+    --primary-soft: 236 57% 18%;
 
-    --secondary: 220 25% 15%;
-    --secondary-foreground: 214 40% 96%;
+    --secondary: 240 16% 13%;
+    --secondary-foreground: 240 12% 95%;
 
-    --muted: 220 26% 15%;
-    --muted-foreground: 217 16% 68%;
+    --muted: 240 20% 15%;
+    --muted-foreground: 219 7% 65%;
 
-    --accent: 221 24% 17%;
-    --accent-foreground: 214 40% 96%;
+    --accent: 240 19% 18%;
+    --accent-foreground: 240 12% 95%;
 
-    --destructive: 0 66% 50%;
+    --destructive: 0 79% 63%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 148 60% 44%;
-    --success-foreground: 0 0% 100%;
+    --success: 148 65% 54%;
+    --success-foreground: 240 11% 7%;
 
-    --warning: 38 92% 52%;
-    --warning-foreground: 0 0% 8%;
+    --warning: 48 100% 47%;
+    --warning-foreground: 240 11% 7%;
 
     --amazon: 35 100% 50%;
     --shopee: 17 100% 55%;
     --rakuten: 350 75% 50%;
 
-    --border: 221 25% 18%;
-    --input: 221 25% 18%;
-    --ring: 232 92% 66%;
-    --ring-accent: 191 92% 60%;
+    --border: 240 14% 20%;
+    --input: 240 14% 20%;
+    --ring: 236 57% 60%;
+    --ring-accent: 233 55% 64%;
 
-    --surface-stage: 224 50% 4.5%;
-    --surface-sidebar: 222 34% 9%;
-    --surface-toolbar: 223 31% 11%;
-    --surface-workspace: 223 30% 8%;
-    --surface-data: 222 28% 10%;
+    --surface-stage: 240 11% 7%;
+    --surface-sidebar: 240 16% 13%;
+    --surface-toolbar: 240 17% 12%;
+    --surface-workspace: 240 11% 7%;
+    --surface-data: 240 16% 13%;
     --surface-map: 220 58% 8%;
-    --surface-control: 223 25% 12%;
-    --surface-overlay: 223 26% 11%;
-    --surface-selected: 229 68% 17%;
-    --surface-hover: 221 28% 15%;
-    --surface-glass: 223 27% 12%;
-    --overlay-scrim: 223 40% 5%;
+    --surface-control: 240 20% 15%;
+    --surface-overlay: 240 20% 15%;
+    --surface-command: 240 20% 15%;
+    --surface-selected: 236 57% 16%;
+    --surface-row-hover: 240 20% 15%;
+    --surface-row-selected: 236 57% 13%;
+    --surface-hover: 240 20% 15%;
+    --surface-glass: 240 18% 14%;
+    --surface-highlight: 0 0% 100%;
+    --overlay-scrim: 240 35% 5%;
 
-    --border-divider: 219 22% 18%;
+    --border-divider: 240 14% 20%;
     --border-highlight: 0 0% 100%;
-    --border-active: 232 92% 66%;
+    --border-active: 236 57% 60%;
 
-    --sidebar-background: 222 34% 9%;
-    --sidebar-foreground: 217 18% 74%;
-    --sidebar-primary: 232 92% 66%;
+    --sidebar-background: 240 16% 13%;
+    --sidebar-foreground: 219 7% 64%;
+    --sidebar-primary: 236 57% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 221 28% 14%;
-    --sidebar-accent-foreground: 214 40% 96%;
-    --sidebar-border: 219 22% 17%;
-    --sidebar-ring: 232 92% 66%;
+    --sidebar-accent: 240 20% 15%;
+    --sidebar-accent-foreground: 240 12% 95%;
+    --sidebar-border: 240 14% 20%;
+    --sidebar-ring: 236 57% 60%;
 
-    --chart-1: 232 92% 66%;
-    --chart-2: 148 60% 44%;
-    --chart-3: 35 100% 50%;
+    --chart-1: 236 57% 60%;
+    --chart-2: 148 65% 54%;
+    --chart-3: 48 100% 47%;
     --chart-4: 17 100% 55%;
-    --chart-5: 350 75% 50%;
+    --chart-5: 0 79% 63%;
 
     --map-background: 219 63% 6%;
     --map-land: 213 61% 13%;
     --map-border: 209 48% 23%;
     --map-focused: 243 75% 59%;
     --map-hover: 212 56% 27%;
+
+    --text-primary: 240 12% 95%;
+    --text-secondary: 219 7% 65%;
+    --text-tertiary: 219 6% 53%;
+    --text-disabled: 219 6% 42%;
+    --text-metadata: 219 7% 57%;
+    --text-identifier: 219 7% 67%;
+
+    --decision-go: 148 65% 54%;
+    --decision-review: 48 100% 47%;
+    --decision-hold: 32 94% 60%;
+    --decision-no-go: 0 79% 63%;
+
+    --status-active: 148 65% 54%;
+    --status-ready: 236 57% 60%;
+    --status-review: 48 100% 47%;
+    --status-hold: 32 94% 60%;
+    --status-blocked: 0 79% 63%;
+    --status-paused: 219 7% 57%;
+    --status-completed: 148 65% 54%;
+    --status-suppressed: 219 7% 57%;
+
+    --area-intelligence: 236 57% 60%;
+    --area-demand: 48 100% 47%;
+    --area-customer: 148 65% 54%;
+    --area-ecom: 200 84% 60%;
+    --area-finance: 158 64% 52%;
   }
 }
 
@@ -177,11 +257,18 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background-image:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.12), transparent 26%),
-      radial-gradient(circle at top right, hsl(var(--ring-accent) / 0.08), transparent 20%),
-      linear-gradient(180deg, hsl(var(--surface-stage)) 0%, hsl(var(--background)) 100%);
+    font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-image: none;
+    background-color: hsl(var(--background));
     background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: "General Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.03em;
   }
 
   ::selection {
@@ -251,69 +338,75 @@
   a:focus-visible,
   [role="button"]:focus-visible,
   [tabindex="0"]:focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-    border-radius: 0.875rem;
+    outline: none;
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.12);
+    border-radius: var(--radius-md);
   }
 }
 
-/* V2-03: Button press feedback — scale 97% on press, 150ms ease-out */
 @layer base {
   button:not(:disabled) {
-    transition: background-color 150ms ease-out, color 150ms ease-out,
-      border-color 150ms ease-out, opacity 150ms ease-out,
-      transform 150ms ease-out, box-shadow 150ms ease-out;
+    transition: background-color 200ms ease-out, color 200ms ease-out,
+      border-color 200ms ease-out, opacity 200ms ease-out,
+      transform 200ms ease-out, box-shadow 200ms ease-out;
   }
   button:not(:disabled):active {
-    transform: scale(0.97);
+    transform: translateY(0);
   }
 }
 
 @layer components {
   .surface-glass {
     @apply border;
-    border-color: hsl(var(--border-divider) / 0.7);
-    background-color: hsl(var(--surface-glass) / 0.72);
-    -webkit-backdrop-filter: blur(24px);
-    backdrop-filter: blur(24px);
-    box-shadow: 0 18px 50px hsl(var(--overlay-scrim) / 0.18), inset 0 1px 0 hsl(var(--border-highlight) / 0.06);
+    border-color: hsl(var(--border-divider));
+    background-color: hsl(var(--surface-glass) / 0.82);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow: none;
   }
 
   .surface-toolbar {
     @apply border;
-    border-color: hsl(var(--border-divider) / 0.7);
-    background-color: hsl(var(--surface-toolbar) / 0.84);
-    -webkit-backdrop-filter: blur(24px);
-    backdrop-filter: blur(24px);
-    box-shadow: 0 12px 30px hsl(var(--overlay-scrim) / 0.12), inset 0 1px 0 hsl(var(--border-highlight) / 0.05);
+    border-color: hsl(var(--border-divider));
+    background-color: hsl(var(--surface-toolbar) / 0.88);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow: none;
   }
 
   .surface-solid {
     @apply border;
-    border-color: hsl(var(--border-divider) / 0.8);
-    background-color: hsl(var(--surface-data) / 0.94);
-    box-shadow: 0 10px 24px hsl(var(--overlay-scrim) / 0.1), inset 0 1px 0 hsl(var(--border-highlight) / 0.03);
+    border-color: hsl(var(--border-divider));
+    background-color: hsl(var(--surface-data));
+    box-shadow: none;
   }
 
   .surface-workspace {
     @apply border;
-    border-color: hsl(var(--border-divider) / 0.8);
-    background-color: hsl(var(--surface-workspace) / 0.88);
+    border-color: hsl(var(--border-divider));
+    background-color: hsl(var(--surface-workspace));
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
-    box-shadow: 0 28px 80px hsl(var(--overlay-scrim) / 0.28), inset 0 1px 0 hsl(var(--border-highlight) / 0.04);
+    box-shadow: none;
   }
 
   .control-surface {
     @apply border;
-    border-color: hsl(var(--border-divider) / 0.8);
-    background-color: hsl(var(--surface-control) / 0.82);
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
+    border-color: hsl(var(--border-divider));
+    background-color: hsl(var(--surface-control));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .hairline-highlight {
-    box-shadow: inset 0 1px 0 hsl(var(--border-highlight) / 0.06);
+    box-shadow: none;
+  }
+
+  .surface-command {
+    @apply border;
+    border-color: hsl(var(--border-divider));
+    background-color: hsl(var(--surface-command));
+    box-shadow: 0 18px 48px hsl(var(--overlay-scrim) / 0.12);
   }
 }
 
@@ -400,5 +493,26 @@
   }
   .border-warning {
     border-color: hsl(var(--warning));
+  }
+
+  .font-identifier {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .text-metadata {
+    color: hsl(var(--text-metadata));
+  }
+
+  .text-identifier {
+    color: hsl(var(--text-identifier));
+  }
+
+  .bg-row-hover {
+    background-color: hsl(var(--surface-row-hover));
+  }
+
+  .bg-row-selected {
+    background-color: hsl(var(--surface-row-selected));
   }
 }

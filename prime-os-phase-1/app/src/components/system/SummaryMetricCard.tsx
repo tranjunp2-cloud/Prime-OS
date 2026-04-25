@@ -36,11 +36,11 @@ export function SummaryMetricCard({
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               {loading ? <Skeleton className="h-3 w-24 rounded-full" /> : label}
             </p>
-            <div className={cn('mt-2 min-h-[2rem] text-2xl font-semibold tracking-[-0.03em] text-foreground', valueClassName)}>
-              {loading ? <Skeleton className="h-8 w-20 rounded-xl" /> : value}
+            <div className={cn('font-display mt-2 min-h-[2rem] text-2xl font-semibold text-foreground', valueClassName)}>
+              {loading ? <Skeleton className="h-8 w-20 rounded-md" /> : value}
             </div>
             {status ? (
               <div className="mt-2">{loading ? <Skeleton className="h-5 w-24 rounded-full" /> : status}</div>
@@ -52,7 +52,7 @@ export function SummaryMetricCard({
             )}
           </div>
           {icon && (
-            <div className={cn('rounded-2xl p-2.5', loading ? 'bg-muted/70' : getSemanticSurfaceToneClassName(tone))}>
+            <div className={cn('rounded-md p-2.5', loading ? 'bg-muted/70' : getSemanticSurfaceToneClassName(tone))}>
               {loading ? <Skeleton className="size-5 rounded-md" /> : icon}
             </div>
           )}

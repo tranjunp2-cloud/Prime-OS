@@ -71,6 +71,19 @@ import {
 import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
 import {
+  ActionSetupPanel,
+  DecisionHeader,
+  EvidenceStack,
+  HandoffRail,
+  LinkedEntityStrip,
+  OperatingLoop,
+  OutcomePreview,
+  RegistryList,
+  type EvidenceItem,
+  type OperatingLoopStep,
+  type RegistryItem,
+} from '@/components/prime/PrimeOperatingSystem';
+import {
   PRIME_TOWER_CONFIGS,
   getPrimeSnapshot,
   getSkuCodeValue,
@@ -211,6 +224,121 @@ const currency = new Intl.NumberFormat('ja-JP', {
 const demandTowerIds: PrimeTowerId[] = ['campaign-ops', 'content-creator-ops', 'lead-response-capture', 'retargeting-outreach'];
 const intelligenceTowerIds: PrimeTowerId[] = ['creators', 'customers', 'campaigns', 'analytics', 'attribution', 'forecasting', 'ai-operator', 'voc', 'alerts'];
 const financeTowerIds: PrimeTowerId[] = ['offers', 'risk', 'settlement'];
+
+function getTowerConfidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot) {
+  if (demandTowerIds.includes(towerId)) {
+    return Math.min(94, 62 + snapshot.campaigns.length * 5 + Math.round(snapshot.metrics.leadToOrderRate / 3));
+  }
+
+  if (intelligenceTowerIds.includes(towerId)) {
+    return Math.min(95, 66 + snapshot.insightModels.length * 4 + snapshot.activationPlays.length * 3);
+  }
+
+  if (financeTowerIds.includes(towerId)) {
+    return 76;
+  }
+
+  if (towerId === 'crm-compact' || towerId === 'service') {
+    return Math.min(92, 68 + snapshot.customers.length * 2);
+  }
+
+  return 72;
+}
+
+function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot): EvidenceItem[] {
+  if (demandTowerIds.includes(towerId)) {
+    return [
+      { label: 'Campaigns', value: snapshot.campaigns.length, detail: `${snapshot.leads.length} leads and ${snapshot.rfqs.length} RFQs attached.`, tone: 'info' },
+      { label: 'Orders', value: snapshot.orders.length, detail: `${currency.format(snapshot.metrics.revenue)} revenue context from OMS.`, tone: 'success' },
+      { label: 'Guardrail', value: `${snapshot.alerts.length} alerts`, detail: 'Demand actions must keep COS, finance, and customer controls visible.', tone: snapshot.alerts.length ? 'warning' : 'muted' },
+    ];
+  }
+
+  if (intelligenceTowerIds.includes(towerId)) {
+    return [
+      { label: 'Signals', value: snapshot.socialStreams.length + snapshot.vocInsights.length, detail: 'Social, creator, VOC, and product signals are joined before action.', tone: 'purple' },
+      { label: 'Models', value: snapshot.insightModels.length, detail: 'Mock ML/DL models explain what to activate next.', tone: 'info' },
+      { label: 'Actions', value: snapshot.activationPlays.length, detail: 'Recommendations hand off into Demand, Customer, or COS.', tone: 'success' },
+    ];
+  }
+
+  if (financeTowerIds.includes(towerId)) {
+    return [
+      { label: 'Revenue', value: currency.format(snapshot.metrics.revenue), detail: 'Finance reads operating reality from OMS.', tone: 'success' },
+      { label: 'Risk', value: `${snapshot.forecasts.filter((forecast) => forecast.risk === 'high').length} blockers`, detail: 'Inventory and eligibility pressure stay visible before scale.', tone: 'warning' },
+      { label: 'Customers', value: snapshot.customers.length, detail: 'CRM memory supports repayment and repeat health context.', tone: 'info' },
+    ];
+  }
+
+  return [
+    { label: 'Customers', value: snapshot.customers.length, detail: 'Customer memory anchors follow-up, repeat, and service context.', tone: 'info' },
+    { label: 'Orders', value: snapshot.orders.length, detail: 'OMS order preview stays linked but not owned here.', tone: 'success' },
+    { label: 'Service', value: snapshot.tickets.length, detail: 'Service context is previewed without absorbing the Service tower.', tone: 'warning' },
+  ];
+}
+
+function getTowerLoop(towerId: PrimeTowerId, job: { handoffHref: string } | undefined, snapshot: PrimeSnapshot): OperatingLoopStep[] {
+  if (demandTowerIds.includes(towerId)) {
+    return [
+      { label: 'Signal', title: 'Warm buyer or launch route appears', detail: `${snapshot.campaigns.length} campaign routes and ${snapshot.leads.length} leads are available.`, href: '/intelligence/launch-decisions', tone: 'purple' },
+      { label: 'Decision', title: 'Choose message, CTA, and owner', detail: 'Demand works only after a clear route, audience, and guardrail exist.', tone: 'info' },
+      { label: 'Handoff', title: 'Capture and CRM receive response', detail: 'RFQs, replies, and owner tasks should not disappear into marketing reporting.', href: job?.handoffHref || '/customer/crm-compact', tone: 'default' },
+      { label: 'Outcome', title: 'OMS/CRM read back result', detail: `${snapshot.orders.length} orders and ${snapshot.customers.length} customer profiles close the loop.`, href: '/ecom/cos/oms', tone: 'success' },
+    ];
+  }
+
+  if (intelligenceTowerIds.includes(towerId)) {
+    return [
+      { label: 'Signal', title: 'Signals are joined', detail: 'Creator, trend, VOC, SKU, campaign, and customer signals come together.', tone: 'purple' },
+      { label: 'Decision', title: 'Recommend the next move', detail: 'The tower answers what to do now, not just what happened.', href: '/intelligence/launch-decisions', tone: 'info' },
+      { label: 'Handoff', title: 'Send action to the owning tower', detail: 'Demand, COS, Finance, or Customer receives the next step.', href: job?.handoffHref || '/overview', tone: 'default' },
+      { label: 'Outcome', title: 'Read execution back', detail: 'Orders, RFQs, and CRM outcomes return as evidence.', href: '/overview', tone: 'success' },
+    ];
+  }
+
+  return [
+    { label: 'Context', title: 'Read the operating record', detail: 'Use linked customer, finance, service, or commerce context.', tone: 'info' },
+    { label: 'Decision', title: 'Pick the next accountable action', detail: 'Every screen should tell the operator what decision it supports.', tone: 'purple' },
+    { label: 'Handoff', title: 'Move to the owner tower', detail: job?.handoffHref ? 'The next route is explicit.' : 'The handoff remains in this workspace.', href: job?.handoffHref, tone: 'default' },
+    { label: 'Outcome', title: 'Preview result and risk', detail: 'Results are read views, not a parallel source of truth.', tone: 'success' },
+  ];
+}
+
+function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): RegistryItem[] {
+  if (demandTowerIds.includes(towerId)) {
+    return snapshot.campaigns.slice(0, 5).map((campaign) => ({
+      id: campaign.id,
+      label: 'Campaign',
+      title: campaign.name,
+      detail: `${getSkuLabel(campaign.skuCode)} · ${campaign.leads} leads · ${campaign.orders} orders`,
+      meta: campaign.status,
+      href: '/demand/campaign-ops',
+      tone: 'info',
+    }));
+  }
+
+  if (intelligenceTowerIds.includes(towerId)) {
+    return snapshot.activationPlays.slice(0, 5).map((play) => ({
+      id: play.id,
+      label: 'Play',
+      title: play.audience,
+      detail: play.nextBestAction,
+      meta: `+${play.projectedLift}%`,
+      href: '/demand/campaign-ops',
+      tone: 'purple',
+    }));
+  }
+
+  return snapshot.customers.slice(0, 5).map((customer) => ({
+    id: customer.id,
+    label: 'Customer',
+    title: customer.name,
+    detail: `${customer.company} · ${customer.totalOrders} orders`,
+    meta: customer.lifecycle,
+    href: '/customer/crm-compact',
+    tone: 'info',
+  }));
+}
 
 function statusTone(status: string) {
   if (['active', 'qualified', 'converted', 'resolved', 'positive', 'low'].includes(status)) return 'text-emerald-600 dark:text-emerald-300';
@@ -6973,6 +7101,11 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
 export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
   const config = PRIME_TOWER_CONFIGS[towerId];
   const job = towerJobDescriptions[towerId];
+  const snapshot = getPrimeSnapshot();
+  const confidence = getTowerConfidence(towerId, snapshot);
+  const evidence = getTowerEvidence(towerId, snapshot);
+  const loop = getTowerLoop(towerId, job, snapshot);
+  const registryItems = getTowerRegistryItems(towerId, snapshot);
 
   return (
     <div className="min-h-full bg-background">
@@ -6985,6 +7118,71 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
       />
 
       <div className="space-y-6 p-4 md:p-6">
+        <DecisionHeader
+          eyebrow={`${config.area} operating workspace`}
+          title={config.tower}
+          description={job?.decide || config.promise}
+          confidence={confidence}
+          status={confidence >= 80 ? 'Ready' : confidence >= 65 ? 'Watch' : 'Needs action'}
+          actions={(
+            <>
+              {job ? (
+                <Button asChild>
+                  <Link to={job.handoffHref}>
+                    Open handoff
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              ) : null}
+              <Button asChild variant="outline">
+                <Link to="/overview">
+                  Back to loop
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          evidence={evidence}
+        />
+
+        <LinkedEntityStrip
+          entities={[
+            { label: 'Area', value: config.area, tone: 'purple' },
+            { label: 'Tower', value: config.tower, tone: 'info' },
+            { label: 'Orders', value: String(snapshot.orders.length), href: '/ecom/cos/oms', tone: 'success' },
+            { label: 'Signals', value: String(snapshot.socialStreams.length + snapshot.vocInsights.length), href: '/intelligence/trends', tone: 'muted' },
+          ]}
+        />
+
+        <OperatingLoop steps={loop} />
+
+        {job ? (
+          <HandoffRail
+            from={config.tower}
+            to={job.handoff}
+            detail={config.promise}
+            href={job.handoffHref}
+          />
+        ) : null}
+
+        <section className="grid gap-4 xl:grid-cols-[1fr_1fr_0.8fr]">
+          <EvidenceStack items={evidence} />
+          <RegistryList items={registryItems} />
+          <div className="grid gap-4">
+            <OutcomePreview
+              value={demandTowerIds.includes(towerId) ? snapshot.orders.length : intelligenceTowerIds.includes(towerId) ? snapshot.activationPlays.length : snapshot.customers.length}
+              detail={demandTowerIds.includes(towerId) ? 'Orders read back from OMS after demand execution.' : intelligenceTowerIds.includes(towerId) ? 'Activation plays ready for operator handoff.' : 'Customer/account records available for operating context.'}
+              tone={confidence >= 80 ? 'success' : 'info'}
+            />
+            <ActionSetupPanel
+              title={job ? 'Continue the accountable handoff' : 'Return to the operating loop'}
+              detail={job?.handoff || 'Use the overview to select the next owner workspace.'}
+              actionLabel={job ? 'Open next tower' : 'Open overview'}
+              href={job?.handoffHref || '/overview'}
+            />
+          </div>
+        </section>
+
         {job ? (
           <Card className="rounded-lg border border-primary/20 bg-primary/5">
             <CardContent className="grid gap-3 p-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">

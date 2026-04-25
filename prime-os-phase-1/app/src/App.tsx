@@ -23,6 +23,7 @@ import SlaPolicies from "./pages/SlaPolicies";
 import RoutingPlans from "./pages/RoutingPlans";
 import UIRegressionReview from "./pages/UIRegressionReview";
 import { AppLayout } from "./components/layout/AppLayout";
+import { LegacyEntityRedirect, LegacyPathRedirect } from "./components/routing/LegacyEntityRedirect";
 import { PrimeOverview } from "./pages/prime/PrimeOverview";
 import { PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "./pages/prime/CommerceSurfacePage";
@@ -61,7 +62,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="sme-ech-theme">
+      <ThemeProvider defaultTheme="light" storageKey="prime-os-genesis-theme">
         <I18nProvider>
           <AuthProvider>
             <TooltipProvider>
@@ -135,9 +136,15 @@ const App = () => {
 
                     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
                     <Route path="/products" element={<Navigate to="/ecom/cos/product-master" replace />} />
+                    <Route path="/products/new" element={<LegacyPathRedirect to="/ecom/cos/product-master/new" />} />
+                    <Route path="/products/:id/edit" element={<LegacyPathRedirect to="/ecom/cos/product-master/:id/edit" />} />
+                    <Route path="/products/:id/variants/:sku" element={<LegacyPathRedirect to="/ecom/cos/product-master/:id?variant=:sku" />} />
+                    <Route path="/products/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/product-master" />} />
                     <Route path="/inventory" element={<Navigate to="/ecom/cos/inventory-brain" replace />} />
                     <Route path="/orders" element={<Navigate to="/ecom/cos/oms" replace />} />
+                    <Route path="/orders/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/oms" />} />
                     <Route path="/fulfillment" element={<Navigate to="/ecom/cos/fulfillment" replace />} />
+                    <Route path="/fulfillment/jobs/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/fulfillment/jobs" />} />
                     <Route path="/returns" element={<Navigate to="/ecom/cos/returns" replace />} />
                     <Route path="/sla-policies" element={<Navigate to="/ecom/cos/policy-rule/sla" replace />} />
                     <Route path="/routing-plans" element={<Navigate to="/ecom/cos/policy-rule/routing" replace />} />

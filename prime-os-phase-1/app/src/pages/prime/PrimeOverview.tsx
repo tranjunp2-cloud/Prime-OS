@@ -25,6 +25,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
+import {
+  DecisionHeader,
+  EvidenceStack,
+  GuardrailCard,
+  HandoffRail,
+  LinkedEntityStrip,
+  OperatingLoop,
+  OutcomePreview,
+  RegistryList,
+} from '@/components/prime/PrimeOperatingSystem';
 import { getPrimeSnapshot, getSkuLabel, getSkuProductName } from '@/lib/prime/prime-data';
 
 const currency = new Intl.NumberFormat('ja-JP', {
@@ -182,6 +192,60 @@ export function PrimeOverview() {
       />
 
       <div className="space-y-6 p-4 md:p-6">
+        <DecisionHeader
+          eyebrow="Prime OS control plane"
+          title={topCampaign ? `Scale ${topCampaign.name}` : 'Choose the next closed-loop launch route'}
+          description={topRecommendation?.reasoning || 'PrimeOS joins intelligence, product readiness, demand execution, finance health, and customer memory into one operator recommendation.'}
+          confidence={systemScore}
+          status={scoreCopy(systemScore)}
+          actions={(
+            <>
+              <Button asChild>
+                <Link to="/intelligence/launch-decisions">
+                  Open Launch Decisions
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/demand/campaign-ops">
+                  Execute in Demand
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          evidence={[
+            { label: 'Signal', value: topRecommendation?.target || 'Launch route', detail: topRecommendation ? `${topRecommendation.confidence}% confidence` : 'Decision context ready', tone: 'purple' },
+            { label: 'Demand', value: topPlay?.audience || topCampaign?.targetSegment || 'Buyer audience', detail: topPlay ? `+${topPlay.projectedLift}% projected lift` : `${totalLeads} leads in motion`, tone: 'info' },
+            { label: 'Guardrail', value: topForecast ? scoreCopy(ecomScore) : 'Clear', detail: topForecast ? `${topForecast.risk} stock risk` : 'No stock blocker detected', tone: topForecast?.risk === 'high' ? 'danger' : 'success' },
+          ]}
+        />
+
+        <LinkedEntityStrip
+          entities={[
+            { label: 'SKU', value: heroSku || 'pending', href: '/ecom/cos/product-master', tone: 'info' },
+            { label: 'Campaign', value: topCampaign?.id || 'pending', href: '/demand/campaign-ops', tone: 'purple' },
+            { label: 'CRM', value: topCustomer?.id || 'customer-memory', href: '/customer/crm-compact', tone: 'success' },
+            { label: 'Orders', value: String(totalOrders), href: '/ecom/cos/oms', tone: 'muted' },
+          ]}
+        />
+
+        <OperatingLoop
+          steps={[
+            { label: 'Signal', title: 'Intelligence explains why now', detail: `${snapshot.insightModels.length + snapshot.vocInsights.length} model/VOC signals available.`, href: '/intelligence/launch-decisions', tone: 'purple' },
+            { label: 'Decision', title: 'Operator chooses the route', detail: topCampaign ? topCampaign.name : 'Launch route is ready for review.', href: '/intelligence/launch-decisions', tone: 'info' },
+            { label: 'Handoff', title: 'Demand executes the move', detail: 'Campaign, creator, lead response, and retargeting stay connected.', href: '/demand/campaign-ops', tone: 'default' },
+            { label: 'Outcome', title: 'COS and CRM read back reality', detail: `${totalOrders} orders, ${repeatCustomers} repeat buyers, and ${openTickets.length} service flags.`, href: '/ecom/cos/oms', tone: 'success' },
+          ]}
+        />
+
+        <HandoffRail
+          from="Prime OS Overview"
+          to="Launch Decisions"
+          detail="The overview should not become the workbench. It sends the operator into the specific decision queue with evidence attached."
+          href="/intelligence/launch-decisions"
+        />
+
         <Card className="overflow-hidden rounded-lg border">
           <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-emerald-500/10">
             <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_190px] xl:items-stretch">
@@ -320,6 +384,39 @@ export function PrimeOverview() {
         </Card>
 
         <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+          <EvidenceStack
+            items={[
+              { label: 'Revenue context', value: currency.format(snapshot.metrics.revenue), detail: `${repeatCustomers} repeat buyers in CRM memory.`, tone: 'success' },
+              { label: 'Demand proof', value: `${leadToOrderRate}% lead to order`, detail: `${totalLeads} leads, ${totalRfqs} RFQs, ${totalOrders} orders.`, tone: 'info' },
+              { label: 'Product readiness', value: `${snapshot.products.length} products covered`, detail: `${snapshot.inventoryPositions.length} inventory rows across ${snapshot.warehousesCount} warehouses.`, tone: highRiskForecasts.length ? 'warning' : 'success' },
+            ]}
+          />
+
+          <RegistryList
+            items={[
+              ...snapshot.recommendations.slice(0, 3).map((recommendation) => ({
+                id: recommendation.id,
+                label: 'AI',
+                title: recommendation.target,
+                detail: recommendation.action,
+                meta: `${recommendation.confidence}%`,
+                href: '/intelligence/launch-decisions',
+                tone: 'purple' as const,
+              })),
+              ...snapshot.activationPlays.slice(0, 3).map((play) => ({
+                id: play.id,
+                label: 'Demand',
+                title: play.audience,
+                detail: play.nextBestAction,
+                meta: `+${play.projectedLift}%`,
+                href: '/demand/campaign-ops',
+                tone: 'info' as const,
+              })),
+            ]}
+          />
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
           <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle>Next actions</CardTitle>
@@ -386,6 +483,25 @@ export function PrimeOverview() {
               </div>
             </CardContent>
           </Card>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          <OutcomePreview
+            value={currency.format(snapshot.metrics.revenue)}
+            detail="Outcome is read from OMS and CRM context, not a decorative chart."
+          />
+          <GuardrailCard
+            title={highRiskForecasts.length ? 'Inventory pressure before scale' : 'No major scale blocker'}
+            detail={highRiskForecasts.length ? `${highRiskForecasts.length} SKU routes need inventory attention before broader demand.` : 'Current product, customer, and finance signals are clear enough for the next operating move.'}
+            tone={highRiskForecasts.length ? 'warning' : 'success'}
+            status={highRiskForecasts.length ? 'Watch' : 'Clear'}
+          />
+          <OutcomePreview
+            label="Customer memory"
+            value={repeatCustomers}
+            detail="Repeat buyers stay linked back into CRM Compact so Prime OS can learn from demand outcomes."
+            tone="info"
+          />
         </section>
       </div>
     </div>

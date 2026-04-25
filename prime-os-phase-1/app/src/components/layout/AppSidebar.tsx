@@ -25,21 +25,21 @@ function SidebarLink({
   const href = getPrimeNodeHref(node);
   const isExternal = node.external || /^https?:\/\//.test(href);
   const baseClassName = cn(
-    'group flex min-h-11 items-center gap-2.5 rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/70',
+    'group relative flex min-h-10 items-center gap-2.5 rounded-md text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)]',
     isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
     isActive
       ? isLeaf
-        ? 'bg-primary/10 text-primary ring-1 ring-primary/25'
-        : 'bg-muted/70 text-foreground'
-      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+        ? 'bg-primary text-primary-foreground shadow-[0_4px_12px_hsl(var(--primary)/0.22)]'
+        : 'bg-[hsl(var(--surface-toolbar))] text-foreground ring-1 ring-border'
+      : 'text-muted-foreground hover:bg-[hsl(var(--surface-hover))] hover:text-foreground'
   );
 
   const content = (
     <>
-      {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
+      {Icon ? <Icon className={cn('size-4 shrink-0', isActive && isLeaf ? 'text-primary-foreground' : isActive && 'text-primary')} /> : null}
       <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
       {node.badge ? (
-        <span className="hidden rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary md:inline">
+        <span className="hidden rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary md:inline">
           {node.badge}
         </span>
       ) : null}
@@ -101,16 +101,16 @@ function SidebarFolder({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         className={cn(
-          'group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/70 md:pl-3 md:pr-2',
+          'group relative flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] md:pl-3 md:pr-2',
           isActive
-            ? 'bg-muted/70 text-foreground ring-1 ring-primary/15'
-            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+            ? 'bg-[hsl(var(--surface-toolbar))] text-foreground ring-1 ring-border'
+            : 'text-muted-foreground hover:bg-[hsl(var(--surface-hover))] hover:text-foreground'
         )}
       >
         {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
         <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
         {node.badge ? (
-          <span className="hidden rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary md:inline">
+          <span className="hidden rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary md:inline">
             {node.badge}
           </span>
         ) : null}
@@ -151,21 +151,21 @@ export function AppSidebar() {
   const [overviewNode, ...areaNodes] = primeNavigation;
 
   return (
-    <aside className="flex h-full w-[76px] shrink-0 flex-col border-r bg-card md:w-[316px]">
-      <div className="flex h-14 items-center justify-center border-b px-3 md:justify-start md:px-4">
+    <aside className="flex h-full w-[var(--sidebar-width-compact)] shrink-0 flex-col border-r border-border bg-card/95 md:w-[var(--sidebar-width-expanded)]">
+      <div className="flex h-[var(--header-height)] items-center justify-center border-b border-border px-3 md:justify-start md:px-4">
         <img
           src="/brand-logo.svg"
           alt="Prime OS logo"
           className="h-7 w-auto shrink-0"
         />
         <div className="hidden min-w-0 flex-col md:flex">
-          <span className="truncate text-sm font-semibold leading-none">Prime OS</span>
+          <span className="font-display truncate text-sm font-semibold leading-none">Prime OS</span>
           <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">Closed-loop commerce platform</span>
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3" aria-label="Primary navigation">
-        <div className="space-y-4 px-3">
+        <div className="space-y-4 px-2.5 md:px-3">
           <div>
             <SidebarLink node={overviewNode} activeIds={activeIds} isLeaf />
           </div>
@@ -176,7 +176,7 @@ export function AppSidebar() {
         </div>
       </nav>
 
-      <div className="space-y-3 border-t p-3">
+      <div className="space-y-3 border-t border-border p-3">
         <div className="hidden md:flex md:justify-center">
           <ThemeModeSwitcher compact />
         </div>

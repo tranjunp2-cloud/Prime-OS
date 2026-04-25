@@ -68,27 +68,23 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Cool background decorations for modern vibe */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary/20 blur-[120px] rounded-full mix-blend-screen animate-pulse pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-primary/100/20 blur-[120px] rounded-full mix-blend-screen animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
-
-      <Card className="w-full max-w-md relative z-10 border-slate-800 bg-slate-900/50 backdrop-blur-xl shadow-2xl">
-        <CardHeader className="text-center pb-6 pt-10">
-          <div className="mx-auto bg-primary/20 size-16 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(79,70,229,0.3)]">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-[520px]">
+        <CardHeader className="pb-8 pt-10 text-center">
+          <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
             <LockKeyhole className="size-8 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-white">
+          <CardTitle className="font-display text-4xl font-semibold text-foreground">
             Sign in
           </CardTitle>
-          <CardDescription className="text-slate-400 mt-2 text-base">
+          <CardDescription className="mt-3 text-[15px] text-muted-foreground">
             Enter your PrimeOS workspace account.
           </CardDescription>
         </CardHeader>
-        <CardContent className="pb-10 px-8">
+        <CardContent className="px-8 pb-10">
           <form className="flex flex-col gap-5" onSubmit={handleLogin}>
             <div className="space-y-2">
-              <Label htmlFor="primeos-email" className="text-slate-200">Email</Label>
+              <Label htmlFor="primeos-email">Email</Label>
               <Input
                 id="primeos-email"
                 type="email"
@@ -97,12 +93,12 @@ export default function Auth() {
                 autoComplete="username"
                 placeholder="seller@company.com"
                 required
-                className="h-12 border-slate-700 bg-slate-950/70 text-white placeholder:text-slate-500"
+                className="h-11"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="primeos-password" className="text-slate-200">Password</Label>
+              <Label htmlFor="primeos-password">Password</Label>
               <Input
                 id="primeos-password"
                 type="password"
@@ -111,19 +107,20 @@ export default function Auth() {
                 autoComplete="current-password"
                 placeholder="Enter password"
                 required
-                className="h-12 border-slate-700 bg-slate-950/70 text-white placeholder:text-slate-500"
+                className="h-11"
               />
             </div>
 
             {formError ? (
-              <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {formError}
               </div>
             ) : null}
 
             <Button
               type="submit"
-              className="mt-2 h-14 w-full text-lg font-medium shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-all hover:shadow-[0_0_30px_rgba(79,70,229,0.6)]"
+              size="lg"
+              className="mt-2 w-full text-[15px]"
               disabled={isLoading}
             >
               {isLoading ? (

@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { LogOut, Search } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
+import { PrimeCommandPalette } from './PrimeCommandPalette';
 import { GlobalCopilotWorkspace } from '@/components/copilot/GlobalCopilotWorkspace';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 
 export function AppLayout() {
   const [bootstrapping, setBootstrapping] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -36,6 +37,21 @@ export function AppLayout() {
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const openCommand = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setCommandOpen((value) => !value);
+      }
+    };
+
+    window.addEventListener('keydown', openCommand);
+
+    return () => {
+      window.removeEventListener('keydown', openCommand);
     };
   }, []);
 
@@ -77,17 +93,23 @@ export function AppLayout() {
       <AppSidebar />
       <div className="flex-1 min-w-0 overflow-hidden">
         <GlobalCopilotWorkspace>
-          <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b bg-background/92 px-4 backdrop-blur md:px-6">
-            <div className="relative min-w-0 flex-1 md:max-w-xl">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                aria-label="Global entity search"
-                className="h-9 rounded-lg pl-9 text-sm"
-                placeholder="Search product, SKU, order, lead, customer, alert..."
-              />
-            </div>
+          <header className="sticky top-0 z-30 flex min-h-[var(--header-height)] items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-xl md:px-6">
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              className="group flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-input bg-card px-3.5 text-left text-sm text-muted-foreground transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-primary/45 hover:bg-[hsl(var(--surface-hover))] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] md:max-w-xl"
+              aria-label="Open command palette"
+            >
+              <Search className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">
+                Search product, order, lead, customer, workspace...
+              </span>
+              <span className="font-identifier hidden rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+                Cmd K
+              </span>
+            </button>
             <div className="hidden min-w-0 flex-col text-right md:flex">
-              <span className="text-[11px] font-medium text-muted-foreground">PrimeOS session</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Prime OS session</span>
               <span className="max-w-[180px] truncate text-xs font-semibold text-foreground">
                 {user?.email || 'Demo workspace'}
               </span>
@@ -98,15 +120,16 @@ export function AppLayout() {
               size="sm"
               onClick={handleSignOut}
               disabled={signingOut}
-              className="shrink-0 rounded-lg"
+              className="shrink-0"
             >
               <LogOut className="size-4" />
               <span className="hidden sm:inline">{signingOut ? 'Signing out...' : 'Logout'}</span>
             </Button>
           </header>
+          <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
           <main
             id="main-content"
-            className="h-[calc(100%-3.5rem)] min-w-0 overflow-y-auto overflow-x-auto animate-in fade-in-5 duration-200"
+            className="h-[calc(100%-var(--header-height))] min-w-0 overflow-y-auto overflow-x-auto animate-in fade-in-5 duration-200"
           >
             <Outlet />
           </main>

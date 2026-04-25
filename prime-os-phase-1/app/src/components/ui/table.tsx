@@ -20,23 +20,23 @@ const variantClassMap: Record<TableVariant, {
   index: {
     wrapper: "",
     table: "text-sm",
-    head: "px-4 py-3 text-xs",
-    row: "hover:bg-muted/30",
-    cell: "px-4 py-3 text-sm",
+    head: "h-9 px-4 py-2 text-[11px]",
+    row: "hover:bg-[hsl(var(--surface-row-hover))]",
+    cell: "h-11 px-4 py-2 text-[15px]",
   },
   embedded: {
     wrapper: "",
     table: "text-sm",
-    head: "px-4 py-3 text-xs",
-    row: "hover:bg-muted/30",
-    cell: "px-4 py-3 text-sm",
+    head: "h-9 px-4 py-2 text-[11px]",
+    row: "hover:bg-[hsl(var(--surface-row-hover))]",
+    cell: "h-11 px-4 py-2 text-[15px]",
   },
   compact: {
     wrapper: "",
     table: "text-xs",
-    head: "px-3 py-2 text-[11px]",
-    row: "hover:bg-muted/20",
-    cell: "px-3 py-2 text-xs",
+    head: "h-8 px-3 py-1.5 text-[10px]",
+    row: "hover:bg-[hsl(var(--surface-row-hover))]",
+    cell: "h-9 px-3 py-1.5 text-xs",
   },
 };
 
@@ -89,7 +89,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
       <tr
         ref={ref}
         className={cn(
-          "border-b border-border/50 transition-colors data-[state=selected]:bg-muted",
+          "border-b border-border/45 transition-colors duration-150 ease-out data-[state=selected]:bg-[hsl(var(--surface-row-selected))]",
           variantClassMap[variant].row,
           className,
         )}
@@ -107,7 +107,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
       <th
         ref={ref}
         className={cn(
-          "sticky top-0 z-30 bg-[hsl(var(--surface-toolbar))] text-left align-middle font-medium uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--border-divider)/0.7)] [&:has([role=checkbox])]:pr-0",
+          "sticky top-0 z-30 bg-[hsl(var(--surface-toolbar))] text-left align-middle font-semibold uppercase tracking-[0.08em] text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--border-divider))] [&:has([role=checkbox])]:pr-0",
           variantClassMap[variant].head,
           className,
         )}

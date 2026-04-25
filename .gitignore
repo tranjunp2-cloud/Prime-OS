@@ -13,6 +13,7 @@ test-results/
 
 # Local QA evidence can be regenerated; keep markdown/json reports only.
 .gstack/qa-reports/screenshots/
+**/.gstack/qa-reports/screenshots/
 
 # Local agent/editor noise
 .claude/

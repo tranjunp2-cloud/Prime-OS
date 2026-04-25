@@ -90,7 +90,7 @@ export function DataTable<T>({
     }
 
     if (isLoading) {
-        const skeletonClass = variant === "compact" ? "h-9 rounded-xl" : variant === "embedded" ? "h-12 rounded-2xl" : "h-[78px] rounded-[1.5rem]";
+        const skeletonClass = variant === "compact" ? "h-9 rounded-md" : variant === "embedded" ? "h-12 rounded-md" : "h-[78px] rounded-lg";
 
         return (
             <div className="flex w-full flex-col gap-2">
@@ -118,7 +118,7 @@ export function DataTable<T>({
                     />
                 )
             ) : (
-                <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+                <div className="surface-solid overflow-hidden rounded-xl">
                     <Table variant={variant} wrapperClassName={resolvedWrapperClassName}>
                         <TableHeader>
                             <TableRow className="hover:bg-transparent">
@@ -150,7 +150,7 @@ export function DataTable<T>({
                                         tabIndex={interactive ? 0 : undefined}
                                         aria-label={rowLabel?.(item)}
                                         className={cn(
-                                            interactive && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                            interactive && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/80",
                                             href && "group",
                                             computedRowClassName,
                                         )}
