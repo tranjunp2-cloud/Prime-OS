@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -87,6 +87,10 @@ function SidebarFolder({
   const Icon = node.icon;
   const isActive = activeIds.has(node.id);
   const [open, setOpen] = useState(isActive);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileTop, setMobileTop] = useState(80);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const flyoutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isActive) {
@@ -94,14 +98,66 @@ function SidebarFolder({
     }
   }, [isActive]);
 
+  useEffect(() => {
+    if (!mobileOpen) {
+      return;
+    }
+
+    const closeIfOutside = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+
+      if (!target) {
+        return;
+      }
+
+      if (buttonRef.current?.contains(target) || flyoutRef.current?.contains(target)) {
+        return;
+      }
+
+      setMobileOpen(false);
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeIfOutside);
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeIfOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [mobileOpen]);
+
+  const handleToggle = () => {
+    setOpen((value) => !value);
+
+    if (!window.matchMedia('(max-width: 767px)').matches) {
+      setMobileOpen(false);
+      return;
+    }
+
+    const rect = buttonRef.current?.getBoundingClientRect();
+    const preferredTop = rect ? rect.top - 8 : 80;
+    const maxTop = Math.max(72, window.innerHeight - 420);
+    setMobileTop(Math.min(Math.max(72, preferredTop), maxTop));
+    setMobileOpen((value) => !value);
+  };
+
   return (
     <div className="space-y-1">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
+        onClick={handleToggle}
+        aria-expanded={open || mobileOpen}
+        aria-label={`Open ${node.label} navigation`}
+        title={node.label}
         className={cn(
-          'group relative flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] md:pl-3 md:pr-2',
+          'group relative flex min-h-10 w-full items-center justify-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] md:justify-start md:pl-3 md:pr-2',
           isActive
             ? 'bg-[hsl(var(--surface-toolbar))] text-foreground ring-1 ring-border'
             : 'text-muted-foreground hover:bg-[hsl(var(--surface-hover))] hover:text-foreground'
@@ -123,6 +179,103 @@ function SidebarFolder({
             child.children?.length
               ? <SidebarFolder key={child.id} node={child} activeIds={activeIds} />
               : <SidebarLink key={child.id} node={child} activeIds={activeIds} isLeaf />
+          ))}
+        </div>
+      ) : null}
+
+      {mobileOpen && node.children?.length ? (
+        <div
+          ref={flyoutRef}
+          className="fixed left-[84px] z-50 max-h-[calc(100vh-5rem)] w-[min(320px,calc(100vw-96px))] overflow-y-auto rounded-2xl border bg-card p-3 shadow-2xl md:hidden"
+          style={{ top: mobileTop }}
+        >
+          <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+            {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-foreground">{node.label}</div>
+              <div className="text-[11px] text-muted-foreground">{node.children.length} tabs</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            {node.children.map((child) => (
+              <MobileNavNode
+                key={child.id}
+                node={child}
+                activeIds={activeIds}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MobileNavNode({
+  node,
+  activeIds,
+  onNavigate,
+  depth = 0,
+}: {
+  node: PrimeNavNode;
+  activeIds: Set<string>;
+  onNavigate: () => void;
+  depth?: number;
+}) {
+  const Icon = node.icon;
+  const href = getPrimeNodeHref(node);
+  const isExternal = node.external || /^https?:\/\//.test(href);
+  const isActive = activeIds.has(node.id);
+  const className = cn(
+    'flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
+    depth > 0 && 'ml-4',
+    isActive
+      ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
+      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+  );
+  const content = (
+    <>
+      {Icon ? <Icon className="size-4 shrink-0" /> : null}
+      <span className="min-w-0 flex-1 truncate">{node.label}</span>
+      {node.badge ? (
+        <span className="rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">
+          {node.badge}
+        </span>
+      ) : null}
+      {!node.children?.length ? <ChevronRight className="size-3.5 shrink-0" /> : null}
+    </>
+  );
+
+  return (
+    <div className="space-y-1">
+      {isExternal ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className={className}
+          onClick={onNavigate}
+        >
+          {content}
+        </a>
+      ) : (
+        <NavLink to={href} className={className} onClick={onNavigate}>
+          {content}
+        </NavLink>
+      )}
+
+      {node.children?.length ? (
+        <div className="space-y-1 border-l border-border/80 pl-1">
+          {node.children.map((child) => (
+            <MobileNavNode
+              key={child.id}
+              node={child}
+              activeIds={activeIds}
+              onNavigate={onNavigate}
+              depth={depth + 1}
+            />
           ))}
         </div>
       ) : null}
