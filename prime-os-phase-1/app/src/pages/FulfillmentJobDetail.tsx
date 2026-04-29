@@ -584,7 +584,7 @@ export default function FulfillmentJobDetail() {
                     <TableCell>
                       {item.resolved_product_id ? (
                         <Link
-                          to={`/products/${item.resolved_product_id}`}
+                          to={`/ecom/cos/product-master/${item.resolved_product_id}`}
                           className="inline-flex transition-opacity hover:opacity-90"
                         >
                           <SkuBadge sku={item.display_sku_code} size="compact" />
@@ -597,7 +597,7 @@ export default function FulfillmentJobDetail() {
                       <div className="flex flex-col gap-0.5">
                         {item.resolved_product_id ? (
                           <Link
-                            to={`/products/${item.resolved_product_id}`}
+                            to={`/ecom/cos/product-master/${item.resolved_product_id}`}
                             className="font-medium transition-colors hover:text-primary hover:underline"
                           >
                             {item.display_product_name}

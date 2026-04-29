@@ -55,6 +55,14 @@ describe('legacy COS route redirects', () => {
     });
   });
 
+  it('keeps legacy return links inside the Prime OS returns route', async () => {
+    renderRedirect('/returns/rma_123', '/returns/:id', '/ecom/cos/returns');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/ecom/cos/returns/rma_123');
+    });
+  });
+
   it('keeps legacy product detail links inside the Prime OS product master route', async () => {
     renderRedirect('/products/prod_123', '/products/:id', '/ecom/cos/product-master');
 

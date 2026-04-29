@@ -16,9 +16,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 4%;
 
-    --primary: 239 84% 67%;
+    --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 243 75% 59%;
+    --primary-hover: 245 58% 51%;
     --primary-soft: 239 84% 96%;
     --brand-secondary: 112 86% 32%;
 
@@ -26,7 +26,7 @@
     --secondary-foreground: 0 0% 10%;
 
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 42%;
+    --muted-foreground: 0 0% 36%;
 
     --accent: 240 12% 96%;
     --accent-foreground: 0 0% 10%;
@@ -46,8 +46,8 @@
 
     --border: 240 12% 92%;
     --input: 240 12% 92%;
-    --ring: 239 84% 67%;
-    --ring-accent: 239 84% 67%;
+    --ring: 243 75% 59%;
+    --ring-accent: 243 75% 59%;
 
     --radius: 0.375rem;
     --radius-sm: 0.25rem;
@@ -80,18 +80,18 @@
 
     --border-divider: 240 12% 92%;
     --border-highlight: 0 0% 100%;
-    --border-active: 239 84% 67%;
+    --border-active: 243 75% 59%;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 0 0% 20%;
-    --sidebar-primary: 239 84% 67%;
+    --sidebar-primary: 243 75% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 12% 96%;
     --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-border: 240 12% 92%;
-    --sidebar-ring: 239 84% 67%;
+    --sidebar-ring: 243 75% 59%;
 
-    --chart-1: 239 84% 67%;
+    --chart-1: 243 75% 59%;
     --chart-2: 160 84% 39%;
     --chart-3: 38 92% 50%;
     --chart-4: 17 100% 55%;
@@ -104,10 +104,10 @@
     --map-hover: 209 55% 38%;
 
     --text-primary: 0 0% 4%;
-    --text-secondary: 0 0% 42%;
+    --text-secondary: 0 0% 36%;
     --text-tertiary: 0 0% 61%;
     --text-disabled: 0 0% 68%;
-    --text-metadata: 0 0% 42%;
+    --text-metadata: 0 0% 36%;
     --text-identifier: 0 0% 34%;
 
     --decision-go: 160 84% 39%;
@@ -124,7 +124,7 @@
     --status-completed: 160 84% 39%;
     --status-suppressed: 0 0% 42%;
 
-    --area-intelligence: 239 84% 67%;
+    --area-intelligence: 243 75% 59%;
     --area-demand: 38 92% 50%;
     --area-customer: 160 84% 39%;
     --area-ecom: 209 85% 52%;

@@ -237,7 +237,7 @@ export default function Fulfillment() {
       width: '160px',
       cell: ({ job }) => (
         <Link
-          to={`/fulfillment/jobs/${job.id}`}
+          to={`/ecom/cos/fulfillment/jobs/${job.id}`}
           state={listNavigationState}
           className="inline-flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary hover:underline"
           onClick={(event) => event.stopPropagation()}
@@ -257,7 +257,7 @@ export default function Fulfillment() {
       width: '160px',
       cell: ({ job }) => job.order?.id ? (
         <Link
-          to={`/orders/${job.order.id}`}
+          to={`/ecom/cos/oms/${job.order.id}`}
           state={listNavigationState}
           className="flex flex-col gap-0.5 text-sm text-foreground transition-colors hover:text-primary hover:underline"
           onClick={(event) => event.stopPropagation()}
@@ -381,7 +381,7 @@ export default function Fulfillment() {
       className: 'text-right',
       cell: ({ job }) => (
         <Link
-          to={`/fulfillment/jobs/${job.id}`}
+          to={`/ecom/cos/fulfillment/jobs/${job.id}`}
           state={listNavigationState}
           className="inline-flex justify-end text-muted-foreground transition-colors hover:text-foreground"
           onClick={(event) => event.stopPropagation()}
@@ -398,7 +398,7 @@ export default function Fulfillment() {
       header: 'Job',
       cell: ({ job }) => (
         <Link
-          to={`/fulfillment/jobs/${job.id}`}
+          to={`/ecom/cos/fulfillment/jobs/${job.id}`}
           state={listNavigationState}
           className="font-mono text-sm font-medium text-foreground transition-colors hover:text-primary hover:underline"
           onClick={(event) => event.stopPropagation()}
@@ -517,7 +517,7 @@ export default function Fulfillment() {
           data={filtered}
           isLoading={isLoading}
           keyExtractor={(row) => row.job.id}
-          rowHref={(row) => `/fulfillment/jobs/${row.job.id}`}
+          rowHref={(row) => `/ecom/cos/fulfillment/jobs/${row.job.id}`}
           rowState={() => listNavigationState}
           rowLabel={(row) => `${copy.openFulfillmentJob} ${row.job.display_job_code}`}
           wrapperClassName="[&_table]:min-w-[1320px]"
@@ -539,7 +539,7 @@ export default function Fulfillment() {
           data={shippedJobs}
           isLoading={isLoading}
           keyExtractor={(row) => `ship-${row.job.id}`}
-          rowHref={(row) => `/fulfillment/jobs/${row.job.id}`}
+          rowHref={(row) => `/ecom/cos/fulfillment/jobs/${row.job.id}`}
           rowState={() => listNavigationState}
           rowLabel={(row) => `${copy.openShippedJob} ${row.job.display_job_code}`}
           wrapperClassName="[&_table]:min-w-[760px]"

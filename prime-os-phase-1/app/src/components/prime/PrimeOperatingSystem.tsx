@@ -12,10 +12,10 @@ type Tone = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'p
 
 const toneClassMap: Record<Tone, string> = {
   default: 'border-primary/25 bg-primary/10 text-primary',
-  success: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
-  warning: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  danger: 'border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-300',
-  info: 'border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  success: 'border-emerald-700/25 bg-emerald-50 text-emerald-800 dark:border-emerald-300/25 dark:bg-emerald-500/12 dark:text-emerald-200',
+  warning: 'border-amber-700/25 bg-amber-50 text-amber-900 dark:border-amber-300/25 dark:bg-amber-500/12 dark:text-amber-200',
+  danger: 'border-rose-700/25 bg-rose-50 text-rose-800 dark:border-rose-300/25 dark:bg-rose-500/12 dark:text-rose-200',
+  info: 'border-sky-700/25 bg-sky-50 text-sky-800 dark:border-sky-300/25 dark:bg-sky-500/12 dark:text-sky-200',
   muted: 'border-border/70 bg-muted/35 text-muted-foreground',
   purple: 'border-primary/25 bg-primary/10 text-primary',
 };
@@ -84,8 +84,8 @@ export function LinkedEntityStrip({
       {entities.map((entity) => {
         const content = (
           <>
-            <span className="text-muted-foreground">{entity.label}</span>
-            <IdentifierText>{entity.value}</IdentifierText>
+            <span className="text-current">{entity.label}</span>
+            <IdentifierText className="text-current">{entity.value}</IdentifierText>
           </>
         );
         const classes = cn('inline-flex min-h-7 items-center gap-1.5 rounded-md border px-2 text-xs', toneClassMap[entity.tone || 'muted']);
@@ -113,6 +113,7 @@ export function DecisionHeader({
   status,
   actions,
   evidence,
+  variant = 'default',
   className,
 }: {
   eyebrow: string;
@@ -122,10 +123,55 @@ export function DecisionHeader({
   status?: string;
   actions?: ReactNode;
   evidence?: EvidenceItem[];
+  variant?: 'default' | 'compact';
   className?: string;
 }) {
+  const confidenceValue = confidence ?? 72;
+  const confidenceBadge = confidenceValue >= 75 ? 'Ready' : 'Watch';
+
+  if (variant === 'compact') {
+    return (
+      <section data-testid="prime-tower-hero" className={cn('surface-solid overflow-hidden rounded-lg border border-primary/20', className)}>
+        <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start lg:p-5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">{eyebrow}</Badge>
+              {status ? <Badge>{status}</Badge> : null}
+            </div>
+            <h1 className="mt-3 text-2xl font-semibold tracking-normal text-foreground md:text-3xl">{title}</h1>
+            <div className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground md:text-base md:leading-7">{description}</div>
+            {actions ? <div className="mt-4 flex flex-wrap gap-2">{actions}</div> : null}
+          </div>
+
+          <div className="rounded-lg border border-border/70 bg-[hsl(var(--surface-control))] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-metadata">Decision readiness</div>
+                <div className="mt-1 text-3xl font-semibold tracking-normal">{confidenceValue}%</div>
+              </div>
+              <Badge variant={confidenceValue >= 75 ? 'default' : 'warning'}>{confidenceBadge}</Badge>
+            </div>
+            <Progress value={confidenceValue} className="mt-3 h-1.5" />
+          </div>
+        </div>
+
+        {evidence?.length ? (
+          <div className="grid gap-2 border-t border-border/70 p-4 pt-3 sm:grid-cols-3 lg:p-5 lg:pt-3">
+            {evidence.slice(0, 3).map((item) => (
+              <div key={item.label} className="rounded-md border border-border/60 bg-background/55 p-3">
+                <div className="text-metadata">{item.label}</div>
+                <div className="mt-1 text-sm font-semibold">{item.value}</div>
+                {item.detail ? <div className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.detail}</div> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
-    <section className={cn('surface-solid overflow-hidden rounded-lg border border-primary/20', className)}>
+    <section data-testid="prime-decision-header" className={cn('surface-solid overflow-hidden rounded-lg border border-primary/20', className)}>
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -139,10 +185,10 @@ export function DecisionHeader({
         <div className="rounded-lg border border-border/70 bg-[hsl(var(--surface-control))] p-4">
           <div className="text-metadata">Decision readiness</div>
           <div className="mt-2 flex items-end justify-between gap-3">
-            <div className="text-4xl font-semibold tracking-normal">{confidence ?? 72}%</div>
-            <Badge variant={(confidence ?? 72) >= 75 ? 'default' : 'warning'}>{(confidence ?? 72) >= 75 ? 'Ready' : 'Watch'}</Badge>
+            <div className="text-4xl font-semibold tracking-normal">{confidenceValue}%</div>
+            <Badge variant={confidenceValue >= 75 ? 'default' : 'warning'}>{confidenceBadge}</Badge>
           </div>
-          <Progress value={confidence ?? 72} className="mt-3 h-1.5" />
+          <Progress value={confidenceValue} className="mt-3 h-1.5" />
           {evidence?.length ? (
             <div className="mt-4 grid gap-2">
               {evidence.slice(0, 3).map((item) => (

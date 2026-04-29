@@ -399,13 +399,13 @@ export function AppLayout() {
       <AppSidebar />
       <div className="flex-1 min-w-0 overflow-hidden">
         <GlobalCopilotWorkspace>
-          <header className="sticky top-0 z-30 flex min-h-[var(--header-height)] items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-xl md:px-6">
-            <div ref={searchBoxRef} className="relative min-w-0 flex-1 md:max-w-xl">
+          <header className="sticky top-0 z-30 grid min-h-[var(--header-height)] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-xl md:grid-cols-[minmax(20rem,42rem)_minmax(1rem,1fr)_auto] md:px-6">
+            <div ref={searchBoxRef} className="relative min-w-0 md:w-full">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label="Global entity search"
                 autoComplete="off"
-                className="h-10 rounded-xl border-input bg-card pl-9 pr-16 text-sm transition-[border-color,box-shadow] focus-visible:border-primary/45"
+                className="h-10 w-full rounded-xl border-input bg-card pl-9 pr-16 text-sm transition-[border-color,box-shadow] focus-visible:border-primary/45"
                 placeholder="Search product, SKU, order, lead, customer, alert..."
                 value={searchQuery}
                 onChange={(event) => {
@@ -431,7 +431,7 @@ export function AppLayout() {
                 <button
                   type="button"
                   aria-label="Open command palette"
-                  className="font-identifier absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground sm:block"
+                  className="font-identifier absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] sm:block"
                   onClick={() => setCommandOpen(true)}
                 >
                   Cmd K
@@ -489,23 +489,26 @@ export function AppLayout() {
                 </div>
               ) : null}
             </div>
-            <div className="hidden min-w-0 flex-col text-right md:flex">
-              <span className="text-[11px] font-medium text-muted-foreground">Prime OS session</span>
-              <span className="max-w-[180px] truncate text-xs font-semibold text-foreground">
-                {user?.email || 'Demo workspace'}
-              </span>
+            <div className="hidden md:block" aria-hidden="true" />
+            <div className="flex min-w-0 items-center justify-end gap-3">
+              <div className="hidden min-w-0 flex-col text-right lg:flex">
+                <span className="text-[11px] font-medium text-muted-foreground">Prime OS session</span>
+                <span className="max-w-[180px] truncate text-xs font-semibold text-foreground">
+                  {user?.email || 'Demo workspace'}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="shrink-0"
+              >
+                <LogOut className="size-4" />
+                <span className="hidden sm:inline">{signingOut ? 'Signing out...' : 'Logout'}</span>
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="shrink-0"
-            >
-              <LogOut className="size-4" />
-              <span className="hidden sm:inline">{signingOut ? 'Signing out...' : 'Logout'}</span>
-            </Button>
           </header>
           <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
           <main

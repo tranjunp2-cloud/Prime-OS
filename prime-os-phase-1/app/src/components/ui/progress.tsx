@@ -6,9 +6,11 @@ import { cn } from "@/lib/utils";
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
->(({ className, value, ...props }, ref) => (
+>(({ className, value, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
+    aria-label={ariaLabelledBy ? undefined : (ariaLabel ?? "Progress")}
+    aria-labelledby={ariaLabelledBy}
     className={cn("relative h-4 w-full overflow-hidden rounded-full bg-secondary", className)}
     {...props}
   >

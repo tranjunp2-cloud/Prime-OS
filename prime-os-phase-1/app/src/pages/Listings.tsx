@@ -90,7 +90,7 @@ export default function Listings() {
         <div className="flex flex-col gap-0.5">
           {listing.product_id ? (
             <Link
-              to={`/products/${listing.product_id}`}
+              to={`/ecom/cos/product-master/${listing.product_id}`}
               className="truncate text-sm font-medium text-foreground transition-colors hover:text-primary hover:underline"
             >
               {listing.display_product_name}

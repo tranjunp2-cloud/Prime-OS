@@ -181,7 +181,7 @@ export default function ProductDetail() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => navigate(`/products/${product.id}/edit`)}
+              onClick={() => navigate(`/ecom/cos/product-master/${product.id}/edit`)}
             >
               <Pencil className="size-4 mr-2" />{t('products.edit')}
             </Button>

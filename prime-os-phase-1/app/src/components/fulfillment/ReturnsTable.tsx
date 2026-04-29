@@ -56,11 +56,11 @@ export function ReturnsTable({ returns, isLoading }: ReturnsTableProps) {
           <TableRow
             key={ret.id}
             className="group/return cursor-pointer"
-            onClick={() => navigate(`/fulfillment/returns/${ret.id}`)}
+            onClick={() => navigate(`/ecom/cos/returns/${ret.id}`)}
           >
             <TableCell className="py-3.5">
               <Link
-                to={`/fulfillment/returns/${ret.id}`}
+                to={`/ecom/cos/returns/${ret.id}`}
                 className="font-mono font-medium text-foreground transition-colors hover:text-primary hover:underline"
                 onClick={(event) => event.stopPropagation()}
               >
@@ -97,7 +97,7 @@ export function ReturnsTable({ returns, isLoading }: ReturnsTableProps) {
             </TableCell>
             <TableCell className="py-3.5">
               <Link
-                to={`/fulfillment/returns/${ret.id}`}
+                to={`/ecom/cos/returns/${ret.id}`}
                 className="inline-flex text-muted-foreground opacity-70 transition-opacity group-hover/return:opacity-100 hover:text-foreground"
                 onClick={(event) => event.stopPropagation()}
               >

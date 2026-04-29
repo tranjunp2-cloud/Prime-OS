@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Package, Search, X, CheckCircle2, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/system/PageHeader';
 import { ChannelBadge } from '@/components/system/ChannelBadge';
@@ -125,7 +125,7 @@ export default function Products() {
     if (params.selectedVariants) {
       query.set('variantsJson', JSON.stringify(params.selectedVariants));
     }
-    navigate(`/products/new?${query.toString()}`);
+    navigate(`/ecom/cos/product-master/new?${query.toString()}`);
   }
 
   const filtered = products.filter(p =>
@@ -313,7 +313,12 @@ export default function Products() {
                                 onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${p.id}/64/64`; }}
                               />
                               <div className="min-w-0">
-                                <p className="font-medium text-sm leading-tight truncate max-w-[200px]">{p.name}</p>
+                                    <Link
+                                      to={`/ecom/cos/product-master/${p.id}`}
+                                      className="block max-w-[200px] truncate text-sm font-medium leading-tight text-foreground transition-colors hover:text-primary hover:underline"
+                                    >
+                                      {p.name}
+                                    </Link>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <span className="text-xs text-muted-foreground truncate max-w-[160px]">{p.brand || '—'}</span>
                                   {isVariantParent && (
@@ -374,7 +379,7 @@ export default function Products() {
                                 size="icon"
                                 className="size-8"
                                 aria-label={t('products.editProduct')}
-                                onClick={() => navigate(`/products/${p.id}/edit`)}
+                                onClick={() => navigate(`/ecom/cos/product-master/${p.id}/edit`)}
                               >
                                 <Pencil className="size-3.5 text-muted-foreground" />
                               </Button>

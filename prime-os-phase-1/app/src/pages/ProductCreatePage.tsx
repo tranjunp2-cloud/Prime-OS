@@ -866,7 +866,7 @@ export default function ProductCreatePage() {
 
   // Guard: if editing but product not found, redirect to create page
   if (editId && !existingProduct) {
-    navigate('/products/new', { replace: true });
+    navigate('/ecom/cos/product-master/new', { replace: true });
     return null;
   }
 

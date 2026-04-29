@@ -146,6 +146,7 @@ const App = () => {
                     <Route path="/fulfillment" element={<Navigate to="/ecom/cos/fulfillment" replace />} />
                     <Route path="/fulfillment/jobs/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/fulfillment/jobs" />} />
                     <Route path="/returns" element={<Navigate to="/ecom/cos/returns" replace />} />
+                    <Route path="/returns/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/returns" />} />
                     <Route path="/sla-policies" element={<Navigate to="/ecom/cos/policy-rule/sla" replace />} />
                     <Route path="/routing-plans" element={<Navigate to="/ecom/cos/policy-rule/routing" replace />} />
                   </Route>

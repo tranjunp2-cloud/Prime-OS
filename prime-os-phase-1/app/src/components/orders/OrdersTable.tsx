@@ -43,7 +43,7 @@ export function OrdersTable({ orders, isLoading, emptyState }: OrdersTableProps)
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Link
-                to={`/orders/${order.id}`}
+                to={`/ecom/cos/oms/${order.id}`}
                 state={listNavigationState}
                 className="truncate text-sm font-semibold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 onClick={(event) => event.stopPropagation()}
@@ -99,7 +99,7 @@ export function OrdersTable({ orders, isLoading, emptyState }: OrdersTableProps)
       keyExtractor={(item) => item.id}
       isLoading={isLoading}
       emptyState={emptyState}
-      rowHref={(item) => `/orders/${item.id}`}
+      rowHref={(item) => `/ecom/cos/oms/${item.id}`}
       rowState={() => listNavigationState}
       rowLabel={(item) => `${t('common.viewDetails')}: ${item.order_id}`}
       variant="index"

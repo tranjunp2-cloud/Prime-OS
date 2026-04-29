@@ -124,23 +124,23 @@ export function MovementsTable({ movements, isLoading, onBatchClick }: Movements
   const handleSkuClick = (skuCode: string) => {
     const mapping = skuMappings.find(s => s.sku_code === skuCode);
     if (mapping) {
-      navigate(`/products/${mapping.product_id}/variants/${mapping.id}`);
+      navigate(`/ecom/cos/product-master/${mapping.product_id}?variant=${mapping.id}`);
     } else {
       toast.error(t('inventory.errorSkuNotFound'));
-      navigate(`/products?search=${encodeURIComponent(skuCode)}`);
+      navigate(`/ecom/cos/product-master?search=${encodeURIComponent(skuCode)}`);
     }
   };
 
   const handleSourceRefClick = (sourceType: string, sourceRef: string) => {
     if (sourceType === 'ORDER') {
-      navigate(`/orders?search=${encodeURIComponent(sourceRef)}`);
+      navigate(`/ecom/cos/oms?search=${encodeURIComponent(sourceRef)}`);
     } else if (sourceType === 'ADJUSTMENT') {
       navigate(`/inventory/adjustments?search=${encodeURIComponent(sourceRef)}`);
     }
   };
 
   const handleWarehouseClick = (warehouseId: string) => {
-    navigate(`/inventory/warehouses/${warehouseId}`);
+    navigate(`/ecom/cos/warehouses?warehouse=${encodeURIComponent(warehouseId)}`);
   };
 
   if (isLoading) {

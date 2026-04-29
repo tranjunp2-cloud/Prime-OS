@@ -68,7 +68,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
 import {
   ActionSetupPanel,
@@ -7109,14 +7108,6 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
 
   return (
     <div className="min-h-full bg-background">
-      <PageHeader
-        title={config.tower}
-        description={config.promise}
-        actions={(
-          <Badge variant="outline">{config.area}</Badge>
-        )}
-      />
-
       <div className="space-y-6 p-4 md:p-6">
         <DecisionHeader
           eyebrow={`${config.area} operating workspace`}
@@ -7143,6 +7134,7 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
             </>
           )}
           evidence={evidence}
+          variant="compact"
         />
 
         <LinkedEntityStrip

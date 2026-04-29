@@ -136,7 +136,7 @@ export function ReservationLedger({ compact = false }: ReservationLedgerProps) {
                     </TableCell>
                     <TableCell>
                       <Link
-                        to={`/orders/${orderId}`}
+                        to={`/ecom/cos/oms/${orderId}`}
                         className="text-sm font-mono text-primary hover:underline"
                       >
                         {orderId.slice(0, 12)}...

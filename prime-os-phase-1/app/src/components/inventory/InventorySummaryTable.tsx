@@ -116,7 +116,7 @@ export function InventorySummaryTable({
                     <TableCell className="py-3.5">
                       <div>
                         <Link
-                          to={`/products/${item.product_id}`}
+                          to={`/ecom/cos/product-master/${item.product_id}`}
                           className="font-medium text-primary hover:underline transition-colors"
                         >
                           {item.product_name}
@@ -130,7 +130,7 @@ export function InventorySummaryTable({
                     </TableCell>
                     <TableCell className="py-3.5">
                       <Link
-                        to={`/products/${item.product_id}/variants/${item.sku_id}`}
+                        to={`/ecom/cos/product-master/${item.product_id}?variant=${item.sku_id}`}
                         className="inline-flex transition-opacity hover:opacity-90"
                       >
                         <SkuBadge sku={item.sku_code} size="compact" />
@@ -142,7 +142,7 @@ export function InventorySummaryTable({
                     <TableCell className="py-3.5">
                       <div>
                         <Link
-                          to={`/warehouses`}
+                          to="/ecom/cos/warehouses"
                           className="font-medium hover:underline transition-colors"
                         >
                           {item.warehouse_name}

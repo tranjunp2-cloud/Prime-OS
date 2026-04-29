@@ -70,7 +70,7 @@ export function WarehouseTable({
     if (onRowClick) {
       onRowClick(warehouse);
     } else {
-      navigate(`/inventory/warehouses/${warehouse.id}`);
+      navigate(`/ecom/cos/warehouses?warehouse=${encodeURIComponent(warehouse.id)}`);
     }
   };
 

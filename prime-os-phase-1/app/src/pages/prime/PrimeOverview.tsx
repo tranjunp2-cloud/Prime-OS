@@ -23,7 +23,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
 import {
   DecisionHeader,
@@ -176,21 +175,6 @@ export function PrimeOverview() {
 
   return (
     <div className="min-h-full bg-background">
-      <PageHeader
-        title="PrimeOS Overview"
-        description="The whole operating loop in one view: Intelligence decides, Demand executes, Ecom supports, Finance protects scale, and Customer closes the memory loop."
-        actions={(
-          <>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/intelligence/launch-decisions">Start with Intelligence</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link to="/demand/campaign-ops">Execute in Demand</Link>
-            </Button>
-          </>
-        )}
-      />
-
       <div className="space-y-6 p-4 md:p-6">
         <DecisionHeader
           eyebrow="Prime OS control plane"
@@ -219,6 +203,7 @@ export function PrimeOverview() {
             { label: 'Demand', value: topPlay?.audience || topCampaign?.targetSegment || 'Buyer audience', detail: topPlay ? `+${topPlay.projectedLift}% projected lift` : `${totalLeads} leads in motion`, tone: 'info' },
             { label: 'Guardrail', value: topForecast ? scoreCopy(ecomScore) : 'Clear', detail: topForecast ? `${topForecast.risk} stock risk` : 'No stock blocker detected', tone: topForecast?.risk === 'high' ? 'danger' : 'success' },
           ]}
+          variant="compact"
         />
 
         <LinkedEntityStrip

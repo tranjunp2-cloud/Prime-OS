@@ -52,7 +52,7 @@ export default function Returns() {
       header: t('returnsPage.colRma'),
       cell: (ret) => (
         <Link
-          to={`/returns/${ret.id}`}
+          to={`/ecom/cos/returns/${ret.id}`}
           state={listNavigationState}
           className="font-mono text-sm font-semibold text-foreground transition-colors hover:text-primary hover:underline"
         >
@@ -145,7 +145,7 @@ export default function Returns() {
         data={returns}
         keyExtractor={(ret) => ret.id}
         isLoading={isLoading}
-        rowHref={(ret) => `/returns/${ret.id}`}
+        rowHref={(ret) => `/ecom/cos/returns/${ret.id}`}
         rowState={() => listNavigationState}
         rowLabel={(ret) => formatMessage(t('returnsPage.openReturn'), { id: ret.rma_number ?? ret.id })}
         emptyTitle={search || filter ? t('returnsPage.filteredEmptyTitle') : t('returnsPage.emptyTitle')}

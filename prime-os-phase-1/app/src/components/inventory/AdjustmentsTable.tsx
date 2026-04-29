@@ -116,7 +116,7 @@ export function AdjustmentsTable({ adjustments, isLoading }: AdjustmentsTablePro
               <TableCell className="py-3.5">
                 {adjustment.sku_id && adjustment.product_id ? (
                   <Link
-                    to={`/products/${adjustment.product_id}/variants/${adjustment.sku_id}`}
+                    to={`/ecom/cos/product-master/${adjustment.product_id}?variant=${adjustment.sku_id}`}
                     className="inline-flex transition-opacity hover:opacity-90"
                     onClick={(e) => e.stopPropagation()}
                   >
