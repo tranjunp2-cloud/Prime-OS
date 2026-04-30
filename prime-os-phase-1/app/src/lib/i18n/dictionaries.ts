@@ -9,6 +9,28 @@ export const SUPPORTED_LOCALES = ['en-US', 'ja-JP', 'vi-VN'] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
+export const DEFAULT_LOCALE: Locale = 'en-US';
+
+export type LocaleMeta = {
+    nativeName: string;
+    shortLabel: string;
+    currency: string;
+};
+
+export const LOCALE_META: Record<Locale, LocaleMeta> = {
+    'en-US': { nativeName: 'English', shortLabel: 'EN', currency: 'USD' },
+    'ja-JP': { nativeName: '日本語', shortLabel: 'JP', currency: 'JPY' },
+    'vi-VN': { nativeName: 'Tiếng Việt', shortLabel: 'VI', currency: 'VND' },
+};
+
+export function isSupportedLocale(value: unknown): value is Locale {
+    return typeof value === 'string' && SUPPORTED_LOCALES.includes(value as Locale);
+}
+
+export function getLocaleMeta(locale: Locale): LocaleMeta {
+    return LOCALE_META[locale] ?? LOCALE_META[DEFAULT_LOCALE];
+}
+
 export type Dictionary = {
     sidebar: {
         dashboardGroup: string;

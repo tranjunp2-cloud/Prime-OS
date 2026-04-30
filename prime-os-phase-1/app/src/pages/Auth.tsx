@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LockKeyhole } from 'lucide-react';
 import { seedDemoData } from '@/lib/demo-data-seeder';
+import { LanguageToggle } from '@/components/common/LanguageToggle';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import { getAuthDictionary } from '@/lib/i18n/shell-dictionaries';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -16,8 +19,10 @@ export default function Auth() {
   const [statusText, setStatusText] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const { user, signIn } = useAuth();
+  const { locale } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const authCopy = getAuthDictionary(locale);
 
   // Redirect if already logged in
   if (user) {
@@ -28,7 +33,7 @@ export default function Auth() {
     event.preventDefault();
     setIsLoading(true);
     setFormError(null);
-    setStatusText('Checking account...');
+    setStatusText(authCopy.checkingAccount);
 
     try {
       const authRes = await signIn(email.trim(), password);
@@ -38,27 +43,27 @@ export default function Auth() {
       }
 
       const currentUserId = authRes.session?.account?.id;
-      if (!currentUserId) throw new Error('No valid session created.');
+      if (!currentUserId) throw new Error(authCopy.noValidSession);
 
-      setStatusText('Loading workspace data...');
+      setStatusText(authCopy.loadingWorkspace);
       const seedRes = await seedDemoData(currentUserId);
 
       if (seedRes.success) {
         toast({
-          title: 'Welcome to PrimeOS',
-          description: 'Workspace loaded successfully.',
+          title: authCopy.welcomeTitle,
+          description: authCopy.workspaceLoaded,
         });
         navigate('/overview', { replace: true });
       } else {
-        throw new Error('Failed to load workspace data. Please try again.');
+        throw new Error(authCopy.loadWorkspaceFailed);
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      const message = error.message || 'Unable to sign in. Please check your email and password.';
+      const message = error.message || authCopy.unableToSignIn;
       setFormError(message);
       toast({
         variant: 'destructive',
-        title: 'Login failed',
+        title: authCopy.loginFailed,
         description: message,
       });
     } finally {
@@ -69,22 +74,25 @@ export default function Auth() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background p-6">
+      <div className="absolute right-6 top-6">
+        <LanguageToggle />
+      </div>
       <Card className="w-full max-w-[520px]">
         <CardHeader className="pb-8 pt-10 text-center">
           <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
             <LockKeyhole className="size-8 text-primary" />
           </div>
           <CardTitle className="font-display text-4xl font-semibold text-foreground">
-            Sign in
+            {authCopy.title}
           </CardTitle>
           <CardDescription className="mt-3 text-[15px] text-muted-foreground">
-            Enter your PrimeOS workspace account.
+            {authCopy.description}
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-10">
           <form className="flex flex-col gap-5" onSubmit={handleLogin}>
             <div className="space-y-2">
-              <Label htmlFor="primeos-email">Email</Label>
+              <Label htmlFor="primeos-email">{authCopy.email}</Label>
               <Input
                 id="primeos-email"
                 type="email"
@@ -98,14 +106,14 @@ export default function Auth() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="primeos-password">Password</Label>
+              <Label htmlFor="primeos-password">{authCopy.password}</Label>
               <Input
                 id="primeos-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
-                placeholder="Enter password"
+                placeholder={authCopy.passwordPlaceholder}
                 required
                 className="h-11"
               />
@@ -126,10 +134,10 @@ export default function Auth() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-3 size-5 animate-spin" />
-                  {statusText || 'Signing in...'}
+                  {statusText || authCopy.signingIn}
                 </>
               ) : (
-                'Sign in'
+                authCopy.submit
               )}
             </Button>
           </form>

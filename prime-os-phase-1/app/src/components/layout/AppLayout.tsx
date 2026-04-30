@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import { getShellDictionary } from '@/lib/i18n/shell-dictionaries';
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
 import { cn } from '@/lib/utils';
 
@@ -37,15 +39,15 @@ interface GlobalSearchResult {
   priority: number;
 }
 
-const searchKindMeta: Record<SearchKind, { icon: ReactNode; label: string }> = {
-  Product: { icon: <Package className="size-4" />, label: 'Product' },
-  SKU: { icon: <Hash className="size-4" />, label: 'SKU' },
-  Order: { icon: <ShoppingCart className="size-4" />, label: 'Order' },
-  Lead: { icon: <UserRoundCheck className="size-4" />, label: 'Lead' },
-  Customer: { icon: <UserRoundCheck className="size-4" />, label: 'Customer' },
-  RFQ: { icon: <ClipboardList className="size-4" />, label: 'RFQ' },
-  Campaign: { icon: <Megaphone className="size-4" />, label: 'Campaign' },
-  Alert: { icon: <BellRing className="size-4" />, label: 'Alert' },
+const searchKindIcons: Record<SearchKind, ReactNode> = {
+  Product: <Package className="size-4" />,
+  SKU: <Hash className="size-4" />,
+  Order: <ShoppingCart className="size-4" />,
+  Lead: <UserRoundCheck className="size-4" />,
+  Customer: <UserRoundCheck className="size-4" />,
+  RFQ: <ClipboardList className="size-4" />,
+  Campaign: <Megaphone className="size-4" />,
+  Alert: <BellRing className="size-4" />,
 };
 
 function normalizeSearchText(value: unknown) {
@@ -243,7 +245,9 @@ export function AppLayout() {
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
+  const { locale } = useI18n();
   const navigate = useNavigate();
+  const shellCopy = useMemo(() => getShellDictionary(locale), [locale]);
   const globalSearchResults = useMemo(() => (
     bootstrapping ? [] : buildGlobalSearchResults()
   ), [bootstrapping]);
@@ -394,7 +398,7 @@ export function AppLayout() {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded focus:shadow-lg"
       >
-        Skip to main content
+        {shellCopy.skipToMainContent}
       </a>
       <AppSidebar />
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -403,10 +407,10 @@ export function AppLayout() {
             <div ref={searchBoxRef} className="relative min-w-0 md:w-full">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                aria-label="Global entity search"
+                aria-label={shellCopy.searchAriaLabel}
                 autoComplete="off"
                 className="h-10 w-full rounded-xl border-input bg-card pl-9 pr-16 text-sm transition-[border-color,box-shadow] focus-visible:border-primary/45"
-                placeholder="Search product, SKU, order, lead, customer, alert..."
+                placeholder={shellCopy.searchPlaceholder}
                 value={searchQuery}
                 onChange={(event) => {
                   setSearchQuery(event.target.value);
@@ -418,7 +422,7 @@ export function AppLayout() {
               {searchQuery ? (
                 <button
                   type="button"
-                  aria-label="Clear search"
+                  aria-label={shellCopy.clearSearch}
                   className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   onClick={() => {
                     setSearchQuery('');
@@ -430,7 +434,7 @@ export function AppLayout() {
               ) : (
                 <button
                   type="button"
-                  aria-label="Open command palette"
+                  aria-label={shellCopy.openCommandPalette}
                   className="font-identifier absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] sm:block"
                   onClick={() => setCommandOpen(true)}
                 >
@@ -441,13 +445,16 @@ export function AppLayout() {
               {shouldShowSearchPanel ? (
                 <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-2xl border bg-card shadow-2xl">
                   <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Search PrimeOS
+                    {shellCopy.searchPanelHeading}
                   </div>
 
                   {visibleSearchResults.length > 0 ? (
                     <div className="max-h-[min(70vh,420px)] overflow-y-auto p-2">
                       {visibleSearchResults.map((result, index) => {
-                        const meta = searchKindMeta[result.kind];
+                        const meta = {
+                          icon: searchKindIcons[result.kind],
+                          label: shellCopy.searchKindLabels[result.kind],
+                        };
                         const isActive = index === activeSearchIndex;
 
                         return (
@@ -483,7 +490,7 @@ export function AppLayout() {
                     </div>
                   ) : (
                     <div className="px-4 py-6 text-sm text-muted-foreground">
-                      Không tìm thấy kết quả phù hợp. Thử SKU, order ID, tên khách hàng hoặc tên campaign khác nhé.
+                      {shellCopy.noSearchResults}
                     </div>
                   )}
                 </div>
@@ -492,9 +499,9 @@ export function AppLayout() {
             <div className="hidden md:block" aria-hidden="true" />
             <div className="flex min-w-0 items-center justify-end gap-3">
               <div className="hidden min-w-0 flex-col text-right lg:flex">
-                <span className="text-[11px] font-medium text-muted-foreground">Prime OS session</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{shellCopy.sessionLabel}</span>
                 <span className="max-w-[180px] truncate text-xs font-semibold text-foreground">
-                  {user?.email || 'Demo workspace'}
+                  {user?.email || shellCopy.demoWorkspace}
                 </span>
               </div>
               <Button
@@ -506,7 +513,7 @@ export function AppLayout() {
                 className="shrink-0"
               >
                 <LogOut className="size-4" />
-                <span className="hidden sm:inline">{signingOut ? 'Signing out...' : 'Logout'}</span>
+                <span className="hidden sm:inline">{signingOut ? shellCopy.signingOut : shellCopy.logout}</span>
               </Button>
             </div>
           </header>

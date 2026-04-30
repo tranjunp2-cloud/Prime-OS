@@ -10,20 +10,33 @@ import {
 } from '@/lib/prime/prime-navigation';
 import { ThemeModeSwitcher } from '@/components/system/ThemeModeSwitcher';
 import { LanguageToggle } from '@/components/common/LanguageToggle';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import { formatMessage } from '@/lib/i18n/format';
+import {
+  getShellDictionary,
+  getShellNavBadge,
+  getShellNavLabel,
+  type ShellDictionary,
+} from '@/lib/i18n/shell-dictionaries';
+import type { Locale } from '@/lib/i18n/dictionaries';
 
 function SidebarLink({
   node,
   activeIds,
+  locale,
   isLeaf = false,
 }: {
   node: PrimeNavNode;
   activeIds: Set<string>;
+  locale: Locale;
   isLeaf?: boolean;
 }) {
   const Icon = node.icon;
   const isActive = activeIds.has(node.id);
   const href = getPrimeNodeHref(node);
   const isExternal = node.external || /^https?:\/\//.test(href);
+  const label = getShellNavLabel(locale, node.id, node.label);
+  const badge = node.badge ? getShellNavBadge(locale, node.badge) : null;
   const baseClassName = cn(
     'group relative flex min-h-10 items-center gap-2.5 rounded-md text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)]',
     isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
@@ -37,10 +50,10 @@ function SidebarLink({
   const content = (
     <>
       {Icon ? <Icon className={cn('size-4 shrink-0', isActive && isLeaf ? 'text-primary-foreground' : isActive && 'text-primary')} /> : null}
-      <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
-      {node.badge ? (
+      <span className="hidden min-w-0 flex-1 truncate md:inline">{label}</span>
+      {badge ? (
         <span className="hidden rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary md:inline">
-          {node.badge}
+          {badge}
         </span>
       ) : null}
       {node.children?.length ? (
@@ -53,8 +66,8 @@ function SidebarLink({
     return (
       <a
         href={href}
-        aria-label={node.label}
-        title={node.label}
+        aria-label={label}
+        title={label}
         target="_blank"
         rel="noreferrer"
         className={baseClassName}
@@ -67,9 +80,9 @@ function SidebarLink({
   return (
     <NavLink
       to={href}
-      aria-label={node.label}
+      aria-label={label}
       aria-current={isActive && isLeaf ? 'page' : undefined}
-      title={node.label}
+      title={label}
       className={baseClassName}
     >
       {content}
@@ -80,12 +93,18 @@ function SidebarLink({
 function SidebarFolder({
   node,
   activeIds,
+  locale,
+  shellCopy,
 }: {
   node: PrimeNavNode;
   activeIds: Set<string>;
+  locale: Locale;
+  shellCopy: ShellDictionary;
 }) {
   const Icon = node.icon;
   const isActive = activeIds.has(node.id);
+  const label = getShellNavLabel(locale, node.id, node.label);
+  const badge = node.badge ? getShellNavBadge(locale, node.badge) : null;
   const [open, setOpen] = useState(isActive);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileTop, setMobileTop] = useState(80);
@@ -154,8 +173,8 @@ function SidebarFolder({
         type="button"
         onClick={handleToggle}
         aria-expanded={open || mobileOpen}
-        aria-label={`Open ${node.label} navigation`}
-        title={node.label}
+        aria-label={formatMessage(shellCopy.openNavigation, { label })}
+        title={label}
         className={cn(
           'group relative flex min-h-10 w-full items-center justify-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] md:justify-start md:pl-3 md:pr-2',
           isActive
@@ -164,10 +183,10 @@ function SidebarFolder({
         )}
       >
         {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
-        <span className="hidden min-w-0 flex-1 truncate md:inline">{node.label}</span>
-        {node.badge ? (
+        <span className="hidden min-w-0 flex-1 truncate md:inline">{label}</span>
+        {badge ? (
           <span className="hidden rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary md:inline">
-            {node.badge}
+            {badge}
           </span>
         ) : null}
         <ChevronRight className={cn('hidden size-3.5 shrink-0 transition-transform md:block', open && 'rotate-90', isActive ? 'text-primary' : 'text-muted-foreground')} />
@@ -177,8 +196,8 @@ function SidebarFolder({
         <div className={cn('ml-5 hidden space-y-1 border-l pl-2 md:block', isActive ? 'border-primary/35' : 'border-border/70')}>
           {node.children?.map((child) => (
             child.children?.length
-              ? <SidebarFolder key={child.id} node={child} activeIds={activeIds} />
-              : <SidebarLink key={child.id} node={child} activeIds={activeIds} isLeaf />
+              ? <SidebarFolder key={child.id} node={child} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
+              : <SidebarLink key={child.id} node={child} activeIds={activeIds} locale={locale} isLeaf />
           ))}
         </div>
       ) : null}
@@ -192,8 +211,8 @@ function SidebarFolder({
           <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
             {Icon ? <Icon className={cn('size-4 shrink-0', isActive && 'text-primary')} /> : null}
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-foreground">{node.label}</div>
-              <div className="text-[11px] text-muted-foreground">{node.children.length} tabs</div>
+              <div className="truncate text-sm font-semibold text-foreground">{label}</div>
+              <div className="text-[11px] text-muted-foreground">{formatMessage(shellCopy.mobileTabs, { count: node.children.length })}</div>
             </div>
           </div>
 
@@ -203,6 +222,8 @@ function SidebarFolder({
                 key={child.id}
                 node={child}
                 activeIds={activeIds}
+                locale={locale}
+                shellCopy={shellCopy}
                 onNavigate={() => setMobileOpen(false)}
               />
             ))}
@@ -216,11 +237,15 @@ function SidebarFolder({
 function MobileNavNode({
   node,
   activeIds,
+  locale,
+  shellCopy,
   onNavigate,
   depth = 0,
 }: {
   node: PrimeNavNode;
   activeIds: Set<string>;
+  locale: Locale;
+  shellCopy: ShellDictionary;
   onNavigate: () => void;
   depth?: number;
 }) {
@@ -228,6 +253,8 @@ function MobileNavNode({
   const href = getPrimeNodeHref(node);
   const isExternal = node.external || /^https?:\/\//.test(href);
   const isActive = activeIds.has(node.id);
+  const label = getShellNavLabel(locale, node.id, node.label);
+  const badge = node.badge ? getShellNavBadge(locale, node.badge) : null;
   const className = cn(
     'flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
     depth > 0 && 'ml-4',
@@ -238,10 +265,10 @@ function MobileNavNode({
   const content = (
     <>
       {Icon ? <Icon className="size-4 shrink-0" /> : null}
-      <span className="min-w-0 flex-1 truncate">{node.label}</span>
-      {node.badge ? (
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge ? (
         <span className="rounded border border-primary/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">
-          {node.badge}
+          {badge}
         </span>
       ) : null}
       {!node.children?.length ? <ChevronRight className="size-3.5 shrink-0" /> : null}
@@ -273,6 +300,8 @@ function MobileNavNode({
               key={child.id}
               node={child}
               activeIds={activeIds}
+              locale={locale}
+              shellCopy={shellCopy}
               onNavigate={onNavigate}
               depth={depth + 1}
             />
@@ -286,22 +315,29 @@ function MobileNavNode({
 function AreaSection({
   node,
   activeIds,
+  locale,
+  shellCopy,
 }: {
   node: PrimeNavNode;
   activeIds: Set<string>;
+  locale: Locale;
+  shellCopy: ShellDictionary;
 }) {
+  const label = getShellNavLabel(locale, node.id, node.label);
   return (
-    <section aria-label={node.label} className="space-y-1.5">
-      <SidebarFolder node={node} activeIds={activeIds} />
+    <section aria-label={label} className="space-y-1.5">
+      <SidebarFolder node={node} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
     </section>
   );
 }
 
 export function AppSidebar() {
+  const { locale } = useI18n();
   const location = useLocation();
   const activePath = getPrimeNavPath(location.pathname);
   const activeIds = new Set(activePath.map((node) => node.id));
   const [overviewNode, ...areaNodes] = primeNavigation;
+  const shellCopy = getShellDictionary(locale);
 
   return (
     <aside className="flex h-full w-[var(--sidebar-width-compact)] shrink-0 flex-col border-r border-border bg-card/95 md:w-[var(--sidebar-width-expanded)]">
@@ -313,18 +349,18 @@ export function AppSidebar() {
         />
         <div className="hidden min-w-0 flex-col md:flex">
           <span className="font-display truncate text-sm font-semibold leading-none">Prime OS</span>
-          <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">Closed-loop commerce platform</span>
+          <span className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">{shellCopy.brandDescriptor}</span>
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-3" aria-label="Primary navigation">
+      <nav className="flex-1 overflow-y-auto py-3" aria-label={shellCopy.primaryNavigation}>
         <div className="space-y-4 px-2.5 md:px-3">
           <div>
-            <SidebarLink node={overviewNode} activeIds={activeIds} isLeaf />
+            <SidebarLink node={overviewNode} activeIds={activeIds} locale={locale} isLeaf />
           </div>
 
           {areaNodes.map((node) => (
-            <AreaSection key={node.id} node={node} activeIds={activeIds} />
+            <AreaSection key={node.id} node={node} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
           ))}
         </div>
       </nav>

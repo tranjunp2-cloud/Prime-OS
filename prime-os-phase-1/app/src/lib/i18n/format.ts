@@ -1,4 +1,4 @@
-import type { Locale } from './dictionaries';
+import { DEFAULT_LOCALE, type Locale } from './dictionaries';
 
 export function formatMessage(
   template: string,
@@ -41,7 +41,7 @@ export function formatLocalizedDateTime(
       minute: '2-digit',
     }).format(date);
   } catch {
-    return new Intl.DateTimeFormat('en-US', options ?? {
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, options ?? {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -67,7 +67,7 @@ export function formatLocalizedDate(
       day: 'numeric',
     }).format(date);
   } catch {
-    return new Intl.DateTimeFormat('en-US', options ?? {
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, options ?? {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -85,7 +85,7 @@ export function formatLocalizedNumber(
   try {
     return new Intl.NumberFormat(locale, options).format(value);
   } catch {
-    return new Intl.NumberFormat('en-US', options).format(value);
+    return new Intl.NumberFormat(DEFAULT_LOCALE, options).format(value);
   }
 }
 

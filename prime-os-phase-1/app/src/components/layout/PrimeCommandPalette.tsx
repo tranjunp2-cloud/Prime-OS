@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type Dispatch } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ExternalLink, LayoutDashboard, Search } from 'lucide-react';
 
@@ -12,11 +12,14 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import { getShellDictionary, getShellNavLabel } from '@/lib/i18n/shell-dictionaries';
 import { getPrimeNodeHref, primeNavigation, type PrimeNavNode } from '@/lib/prime/prime-navigation';
+import type { Locale } from '@/lib/i18n/dictionaries';
 
 type PrimeCommandPaletteProps = {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: Dispatch<boolean>;
 };
 
 type CommandRoute = {
@@ -28,20 +31,21 @@ type CommandRoute = {
   icon?: PrimeNavNode['icon'];
 };
 
-const routeFromNode = (node: PrimeNavNode, area: string): CommandRoute => ({
+const routeFromNode = (node: PrimeNavNode, area: string, locale: Locale): CommandRoute => ({
   id: node.id,
-  label: node.label,
+  label: getShellNavLabel(locale, node.id, node.label),
   area,
   href: getPrimeNodeHref(node),
   external: Boolean(node.external),
   icon: node.icon,
 });
 
-function collectRoutes(nodes: PrimeNavNode[], area = 'Prime OS'): CommandRoute[] {
+function collectRoutes(nodes: PrimeNavNode[], locale: Locale, area = 'Prime OS'): CommandRoute[] {
   return nodes.flatMap((node) => {
-    const nextArea = node.kind === 'area' ? node.label : area;
-    const current = node.href || node.kind === 'overview' ? [routeFromNode(node, nextArea)] : [];
-    const children = node.children?.length ? collectRoutes(node.children, nextArea) : [];
+    const nodeLabel = getShellNavLabel(locale, node.id, node.label);
+    const nextArea = node.kind === 'area' ? nodeLabel : area;
+    const current = node.href || node.kind === 'overview' ? [routeFromNode(node, nextArea, locale)] : [];
+    const children = node.children?.length ? collectRoutes(node.children, locale, nextArea) : [];
 
     return [...current, ...children];
   });
@@ -49,7 +53,9 @@ function collectRoutes(nodes: PrimeNavNode[], area = 'Prime OS'): CommandRoute[]
 
 export function PrimeCommandPalette({ open, onOpenChange }: PrimeCommandPaletteProps) {
   const navigate = useNavigate();
-  const routes = useMemo(() => collectRoutes(primeNavigation), []);
+  const { locale } = useI18n();
+  const shellCopy = useMemo(() => getShellDictionary(locale), [locale]);
+  const routes = useMemo(() => collectRoutes(primeNavigation, locale), [locale]);
 
   const goTo = (route: CommandRoute) => {
     onOpenChange(false);
@@ -64,10 +70,10 @@ export function PrimeCommandPalette({ open, onOpenChange }: PrimeCommandPaletteP
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Jump to a workspace, customer, demand module, or COS..." />
+      <CommandInput placeholder={shellCopy.commandInputPlaceholder} />
       <CommandList>
-        <CommandEmpty>No matching workspace found.</CommandEmpty>
-        <CommandGroup heading="Fast navigation">
+        <CommandEmpty>{shellCopy.commandEmpty}</CommandEmpty>
+        <CommandGroup heading={shellCopy.commandFastNavigation}>
           {routes.map((route) => {
             const Icon = route.icon || LayoutDashboard;
 
@@ -86,16 +92,16 @@ export function PrimeCommandPalette({ open, onOpenChange }: PrimeCommandPaletteP
           })}
         </CommandGroup>
         <CommandSeparator />
-        <CommandGroup heading="Operator actions">
-          <CommandItem value="Search entities products SKUs orders leads customers alerts">
+        <CommandGroup heading={shellCopy.commandOperatorActions}>
+          <CommandItem value={shellCopy.commandSearchEntitiesValue}>
             <Search className="size-4 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Search products, orders, leads, customers, alerts</span>
-            <CommandShortcut>soon</CommandShortcut>
+            <span className="min-w-0 flex-1 truncate">{shellCopy.commandSearchEntitiesLabel}</span>
+            <CommandShortcut>{shellCopy.commandSoon}</CommandShortcut>
           </CommandItem>
-          <CommandItem value="Review launch decisions intelligence">
+          <CommandItem value={shellCopy.commandReviewLaunchValue}>
             <LayoutDashboard className="size-4 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Review launch decision queue</span>
-            <CommandShortcut>tab</CommandShortcut>
+            <span className="min-w-0 flex-1 truncate">{shellCopy.commandReviewLaunchLabel}</span>
+            <CommandShortcut>{shellCopy.commandTab}</CommandShortcut>
           </CommandItem>
         </CommandGroup>
       </CommandList>
