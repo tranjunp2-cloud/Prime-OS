@@ -2,8 +2,9 @@ import { expect, test } from '@playwright/test';
 import { expectPrimeShellReady, installPrimeSession } from './helpers/prime-session';
 
 const towerRoutes = [
-  { path: '/intelligence/creators', heading: 'Creators Intelligence' },
-  { path: '/intelligence/trends', heading: 'Trends Intelligence' },
+  { path: '/intelligence/decision-hub', heading: 'Decision Hub' },
+  { path: '/intelligence/signals', heading: 'Signals' },
+  { path: '/intelligence/launch-decisions', heading: 'Launch Decisions' },
   { path: '/demand/campaign-ops', heading: 'Campaign Ops' },
   { path: '/customer/crm-compact', heading: 'CRM Compact' },
 ];

@@ -3,11 +3,15 @@ import { expectPrimeShellReady, installPrimeSession, mockPrimeBackend } from './
 
 const coreRoutes = [
   '/overview',
+  '/intelligence/decision-hub',
+  '/intelligence/signals',
   '/intelligence/launch-decisions',
-  '/demand/campaign-ops',
-  '/demand/content-creator-ops',
-  '/demand/lead-response-capture',
-  '/demand/retargeting-outreach',
+  '/demand/hub',
+  '/demand/sources',
+  '/demand/campaigns',
+  '/demand/content-social',
+  '/demand/leads-rfqs',
+  '/demand/re-engage',
   '/customer/crm-compact',
   '/customer/service',
   '/finance/health',
@@ -20,8 +24,19 @@ const coreRoutes = [
 ];
 
 const legacyRedirects = [
-  ['/demand/campaign', /\/demand\/campaign-ops$/],
-  ['/demand/retargeting', /\/demand\/retargeting-outreach$/],
+  ['/intelligence', /\/intelligence$/],
+  ['/intelligence/creators', /\/intelligence\/signals\?view=creators$/],
+  ['/intelligence/trends', /\/intelligence\/signals\?view=customer-trends$/],
+  ['/intelligence/analytics', /\/intelligence\/decision-hub\?capability=analytics$/],
+  ['/intelligence/alerts', /\/intelligence\/decision-hub\?view=alerts$/],
+  ['/demand/campaign-ops', /\/demand\/campaigns$/],
+  ['/demand/content-creator-ops', /\/demand\/content-social\?view=creator-proof$/],
+  ['/demand/lead-response-capture', /\/demand\/leads-rfqs$/],
+  ['/demand/retargeting-outreach', /\/demand\/re-engage$/],
+  ['/demand/acquisition', /\/demand\/sources$/],
+  ['/demand/campaign', /\/demand\/campaigns$/],
+  ['/demand/lead-capture', /\/demand\/leads-rfqs$/],
+  ['/demand/retargeting', /\/demand\/re-engage$/],
   ['/finance/capital', /\/finance\/capital-offers$/],
   ['/orders', /\/ecom\/cos\/oms$/],
   ['/products', /\/ecom\/cos\/product-master$/],
@@ -29,6 +44,9 @@ const legacyRedirects = [
 ];
 
 test('protected routes redirect anonymous users to auth', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.removeItem('prime-os-auth-token');
+  });
   await page.goto('/overview');
   await expect(page).toHaveURL(/\/auth$/);
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
@@ -36,6 +54,9 @@ test('protected routes redirect anonymous users to auth', async ({ page }) => {
 
 test('auth form accepts a mocked PrimeOS session and enters the shell', async ({ page }) => {
   await mockPrimeBackend(page);
+  await page.addInitScript(() => {
+    window.sessionStorage.removeItem('prime-os-auth-token');
+  });
   await page.goto('/auth');
 
   await page.getByLabel('Email').fill('qa@primeos.local');

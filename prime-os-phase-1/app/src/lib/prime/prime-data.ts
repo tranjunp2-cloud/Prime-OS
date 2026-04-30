@@ -22,6 +22,8 @@ export type PrimeTowerId =
   | 'retargeting-outreach'
   | 'crm-compact'
   | 'service'
+  | 'decision-hub'
+  | 'signals'
   | 'creators'
   | 'customers'
   | 'campaigns'
@@ -303,6 +305,22 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     promise: 'Resolve order issues while feeding the customer timeline and COS operating context.',
     reuseSource: 'New Prime OS wrapper, linked to COS Returns, OMS, and Fulfillment.',
     floors: ['Ticket queue', 'Case detail', 'RMA', 'SLA', 'Resolution'],
+  },
+  'decision-hub': {
+    id: 'decision-hub',
+    area: 'Intelligence Area',
+    tower: 'Decision Hub',
+    promise: 'Turn cross-area signals into the next launch, fix, follow-up, or guardrail decision.',
+    reuseSource: 'New Prime OS wrapper, combining analytics, forecasting, alerts, AI operator, and outcome readback.',
+    floors: ['Decision queue', 'Operating health', 'Cross-area alerts', 'Outcome learning'],
+  },
+  signals: {
+    id: 'signals',
+    area: 'Intelligence Area',
+    tower: 'Signals',
+    promise: 'Show which market, customer, creator, VOC, attribution, and COS signals are real enough to become action.',
+    reuseSource: 'New Prime OS wrapper, combining analytics, attribution, forecasting, VOC, and COS readiness.',
+    floors: ['Signal registry', 'Evidence stack', 'Guardrail proof', 'Convert to decision'],
   },
   creators: {
     id: 'creators',

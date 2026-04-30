@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LockKeyhole } from 'lucide-react';
+import { Loader2, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 import { LanguageToggle } from '@/components/common/LanguageToggle';
 import { useI18n } from '@/lib/i18n/I18nContext';
@@ -73,75 +73,122 @@ export default function Auth() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="absolute right-6 top-6">
-        <LanguageToggle />
-      </div>
-      <Card className="w-full max-w-[520px]">
-        <CardHeader className="pb-8 pt-10 text-center">
-          <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
-            <LockKeyhole className="size-8 text-primary" />
-          </div>
-          <CardTitle className="font-display text-4xl font-semibold text-foreground">
-            {authCopy.title}
-          </CardTitle>
-          <CardDescription className="mt-3 text-[15px] text-muted-foreground">
-            {authCopy.description}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-8 pb-10">
-          <form className="flex flex-col gap-5" onSubmit={handleLogin}>
-            <div className="space-y-2">
-              <Label htmlFor="primeos-email">{authCopy.email}</Label>
-              <Input
-                id="primeos-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="username"
-                placeholder="seller@company.com"
-                required
-                className="h-11"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="primeos-password">{authCopy.password}</Label>
-              <Input
-                id="primeos-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                placeholder={authCopy.passwordPlaceholder}
-                required
-                className="h-11"
-              />
-            </div>
-
-            {formError ? (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {formError}
+    <div className="flex min-h-dvh items-center justify-center bg-[hsl(var(--surface-stage))] px-4 py-6 sm:px-6 lg:px-10">
+      <Card className="grid w-full max-w-5xl overflow-hidden border border-border bg-card shadow-[0_24px_80px_hsl(var(--foreground)/0.08)] lg:grid-cols-[0.92fr_1.08fr]">
+        <section className="hidden border-r border-border bg-muted/35 p-8 lg:flex lg:flex-col lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <img src="/brand-logo.svg" alt="Prime OS" className="h-9 w-auto" />
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  {authCopy.eyebrow}
+                </p>
+                <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground">
+                  {authCopy.brandTitle}
+                </h1>
               </div>
-            ) : null}
+            </div>
+            <p className="mt-8 max-w-[22rem] text-[15px] leading-7 text-muted-foreground">
+              {authCopy.brandDescription}
+            </p>
+          </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              className="mt-2 w-full text-[15px]"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-3 size-5 animate-spin" />
-                  {statusText || authCopy.signingIn}
-                </>
-              ) : (
-                authCopy.submit
-              )}
-            </Button>
-          </form>
-        </CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-t border-border pt-4 text-sm">
+              <span className="text-muted-foreground">{authCopy.workspaceLabel}</span>
+              <span className="font-medium text-foreground">{authCopy.workspaceValue}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-border pt-4 text-sm">
+              <span className="text-muted-foreground">{authCopy.securityLabel}</span>
+              <span className="inline-flex items-center gap-2 font-medium text-foreground">
+                <ShieldCheck className="size-4 text-primary" />
+                {authCopy.securityValue}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10">
+          <div className="mb-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 lg:hidden">
+              <img src="/brand-logo.svg" alt="Prime OS" className="h-8 w-auto" />
+              <span className="font-display text-lg font-semibold text-foreground">{authCopy.brandTitle}</span>
+            </div>
+            <div className="ml-auto flex items-center gap-3">
+              <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
+                {authCopy.languageSwitcherLabel}
+              </span>
+              <LanguageToggle compact />
+            </div>
+          </div>
+
+          <div className="mx-auto max-w-md">
+            <CardHeader className="px-0 pb-8 pt-0 text-left">
+              <div className="mb-6 flex size-12 items-center justify-center rounded-lg border border-primary/15 bg-primary/10">
+                <LockKeyhole className="size-6 text-primary" />
+              </div>
+              <CardTitle className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+                {authCopy.title}
+              </CardTitle>
+              <CardDescription className="mt-3 text-[15px] leading-6 text-muted-foreground">
+                {authCopy.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 pb-0">
+              <form className="flex flex-col gap-5" onSubmit={handleLogin}>
+                <div className="space-y-2">
+                  <Label htmlFor="primeos-email">{authCopy.email}</Label>
+                  <Input
+                    id="primeos-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    autoComplete="username"
+                    placeholder="seller@company.com"
+                    required
+                    className="h-12 text-[15px]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="primeos-password">{authCopy.password}</Label>
+                  <Input
+                    id="primeos-password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="current-password"
+                    placeholder={authCopy.passwordPlaceholder}
+                    required
+                    className="h-12 text-[15px]"
+                  />
+                </div>
+
+                {formError ? (
+                  <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    {formError}
+                  </div>
+                ) : null}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="mt-2 h-12 w-full text-[15px]"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-3 size-5 animate-spin" />
+                      {statusText || authCopy.signingIn}
+                    </>
+                  ) : (
+                    authCopy.submit
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </div>
+        </section>
       </Card>
     </div>
   );

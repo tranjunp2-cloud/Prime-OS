@@ -221,7 +221,7 @@ const currency = new Intl.NumberFormat('ja-JP', {
 });
 
 const demandTowerIds: PrimeTowerId[] = ['campaign-ops', 'content-creator-ops', 'lead-response-capture', 'retargeting-outreach'];
-const intelligenceTowerIds: PrimeTowerId[] = ['creators', 'customers', 'campaigns', 'analytics', 'attribution', 'forecasting', 'ai-operator', 'voc', 'alerts'];
+const intelligenceTowerIds: PrimeTowerId[] = ['decision-hub', 'signals', 'creators', 'customers', 'campaigns', 'analytics', 'attribution', 'forecasting', 'ai-operator', 'voc', 'alerts'];
 const financeTowerIds: PrimeTowerId[] = ['offers', 'risk', 'settlement'];
 
 function getTowerConfidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot) {
@@ -448,6 +448,343 @@ function ActivationBoard({ plays }: { plays: PrimeActivationPlay[] }) {
             </div>
           </div>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
+  const highRiskForecasts = snapshot.forecasts.filter((forecast) => forecast.risk === 'high');
+  const highRiskAlerts = snapshot.alerts.filter((alert) => alert.severity === 'high');
+  const topRecommendation = snapshot.recommendations[0];
+  const decisionRows = [
+    ...snapshot.recommendations.slice(0, 3).map((recommendation) => ({
+      id: recommendation.id,
+      type: 'Launch',
+      title: recommendation.target,
+      detail: recommendation.reasoning,
+      state: recommendation.confidence >= 82 ? 'Go' : 'Review',
+      confidence: recommendation.confidence,
+      owner: 'AI Operator',
+      href: INTELLIGENCE_DECISIONS_HREF,
+    })),
+    ...highRiskForecasts.slice(0, 2).map((forecast) => ({
+      id: forecast.id,
+      type: 'Fix',
+      title: getSkuProductName(forecast.skuCode),
+      detail: forecast.suggestedAction,
+      state: 'Hold',
+      confidence: Math.min(95, Math.round((forecast.demand7d / Math.max(forecast.ats, 1)) * 100)),
+      owner: 'COS',
+      href: '/ecom/cos/inventory-brain',
+    })),
+    ...highRiskAlerts.slice(0, 2).map((alert) => ({
+      id: alert.id,
+      type: 'Investigate',
+      title: alert.title,
+      detail: `Linked entity: ${alert.linkedEntity}`,
+      state: 'Review',
+      confidence: 74,
+      owner: alert.area.replace(' Area', ''),
+      href: '/intelligence/decision-hub?view=alerts',
+    })),
+  ].slice(0, 6);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-5">
+        <SummaryMetricCard label="Decisions today" value={decisionRows.length} meta="Launch, fix, follow-up, or investigate." icon={<ClipboardList className="size-5" />} tone="purple" />
+        <SummaryMetricCard label="Signals joined" value={snapshot.socialStreams.length + snapshot.vocInsights.length} meta="Market, VOC, creator, and customer proof." icon={<ScanSearch className="size-5" />} tone="info" />
+        <SummaryMetricCard label="COS guardrails" value={highRiskForecasts.length} meta="Stock and execution blockers." icon={<Gauge className="size-5" />} tone={highRiskForecasts.length ? 'warning' : 'success'} />
+        <SummaryMetricCard label="Outcome readback" value={snapshot.orders.length} meta="OMS orders close the loop." icon={<TrendingUp className="size-5" />} tone="success" />
+        <SummaryMetricCard label="AI drafts" value={snapshot.recommendations.length} meta="Explain, recommend, draft, audit." icon={<Bot className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>Decision queue</CardTitle>
+              <Badge variant="outline">Action, not report</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Decision</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead className="text-right">Confidence</TableHead>
+                  <TableHead>Owner</TableHead>
+                  <TableHead className="text-right">Handoff</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {decisionRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>
+                      <div className="font-medium">{row.title}</div>
+                      <div className="line-clamp-1 text-xs text-muted-foreground">{row.detail}</div>
+                    </TableCell>
+                    <TableCell>{row.type}</TableCell>
+                    <TableCell><Badge variant={row.state === 'Hold' ? 'warning' : row.state === 'Go' ? 'default' : 'outline'}>{row.state}</Badge></TableCell>
+                    <TableCell className="text-right">{row.confidence}%</TableCell>
+                    <TableCell>{row.owner}</TableCell>
+                    <TableCell className="text-right">
+                      <Link to={row.href} className="inline-flex items-center gap-1 text-primary hover:underline">
+                        Open <ArrowRight className="size-3" />
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Operator readout</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-xs uppercase text-muted-foreground">Explain</div>
+              <p className="mt-2 text-sm font-medium">{topRecommendation?.reasoning || 'PrimeOS is waiting for enough linked signals.'}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-xs uppercase text-muted-foreground">Draft action</div>
+              <p className="mt-2 text-sm text-primary">{topRecommendation?.action || 'Open Signals to validate the next decision.'}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-xs uppercase text-muted-foreground">Audit note</div>
+              <p className="mt-2 text-sm text-muted-foreground">AI can explain and draft. Demand, Customer, COS, or Finance still owns the action.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ActivationBoard plays={snapshot.activationPlays.slice(0, 3)} />
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Outcome learning</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-2xl font-semibold">{snapshot.leads.length}</div>
+              <div className="text-sm text-muted-foreground">Leads feeding decisions</div>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-2xl font-semibold">{snapshot.rfqs.length}</div>
+              <div className="text-sm text-muted-foreground">RFQs as conversion proof</div>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="text-2xl font-semibold">{snapshot.tickets.length}</div>
+              <div className="text-sm text-muted-foreground">Service signals to respect</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+type IntelligenceSignalRow = {
+  id: string;
+  family: string;
+  source: string;
+  linkedEntity: string;
+  strength: number;
+  freshness: string;
+  recommendation: string;
+  targetHref: string;
+  detail: string;
+};
+
+function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRow[] {
+  return [
+    ...snapshot.socialStreams.map((stream) => ({
+      id: stream.id,
+      family: 'Market signal',
+      source: stream.source,
+      linkedEntity: stream.ingestionMode,
+      strength: stream.status === 'healthy' ? 86 : stream.status === 'watch' ? 68 : 44,
+      freshness: `${stream.freshnessMinutes}m`,
+      recommendation: stream.audienceSignal,
+      targetHref: INTELLIGENCE_DECISIONS_HREF,
+      detail: `${stream.eventVolume.toLocaleString()} events from ${stream.source}.`,
+    })),
+    ...snapshot.vocInsights.map((insight) => ({
+      id: insight.id,
+      family: 'VOC',
+      source: insight.source,
+      linkedEntity: insight.campaignId,
+      strength: insight.sentiment === 'positive' ? 82 : insight.sentiment === 'negative' ? 76 : 63,
+      freshness: 'today',
+      recommendation: insight.action,
+      targetHref: insight.sentiment === 'negative' ? '/customer/service' : '/demand/campaign-ops',
+      detail: insight.summary,
+    })),
+    ...snapshot.forecasts.map((forecast) => ({
+      id: forecast.id,
+      family: 'COS guardrail',
+      source: 'Inventory Brain',
+      linkedEntity: getSkuLabel(forecast.skuCode),
+      strength: forecast.risk === 'high' ? 92 : forecast.risk === 'medium' ? 70 : 48,
+      freshness: 'live',
+      recommendation: forecast.suggestedAction,
+      targetHref: forecast.risk === 'high' ? '/ecom/cos/inventory-brain' : INTELLIGENCE_DECISIONS_HREF,
+      detail: `7d demand ${forecast.demand7d}, ATS ${forecast.ats}.`,
+    })),
+    ...snapshot.campaigns.map((campaign) => ({
+      id: campaign.id,
+      family: 'Attribution',
+      source: campaign.channel,
+      linkedEntity: campaign.skuCode,
+      strength: Math.min(95, 45 + campaign.orders * 8 + campaign.rfqs * 3),
+      freshness: campaign.status,
+      recommendation: `${campaign.leads} leads, ${campaign.rfqs} RFQs, ${campaign.orders} orders.`,
+      targetHref: '/demand/campaign-ops',
+      detail: `${campaign.name} is tied to ${getSkuLabel(campaign.skuCode)}.`,
+    })),
+  ].sort((left, right) => right.strength - left.strength);
+}
+
+function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
+  const signals = useMemo(() => buildIntelligenceSignals(snapshot), [snapshot]);
+  const [selectedSignalId, setSelectedSignalId] = useState('');
+  const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? signals[0];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <SummaryMetricCard label="Validated signals" value={signals.length} meta="Market, VOC, COS, attribution." icon={<ScanSearch className="size-5" />} tone="info" />
+        <SummaryMetricCard label="High strength" value={signals.filter((signal) => signal.strength >= 80).length} meta="Ready for decision review." icon={<Target className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Guardrails" value={snapshot.forecasts.filter((forecast) => forecast.risk !== 'low').length} meta="Forecast and ATS checks." icon={<Gauge className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="VOC linked" value={snapshot.vocInsights.length} meta="Customer voice with business context." icon={<MessageCircle className="size-5" />} tone="purple" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>Signal registry</CardTitle>
+              <Badge variant="outline">Evidence before action</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table variant="embedded">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Signal</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Linked entity</TableHead>
+                  <TableHead className="text-right">Strength</TableHead>
+                  <TableHead>Freshness</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {signals.map((signal) => (
+                  <TableRow
+                    key={signal.id}
+                    onClick={() => setSelectedSignalId(signal.id)}
+                    className={selectedSignal?.id === signal.id ? 'bg-primary/5' : 'cursor-pointer'}
+                  >
+                    <TableCell>
+                      <div className="font-medium">{signal.family}</div>
+                      <div className="line-clamp-1 text-xs text-muted-foreground">{signal.recommendation}</div>
+                    </TableCell>
+                    <TableCell>{signal.source}</TableCell>
+                    <TableCell className="font-mono text-xs">{signal.linkedEntity}</TableCell>
+                    <TableCell className="text-right">{signal.strength}%</TableCell>
+                    <TableCell>{signal.freshness}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader>
+            <CardTitle>Signal detail</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {selectedSignal ? (
+              <>
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground">{selectedSignal.family}</div>
+                  <div className="mt-2 text-xl font-semibold">{selectedSignal.source}</div>
+                  <p className="mt-2 text-sm text-muted-foreground">{selectedSignal.detail}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs uppercase text-muted-foreground">Why it matters</div>
+                  <p className="mt-2 text-sm font-medium">{selectedSignal.recommendation}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs uppercase text-muted-foreground">Guardrail</div>
+                  <p className="mt-2 text-sm text-muted-foreground">Before action, check COS readiness, customer context, and service/finance blockers.</p>
+                </div>
+                <Button asChild className="w-full">
+                  <Link to={selectedSignal.targetHref}>
+                    Convert to decision
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">No signals are available yet.</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function launchDecisionLane(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized.includes('approved') || normalized.includes('go')) return 'Go';
+  if (normalized.includes('hold')) return 'Hold';
+  if (normalized.includes('reject') || normalized.includes('no')) return 'No-go';
+  return 'Review';
+}
+
+function LaunchDecisionStateBoard({ decisions }: { decisions: IntelligenceLaunchDecisionRecord[] }) {
+  const lanes = ['Go', 'Review', 'Hold', 'No-go'];
+
+  return (
+    <Card className="rounded-lg border">
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Launch decision board</CardTitle>
+          <Badge variant="outline">Go / Review / Hold / No-go</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 lg:grid-cols-4">
+        {lanes.map((lane) => {
+          const laneItems = decisions.filter((decision) => launchDecisionLane(decision.approvalStatus) === lane);
+          return (
+            <div key={lane} className="min-h-32 rounded-lg border bg-muted/20 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold">{lane}</div>
+                <Badge variant={lane === 'Go' ? 'default' : lane === 'Hold' ? 'warning' : lane === 'No-go' ? 'destructive' : 'outline'}>{laneItems.length}</Badge>
+              </div>
+              <div className="mt-3 space-y-2">
+                {laneItems.map((decision) => (
+                  <div key={decision.id} className="rounded-md border bg-background p-2">
+                    <div className="line-clamp-1 text-sm font-medium">{decision.decisionName}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{decision.skuCode} · {decision.confidence}%</div>
+                  </div>
+                ))}
+                {!laneItems.length ? (
+                  <div className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">No decision in this lane.</div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
@@ -6775,6 +7112,14 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
     enabled: towerId === 'creators' || towerId === 'customers' || towerId === 'campaigns',
   });
 
+  if (towerId === 'decision-hub') {
+    return <IntelligenceDecisionHubPanel snapshot={snapshot} />;
+  }
+
+  if (towerId === 'signals') {
+    return <IntelligenceSignalsPanel snapshot={snapshot} />;
+  }
+
   if (towerId === 'creators') {
     return (
       <CompactCreatorsRuntimePanel
@@ -6799,12 +7144,15 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
 
   if (towerId === 'campaigns') {
     return (
-      <CompactLaunchDecisionsRuntimePanel
-        data={intelligenceControlQuery.data}
-        isLoading={intelligenceControlQuery.isLoading}
-        error={intelligenceControlQuery.error}
-        snapshot={snapshot}
-      />
+      <div className="space-y-4">
+        <LaunchDecisionStateBoard decisions={intelligenceControlQuery.data?.launchDecisions ?? []} />
+        <CompactLaunchDecisionsRuntimePanel
+          data={intelligenceControlQuery.data}
+          isLoading={intelligenceControlQuery.isLoading}
+          error={intelligenceControlQuery.error}
+          snapshot={snapshot}
+        />
+      </div>
     );
   }
 
@@ -7076,6 +7424,8 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
 }
 
 const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; handoff: string; handoffHref: string }>> = {
+  'decision-hub': { decide: 'What should the operator act on today?', handoff: 'Open the strongest signal or decision package with evidence attached.', handoffHref: '/intelligence/signals' },
+  signals: { decide: 'Which signals are real enough to become action?', handoff: 'Convert validated evidence into a launch, fix, follow-up, or suppression decision.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   creators: { decide: 'Which creator should help sell this product?', handoff: 'PrimeOS explains the fit and sends the best route into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   customers: { decide: 'Pick the customer trend to activate now.', handoff: 'Send the trend into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   campaigns: { decide: 'Launch, review, hold, or no-go?', handoff: 'If Go, send it to Campaign Ops. If not, clear the one blocker.', handoffHref: '/demand/campaign-ops' },
@@ -7096,6 +7446,310 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   risk: { decide: 'What should this seller avoid or fix before asking for more capital?', handoff: 'Cleared eligibility blockers unlock safer Capital Offers.', handoffHref: '/finance/capital-offers' },
   settlement: { decide: 'Is seller finance healthy enough to keep scaling?', handoff: 'Health recommendations feed Demand, CRM, and the next capital decision.', handoffHref: '/finance/capital-offers' },
 };
+
+export function PrimeDemandHubPage() {
+  const snapshot = getPrimeSnapshot();
+  const activeCampaigns = snapshot.campaigns.filter((campaign) => campaign.status === 'active').length;
+  const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
+  const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
+  const totalOrders = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.orders, 0);
+  const openRfqs = snapshot.rfqs.filter((rfq) => rfq.status !== 'converted').length;
+  const reengageEligible = snapshot.activationPlays.length;
+  const sourceVolume = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
+  const blockedGuardrails = snapshot.forecasts.filter((forecast) => forecast.risk === 'high').length + snapshot.tickets.filter((ticket) => ticket.status !== 'resolved').length;
+  const primaryCampaign = snapshot.campaigns[0];
+  const primaryPlay = snapshot.activationPlays[0];
+
+  const evidence: EvidenceItem[] = [
+    {
+      label: 'Source',
+      value: `${formatCompactCount(sourceVolume)} signals`,
+      detail: `${snapshot.socialStreams.length} acquisition/content sources are feeding Demand.`,
+      tone: 'info',
+    },
+    {
+      label: 'Response',
+      value: `${totalLeads} leads / ${totalRfqs} RFQs`,
+      detail: 'Lead and RFQ intent is read from the same campaign backbone.',
+      tone: 'success',
+    },
+    {
+      label: 'Guardrail',
+      value: blockedGuardrails ? `${blockedGuardrails} blockers` : 'Clear',
+      detail: blockedGuardrails ? 'COS stock or service context must stay visible before scale.' : 'No high-risk blocker in the current route.',
+      tone: blockedGuardrails ? 'warning' : 'success',
+    },
+  ];
+
+  const loop: OperatingLoopStep[] = [
+    {
+      label: 'Source',
+      title: 'Find the strongest demand origin',
+      detail: 'Use source quality, social streams, and campaign origin before adding spend.',
+      href: '/demand/sources',
+      tone: 'info',
+    },
+    {
+      label: 'Campaign',
+      title: 'Package the market move',
+      detail: 'Objective, audience, offer, channel, owner, and guardrail belong together.',
+      href: '/demand/campaigns',
+      tone: 'purple',
+    },
+    {
+      label: 'Response',
+      title: 'Turn intent into lead/RFQ work',
+      detail: 'Every response needs qualification, owner, SLA, and CRM/COS handoff.',
+      href: '/demand/leads-rfqs',
+      tone: 'success',
+    },
+    {
+      label: 'Re-entry',
+      title: 'Recover warm buyers safely',
+      detail: 'Re-engage only with suppression, cooldown, and outcome readback.',
+      href: '/demand/re-engage',
+      tone: 'warning',
+    },
+  ];
+
+  return (
+    <div className="min-h-full bg-background">
+      <div className="space-y-6 p-4 md:p-6">
+        <DecisionHeader
+          eyebrow="Demand Area operating workspace"
+          title="Demand Hub"
+          description="Coordinate sources, campaigns, content, leads/RFQs, and re-engagement from one growth-input loop."
+          confidence={blockedGuardrails ? 78 : 86}
+          status={blockedGuardrails ? 'Watch guardrails' : 'Ready'}
+          actions={(
+            <>
+              <Button asChild>
+                <Link to="/demand/campaigns">
+                  Open Campaigns
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/intelligence/launch-decisions">
+                  Start from Intelligence
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          evidence={evidence}
+          variant="compact"
+        />
+
+        <LinkedEntityStrip
+          entities={[
+            { label: 'Area', value: 'Demand Area', tone: 'purple' },
+            { label: 'Hub', value: 'Growth input', tone: 'info' },
+            { label: 'Campaign', value: primaryCampaign?.id || 'pending', href: '/demand/campaigns', tone: 'purple' },
+            { label: 'Orders', value: String(totalOrders), href: '/ecom/cos/oms', tone: 'success' },
+          ]}
+        />
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <SummaryMetricCard label="Active campaigns" value={activeCampaigns} meta="Planned demand pushes." icon={<Megaphone className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Source signals" value={formatCompactCount(sourceVolume)} meta="Acquisition/content intent." icon={<Globe className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Open leads/RFQs" value={openRfqs + totalLeads} meta="Needs owner/SLA." icon={<UserRoundCheck className="size-5" />} tone="success" />
+          <SummaryMetricCard label="Re-engage plays" value={reengageEligible} meta="Warm buyer routes." icon={<Target className="size-5" />} tone="warning" />
+          <SummaryMetricCard label="Guardrails" value={blockedGuardrails} meta="Stock/service blockers." icon={<ClipboardList className="size-5" />} tone={blockedGuardrails ? 'warning' : 'success'} />
+        </div>
+
+        <OperatingLoop steps={loop} />
+
+        <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Today demand moves</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {[
+                {
+                  label: 'Launch move',
+                  title: primaryCampaign?.name || 'Campaign route pending',
+                  detail: `${primaryCampaign?.targetSegment || 'Target audience'} · ${primaryCampaign ? getSkuLabel(primaryCampaign.skuCode) : 'SKU pending'}`,
+                  href: '/demand/campaigns',
+                },
+                {
+                  label: 'Response move',
+                  title: `${openRfqs} RFQs need commercial read`,
+                  detail: 'Draft reply, assign owner, and sync CRM memory before intent cools.',
+                  href: '/demand/leads-rfqs',
+                },
+                {
+                  label: 'Recovery move',
+                  title: primaryPlay?.audience || 'Warm buyer recovery',
+                  detail: primaryPlay?.nextBestAction || 'Use suppression before outreach.',
+                  href: '/demand/re-engage',
+                },
+              ].map((move) => (
+                <Link key={move.label} to={move.href} className="block rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                  <div className="text-metadata">{move.label}</div>
+                  <div className="mt-1 text-sm font-semibold">{move.title}</div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{move.detail}</p>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Outcome readback</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table variant="embedded">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead className="text-right">Leads</TableHead>
+                    <TableHead className="text-right">RFQs</TableHead>
+                    <TableHead className="text-right">Orders</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {snapshot.campaigns.slice(0, 5).map((campaign) => (
+                    <TableRow key={campaign.id}>
+                      <TableCell className="font-medium">{campaign.name}</TableCell>
+                      <TableCell className="text-right">{campaign.leads}</TableCell>
+                      <TableCell className="text-right">{campaign.rfqs}</TableCell>
+                      <TableCell className="text-right">{campaign.orders}</TableCell>
+                      <TableCell className="text-right">{currency.format(campaign.revenue)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export function PrimeDemandSourcesPage() {
+  const snapshot = getPrimeSnapshot();
+  const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
+  const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
+  const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
+  const sourceVolume = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
+  const leadRate = totalTraffic ? Math.round((totalLeads / totalTraffic) * 100) : 0;
+  const rfqRate = totalLeads ? Math.round((totalRfqs / totalLeads) * 100) : 0;
+
+  const sourceEvidence: EvidenceItem[] = [
+    { label: 'Traffic intent', value: formatCompactCount(totalTraffic), detail: 'Campaign traffic connected to SKU routes.', tone: 'info' },
+    { label: 'Lead rate', value: `${leadRate}%`, detail: 'Preview conversion from campaign traffic to leads.', tone: 'success' },
+    { label: 'RFQ rate', value: `${rfqRate}%`, detail: 'Commercial readiness from leads into RFQs.', tone: 'purple' },
+  ];
+
+  return (
+    <div className="min-h-full bg-background">
+      <div className="space-y-6 p-4 md:p-6">
+        <DecisionHeader
+          eyebrow="Demand Area source workspace"
+          title="Sources"
+          description="Read acquisition and content origins as source quality, then decide whether to scale, test, fix, or pause."
+          confidence={82}
+          status="Ready"
+          actions={(
+            <>
+              <Button asChild>
+                <Link to="/demand/campaigns">
+                  Build campaign
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/demand/content-social">
+                  Fix content/CTA
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          evidence={sourceEvidence}
+          variant="compact"
+        />
+
+        <LinkedEntityStrip
+          entities={[
+            { label: 'Area', value: 'Demand Area', tone: 'purple' },
+            { label: 'Workspace', value: 'Sources', tone: 'info' },
+            { label: 'Signals', value: formatCompactCount(sourceVolume), href: '/intelligence/signals', tone: 'muted' },
+            { label: 'Leads', value: String(totalLeads), href: '/demand/leads-rfqs', tone: 'success' },
+          ]}
+        />
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryMetricCard label="Source signal volume" value={formatCompactCount(sourceVolume)} meta="Social, creator, chat, and review streams." icon={<RadioTower className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Campaign traffic" value={formatCompactCount(totalTraffic)} meta="Traffic linked to active campaign routes." icon={<Megaphone className="size-5" />} tone="purple" />
+          <SummaryMetricCard label="Lead conversion" value={`${leadRate}%`} meta={`${totalLeads} leads from tracked demand.`} icon={<UserRoundCheck className="size-5" />} tone="success" />
+          <SummaryMetricCard label="RFQ readiness" value={`${rfqRate}%`} meta={`${totalRfqs} RFQs attached.`} icon={<ClipboardList className="size-5" />} tone="warning" />
+        </div>
+
+        <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Source quality registry</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table variant="embedded">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Mode</TableHead>
+                    <TableHead className="text-right">Signals</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Next move</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {snapshot.socialStreams.map((stream) => (
+                    <TableRow key={stream.id}>
+                      <TableCell className="font-medium">{stream.source}</TableCell>
+                      <TableCell>{stream.ingestionMode}</TableCell>
+                      <TableCell className="text-right">{formatCompactCount(stream.eventVolume)}</TableCell>
+                      <TableCell>
+                        <Badge variant={stream.status === 'healthy' ? 'default' : stream.status === 'watch' ? 'secondary' : 'outline'}>
+                          {stream.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[320px] text-muted-foreground">{stream.audienceSignal}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border">
+            <CardHeader>
+              <CardTitle>Source to action</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {snapshot.campaigns.slice(0, 4).map((campaign) => (
+                <Link key={campaign.id} to="/demand/campaigns" className="block rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{campaign.name}</div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {campaign.channel} source feeds {campaign.leads} leads, {campaign.rfqs} RFQs, and {campaign.orders} orders.
+                      </p>
+                    </div>
+                    <Badge variant="outline">{campaign.status}</Badge>
+                  </div>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </div>
+  );
+}
 
 export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
   const config = PRIME_TOWER_CONFIGS[towerId];

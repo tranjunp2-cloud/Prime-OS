@@ -25,7 +25,7 @@ import UIRegressionReview from "./pages/UIRegressionReview";
 import { AppLayout } from "./components/layout/AppLayout";
 import { LegacyEntityRedirect, LegacyPathRedirect } from "./components/routing/LegacyEntityRedirect";
 import { PrimeOverview } from "./pages/prime/PrimeOverview";
-import { PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
+import { PrimeDemandHubPage, PrimeDemandSourcesPage, PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "./pages/prime/CommerceSurfacePage";
 import { CosPolicyRulePage } from "./pages/prime/CosPolicyRulePage";
 import { CosEventAuditPage } from "./pages/prime/CosEventAuditPage";
@@ -81,15 +81,21 @@ const App = () => {
                   >
                     <Route path="/overview" element={<PrimeOverview />} />
 
-                    <Route path="/demand/campaign-ops" element={<PrimeTowerPage towerId="campaign-ops" />} />
-                    <Route path="/demand/content-creator-ops" element={<PrimeTowerPage towerId="content-creator-ops" />} />
-                    <Route path="/demand/lead-response-capture" element={<PrimeTowerPage towerId="lead-response-capture" />} />
-                    <Route path="/demand/retargeting-outreach" element={<PrimeTowerPage towerId="retargeting-outreach" />} />
-                    <Route path="/demand/acquisition" element={<Navigate to="/demand/campaign-ops" replace />} />
-                    <Route path="/demand/campaign" element={<Navigate to="/demand/campaign-ops" replace />} />
-                    <Route path="/demand/content-social" element={<Navigate to="/demand/content-creator-ops" replace />} />
-                    <Route path="/demand/lead-capture" element={<Navigate to="/demand/lead-response-capture" replace />} />
-                    <Route path="/demand/retargeting" element={<Navigate to="/demand/retargeting-outreach" replace />} />
+                    <Route path="/demand" element={<PrimeDemandHubPage />} />
+                    <Route path="/demand/hub" element={<PrimeDemandHubPage />} />
+                    <Route path="/demand/sources" element={<PrimeDemandSourcesPage />} />
+                    <Route path="/demand/campaigns" element={<PrimeTowerPage towerId="campaign-ops" />} />
+                    <Route path="/demand/content-social" element={<PrimeTowerPage towerId="content-creator-ops" />} />
+                    <Route path="/demand/leads-rfqs" element={<PrimeTowerPage towerId="lead-response-capture" />} />
+                    <Route path="/demand/re-engage" element={<PrimeTowerPage towerId="retargeting-outreach" />} />
+                    <Route path="/demand/campaign-ops" element={<Navigate to="/demand/campaigns" replace />} />
+                    <Route path="/demand/content-creator-ops" element={<Navigate to="/demand/content-social?view=creator-proof" replace />} />
+                    <Route path="/demand/lead-response-capture" element={<Navigate to="/demand/leads-rfqs" replace />} />
+                    <Route path="/demand/retargeting-outreach" element={<Navigate to="/demand/re-engage" replace />} />
+                    <Route path="/demand/acquisition" element={<Navigate to="/demand/sources" replace />} />
+                    <Route path="/demand/campaign" element={<Navigate to="/demand/campaigns" replace />} />
+                    <Route path="/demand/lead-capture" element={<Navigate to="/demand/leads-rfqs" replace />} />
+                    <Route path="/demand/retargeting" element={<Navigate to="/demand/re-engage" replace />} />
 
                     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
                     <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />
@@ -122,15 +128,18 @@ const App = () => {
                     <Route path="/ecom/cos/policy-rule/routing" element={<RoutingPlans />} />
                     <Route path="/ecom/cos/event-audit" element={<CosEventAuditPage />} />
 
-                    <Route path="/intelligence/analytics" element={<PrimeTowerPage towerId="analytics" />} />
-                    <Route path="/intelligence/attribution" element={<PrimeTowerPage towerId="attribution" />} />
-                    <Route path="/intelligence/forecasting" element={<PrimeTowerPage towerId="forecasting" />} />
-                    <Route path="/intelligence/ai-operator" element={<PrimeTowerPage towerId="ai-operator" />} />
-                    <Route path="/intelligence/voc" element={<PrimeTowerPage towerId="voc" />} />
-                    <Route path="/intelligence/alerts" element={<PrimeTowerPage towerId="alerts" />} />
-                    <Route path="/intelligence/creators" element={<PrimeTowerPage towerId="creators" />} />
-                    <Route path="/intelligence/trends" element={<PrimeTowerPage towerId="customers" />} />
-                    <Route path="/intelligence/customers" element={<Navigate to="/intelligence/trends" replace />} />
+                    <Route path="/intelligence" element={<PrimeTowerPage towerId="decision-hub" />} />
+                    <Route path="/intelligence/decision-hub" element={<PrimeTowerPage towerId="decision-hub" />} />
+                    <Route path="/intelligence/signals" element={<PrimeTowerPage towerId="signals" />} />
+                    <Route path="/intelligence/analytics" element={<Navigate to="/intelligence/decision-hub?capability=analytics" replace />} />
+                    <Route path="/intelligence/ai-operator" element={<Navigate to="/intelligence/decision-hub?view=operator" replace />} />
+                    <Route path="/intelligence/alerts" element={<Navigate to="/intelligence/decision-hub?view=alerts" replace />} />
+                    <Route path="/intelligence/attribution" element={<Navigate to="/intelligence/signals?capability=attribution" replace />} />
+                    <Route path="/intelligence/forecasting" element={<Navigate to="/intelligence/signals?capability=forecasting" replace />} />
+                    <Route path="/intelligence/voc" element={<Navigate to="/intelligence/signals?capability=voc" replace />} />
+                    <Route path="/intelligence/creators" element={<Navigate to="/intelligence/signals?view=creators" replace />} />
+                    <Route path="/intelligence/trends" element={<Navigate to="/intelligence/signals?view=customer-trends" replace />} />
+                    <Route path="/intelligence/customers" element={<Navigate to="/intelligence/signals?view=customer-trends" replace />} />
                     <Route path="/intelligence/launch-decisions" element={<PrimeTowerPage towerId="campaigns" />} />
                     <Route path="/intelligence/campaigns" element={<Navigate to="/intelligence/launch-decisions" replace />} />
 
