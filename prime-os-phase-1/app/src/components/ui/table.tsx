@@ -89,7 +89,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
       <tr
         ref={ref}
         className={cn(
-          "border-b border-border/45 transition-colors duration-150 ease-out data-[state=selected]:bg-[hsl(var(--surface-row-selected))]",
+          "prime-transition-fast border-b border-border/45 transition-colors data-[state=selected]:bg-[hsl(var(--surface-row-selected))]",
           variantClassMap[variant].row,
           className,
         )}

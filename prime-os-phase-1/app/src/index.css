@@ -61,6 +61,17 @@
     --row-height-default: 2.75rem;
     --command-palette-width: 40rem;
 
+    --motion-fast: 150ms;
+    --motion-standard: 200ms;
+    --motion-slow: 300ms;
+    --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+    --focus-ring-size: 3px;
+    --focus-ring-offset: 2px;
+    --focus-ring-color: hsl(var(--ring) / 0.28);
+    --shadow-surface: 0 1px 2px hsl(var(--overlay-scrim) / 0.05);
+    --shadow-panel: 0 16px 44px hsl(var(--overlay-scrim) / 0.1);
+    --shadow-command: 0 18px 48px hsl(var(--overlay-scrim) / 0.12);
+
     --surface-stage: 0 0% 98%;
     --surface-sidebar: 0 0% 100%;
     --surface-toolbar: 0 0% 100%;
@@ -189,6 +200,11 @@
     --surface-glass: 240 18% 14%;
     --surface-highlight: 0 0% 100%;
     --overlay-scrim: 240 35% 5%;
+
+    --focus-ring-color: hsl(var(--ring) / 0.34);
+    --shadow-surface: 0 1px 2px hsl(var(--overlay-scrim) / 0.16);
+    --shadow-panel: 0 16px 44px hsl(var(--overlay-scrim) / 0.24);
+    --shadow-command: 0 18px 48px hsl(var(--overlay-scrim) / 0.28);
 
     --border-divider: 240 14% 20%;
     --border-highlight: 0 0% 100%;
@@ -336,19 +352,27 @@
   }
 
   a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
   [role="button"]:focus-visible,
   [tabindex="0"]:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.12);
+    box-shadow: 0 0 0 var(--focus-ring-offset) hsl(var(--background)),
+      0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-size)) var(--focus-ring-color);
     border-radius: var(--radius-md);
   }
 }
 
 @layer base {
   button:not(:disabled) {
-    transition: background-color 200ms ease-out, color 200ms ease-out,
-      border-color 200ms ease-out, opacity 200ms ease-out,
-      transform 200ms ease-out, box-shadow 200ms ease-out;
+    transition: background-color var(--motion-standard) var(--motion-ease),
+      color var(--motion-standard) var(--motion-ease),
+      border-color var(--motion-standard) var(--motion-ease),
+      opacity var(--motion-standard) var(--motion-ease),
+      transform var(--motion-standard) var(--motion-ease),
+      box-shadow var(--motion-standard) var(--motion-ease);
   }
   button:not(:disabled):active {
     transform: translateY(0);
@@ -406,7 +430,7 @@
     @apply border;
     border-color: hsl(var(--border-divider));
     background-color: hsl(var(--surface-command));
-    box-shadow: 0 18px 48px hsl(var(--overlay-scrim) / 0.12);
+    box-shadow: var(--shadow-command);
   }
 }
 
@@ -422,6 +446,33 @@
 }
 
 @layer utilities {
+  .prime-transition {
+    transition-duration: var(--motion-standard);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  .prime-transition-fast {
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  .surface-shadow {
+    box-shadow: var(--shadow-surface);
+  }
+
+  .panel-shadow {
+    box-shadow: var(--shadow-panel);
+  }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .data-number {
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Always-visible scrollbar — prevents hidden-scrollbar UX pain */
   .scrollbar-visible {
     scrollbar-width: thin;

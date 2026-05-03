@@ -38,7 +38,7 @@ function SidebarLink({
   const label = getShellNavLabel(locale, node.id, node.label);
   const badge = node.badge ? getShellNavBadge(locale, node.badge) : null;
   const baseClassName = cn(
-    'group relative flex min-h-10 items-center gap-2.5 rounded-md text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)]',
+    'group prime-transition-fast relative flex min-h-10 items-center gap-2.5 rounded-lg text-sm font-medium outline-none hover:-translate-y-px',
     isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
     isActive
       ? isLeaf
@@ -176,7 +176,7 @@ function SidebarFolder({
         aria-label={formatMessage(shellCopy.openNavigation, { label })}
         title={label}
         className={cn(
-          'group relative flex min-h-10 w-full items-center justify-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] md:justify-start md:pl-3 md:pr-2',
+          'group prime-transition-fast relative flex min-h-10 w-full items-center justify-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none hover:-translate-y-px md:justify-start md:pl-3 md:pr-2',
           isActive
             ? 'bg-[hsl(var(--surface-toolbar))] text-foreground ring-1 ring-border'
             : 'text-muted-foreground hover:bg-[hsl(var(--surface-hover))] hover:text-foreground'
@@ -324,8 +324,19 @@ function AreaSection({
   shellCopy: ShellDictionary;
 }) {
   const label = getShellNavLabel(locale, node.id, node.label);
+  const childCount = node.children?.length ?? 0;
   return (
     <section aria-label={label} className="space-y-1.5">
+      <div className="hidden items-center justify-between px-3 md:flex">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          {label}
+        </span>
+        {childCount > 0 ? (
+          <span className="font-identifier rounded-full border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
+            {childCount}
+          </span>
+        ) : null}
+      </div>
       <SidebarFolder node={node} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
     </section>
   );
@@ -353,8 +364,8 @@ export function AppSidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-3" aria-label={shellCopy.primaryNavigation}>
-        <div className="space-y-4 px-2.5 md:px-3">
+      <nav className="scrollbar-visible flex-1 overflow-y-auto py-3" aria-label={shellCopy.primaryNavigation}>
+        <div className="space-y-5 px-2.5 md:px-3">
           <div>
             <SidebarLink node={overviewNode} activeIds={activeIds} locale={locale} isLeaf />
           </div>

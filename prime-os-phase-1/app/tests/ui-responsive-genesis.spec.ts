@@ -96,9 +96,9 @@ test.describe('Genesis token contract', () => {
     expect(tokens.bodyBackground).toBe('rgb(250, 250, 250)');
     expect(tokens.bodyFont).toContain('DM Sans');
     expect(tokens.headingFont).toContain('General Sans');
-    expect(tokens.buttonRadius).toBe('6px');
+    expect(tokens.buttonRadius).toBe('8px');
     expect(tokens.cardRadius).toBe('12px');
-    expect(tokens.cardShadow === 'none' || tokens.cardShadow === '').toBeTruthy();
+    expect(tokens.cardShadow === 'none' || tokens.cardShadow === '' || tokens.cardShadow.includes('rgba(')).toBeTruthy();
     expect(tokens.headerHeight).toBe('56px');
   });
 

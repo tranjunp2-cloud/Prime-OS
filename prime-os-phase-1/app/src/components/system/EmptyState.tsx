@@ -31,12 +31,12 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-lg border border-border/60 bg-card px-6 py-12 text-center text-card-foreground',
+        'surface-solid flex flex-col items-center justify-center rounded-3xl px-6 py-12 text-center text-card-foreground',
         className,
       )}
     >
       {icon && (
-        <div className={cn('mb-4 flex size-12 items-center justify-center rounded-lg [&>svg]:size-6', getSemanticSurfaceToneClassName(tone))}>
+        <div className={cn('mb-4 flex size-12 items-center justify-center rounded-2xl [&>svg]:size-6', getSemanticSurfaceToneClassName(tone))}>
           {icon}
         </div>
       )}

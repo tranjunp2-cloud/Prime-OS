@@ -59,7 +59,7 @@ export function PageDataState<T>({
   if (error && !data) {
     return (
       <div className={cn(
-        'flex min-h-[200px] flex-col items-center justify-center rounded-[1.75rem] border border-border/60 bg-card px-6 py-12 text-center',
+        'surface-solid flex min-h-[200px] flex-col items-center justify-center rounded-3xl px-6 py-12 text-center',
         className,
       )}>
         <AlertCircle className="mb-4 size-10 text-destructive" />
@@ -68,7 +68,7 @@ export function PageDataState<T>({
           {error.message || "Failed to load data. Please try again."}
         </p>
         <Button onClick={refetch} variant="outline" size="sm">
-          <RefreshCcw className="size-4 mr-2" />
+          <RefreshCcw className="mr-2 size-4" />
           Try again
         </Button>
       </div>

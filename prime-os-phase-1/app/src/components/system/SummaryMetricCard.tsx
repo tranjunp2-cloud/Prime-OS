@@ -39,7 +39,7 @@ export function SummaryMetricCard({
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               {loading ? <Skeleton className="h-3 w-24 rounded-full" /> : label}
             </p>
-            <div className={cn('font-display mt-2 min-h-[2rem] text-2xl font-semibold text-foreground', valueClassName)}>
+            <div className={cn('font-display data-number mt-2 min-h-[2rem] text-2xl font-semibold text-foreground', valueClassName)}>
               {loading ? <Skeleton className="h-8 w-20 rounded-md" /> : value}
             </div>
             {status ? (
@@ -52,7 +52,7 @@ export function SummaryMetricCard({
             )}
           </div>
           {icon && (
-            <div className={cn('rounded-md p-2.5', loading ? 'bg-muted/70' : getSemanticSurfaceToneClassName(tone))}>
+            <div className={cn('rounded-xl p-2.5', loading ? 'bg-muted/70' : getSemanticSurfaceToneClassName(tone))}>
               {loading ? <Skeleton className="size-5 rounded-md" /> : icon}
             </div>
           )}

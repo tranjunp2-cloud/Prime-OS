@@ -48,7 +48,7 @@ const TONE_CLASS_NAMES: Record<SemanticTone, string> = {
   muted: 'bg-muted text-muted-foreground',
   purple: 'bg-violet-500/14 text-violet-700 dark:bg-violet-500/18 dark:text-violet-300',
   teal: 'bg-teal-500/14 text-teal-700 dark:bg-teal-500/18 dark:text-teal-300',
-  orange: 'bg-orange-500/14 text-orange-700 dark:bg-orange-500/18 dark:text-orange-300',
+  orange: 'bg-orange-500/14 text-orange-800 dark:bg-orange-500/18 dark:text-orange-300',
   indigo: 'bg-indigo-500/14 text-indigo-700 dark:bg-indigo-500/18 dark:text-indigo-300',
   black: 'bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-950',
 };
@@ -61,7 +61,7 @@ const SURFACE_TONE_CLASS_NAMES: Record<SemanticTone, string> = {
   muted: 'bg-muted/70 text-muted-foreground',
   purple: 'bg-violet-500/10 text-violet-700 dark:bg-violet-500/12 dark:text-violet-300',
   teal: 'bg-teal-500/10 text-teal-700 dark:bg-teal-500/12 dark:text-teal-300',
-  orange: 'bg-orange-500/10 text-orange-700 dark:bg-orange-500/12 dark:text-orange-300',
+  orange: 'bg-orange-500/10 text-orange-800 dark:bg-orange-500/12 dark:text-orange-300',
   indigo: 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-500/12 dark:text-indigo-300',
   black: 'bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-950',
 };
@@ -87,7 +87,7 @@ const TEXT_TONE_CLASS_NAMES: Record<SemanticTone, string> = {
   muted: 'text-muted-foreground',
   purple: 'text-violet-700 dark:text-violet-300',
   teal: 'text-teal-700 dark:text-teal-300',
-  orange: 'text-orange-700 dark:text-orange-300',
+  orange: 'text-orange-800 dark:text-orange-300',
   indigo: 'text-indigo-700 dark:text-indigo-300',
   black: 'text-foreground',
 };

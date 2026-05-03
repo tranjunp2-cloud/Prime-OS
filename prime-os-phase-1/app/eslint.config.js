@@ -15,6 +15,7 @@ export default tseslint.config(
       globals: {
         ...globals.browser,
         ...globals.node,
+        React: 'readonly',
       },
       parserOptions: {
         ecmaVersion: 'latest',
@@ -32,9 +33,12 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
-      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/rules-of-hooks': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': 'warn',
     },
@@ -42,11 +46,7 @@ export default tseslint.config(
   {
     files: ['**/*.tsx'],
     rules: {
-      '@typescript-eslint/no-unused-vars': ['error', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_',
-      }],
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
 );

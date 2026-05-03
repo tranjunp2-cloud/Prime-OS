@@ -1,5 +1,5 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BellRing,
   ChevronRight,
@@ -23,8 +23,9 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 import { useI18n } from '@/lib/i18n/I18nContext';
-import { getShellDictionary } from '@/lib/i18n/shell-dictionaries';
+import { getShellDictionary, getShellNavLabel } from '@/lib/i18n/shell-dictionaries';
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
+import { getPrimeNavPath } from '@/lib/prime/prime-navigation';
 import { cn } from '@/lib/utils';
 
 type SearchKind = 'Product' | 'SKU' | 'Order' | 'Lead' | 'Customer' | 'RFQ' | 'Campaign' | 'Alert';
@@ -247,6 +248,7 @@ export function AppLayout() {
   const { user, signOut } = useAuth();
   const { locale } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const shellCopy = useMemo(() => getShellDictionary(locale), [locale]);
   const globalSearchResults = useMemo(() => (
     bootstrapping ? [] : buildGlobalSearchResults()
@@ -265,6 +267,13 @@ export function AppLayout() {
       .slice(0, 9)
       .map((item) => item.result);
   }, [globalSearchResults, searchQuery]);
+
+  const breadcrumbItems = useMemo(() => (
+    getPrimeNavPath(location.pathname).map((node) => ({
+      id: node.id,
+      label: getShellNavLabel(locale, node.id, node.label),
+    }))
+  ), [locale, location.pathname]);
 
   const shouldShowSearchPanel = searchOpen && searchQuery.trim().length > 0;
 
@@ -435,15 +444,15 @@ export function AppLayout() {
                 <button
                   type="button"
                   aria-label={shellCopy.openCommandPalette}
-                  className="font-identifier absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsl(var(--ring)/0.12)] sm:block"
+                  className="font-identifier prime-transition-fast absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary/35 hover:text-foreground sm:block"
                   onClick={() => setCommandOpen(true)}
                 >
-                  Cmd K
+                  ⌘K
                 </button>
               )}
 
               {shouldShowSearchPanel ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-2xl border bg-card shadow-2xl">
+                <div className="panel-shadow absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-2xl border bg-card">
                   <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     {shellCopy.searchPanelHeading}
                   </div>
@@ -462,7 +471,7 @@ export function AppLayout() {
                             key={result.id}
                             type="button"
                             className={cn(
-                              'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors',
+                              'prime-transition-fast flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left',
                               isActive ? 'bg-primary/10 text-foreground ring-1 ring-primary/20' : 'hover:bg-muted/70'
                             )}
                             onMouseEnter={() => setActiveSearchIndex(index)}
@@ -496,7 +505,16 @@ export function AppLayout() {
                 </div>
               ) : null}
             </div>
-            <div className="hidden md:block" aria-hidden="true" />
+            <nav className="hidden min-w-0 items-center gap-1 text-xs text-muted-foreground md:flex" aria-label="Breadcrumb">
+              {breadcrumbItems.length > 0 ? breadcrumbItems.map((item, index) => (
+                <span key={item.id} className="flex min-w-0 items-center gap-1">
+                  {index > 0 ? <ChevronRight className="size-3 shrink-0" /> : null}
+                  <span className={cn('truncate', index === breadcrumbItems.length - 1 && 'font-semibold text-foreground')}>
+                    {item.label}
+                  </span>
+                </span>
+              )) : <span aria-hidden="true" />}
+            </nav>
             <div className="flex min-w-0 items-center justify-end gap-3">
               <div className="hidden min-w-0 flex-col text-right lg:flex">
                 <span className="text-[11px] font-medium text-muted-foreground">{shellCopy.sessionLabel}</span>
