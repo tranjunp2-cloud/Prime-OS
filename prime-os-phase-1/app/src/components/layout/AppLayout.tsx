@@ -3,14 +3,18 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BellRing,
   ChevronRight,
+  ChevronDown,
   ClipboardList,
   Hash,
   LogOut,
   Megaphone,
   Package,
   Search,
+  ShieldCheck,
   ShoppingCart,
+  UserRound,
   UserRoundCheck,
+  UsersRound,
   X,
 } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
@@ -19,6 +23,15 @@ import { GlobalCopilotWorkspace } from '@/components/copilot/GlobalCopilotWorksp
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
@@ -57,6 +70,22 @@ function normalizeSearchText(value: unknown) {
 
 function buildSearchText(parts: unknown[]) {
   return parts.map((part) => normalizeSearchText(part)).filter(Boolean).join(' ');
+}
+
+function getAccountInitials(fullName?: string, email?: string) {
+  const source = fullName?.trim() || email?.split('@')[0] || 'PrimeOS';
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'PO';
+}
+
+function getAccountRoleLabel(role?: string) {
+  if (role === 'admin') return 'Admin';
+  if (role === 'user') return 'Operator';
+  return 'Viewer';
 }
 
 function scoreSearchResult(result: GlobalSearchResult, query: string) {
@@ -274,6 +303,9 @@ export function AppLayout() {
       label: getShellNavLabel(locale, node.id, node.label),
     }))
   ), [locale, location.pathname]);
+  const accountInitials = getAccountInitials(user?.fullName, user?.email);
+  const accountRoleLabel = getAccountRoleLabel(user?.role);
+  const canManageMembers = user?.role === 'admin';
 
   const shouldShowSearchPanel = searchOpen && searchQuery.trim().length > 0;
   const searchListboxId = 'primeos-global-search-results';
@@ -526,23 +558,72 @@ export function AppLayout() {
               )) : <span aria-hidden="true" />}
             </nav>
             <div className="flex min-w-0 items-center justify-end gap-3">
-              <div className="hidden min-w-0 flex-col text-right lg:flex">
-                <span className="text-[11px] font-medium text-muted-foreground">{shellCopy.sessionLabel}</span>
-                <span className="max-w-[180px] truncate text-xs font-semibold text-foreground">
-                  {user?.email || shellCopy.demoWorkspace}
-                </span>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSignOut}
-                disabled={signingOut}
-                className="shrink-0"
-              >
-                <LogOut className="size-4" />
-                <span className="hidden sm:inline">{signingOut ? shellCopy.signingOut : shellCopy.logout}</span>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 max-w-[240px] justify-start gap-2 rounded-2xl px-2.5 shadow-sm"
+                    aria-label={`Open account menu for ${user?.email || shellCopy.demoWorkspace}`}
+                  >
+                    <Avatar className="size-8 border border-primary/15 bg-primary/10">
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                        {accountInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="hidden min-w-0 flex-col items-start text-left lg:flex">
+                      <span className="max-w-[140px] truncate text-xs font-semibold leading-4 text-foreground">
+                        {user?.fullName || shellCopy.demoWorkspace}
+                      </span>
+                      <span className="max-w-[140px] truncate text-[11px] leading-4 text-muted-foreground">
+                        {user?.email || shellCopy.sessionLabel}
+                      </span>
+                    </span>
+                    <Badge variant="secondary" className="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] md:inline-flex">
+                      {accountRoleLabel}
+                    </Badge>
+                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 rounded-2xl p-2">
+                  <DropdownMenuLabel className="rounded-xl bg-muted/35 px-3 py-3">
+                    <span className="block text-sm font-semibold text-foreground">{user?.fullName || shellCopy.demoWorkspace}</span>
+                    <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">{user?.email || shellCopy.sessionLabel}</span>
+                    <span className="mt-3 inline-flex rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {accountRoleLabel} · {canManageMembers ? 'Workspace owner' : 'Self-service'}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="items-start gap-3 rounded-xl py-3" onSelect={() => navigate('/account')}>
+                    <UserRound className="size-4" />
+                    <span className="grid gap-0.5">
+                      <span className="font-medium">Account cockpit</span>
+                      <span className="text-xs text-muted-foreground">Profile, access, team, audit trail</span>
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="items-start gap-3 rounded-xl py-3" onSelect={() => navigate('/account#security')}>
+                    <ShieldCheck className="size-4" />
+                    <span className="grid gap-0.5">
+                      <span className="font-medium">Security guardrails</span>
+                      <span className="text-xs text-muted-foreground">Session, credential, IAM notes</span>
+                    </span>
+                  </DropdownMenuItem>
+                  {canManageMembers ? (
+                    <DropdownMenuItem className="items-start gap-3 rounded-xl py-3" onSelect={() => navigate('/account#members')}>
+                      <UsersRound className="size-4" />
+                      <span className="grid gap-0.5">
+                        <span className="font-medium">Workspace access</span>
+                        <span className="text-xs text-muted-foreground">Invite and manage operators</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="gap-2 rounded-xl text-destructive focus:text-destructive" disabled={signingOut} onSelect={handleSignOut}>
+                    <LogOut className="size-4" />
+                    {signingOut ? shellCopy.signingOut : shellCopy.logout}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
           <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />

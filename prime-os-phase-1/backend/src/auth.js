@@ -123,6 +123,21 @@ export function getLoginAccountsForSeed() {
   return identityAccounts.map(toSafeAccount);
 }
 
+export function listIdentityAccounts() {
+  return identityAccounts.map(toSafeAccount);
+}
+
+export function updateIdentityAccount(accountId, updates = {}) {
+  const account = identityAccounts.find((candidate) => candidate.id === accountId);
+  if (!account) return null;
+
+  if (typeof updates.fullName === 'string' && updates.fullName.trim()) {
+    account.fullName = updates.fullName.trim().slice(0, 120);
+  }
+
+  return toSafeAccount(account);
+}
+
 export function authenticatePassword(email, password) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const account = identityAccounts.find((candidate) => candidate.email === normalizedEmail);

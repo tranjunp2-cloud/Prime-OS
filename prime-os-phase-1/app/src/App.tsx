@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Auth from "./pages/Auth";
+import Account from "./pages/Account";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import ProductCreatePage from "./pages/ProductCreatePage";
@@ -80,6 +81,7 @@ const App = () => {
                     }
                   >
                     <Route path="/overview" element={<PrimeOverview />} />
+                    <Route path="/account" element={<Account />} />
 
                     <Route path="/demand" element={<PrimeDemandHubPage />} />
                     <Route path="/demand/hub" element={<PrimeDemandHubPage />} />

@@ -21,6 +21,7 @@ import {
   Store,
   Target,
   Truck,
+  UserRound,
   UserRoundCheck,
   Workflow,
 } from 'lucide-react';
@@ -243,6 +244,10 @@ const nodeMatchScore = (pathname: string, node: PrimeNavNode) => {
 };
 
 export function getPrimeNavPath(pathname: string, nodes = primeNavigation) {
+  if (pathname === '/account' || pathname.startsWith('/account/')) {
+    return [{ id: 'account', label: 'Account', kind: 'overview' as const, href: '/account', icon: UserRound }];
+  }
+
   const matches: PrimeNavNode[][] = [];
 
   const walk = (items: PrimeNavNode[], parents: PrimeNavNode[]) => {

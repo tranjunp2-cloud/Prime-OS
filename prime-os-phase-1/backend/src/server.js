@@ -3,7 +3,9 @@ import cors from 'cors';
 import {
   authenticatePassword,
   createSessionToken,
+  listIdentityAccounts,
   toSafeAccount,
+  updateIdentityAccount,
   verifySessionToken
 } from './auth.js';
 import {
@@ -76,6 +78,136 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 app.use(express.json({ limit: process.env.PRIME_JSON_LIMIT || '1mb' }));
+
+app.use((request, response, next) => {
+  const requestId = request.header('x-request-id') || `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  request.primeRequestId = requestId;
+  response.setHeader('X-Request-Id', requestId);
+  next();
+});
+
+const accountWorkspace = {
+  id: 'ws_primeos_local',
+  name: 'PrimeOS main workspace',
+  slug: 'primeos-main',
+  default_locale: 'vi-VN',
+  default_timezone: 'Asia/Ho_Chi_Minh',
+  markets: ['VN', 'JP']
+};
+const roleDefinitions = [
+  {
+    role_key: 'admin',
+    label: 'Admin',
+    description: 'Quản lý workspace, thành viên và quyền truy cập cơ bản.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.members.read', 'iam.members.invite', 'iam.members.suspend', 'iam.members.reactivate', 'iam.roles.read', 'iam.audit.read']
+  },
+  {
+    role_key: 'operator',
+    label: 'Operator',
+    description: 'Vận hành PrimeOS và tự quản lý hồ sơ cá nhân.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.roles.read']
+  },
+  {
+    role_key: 'viewer',
+    label: 'Viewer',
+    description: 'Xem thông tin cá nhân/workspace, không có quyền quản trị.',
+    permissions: ['account.profile.read_self', 'workspace.read', 'iam.roles.read']
+  }
+];
+const membershipOverrides = new Map();
+const memberInvitations = [];
+const accountAuditEvents = [];
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function getRoleKey(account) {
+  return account?.role === 'admin' ? 'admin' : 'operator';
+}
+
+function getMembershipForAccount(account) {
+  const override = membershipOverrides.get(account.id) || {};
+  return {
+    id: `wm_${account.id}`,
+    workspace_id: accountWorkspace.id,
+    principal_id: account.id,
+    role_key: override.role_key || getRoleKey(account),
+    seat_type: account.seatType || (account.role === 'admin' ? 'full_admin' : 'seller_operator'),
+    status: override.status || 'active',
+    last_active_at: override.last_active_at || null
+  };
+}
+
+function getPrincipal(account) {
+  return {
+    id: account.id,
+    email: account.email,
+    display_name: account.fullName,
+    status: getMembershipForAccount(account).status,
+    auth_methods: ['password']
+  };
+}
+
+function getCapabilitiesForAccount(account) {
+  const membership = getMembershipForAccount(account);
+  return roleDefinitions.find((role) => role.role_key === membership.role_key)?.permissions || [];
+}
+
+function buildAccountEnvelope(account) {
+  return {
+    principal: getPrincipal(account),
+    membership: getMembershipForAccount(account),
+    workspace: accountWorkspace,
+    capabilities: getCapabilitiesForAccount(account)
+  };
+}
+
+function getSafeAccountById(accountId) {
+  return listIdentityAccounts().find((account) => account.id === accountId) || null;
+}
+
+function requireCapability(request, response, capability) {
+  const capabilities = getCapabilitiesForAccount(toSafeAccount(request.primeAccount));
+  if (!capabilities.includes(capability)) {
+    response.status(403).json({
+      error: {
+        code: 'iam.forbidden',
+        message: 'You do not have permission for this account action.',
+        request_id: request.primeRequestId
+      }
+    });
+    return false;
+  }
+  return true;
+}
+
+function appendAccountAudit(request, action, targetType, targetId, before = null, after = null, result = 'success') {
+  const event = {
+    id: `audit_${Date.now().toString(36)}_${accountAuditEvents.length + 1}`,
+    workspace_id: accountWorkspace.id,
+    actor_principal_id: request.primeAccount?.id || null,
+    session_id: null,
+    action,
+    target_type: targetType,
+    target_id: targetId,
+    before,
+    after,
+    result,
+    request_id: request.primeRequestId,
+    ip: getClientAddress(request),
+    user_agent: request.header('user-agent') || null,
+    created_at: nowIso()
+  };
+  accountAuditEvents.unshift(event);
+  return event;
+}
+
+function accountError(response, status, code, message, requestId, details = []) {
+  response.status(status).json({
+    error: { code, message, details, request_id: requestId }
+  });
+}
 
 function getClientAddress(request) {
   return request.ip || request.socket?.remoteAddress || 'unknown';
@@ -261,6 +393,149 @@ app.post('/api/admin/reset', async (request, response, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+
+app.get('/api/v1/me', async (request, response) => {
+  const account = toSafeAccount(request.primeAccount);
+  membershipOverrides.set(account.id, { ...(membershipOverrides.get(account.id) || {}), last_active_at: nowIso() });
+  response.json({ data: buildAccountEnvelope(account), meta: { request_id: request.primeRequestId } });
+});
+
+app.patch('/api/v1/me', async (request, response) => {
+  if (!requireCapability(request, response, 'account.profile.update_self')) return;
+  const fullName = String(request.body?.display_name || request.body?.fullName || '').trim();
+  if (fullName.length < 2) {
+    accountError(response, 400, 'account.invalid_display_name', 'Display name must be at least 2 characters.', request.primeRequestId, [{ field: 'display_name', reason: 'too_short' }]);
+    return;
+  }
+
+  const before = buildAccountEnvelope(toSafeAccount(request.primeAccount));
+  const updated = updateIdentityAccount(request.primeAccount.id, { fullName });
+  if (!updated) {
+    accountError(response, 404, 'account.not_found', 'Account not found.', request.primeRequestId);
+    return;
+  }
+  request.primeAccount.fullName = updated.fullName;
+  const after = buildAccountEnvelope(updated);
+  appendAccountAudit(request, 'account.profile.updated', 'principal', updated.id, before.principal, after.principal);
+  response.json({ data: after, meta: { request_id: request.primeRequestId } });
+});
+
+app.get('/api/v1/workspace', async (request, response) => {
+  if (!requireCapability(request, response, 'workspace.read')) return;
+  response.json({ data: accountWorkspace, meta: { request_id: request.primeRequestId } });
+});
+
+app.get('/api/v1/role-definitions', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.roles.read')) return;
+  response.json({ data: roleDefinitions, meta: { request_id: request.primeRequestId } });
+});
+
+app.get('/api/v1/workspace-members', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.read')) return;
+  const accounts = listIdentityAccounts();
+  const activeMembers = accounts.map((account) => ({
+    principal: getPrincipal(account),
+    membership: getMembershipForAccount(account)
+  }));
+  const invitedMembers = memberInvitations
+    .filter((invite) => invite.status === 'pending')
+    .map((invite) => ({
+      principal: {
+        id: `principal_${invite.id}`,
+        email: invite.email,
+        display_name: invite.email,
+        status: 'invited',
+        auth_methods: []
+      },
+      membership: {
+        id: `wm_${invite.id}`,
+        workspace_id: accountWorkspace.id,
+        principal_id: `principal_${invite.id}`,
+        role_key: invite.role_key,
+        seat_type: invite.seat_type,
+        status: 'invited',
+        last_active_at: null
+      },
+      invitation: invite
+    }));
+  response.json({ data: [...activeMembers, ...invitedMembers], meta: { request_id: request.primeRequestId } });
+});
+
+app.post('/api/v1/workspace-member-invitations', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.invite')) return;
+  const email = String(request.body?.email || '').trim().toLowerCase();
+  const roleKey = String(request.body?.role_key || 'operator');
+  const allowedRoleKeys = new Set(['admin', 'operator', 'viewer']);
+
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    accountError(response, 400, 'iam.invalid_email', 'A valid email is required.', request.primeRequestId, [{ field: 'email', reason: 'invalid' }]);
+    return;
+  }
+  if (!allowedRoleKeys.has(roleKey)) {
+    accountError(response, 400, 'iam.invalid_role', 'Role is not supported for invitations.', request.primeRequestId, [{ field: 'role_key', reason: 'unsupported' }]);
+    return;
+  }
+  const exists = listIdentityAccounts().some((account) => account.email === email) || memberInvitations.some((invite) => invite.email === email && invite.status === 'pending');
+  if (exists) {
+    accountError(response, 409, 'iam.member_exists', 'Member already exists in workspace.', request.primeRequestId, [{ field: 'email', reason: 'duplicate' }]);
+    return;
+  }
+
+  const invitation = {
+    id: `inv_${Date.now().toString(36)}_${memberInvitations.length + 1}`,
+    workspace_id: accountWorkspace.id,
+    email,
+    role_key: roleKey,
+    seat_type: roleKey === 'viewer' ? 'viewer' : 'seller_operator',
+    status: 'pending',
+    expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+    created_at: nowIso()
+  };
+  memberInvitations.unshift(invitation);
+  appendAccountAudit(request, 'iam.member.invited', 'invitation', invitation.id, null, invitation);
+  response.status(201).json({ data: invitation, meta: { request_id: request.primeRequestId } });
+});
+
+app.post('/api/v1/workspace-members/:membershipId/deactivate', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.suspend')) return;
+  const accountId = String(request.params.membershipId || '').replace(/^wm_/, '');
+  const target = getSafeAccountById(accountId);
+  if (!target) {
+    accountError(response, 404, 'iam.member_not_found', 'Workspace member not found.', request.primeRequestId);
+    return;
+  }
+  const activeAdmins = listIdentityAccounts().filter((account) => getMembershipForAccount(account).role_key === 'admin' && getMembershipForAccount(account).status === 'active');
+  if (target.role === 'admin' && activeAdmins.length <= 1) {
+    accountError(response, 409, 'iam.last_admin', 'Cannot deactivate the last active admin.', request.primeRequestId);
+    return;
+  }
+  const before = getMembershipForAccount(target);
+  membershipOverrides.set(target.id, { ...(membershipOverrides.get(target.id) || {}), status: 'suspended' });
+  const after = getMembershipForAccount(target);
+  appendAccountAudit(request, 'iam.member.deactivated', 'workspace_membership', before.id, before, after);
+  response.json({ data: { principal: getPrincipal(target), membership: after }, meta: { request_id: request.primeRequestId } });
+});
+
+app.post('/api/v1/workspace-members/:membershipId/reactivate', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.reactivate')) return;
+  const accountId = String(request.params.membershipId || '').replace(/^wm_/, '');
+  const target = getSafeAccountById(accountId);
+  if (!target) {
+    accountError(response, 404, 'iam.member_not_found', 'Workspace member not found.', request.primeRequestId);
+    return;
+  }
+  const before = getMembershipForAccount(target);
+  membershipOverrides.set(target.id, { ...(membershipOverrides.get(target.id) || {}), status: 'active' });
+  const after = getMembershipForAccount(target);
+  appendAccountAudit(request, 'iam.member.reactivated', 'workspace_membership', before.id, before, after);
+  response.json({ data: { principal: getPrincipal(target), membership: after }, meta: { request_id: request.primeRequestId } });
+});
+
+app.get('/api/v1/audit-events', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.audit.read')) return;
+  response.json({ data: accountAuditEvents.slice(0, 25), meta: { request_id: request.primeRequestId } });
 });
 
 app.get('/api/:resource', async (request, response, next) => {
