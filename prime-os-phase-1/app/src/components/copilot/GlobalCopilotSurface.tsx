@@ -26,6 +26,10 @@ export function GlobalCopilotSurface({
   onSend,
   onClear,
 }: GlobalCopilotSurfaceProps) {
+  const isAccountContext = context.title === 'Account Center';
+  const assistantLabel = isAccountContext ? 'Admin AI' : 'Prime AI';
+  const assistantBadge = isAccountContext ? 'IAM Guardrail' : 'Growth Advisor';
+  const assistantDescription = isAccountContext ? 'Access, permission, audit.' : 'Insight, recommendation, action.';
   const showDebug = (
     import.meta.env.DEV
     && typeof window !== 'undefined'
@@ -42,13 +46,13 @@ export function GlobalCopilotSurface({
             </div>
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-semibold tracking-[0.01em] text-foreground">Prime AI</h2>
+                <h2 className="text-sm font-semibold tracking-[0.01em] text-foreground">{assistantLabel}</h2>
                 <span className="rounded-full border border-primary/15 bg-primary/10 px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-primary">
-                  Growth Advisor
+                  {assistantBadge}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Insight, recommendation, action.
+                {assistantDescription}
               </p>
             </div>
           </div>

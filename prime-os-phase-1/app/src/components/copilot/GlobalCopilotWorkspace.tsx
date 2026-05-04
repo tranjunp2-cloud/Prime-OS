@@ -34,6 +34,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
     currentContext,
     telemetry,
   } = useGlobalCopilotEngine();
+  const fabLabel = currentContext.title === 'Account Center' ? 'Admin AI' : 'Prime AI';
 
   useEffect(() => {
     if (!isInitialized) {
@@ -56,7 +57,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
     return (
       <>
         {children}
-        <GlobalCopilotFAB onClick={() => setMobileOpen((value) => !value)} isOpen={mobileOpen} />
+        <GlobalCopilotFAB onClick={() => setMobileOpen((value) => !value)} isOpen={mobileOpen} label={fabLabel} />
         <GlobalCopilotDrawer
           open={mobileOpen}
           onOpenChange={setMobileOpen}
@@ -78,7 +79,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
         {children}
       </div>
 
-      <GlobalCopilotFAB onClick={() => setIsAssistantOpen((value) => !value)} isOpen={isAssistantOpen} />
+      <GlobalCopilotFAB onClick={() => setIsAssistantOpen((value) => !value)} isOpen={isAssistantOpen} label={fabLabel} />
 
       {isAssistantOpen ? (
         <div className="fixed bottom-24 right-6 z-[65] hidden h-[min(78vh,760px)] w-[440px] overflow-hidden rounded-[32px] border border-border/70 bg-card/95 shadow-2xl xl:block">

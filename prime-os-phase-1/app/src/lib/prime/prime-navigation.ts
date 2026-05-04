@@ -24,6 +24,7 @@ import {
   UserRound,
   UserRoundCheck,
   Workflow,
+  Settings2,
 } from 'lucide-react';
 
 export type PrimeNavKind = 'overview' | 'area' | 'tower' | 'floor';
@@ -223,10 +224,17 @@ export const primeNavigation: PrimeNavNode[] = [
       { id: 'service', label: 'Service', kind: 'tower', href: '/customer/service', icon: ClipboardList },
     ],
   },
+  {
+    id: 'platform-admin',
+    label: 'Platform Admin',
+    kind: 'area',
+    href: '/account',
+    icon: Settings2,
+  },
 ];
 
 const routeMatches = (pathname: string, href: string) => (
-  pathname === href || pathname.startsWith(`${href}/`)
+  pathname === href || pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}#`)
 );
 
 const nodeMatchCandidates = (node: PrimeNavNode) => (
@@ -244,10 +252,6 @@ const nodeMatchScore = (pathname: string, node: PrimeNavNode) => {
 };
 
 export function getPrimeNavPath(pathname: string, nodes = primeNavigation) {
-  if (pathname === '/account' || pathname.startsWith('/account/')) {
-    return [{ id: 'account', label: 'Account', kind: 'overview' as const, href: '/account', icon: UserRound }];
-  }
-
   const matches: PrimeNavNode[][] = [];
 
   const walk = (items: PrimeNavNode[], parents: PrimeNavNode[]) => {

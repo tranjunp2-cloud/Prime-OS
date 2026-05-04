@@ -487,11 +487,31 @@ function createSettingsSummary(): CopilotContextSummary {
   };
 }
 
+function createAccountSummary(): CopilotContextSummary {
+  return {
+    domain: 'settings',
+    title: 'Account Center',
+    description: 'Identity, members, roles, security posture and IAM audit trail.',
+    insight: 'Admin AI can explain risky access and draft safer IAM changes, but identity/security actions still require confirmation.',
+    citations: ['Current route: /account', 'Guardrail: IAM actions require user confirmation'],
+    quickPrompts: [
+      { label: 'Full admin access', prompt: 'Who has full admin access?' },
+      { label: 'Recent role changes', prompt: 'Show recent role changes.' },
+      { label: 'Risky permissions', prompt: 'Find risky permissions.' },
+      { label: 'Safer operator role', prompt: 'Draft a safer role for Inventory operators.' },
+    ],
+  };
+}
+
 export function normalizeCopilotInput(value: string) {
   return normalizeText(value);
 }
 
 export function resolveCopilotContext(pathname: string): CopilotContextSummary {
+  if (pathname === '/account') {
+    return createAccountSummary();
+  }
+
   if (pathname === '/products/new') {
     return {
       domain: 'product',

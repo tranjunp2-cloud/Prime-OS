@@ -337,7 +337,11 @@ function AreaSection({
           </span>
         ) : null}
       </div>
-      <SidebarFolder node={node} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
+      {childCount > 0 ? (
+        <SidebarFolder node={node} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
+      ) : (
+        <SidebarLink node={node} activeIds={activeIds} locale={locale} />
+      )}
     </section>
   );
 }
@@ -345,7 +349,8 @@ function AreaSection({
 export function AppSidebar() {
   const { locale } = useI18n();
   const location = useLocation();
-  const activePath = getPrimeNavPath(location.pathname);
+  const routeKey = location.pathname === '/account' ? `${location.pathname}${location.hash}` : location.pathname;
+  const activePath = getPrimeNavPath(routeKey);
   const activeIds = new Set(activePath.map((node) => node.id));
   const [overviewNode, ...areaNodes] = primeNavigation;
   const shellCopy = getShellDictionary(locale);

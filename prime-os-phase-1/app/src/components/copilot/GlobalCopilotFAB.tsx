@@ -5,9 +5,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 interface GlobalCopilotFABProps {
   onClick: () => void;
   isOpen?: boolean;
+  label?: string;
 }
 
-export function GlobalCopilotFAB({ onClick, isOpen = false }: GlobalCopilotFABProps) {
+export function GlobalCopilotFAB({ onClick, isOpen = false, label = 'Prime AI' }: GlobalCopilotFABProps) {
+  const actionLabel = isOpen ? `Close ${label}` : `Open ${label}`;
+
   return (
     <div className="fixed bottom-6 right-6 z-[70] md:bottom-7 md:right-7">
       <Tooltip>
@@ -16,14 +19,14 @@ export function GlobalCopilotFAB({ onClick, isOpen = false }: GlobalCopilotFABPr
             onClick={onClick}
             size="lg"
             className="h-14 rounded-full border border-primary/30 bg-primary/95 px-4 shadow-floating transition-all hover:bg-primary"
-            aria-label={isOpen ? 'Close Prime AI' : 'Open Prime AI'}
+            aria-label={actionLabel}
           >
             <Bot className="size-6" />
-            <span className="ml-2 hidden text-sm font-semibold md:inline">Prime AI</span>
+            <span className="ml-2 hidden text-sm font-semibold md:inline">{label}</span>
           </Button>
         </TooltipTrigger>
         <TooltipContent side="left">
-          <p>{isOpen ? 'Hide Prime AI' : 'Open Prime AI'}</p>
+          <p>{isOpen ? `Hide ${label}` : `Open ${label}`}</p>
         </TooltipContent>
       </Tooltip>
     </div>

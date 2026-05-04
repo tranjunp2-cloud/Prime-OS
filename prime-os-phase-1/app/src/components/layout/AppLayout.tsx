@@ -10,11 +10,8 @@ import {
   Megaphone,
   Package,
   Search,
-  ShieldCheck,
   ShoppingCart,
-  UserRound,
   UserRoundCheck,
-  UsersRound,
   X,
 } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
@@ -298,14 +295,13 @@ export function AppLayout() {
   }, [globalSearchResults, searchQuery]);
 
   const breadcrumbItems = useMemo(() => (
-    getPrimeNavPath(location.pathname).map((node) => ({
+    getPrimeNavPath(location.pathname === '/account' ? `${location.pathname}${location.hash}` : location.pathname).map((node) => ({
       id: node.id,
       label: getShellNavLabel(locale, node.id, node.label),
     }))
-  ), [locale, location.pathname]);
+  ), [locale, location.hash, location.pathname]);
   const accountInitials = getAccountInitials(user?.fullName, user?.email);
   const accountRoleLabel = getAccountRoleLabel(user?.role);
-  const canManageMembers = user?.role === 'admin';
 
   const shouldShowSearchPanel = searchOpen && searchQuery.trim().length > 0;
   const searchListboxId = 'primeos-global-search-results';
@@ -586,37 +582,12 @@ export function AppLayout() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80 rounded-2xl p-2">
-                  <DropdownMenuLabel className="rounded-xl bg-muted/35 px-3 py-3">
-                    <span className="block text-sm font-semibold text-foreground">{user?.fullName || shellCopy.demoWorkspace}</span>
-                    <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">{user?.email || shellCopy.sessionLabel}</span>
-                    <span className="mt-3 inline-flex rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      {accountRoleLabel} · {canManageMembers ? 'Workspace owner' : 'Self-service'}
-                    </span>
+                  <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {user?.email || shellCopy.sessionLabel}
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="items-start gap-3 rounded-xl py-3" onSelect={() => navigate('/account')}>
-                    <UserRound className="size-4" />
-                    <span className="grid gap-0.5">
-                      <span className="font-medium">Account cockpit</span>
-                      <span className="text-xs text-muted-foreground">Profile, access, team, audit trail</span>
-                    </span>
+                  <DropdownMenuItem className="rounded-xl py-3 text-sm font-semibold" onSelect={() => navigate('/account')}>
+                    {accountRoleLabel}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="items-start gap-3 rounded-xl py-3" onSelect={() => navigate('/account#security')}>
-                    <ShieldCheck className="size-4" />
-                    <span className="grid gap-0.5">
-                      <span className="font-medium">Security guardrails</span>
-                      <span className="text-xs text-muted-foreground">Session, credential, IAM notes</span>
-                    </span>
-                  </DropdownMenuItem>
-                  {canManageMembers ? (
-                    <DropdownMenuItem className="items-start gap-3 rounded-xl py-3" onSelect={() => navigate('/account#members')}>
-                      <UsersRound className="size-4" />
-                      <span className="grid gap-0.5">
-                        <span className="font-medium">Workspace access</span>
-                        <span className="text-xs text-muted-foreground">Invite and manage operators</span>
-                      </span>
-                    </DropdownMenuItem>
-                  ) : null}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="gap-2 rounded-xl text-destructive focus:text-destructive" disabled={signingOut} onSelect={handleSignOut}>
                     <LogOut className="size-4" />

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Account from './Account';
 
@@ -74,6 +74,7 @@ describe('Account page', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    window.history.replaceState(null, '', '/');
   });
 
   it('renders the account center from IAM APIs and current session', async () => {
@@ -82,11 +83,47 @@ describe('Account page', () => {
     expect(screen.getByRole('heading', { name: /account center/i })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('PrimeOS Admin')).toBeInTheDocument();
+      expect(screen.getAllByText('PrimeOS main workspace').length).toBeGreaterThan(0);
     });
 
-    expect(screen.getByDisplayValue('admin@primeos.local')).toBeInTheDocument();
-    expect(screen.getByText('PrimeOS main workspace')).toBeInTheDocument();
-    expect(screen.getByText(/Password\/session center vẫn chờ/i)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /overview/i })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText(/Backend IAM is authoritative/i)).toBeInTheDocument();
+  });
+
+  it('exposes roles and security as compact admin tabs', async () => {
+    render(<Account />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('PrimeOS main workspace').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: /roles/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /roles/i })).toHaveAttribute('data-state', 'active');
+    });
+    expect(screen.getByText(/Capability Groups/i)).toBeInTheDocument();
+    expect(screen.getByText(/Organization -> Workspace/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /security/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /security/i })).toHaveAttribute('data-state', 'active');
+    });
+    expect(screen.getByText(/Security Posture/i)).toBeInTheDocument();
+    expect(screen.getByText(/Demo credentials are local\/private only/i)).toBeInTheDocument();
+  });
+
+  it('opens workspace access from the legacy members hash', async () => {
+    window.history.replaceState(null, '', '/account#members');
+
+    render(<Account />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /members/i })).toHaveAttribute('data-state', 'active');
+    });
+
+    expect(screen.getByText(/Workspace access/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Invite member email/i)).toBeInTheDocument();
   });
 });
