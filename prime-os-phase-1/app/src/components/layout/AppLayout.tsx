@@ -276,6 +276,8 @@ export function AppLayout() {
   ), [locale, location.pathname]);
 
   const shouldShowSearchPanel = searchOpen && searchQuery.trim().length > 0;
+  const searchListboxId = 'primeos-global-search-results';
+  const activeSearchResult = shouldShowSearchPanel ? visibleSearchResults[activeSearchIndex] : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -417,6 +419,11 @@ export function AppLayout() {
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label={shellCopy.searchAriaLabel}
+                aria-autocomplete="list"
+                aria-controls={searchListboxId}
+                aria-expanded={shouldShowSearchPanel}
+                aria-activedescendant={activeSearchResult ? `primeos-search-result-${activeSearchResult.id}` : undefined}
+                role="combobox"
                 autoComplete="off"
                 className="h-10 w-full rounded-xl border-input bg-card pl-9 pr-16 text-sm transition-[border-color,box-shadow] focus-visible:border-primary/45"
                 placeholder={shellCopy.searchPlaceholder}
@@ -452,13 +459,13 @@ export function AppLayout() {
               )}
 
               {shouldShowSearchPanel ? (
-                <div className="panel-shadow absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-2xl border bg-card">
+                <div className="panel-shadow absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-2xl border bg-card" role="region" aria-label={shellCopy.searchPanelHeading}>
                   <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     {shellCopy.searchPanelHeading}
                   </div>
 
                   {visibleSearchResults.length > 0 ? (
-                    <div className="max-h-[min(70vh,420px)] overflow-y-auto p-2">
+                    <div id={searchListboxId} className="max-h-[min(70vh,420px)] overflow-y-auto p-2" role="listbox">
                       {visibleSearchResults.map((result, index) => {
                         const meta = {
                           icon: searchKindIcons[result.kind],
@@ -469,7 +476,10 @@ export function AppLayout() {
                         return (
                           <button
                             key={result.id}
+                            id={`primeos-search-result-${result.id}`}
                             type="button"
+                            role="option"
+                            aria-selected={isActive}
                             className={cn(
                               'prime-transition-fast flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left',
                               isActive ? 'bg-primary/10 text-foreground ring-1 ring-primary/20' : 'hover:bg-muted/70'

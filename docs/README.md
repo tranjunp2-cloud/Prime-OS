@@ -12,6 +12,7 @@ Active PrimeOS project docs live here.
 - `05-demo-flows.md` - demo walkthrough flows
 - `06-bod-walkthrough.md` - board-ready storyline
 - `07-meeting-summary-masuda-pitch.md` - pitch summary notes
+- `08-competitor-research.md` - competitor research for commerce OS, OMS/WMS, fulfillment control tower, and AI operator positioning
 
 ## Migration notes
 

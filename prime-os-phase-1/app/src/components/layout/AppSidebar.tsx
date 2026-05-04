@@ -38,7 +38,7 @@ function SidebarLink({
   const label = getShellNavLabel(locale, node.id, node.label);
   const badge = node.badge ? getShellNavBadge(locale, node.badge) : null;
   const baseClassName = cn(
-    'group prime-transition-fast relative flex min-h-10 items-center gap-2.5 rounded-lg text-sm font-medium outline-none hover:-translate-y-px',
+    'group prime-transition-fast relative flex min-h-10 items-center gap-2.5 rounded-lg text-sm font-medium outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     isLeaf ? 'justify-center px-2 py-2 md:justify-start md:pl-3 md:pr-2' : 'justify-center px-2.5 py-2 md:justify-start',
     isActive
       ? isLeaf
@@ -176,7 +176,7 @@ function SidebarFolder({
         aria-label={formatMessage(shellCopy.openNavigation, { label })}
         title={label}
         className={cn(
-          'group prime-transition-fast relative flex min-h-10 w-full items-center justify-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none hover:-translate-y-px md:justify-start md:pl-3 md:pr-2',
+          'group prime-transition-fast relative flex min-h-10 w-full items-center justify-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:justify-start md:pl-3 md:pr-2',
           isActive
             ? 'bg-[hsl(var(--surface-toolbar))] text-foreground ring-1 ring-border'
             : 'text-muted-foreground hover:bg-[hsl(var(--surface-hover))] hover:text-foreground'

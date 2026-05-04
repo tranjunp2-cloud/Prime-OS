@@ -61,10 +61,10 @@ export function GlobalCopilotComposer({
         </Button>
       </div>
 
-      <div className="mt-2 flex items-start gap-2 text-[11px] leading-5 text-muted-foreground">
+      <div className="mt-2 flex items-start gap-2 rounded-xl bg-muted/30 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
         <ShieldCheck className="mt-0.5 size-3.5 flex-shrink-0 text-primary" />
         <p>
-          Draft trước khi thực thi.
+          Prime AI chỉ tạo draft/đề xuất trước; thao tác ghi dữ liệu luôn cần xác nhận.
         </p>
       </div>
     </div>

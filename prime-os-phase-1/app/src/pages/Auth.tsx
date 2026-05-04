@@ -108,7 +108,7 @@ export default function Auth() {
           </div>
         </section>
 
-        <section className="px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10">
+        <section className="px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10" aria-labelledby="primeos-auth-title">
           <div className="mb-10 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 lg:hidden">
               <img src="/brand-logo.svg" alt="Prime OS" className="h-8 w-auto" />
@@ -123,11 +123,24 @@ export default function Auth() {
           </div>
 
           <div className="mx-auto max-w-md">
+            <div className="mb-6 grid gap-2 rounded-2xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground lg:hidden">
+              <div className="flex items-center justify-between gap-3">
+                <span>{authCopy.workspaceLabel}</span>
+                <span className="font-semibold text-foreground">{authCopy.workspaceValue}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
+                <span>{authCopy.securityLabel}</span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  {authCopy.securityValue}
+                </span>
+              </div>
+            </div>
             <CardHeader className="px-0 pb-8 pt-0 text-left">
               <div className="mb-6 flex size-12 items-center justify-center rounded-lg border border-primary/15 bg-primary/10">
                 <LockKeyhole className="size-6 text-primary" />
               </div>
-              <CardTitle className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+              <CardTitle id="primeos-auth-title" className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
                 {authCopy.title}
               </CardTitle>
               <CardDescription className="mt-3 text-[15px] leading-6 text-muted-foreground">
@@ -165,7 +178,7 @@ export default function Auth() {
                 </div>
 
                 {formError ? (
-                  <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {formError}
                   </div>
                 ) : null}
