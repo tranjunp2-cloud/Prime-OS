@@ -98,6 +98,23 @@ describe('copilot context resolver', () => {
     expect(response.debug?.confidenceBucket).toBe('low');
   });
 
+  it('attaches grounding metadata to route-level answers', () => {
+    const response = resolveCopilotResponse('Trang này dùng để làm gì?', '/orders');
+
+    expect(response.grounding?.sources).toContain('route_context');
+    expect(response.grounding?.freshness).toBe('live_session');
+    expect(response.grounding?.citations.length).toBeGreaterThan(0);
+    expect(response.grounding?.policyTags).toContain('no-mutation');
+  });
+
+  it('marks draft responses as draft-before-commit grounding', () => {
+    const response = resolveCopilotResponse('Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001', '/products');
+
+    expect(response.intent).toBe('write_draft');
+    expect(response.grounding?.sources).toContain('draft_prefill');
+    expect(response.grounding?.policyTags).toContain('draft-before-commit');
+  });
+
   it('keeps inventory analysis inside the dedicated inventory boundary', () => {
     const response = resolveCopilotResponse('ATS và tồn kho khả dụng đang như nào?', '/inventory');
 

@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, Copy, Check } from 'lucide-react';
+import { ExternalLink, Copy, Check, ShieldCheck, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalCopilotAction } from './types';
+import { buildAuditEvent, recordCopilotAuditEvent } from '@/lib/copilot/command-gateway';
 import { useState } from 'react';
 
 interface GlobalCopilotActionsProps {
@@ -32,8 +33,7 @@ export function GlobalCopilotActions({ actions }: GlobalCopilotActionsProps) {
               description: action.description ?? 'Đã copy nội dung từ assistant.',
             });
             setTimeout(() => setCopiedValue(null), 2000);
-          } catch (error) {
-            console.error('[GlobalCopilotActions] Clipboard copy failed', error);
+          } catch {
             toast({
               title: 'Copy failed',
               description: 'Không thể copy nội dung. Bạn thử lại giúp mình nhé.',
@@ -43,9 +43,26 @@ export function GlobalCopilotActions({ actions }: GlobalCopilotActionsProps) {
         }
         break;
       case 'confirm_draft':
+        if (!action.command) return;
+        if (!window.confirm('Review draft product? This only opens a prefilled form. Nothing is saved or published.')) {
+          recordCopilotAuditEvent(buildAuditEvent(action.command, 'cancelled'));
+          return;
+        }
+        recordCopilotAuditEvent(buildAuditEvent(action.command, 'confirmed'));
+        toast({
+          title: 'Draft confirmed',
+          description: 'Opening prefilled form. No data has been saved yet.',
+        });
+        if (action.url) navigate(action.url);
+        break;
       case 'cancel_draft':
-        // Phase 1: Draft operations not implemented yet
-        console.log('Draft action:', action.type, action.draftId);
+        if (action.command) {
+          recordCopilotAuditEvent(buildAuditEvent(action.command, 'cancelled'));
+        }
+        toast({
+          title: 'Draft cancelled',
+          description: 'Copilot suggestion cancelled for this session.',
+        });
         break;
     }
   };
@@ -65,6 +82,10 @@ export function GlobalCopilotActions({ actions }: GlobalCopilotActionsProps) {
         >
           {action.type === 'navigate' || action.type === 'open_module' ? (
             <ExternalLink className="size-3 mr-1" />
+          ) : action.type === 'confirm_draft' ? (
+            <ShieldCheck className="size-3 mr-1" />
+          ) : action.type === 'cancel_draft' ? (
+            <XCircle className="size-3 mr-1" />
           ) : action.type === 'copy' ? (
             copiedValue === action.value ? (
               <Check className="size-3 mr-1 text-primary" />

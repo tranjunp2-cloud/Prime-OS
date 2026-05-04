@@ -183,7 +183,7 @@ const resourceGroups: ResourceGroup[] = [
   {
     key: 'ecom',
     label: 'Ecom',
-    description: 'Govern the exact COS floors that PrimeOS Ecom reads: Product Master, Listings, Inventory Brain, Warehouses, OMS, Fulfillment, Policy & Rule, and Event & Audit.',
+    description: 'Govern the exact COS floors that PrimeOS Ecom reads: Products, Listings, Inventory Brain, Warehouses, Orders, Fulfillment, Policy & Rule, and Event & Audit.',
     resources: ['products', 'listings', 'inventoryBrain', 'warehouses', 'omsOrders', 'fulfillmentControl', 'policies', 'eventAudit']
   },
   {
@@ -424,10 +424,10 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
   },
   products: {
     group: 'ecom',
-    label: 'Product Master',
+    label: 'Products',
     singular: 'Product master SKU',
-    description: 'Control the exact records behind Ecom / COS / Product Master.',
-    tableTitle: 'Product master',
+    description: 'Control the exact records behind Ecom / COS / Products.',
+    tableTitle: 'Products',
     strategy: 'PrimeOS Product Master should stay boring and trustworthy so every downstream surface reads the same SKU truth.',
     evidence: ['SKU naming stays normalized', 'Listings and launch screens inherit the same master record', 'Commerce Surface only exposes trusted product truth'],
     statusKey: 'status',
@@ -674,10 +674,10 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
   },
   omsOrders: {
     group: 'ecom',
-    label: 'OMS',
-    singular: 'OMS order',
-    description: 'Control the order rows behind Ecom / COS / OMS.',
-    tableTitle: 'OMS orchestration',
+    label: 'Orders',
+    singular: 'Order',
+    description: 'Control the order rows behind Ecom / COS / Orders.',
+    tableTitle: 'Order orchestration',
     strategy: 'OMS records should stay readable in admin so demand handoff, customer context, and fulfillment release all share one order truth.',
     evidence: ['Order ownership is visible', 'Payment and release state stay explicit', 'Commerce Surface can trace demand into OMS cleanly'],
     statusKey: 'status',

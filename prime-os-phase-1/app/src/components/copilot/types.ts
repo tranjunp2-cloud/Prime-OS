@@ -26,6 +26,7 @@ export type CopilotIntent =
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type CopilotConfidenceBucket = 'high' | 'medium' | 'low';
+export type CopilotGroundingSource = 'local_store' | 'route_context' | 'knowledge_base' | 'session_memory' | 'draft_prefill';
 
 export type UserRole = 'owner_admin' | 'ops' | 'ba' | 'qc' | 'viewer';
 
@@ -78,7 +79,18 @@ export interface GlobalCopilotMessage {
   citations?: string[];
   followUpPrompts?: CopilotQuickPrompt[];
   entityRef?: CopilotEntityRef;
+  grounding?: CopilotGroundingMeta;
   debug?: CopilotDebugMeta;
+}
+
+export interface CopilotCommandRef {
+  commandId: string;
+  commandName: string;
+  target: { entityType: string };
+  risk: RiskLevel;
+  requiresConfirmation: true;
+  idempotencyKey: string;
+  policyTags: string[];
 }
 
 export interface GlobalCopilotAction {
@@ -89,6 +101,7 @@ export interface GlobalCopilotAction {
   draftId?: string;
   value?: string;
   emphasis?: 'primary' | 'secondary';
+  command?: CopilotCommandRef;
 }
 
 export interface DraftObject {
@@ -131,6 +144,15 @@ export interface CopilotDebugMeta {
   usedConversationMemory: boolean;
 }
 
+export interface CopilotGroundingMeta {
+  sources: CopilotGroundingSource[];
+  citations: string[];
+  retrievedAt: string;
+  freshness: 'live_session' | 'seed_snapshot' | 'static_knowledge' | 'unknown';
+  confidence: CopilotConfidenceBucket;
+  policyTags: string[];
+}
+
 export interface CopilotTelemetry {
   totalAssistantMessages: number;
   clarifyCount: number;
@@ -148,6 +170,7 @@ export interface CopilotResponse {
   intent?: CopilotIntent;
   followUpPrompts?: CopilotQuickPrompt[];
   entityRef?: CopilotEntityRef;
+  grounding?: CopilotGroundingMeta;
   debug?: CopilotDebugMeta;
 }
 

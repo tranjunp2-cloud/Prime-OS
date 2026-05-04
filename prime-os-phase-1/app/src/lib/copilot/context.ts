@@ -17,6 +17,9 @@ import { getReturnById, getReturns } from '@/lib/return-store';
 import { type Warehouse, getWarehouses } from '@/lib/warehouse-store';
 import { getListings } from '@/lib/listing-store';
 import { getKnowledgeResponse } from '@/lib/copilot/knowledge';
+import { buildResponseGrounding, readContextSnapshot } from '@/lib/copilot/context-gateway';
+import { deterministicCopilotComposer } from '@/lib/copilot/response-composer';
+import { prepareProductCreateDraftCommand } from '@/lib/copilot/command-gateway';
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
@@ -122,61 +125,15 @@ function buildActions(actions: GlobalCopilotAction[]) {
   return actions.map((action) => ({ emphasis: 'secondary', ...action }));
 }
 
-function toSentence(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
-}
-
-function summarizeActionLine(response: CopilotResponse, context: CopilotContextSummary) {
-  if (response.actions?.length) {
-    return response.actions.slice(0, 2).map((action) => action.label).join(' · ');
-  }
-
-  if (response.followUpPrompts?.length) {
-    return response.followUpPrompts.slice(0, 2).map((prompt) => prompt.label).join(' · ');
-  }
-
-  return `Tiếp tục trong ${context.title}`;
-}
-
-function summarizeRecommendationLine(response: CopilotResponse, context: CopilotContextSummary) {
-  switch (response.intent) {
-    case 'navigate':
-      return `Mở đúng module hoặc queue liên quan trong ${context.title} để xử lý nhanh hơn`;
-    case 'write_draft':
-      return `Dùng draft an toàn trước, rồi mới xác nhận thực thi trong ${context.title}`;
-    case 'clarify':
-      return `Chốt một hướng cụ thể để mình giảm mơ hồ và trả lời sát hơn với ${context.title}`;
-    default:
-      if (response.entityRef?.label) {
-        return `Đọc kỹ context của ${response.entityRef.label} rồi quyết định bước xử lý tiếp theo`;
-      }
-      return `Dùng phần context hiện tại của ${context.title} để chọn next best action phù hợp`;
-  }
-}
-
-function formatStructuredCopilotContent(response: CopilotResponse, context: CopilotContextSummary) {
-  const insight = response.content.trim();
-  const recommendation = summarizeRecommendationLine(response, context);
-  const action = summarizeActionLine(response, context);
-
-  return [
-    '**Insight**',
-    toSentence(insight),
-    '',
-    '**Recommendation**',
-    toSentence(recommendation),
-    '',
-    '**Action**',
-    toSentence(action),
-  ].join('\n');
-}
-
 function finalizeCopilotResponse(response: CopilotResponse, context: CopilotContextSummary) {
+  const snapshot = readContextSnapshot(context);
+  const grounding = response.grounding ?? buildResponseGrounding(response, snapshot);
+
   return {
     ...response,
-    content: formatStructuredCopilotContent(response, context),
+    citations: response.citations?.length ? response.citations : snapshot.citations,
+    grounding,
+    content: deterministicCopilotComposer.compose({ response, context }),
   };
 }
 
@@ -1060,14 +1017,15 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
   }
 
   const resolvedSku = sku || slugToSku(title || brand || 'Draft Product');
-  const searchParams = new URLSearchParams();
+  const draftPayload: Record<string, string> = { sku: resolvedSku };
 
-  searchParams.set('sku', resolvedSku);
-  if (title) searchParams.set('title', title);
-  if (brand) searchParams.set('brand', brand);
-  if (asin) searchParams.set('asin', asin);
-  if (family) searchParams.set('family', family);
-  if (msrp) searchParams.set('msrp', msrp);
+  if (title) draftPayload.title = title;
+  if (brand) draftPayload.brand = brand;
+  if (asin) draftPayload.asin = asin;
+  if (family) draftPayload.family = family;
+  if (msrp) draftPayload.msrp = msrp;
+
+  const preparedCommand = prepareProductCreateDraftCommand(draftPayload);
 
   return {
     domain: 'product',
@@ -1081,13 +1039,8 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       { label: 'Về Products', prompt: 'Mở lại products' },
     ],
     actions: [
-      {
-        type: 'navigate',
-        label: 'Mở draft product',
-        description: 'Đi tới form create đã prefill sẵn',
-        url: `/products/new?${searchParams.toString()}`,
-        emphasis: 'primary',
-      },
+      preparedCommand.confirmAction,
+      preparedCommand.cancelAction,
       {
         type: 'copy',
         label: 'Copy SKU',
@@ -1104,6 +1057,7 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       family ? `- Category: ${family}` : null,
       msrp ? `- MSRP: ${msrp}` : null,
       '',
+      `Command prepared: ${preparedCommand.request.commandName} · risk ${preparedCommand.request.risk}.`,
       'Assistant mới chỉ prefill low-risk fields; chưa có dữ liệu nào được save hay publish cho tới khi bạn xác nhận trong form.',
     ].filter(Boolean).join('\n'),
   };

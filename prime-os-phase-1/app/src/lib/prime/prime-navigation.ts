@@ -86,14 +86,6 @@ export const primeNavigation: PrimeNavNode[] = [
     icon: Store,
     children: [
       {
-        id: 'commerce-surface',
-        label: 'COS',
-        kind: 'tower',
-        href: 'https://client-portal.bdskhudong.com/auth',
-        external: true,
-        icon: Store,
-      },
-      {
         id: 'cos',
         label: 'COS Ops',
         kind: 'tower',
@@ -103,7 +95,7 @@ export const primeNavigation: PrimeNavNode[] = [
         children: [
           {
             id: 'product-master',
-            label: 'Product Master',
+            label: 'Products',
             kind: 'floor',
             href: '/ecom/cos/product-master',
             matchPaths: ['/ecom/cos/product-master', '/ecom/cos/listings'],
@@ -117,7 +109,7 @@ export const primeNavigation: PrimeNavNode[] = [
             matchPaths: ['/ecom/cos/inventory-brain', '/ecom/cos/warehouses'],
             icon: Boxes,
           },
-          { id: 'oms', label: 'OMS', kind: 'floor', href: '/ecom/cos/oms', icon: ShoppingCart },
+          { id: 'oms', label: 'Orders', kind: 'floor', href: '/ecom/cos/oms', icon: ShoppingCart },
           {
             id: 'fulfillment',
             label: 'Fulfillment',

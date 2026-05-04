@@ -13,14 +13,14 @@
 | CRM Compact Tower | `/customer/crm-compact` | New for Prime OS, derived from COS orders/returns |
 | Service Tower | `/customer/service` | New for Prime OS, linked to COS returns/OMS |
 | Commerce Surface Tower | `/ecom/commerce-surface` | New for Prime OS |
-| Product Master list | `/ecom/cos/product-master` | Reused from COS |
-| Product Master detail | `/ecom/cos/product-master/:id` | Reused from COS |
-| Product Master create/edit | `/ecom/cos/product-master/new`, `/ecom/cos/product-master/:id/edit` | Reused from COS |
+| Products list | `/ecom/cos/product-master` | Reused from COS |
+| Products detail | `/ecom/cos/product-master/:id` | Reused from COS |
+| Products create/edit | `/ecom/cos/product-master/new`, `/ecom/cos/product-master/:id/edit` | Reused from COS |
 | Listings | `/ecom/cos/listings` | Reused from COS |
 | Inventory Brain | `/ecom/cos/inventory-brain` | Reused from COS |
 | Warehouses | `/ecom/cos/warehouses` | Reused from COS |
-| OMS | `/ecom/cos/oms` | Reused from COS |
-| OMS detail | `/ecom/cos/oms/:id` | Reused from COS |
+| Orders | `/ecom/cos/oms` | Reused from COS |
+| Orders detail | `/ecom/cos/oms/:id` | Reused from COS |
 | Fulfillment | `/ecom/cos/fulfillment` | Reused from COS |
 | Fulfillment job detail | `/ecom/cos/fulfillment/jobs/:id` | Reused from COS |
 | Returns | `/ecom/cos/returns` | Reused from COS |

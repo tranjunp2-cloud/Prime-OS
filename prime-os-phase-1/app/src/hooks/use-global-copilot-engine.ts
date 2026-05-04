@@ -41,6 +41,7 @@ export function useGlobalCopilotEngine() {
       citations: welcome.citations,
       followUpPrompts: welcome.followUpPrompts,
       entityRef: welcome.entityRef,
+      grounding: welcome.grounding,
       debug: welcome.debug,
     };
 
@@ -81,6 +82,7 @@ export function useGlobalCopilotEngine() {
       citations: response.citations,
       followUpPrompts: response.followUpPrompts,
       entityRef: response.entityRef,
+      grounding: response.grounding,
       debug: response.debug,
     };
 
