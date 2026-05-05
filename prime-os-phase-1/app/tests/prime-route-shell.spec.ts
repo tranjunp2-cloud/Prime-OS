@@ -43,28 +43,23 @@ const legacyRedirects = [
   ['/returns', /\/ecom\/cos\/returns$/],
 ];
 
-test('protected routes redirect anonymous users to auth', async ({ page }) => {
+test('protected routes open directly with the local bypass session', async ({ page }) => {
   await page.addInitScript(() => {
     window.sessionStorage.removeItem('prime-os-auth-token');
   });
   await page.goto('/overview');
-  await expect(page).toHaveURL(/\/auth$/);
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page).toHaveURL(/\/overview$/);
+  await expectPrimeShellReady(page);
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toHaveCount(0);
 });
 
-test('auth form accepts a mocked PrimeOS session and enters the shell', async ({ page }) => {
+test('auth route is hidden behind the local bypass session', async ({ page }) => {
   await mockPrimeBackend(page);
-  await page.addInitScript(() => {
-    window.sessionStorage.removeItem('prime-os-auth-token');
-  });
   await page.goto('/auth');
-
-  await page.getByLabel('Email').fill('qa@primeos.local');
-  await page.getByLabel('Password').fill('prime-qa');
-  await page.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page).toHaveURL(/\/overview$/);
   await expectPrimeShellReady(page);
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toHaveCount(0);
 });
 
 test.describe('authenticated route shell', () => {
@@ -92,11 +87,50 @@ test.describe('authenticated route shell', () => {
     });
   }
 
+  test('shows the overview-style Demand command room', async ({ page }) => {
+    await page.goto('/demand/hub');
+    await expectPrimeShellReady(page);
+
+    await expect(page.getByTestId('demand-command-bar')).toBeVisible();
+    await expect(page.getByText('Priority Demand Queue')).toBeVisible();
+    await expect(page.getByText('Demand Pipeline')).toBeVisible();
+    await expect(page.getByText('Guardrail Rail')).toBeVisible();
+    await expect(page.getByText('Evidence Stack')).toBeVisible();
+  });
+
+  test('shows the compact Demand child command bar and readback', async ({ page }) => {
+    await page.goto('/demand/campaigns');
+    await expectPrimeShellReady(page);
+
+    await expect(page.getByTestId('demand-child-command-bar')).toBeVisible();
+    await expect(page.getByText('Which campaign can run safely now?')).toBeVisible();
+    await expect(page.getByText('Proof & readback')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Demand tabs' }).getByRole('link', { name: /Campaigns/ })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('preserves Demand query context across legacy redirects', async ({ page }) => {
+    await page.goto('/demand/lead-response-capture?lead=lead_1_1');
+    await expect(page).toHaveURL(/\/demand\/leads-rfqs\?lead=lead_1_1$/);
+    await expectPrimeShellReady(page);
+
+    await expect(page.getByText('Lead focus')).toBeVisible();
+    await expect(page.getByText('URL context kept')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Demand tabs' }).getByRole('link', { name: /Leads & RFQs/ })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('opens canonical Demand focused context directly', async ({ page }) => {
+    await page.goto('/demand/leads-rfqs?lead=lead_1_1');
+    await expectPrimeShellReady(page);
+
+    await expect(page).toHaveURL(/\/demand\/leads-rfqs\?lead=lead_1_1$/);
+    await expect(page.getByText('Lead focus')).toBeVisible();
+  });
+
   test('marks nested sidebar item active for OMS', async ({ page }) => {
     await page.goto('/ecom/cos/oms');
     await expectPrimeShellReady(page);
 
-    await expect(page.getByRole('link', { name: 'OMS' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('link', { name: 'Orders' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('command palette opens, filters, and navigates', async ({ page }) => {

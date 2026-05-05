@@ -1,12 +1,11 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -60,6 +59,20 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function LegacyDemandRedirect({ to, defaultSearch = "" }: { to: string; defaultSearch?: string }) {
+  const { search } = useLocation();
+  const params = new URLSearchParams(defaultSearch);
+  const incomingParams = new URLSearchParams(search);
+
+  incomingParams.forEach((value, key) => {
+    params.set(key, value);
+  });
+
+  const nextSearch = params.toString();
+
+  return <Navigate to={`${to}${nextSearch ? `?${nextSearch}` : ""}`} replace />;
+}
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -70,7 +83,7 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth" element={<Navigate to="/overview" replace />} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route
@@ -90,14 +103,14 @@ const App = () => {
                     <Route path="/demand/content-social" element={<PrimeTowerPage towerId="content-creator-ops" />} />
                     <Route path="/demand/leads-rfqs" element={<PrimeTowerPage towerId="lead-response-capture" />} />
                     <Route path="/demand/re-engage" element={<PrimeTowerPage towerId="retargeting-outreach" />} />
-                    <Route path="/demand/campaign-ops" element={<Navigate to="/demand/campaigns" replace />} />
-                    <Route path="/demand/content-creator-ops" element={<Navigate to="/demand/content-social?view=creator-proof" replace />} />
-                    <Route path="/demand/lead-response-capture" element={<Navigate to="/demand/leads-rfqs" replace />} />
-                    <Route path="/demand/retargeting-outreach" element={<Navigate to="/demand/re-engage" replace />} />
-                    <Route path="/demand/acquisition" element={<Navigate to="/demand/sources" replace />} />
-                    <Route path="/demand/campaign" element={<Navigate to="/demand/campaigns" replace />} />
-                    <Route path="/demand/lead-capture" element={<Navigate to="/demand/leads-rfqs" replace />} />
-                    <Route path="/demand/retargeting" element={<Navigate to="/demand/re-engage" replace />} />
+                    <Route path="/demand/campaign-ops" element={<LegacyDemandRedirect to="/demand/campaigns" />} />
+                    <Route path="/demand/content-creator-ops" element={<LegacyDemandRedirect to="/demand/content-social" defaultSearch="view=creator-proof" />} />
+                    <Route path="/demand/lead-response-capture" element={<LegacyDemandRedirect to="/demand/leads-rfqs" />} />
+                    <Route path="/demand/retargeting-outreach" element={<LegacyDemandRedirect to="/demand/re-engage" />} />
+                    <Route path="/demand/acquisition" element={<LegacyDemandRedirect to="/demand/sources" />} />
+                    <Route path="/demand/campaign" element={<LegacyDemandRedirect to="/demand/campaigns" />} />
+                    <Route path="/demand/lead-capture" element={<LegacyDemandRedirect to="/demand/leads-rfqs" />} />
+                    <Route path="/demand/retargeting" element={<LegacyDemandRedirect to="/demand/re-engage" />} />
 
                     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
                     <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />

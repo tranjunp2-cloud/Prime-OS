@@ -1,12 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
-  clearPrimeAuthToken,
-  createPrimeAuthHeaders,
-  getPrimeAuthToken,
   PrimeAccount,
-  PrimeLoginResponse,
   PrimeSession,
-  resolvePrimeBackendBase,
   setPrimeAuthToken
 } from '@/lib/prime/backend-auth';
 
@@ -21,119 +16,54 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function parseError(response: Response, fallback: string) {
-  const body = await response.json().catch(() => null);
-  return new Error(body?.message || fallback);
-}
+const localBypassToken = 'prime-local-bypass-token';
 
-function withToken(session: PrimeSession, token: string, expiresAt?: string): PrimeSession {
-  return {
-    ...session,
-    token,
-    expiresAt,
-  };
-}
+const localBypassSession: PrimeSession = {
+  role: 'admin',
+  roleLabel: 'Admin',
+  description: 'Local bypass session while backend auth is disabled.',
+  canReset: true,
+  canWrite: true,
+  visibleResources: [],
+  writableResources: [],
+  hiddenResources: [],
+  resourcePermissions: {},
+  token: localBypassToken,
+  account: {
+    id: 'prime-local-user',
+    role: 'admin',
+    fullName: 'Prime Local',
+    email: 'local@primeos.local',
+    workspace: 'PrimeOS main',
+    seatType: 'admin',
+  },
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<PrimeAccount | null>(null);
-  const [session, setSession] = useState<PrimeSession | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<PrimeAccount | null>(localBypassSession.account);
+  const [session, setSession] = useState<PrimeSession | null>(localBypassSession);
+  const [token, setToken] = useState<string | null>(localBypassToken);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function restoreSession() {
-      const storedToken = getPrimeAuthToken();
-
-      if (!storedToken) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${resolvePrimeBackendBase()}/api/session`, {
-          headers: createPrimeAuthHeaders(storedToken),
-        });
-
-        if (!response.ok) {
-          throw await parseError(response, 'Session expired. Please sign in again.');
-        }
-
-        const restoredSession = withToken(await response.json() as PrimeSession, storedToken);
-
-        if (!cancelled) {
-          setToken(storedToken);
-          setSession(restoredSession);
-          setUser(restoredSession.account);
-        }
-      } catch {
-        clearPrimeAuthToken();
-
-        if (!cancelled) {
-          setToken(null);
-          setSession(null);
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void restoreSession();
-
-    return () => {
-      cancelled = true;
-    };
+  const applyLocalBypass = useCallback(() => {
+    setPrimeAuthToken(localBypassToken);
+    setToken(localBypassToken);
+    setSession(localBypassSession);
+    setUser(localBypassSession.account);
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      const response = await fetch(`${resolvePrimeBackendBase()}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+  useEffect(() => {
+    applyLocalBypass();
+    setLoading(false);
+  }, [applyLocalBypass]);
 
-      if (!response.ok) {
-        throw await parseError(response, 'Invalid email or password.');
-      }
-
-      const login = await response.json() as PrimeLoginResponse;
-      const nextSession = withToken(login.session, login.token, login.expiresAt);
-
-      setPrimeAuthToken(login.token);
-      setToken(login.token);
-      setSession(nextSession);
-      setUser(nextSession.account);
-
-      return { error: null, session: nextSession };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error : new Error('Unable to sign in. Please try again.'),
-        session: null,
-      };
-    }
+  const signIn = async () => {
+    applyLocalBypass();
+    return { error: null, session: localBypassSession };
   };
 
   const signOut = async () => {
-    const currentToken = token;
-
-    clearPrimeAuthToken();
-    setToken(null);
-    setSession(null);
-    setUser(null);
-
-    if (currentToken) {
-      await fetch(`${resolvePrimeBackendBase()}/api/auth/logout`, {
-        method: 'POST',
-        headers: createPrimeAuthHeaders(currentToken),
-      }).catch(() => undefined);
-    }
+    applyLocalBypass();
   };
 
   return (

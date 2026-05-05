@@ -1,6 +1,7 @@
 export const primeAuthTokenStorageKey = 'prime-os-auth-token';
 
 const defaultControlPlaneBase = import.meta.env.DEV ? 'http://127.0.0.1:8180' : '';
+let primeAuthToken: string | null = null;
 
 export interface PrimeAccount {
   id: string;
@@ -38,16 +39,24 @@ export function resolvePrimeBackendBase() {
 }
 
 export function getPrimeAuthToken() {
+  if (primeAuthToken) return primeAuthToken;
   if (typeof window === 'undefined') return null;
-  return window.sessionStorage.getItem(primeAuthTokenStorageKey);
+  primeAuthToken = window.sessionStorage.getItem(primeAuthTokenStorageKey);
+  return primeAuthToken;
 }
 
 export function setPrimeAuthToken(token: string) {
-  window.sessionStorage.setItem(primeAuthTokenStorageKey, token);
+  primeAuthToken = token;
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.setItem(primeAuthTokenStorageKey, token);
+  }
 }
 
 export function clearPrimeAuthToken() {
-  window.sessionStorage.removeItem(primeAuthTokenStorageKey);
+  primeAuthToken = null;
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.removeItem(primeAuthTokenStorageKey);
+  }
 }
 
 export function createPrimeAuthHeaders(token = getPrimeAuthToken()) {

@@ -16,15 +16,15 @@ test.describe('Prime tower shared layout', () => {
     await page.goto('/overview');
     await expectPrimeShellReady(page);
 
-    const hero = page.getByTestId('prime-tower-hero');
+    const hero = page.getByTestId('overview-command-bar');
     await expect(hero).toBeVisible();
 
     const heroBox = await hero.boundingBox();
-    expect(heroBox?.height).toBeLessThanOrEqual(380);
+    expect(heroBox?.height).toBeLessThanOrEqual(220);
     expect(heroBox?.y).toBeLessThanOrEqual(96);
 
-    const linkedStripTop = await page.getByText(/^SKU$/).first().evaluate((node) => node.getBoundingClientRect().top);
-    expect(linkedStripTop).toBeLessThan(520);
+    const queueTop = await page.locator('#priority-action-queue').evaluate((node) => node.getBoundingClientRect().top);
+    expect(queueTop).toBeLessThan(520);
   });
 
   for (const route of towerRoutes) {

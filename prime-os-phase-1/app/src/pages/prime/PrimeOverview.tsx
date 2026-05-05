@@ -1,40 +1,30 @@
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   Bot,
   Boxes,
+  CheckCircle2,
   CircleDollarSign,
   ClipboardList,
-  Globe,
-  HeartHandshake,
-  ImagePlus,
+  Clock3,
+  FileText,
   Megaphone,
   PackageCheck,
+  Radar,
   ShieldCheck,
-  ShoppingCart,
   Sparkles,
   Store,
   TrendingUp,
-  UserRoundCheck,
+  UsersRound,
+  type LucideIcon,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
-import {
-  DecisionHeader,
-  EvidenceStack,
-  GuardrailCard,
-  HandoffRail,
-  LinkedEntityStrip,
-  OperatingLoop,
-  OutcomePreview,
-  RegistryList,
-} from '@/components/prime/PrimeOperatingSystem';
-import { getPrimeSnapshot, getSkuLabel, getSkuProductName } from '@/lib/prime/prime-data';
+import { getPrimeSnapshot, getSkuProductName } from '@/lib/prime/prime-data';
 
 const currency = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -47,21 +37,58 @@ const compactNumber = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 1,
 });
 
+type OperatingStatus = 'Ready' | 'Watch' | 'Critical';
+
+type PriorityAction = {
+  id: string;
+  title: string;
+  owner: string;
+  object: string;
+  reason: string;
+  due: string;
+  risk: OperatingStatus;
+  impact: string;
+  href: string;
+  cta: string;
+  evidence: string;
+};
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function areaTone(score: number): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (score >= 80) return 'default';
-  if (score >= 60) return 'secondary';
-  if (score >= 35) return 'outline';
-  return 'destructive';
-}
-
-function scoreCopy(score: number) {
+function scoreStatus(score: number): OperatingStatus {
   if (score >= 80) return 'Ready';
   if (score >= 60) return 'Watch';
-  return 'Needs work';
+  return 'Critical';
+}
+
+function statusRank(status: OperatingStatus) {
+  if (status === 'Critical') return 0;
+  if (status === 'Watch') return 1;
+  return 2;
+}
+
+function statusClass(status: OperatingStatus) {
+  if (status === 'Critical') return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300';
+  if (status === 'Watch') return 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+  return 'border-emerald-500/30 bg-background text-emerald-700 dark:text-emerald-300';
+}
+
+function statusDotClass(status: OperatingStatus) {
+  if (status === 'Critical') return 'bg-red-500';
+  if (status === 'Watch') return 'bg-amber-500';
+  return 'bg-emerald-500';
+}
+
+function riskLabel(count: number) {
+  return count === 1 ? '1 risk' : `${count} risks`;
+}
+
+function openPrimeAi() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('prime-ai:open'));
+  }
 }
 
 export function PrimeOverview() {
@@ -75,492 +102,648 @@ export function PrimeOverview() {
   const highRiskForecasts = snapshot.forecasts.filter((forecast) => forecast.risk === 'high');
   const watchForecasts = snapshot.forecasts.filter((forecast) => forecast.risk !== 'low');
   const openTickets = snapshot.tickets.filter((ticket) => ticket.status !== 'resolved');
+  const highPriorityTickets = openTickets.filter((ticket) => ticket.priority === 'high');
+  const ordersAtRisk = snapshot.orders.filter((order) => (
+    order.risk_flags.length > 0
+    || order.status === 'pending'
+    || order.status === 'ready_to_ship'
+    || order.status === 'shipping'
+  ));
   const topCampaign = snapshot.campaigns[0] ?? null;
-  const topPlay = snapshot.activationPlays[0] ?? null;
+  const topForecast = highRiskForecasts[0] ?? watchForecasts[0] ?? snapshot.forecasts[0] ?? null;
+  const topTicket = highPriorityTickets[0] ?? openTickets[0] ?? null;
   const topRecommendation = snapshot.recommendations[0] ?? null;
-  const topCustomer = [...snapshot.customers].sort((left, right) => {
-    if (right.totalRevenue !== left.totalRevenue) return right.totalRevenue - left.totalRevenue;
-    return right.totalOrders - left.totalOrders;
-  })[0] ?? null;
-  const topForecast = watchForecasts[0] ?? snapshot.forecasts[0] ?? null;
-  const heroProduct = snapshot.products.find((product) => product.id === topCampaign?.productId)
-    ?? snapshot.products[0]
-    ?? null;
-  const heroProductImage = heroProduct?.images?.[0];
-  const heroSku = topCampaign?.skuCode || topForecast?.skuCode || '';
-  const heroProductLabel = heroSku ? getSkuLabel(heroSku) : heroProduct?.name || 'Product route pending';
+  const topPlay = snapshot.activationPlays[0] ?? null;
   const leadToOrderRate = snapshot.metrics.leadToOrderRate;
+  const revenueAtRisk = (
+    watchForecasts.reduce((sum, forecast) => sum + Math.max(0, forecast.demand7d - forecast.ats) * 22000, 0)
+    + highPriorityTickets.length * 125000
+    + ordersAtRisk.length * 18000
+  );
 
-  const intelligenceScore = clampScore(72 + snapshot.insightModels.length * 4 + snapshot.vocInsights.length * 2);
-  const ecomScore = clampScore(62 + snapshot.products.length * 4 + snapshot.inventoryPositions.length - highRiskForecasts.length * 16);
-  const demandScore = clampScore(58 + snapshot.campaigns.length * 7 + Math.min(18, leadToOrderRate));
-  const financeScore = clampScore(64 + repeatCustomers * 5 - highRiskForecasts.length * 8);
-  const customerScore = clampScore(66 + snapshot.customers.length * 3 - openTickets.length * 7);
+  const intelligenceScore = clampScore(74 + snapshot.insightModels.length * 4 + snapshot.vocInsights.length * 2);
+  const ecomScore = clampScore(66 + snapshot.products.length * 3 + snapshot.inventoryPositions.length - highRiskForecasts.length * 18);
+  const demandScore = clampScore(60 + snapshot.campaigns.length * 6 + Math.min(18, leadToOrderRate));
+  const financeScore = clampScore(70 + repeatCustomers * 4 - highRiskForecasts.length * 7 - ordersAtRisk.length);
+  const customerScore = clampScore(72 + snapshot.customers.length * 2 - openTickets.length * 8);
   const systemScore = clampScore((intelligenceScore + ecomScore + demandScore + financeScore + customerScore) / 5);
+  const systemStatus = scoreStatus(systemScore);
 
-  const operatingAreas = [
-    {
-      area: 'Intelligence',
+  const priorityActions: PriorityAction[] = [
+    topForecast ? {
+      id: `forecast-${topForecast.id}`,
+      title: topForecast.risk === 'high' ? 'Resolve inventory pressure before campaign scale' : 'Validate inventory pressure',
+      owner: 'Ecom / COS',
+      object: topForecast.skuCode,
+      reason: `${topForecast.ats} ATS vs ${topForecast.demand7d} projected 7-day demand.`,
+      due: topForecast.risk === 'high' ? 'Today' : 'Next 24h',
+      risk: topForecast.risk === 'high' ? 'Critical' : 'Watch',
+      impact: currency.format(Math.max(0, topForecast.demand7d - topForecast.ats) * 22000),
+      href: '/ecom/cos/inventory-brain',
+      cta: 'Check inventory',
+      evidence: topForecast.suggestedAction,
+    } : null,
+    topTicket ? {
+      id: `ticket-${topTicket.id}`,
+      title: 'Clear customer issue blocking trust loop',
+      owner: 'Customer',
+      object: topTicket.linkedEntity,
+      reason: `${topTicket.subject}. SLA ${topTicket.sla}.`,
+      due: topTicket.priority === 'high' ? 'Today' : 'This week',
+      risk: topTicket.priority === 'high' ? 'Critical' : 'Watch',
+      impact: `${topTicket.priority} priority`,
+      href: '/customer/service',
+      cta: 'Open service',
+      evidence: 'Ticket is linked to CRM timeline and COS order context.',
+    } : null,
+    topRecommendation ? {
+      id: topRecommendation.id,
+      title: topRecommendation.target,
+      owner: 'Intelligence',
+      object: topRecommendation.target,
+      reason: topRecommendation.reasoning,
+      due: 'Today',
+      risk: topRecommendation.confidence >= 82 ? 'Watch' : 'Ready',
+      impact: `${topRecommendation.confidence}% confidence`,
       href: '/intelligence/launch-decisions',
-      icon: Sparkles,
-      score: intelligenceScore,
-      title: 'Decide the best route',
-      description: 'Creators, trends, and launch decisions explain what to sell, why now, and what evidence supports it.',
-      metric: `${snapshot.insightModels.length + snapshot.vocInsights.length} signals`,
-      action: 'Open Launch Decisions',
-      accent: 'from-violet-500/15 via-background to-sky-500/10',
+      cta: 'Review decision',
+      evidence: topRecommendation.action,
+    } : null,
+    topPlay ? {
+      id: topPlay.id,
+      title: 'Run next demand play against reachable audience',
+      owner: 'Demand',
+      object: topPlay.audience,
+      reason: topPlay.trigger,
+      due: 'Next run',
+      risk: demandScore >= 80 ? 'Ready' : 'Watch',
+      impact: `+${topPlay.projectedLift}% lift`,
+      href: '/demand/campaigns',
+      cta: 'Open queue',
+      evidence: topPlay.nextBestAction,
+    } : null,
+    {
+      id: 'finance-readiness',
+      title: financeScore >= 80 ? 'Keep finance guardrail in monitor mode' : 'Review finance readiness before demand expansion',
+      owner: 'Finance',
+      object: 'Scale capital',
+      reason: `${financeScore}% finance readiness with ${ordersAtRisk.length} order risk signals.`,
+      due: financeScore >= 80 ? 'This week' : 'Today',
+      risk: scoreStatus(financeScore),
+      impact: currency.format(revenueAtRisk),
+      href: '/finance/risk-trust',
+      cta: 'Review finance',
+      evidence: 'Finance guardrail protects campaign scale from fulfillment and cash risk.',
+    },
+  ].filter(Boolean).sort((left, right) => statusRank(left.risk) - statusRank(right.risk)).slice(0, 5) as PriorityAction[];
+
+  const attentionCount = priorityActions.filter((action) => action.risk !== 'Ready').length;
+  const criticalCount = priorityActions.filter((action) => action.risk === 'Critical').length;
+  const watchCount = priorityActions.filter((action) => action.risk === 'Watch').length;
+
+  const healthMetrics = [
+    {
+      label: 'Revenue at risk',
+      value: currency.format(revenueAtRisk),
+      status: revenueAtRisk > 250000 ? 'Critical' as const : revenueAtRisk > 0 ? 'Watch' as const : 'Ready' as const,
+      context: `${watchForecasts.length} stock signals, ${ordersAtRisk.length} order signals`,
+      cause: revenueAtRisk > 0 ? 'Exposure comes from inventory and service blockers.' : 'No material exposure detected.',
+      href: '/finance/risk-trust',
+      icon: CircleDollarSign,
     },
     {
-      area: 'Ecom',
-      href: '/ecom/cos/product-master',
-      icon: Store,
-      score: ecomScore,
-      title: 'Keep product ready',
-      description: 'Catalog, inventory, OMS, fulfillment, returns, and policy keep the route sellable without hidden blockers.',
-      metric: `${snapshot.products.length} products`,
-      action: 'Check Ecom readiness',
-      accent: 'from-emerald-500/15 via-background to-cyan-500/10',
+      label: 'Demand readiness',
+      value: `${demandScore}%`,
+      status: scoreStatus(demandScore),
+      context: `${compactNumber.format(totalTraffic)} reach, ${totalLeads} leads`,
+      cause: `${leadToOrderRate}% lead-to-order with ${totalRfqs} RFQs attached.`,
+      href: '/demand/campaigns',
+      icon: TrendingUp,
     },
     {
-      area: 'Demand',
-      href: '/demand/campaign-ops',
-      icon: Megaphone,
-      score: demandScore,
-      title: 'Turn decision into reach',
-      description: 'Campaign Ops, creator work, lead capture, and retargeting create the actual buyer touches.',
-      metric: `${compactNumber.format(totalTraffic)} reach`,
-      action: 'Run Demand action',
-      accent: 'from-blue-500/15 via-background to-indigo-500/10',
+      label: 'Inventory pressure',
+      value: `${watchForecasts.length} SKU`,
+      status: highRiskForecasts.length ? 'Critical' as const : watchForecasts.length ? 'Watch' as const : 'Ready' as const,
+      context: highRiskForecasts.length ? `${highRiskForecasts.length} critical` : 'No critical SKU',
+      cause: topForecast ? `${topForecast.skuCode}: ${topForecast.ats} ATS vs ${topForecast.demand7d} demand.` : 'Inventory coverage is clear.',
+      href: '/ecom/cos/inventory-brain',
+      icon: Boxes,
+    },
+    {
+      label: 'Orders at risk',
+      value: String(ordersAtRisk.length),
+      status: ordersAtRisk.length > 3 ? 'Critical' as const : ordersAtRisk.length ? 'Watch' as const : 'Ready' as const,
+      context: `${totalOrders} total orders`,
+      cause: ordersAtRisk.length ? 'Open lifecycle or risk flags need COS review.' : 'No order blocker in the queue.',
+      href: '/ecom/cos/oms',
+      icon: PackageCheck,
+    },
+    {
+      label: 'Customer issues',
+      value: String(openTickets.length),
+      status: highPriorityTickets.length ? 'Critical' as const : openTickets.length ? 'Watch' as const : 'Ready' as const,
+      context: `${highPriorityTickets.length} high priority`,
+      cause: topTicket ? `${topTicket.subject} is still open.` : 'Service queue is clear.',
+      href: '/customer/service',
+      icon: UsersRound,
+    },
+  ];
+
+  const riskRadar = [
+    {
+      area: 'Inventory',
+      title: highRiskForecasts.length ? 'ATS below launch demand' : watchForecasts.length ? 'SKU coverage needs watch' : 'Stock coverage ready',
+      status: highRiskForecasts.length ? 'Critical' as const : watchForecasts.length ? 'Watch' as const : 'Ready' as const,
+      owner: 'Ecom / COS',
+      entity: topForecast?.skuCode || 'Inventory Brain',
+      href: '/ecom/cos/inventory-brain',
     },
     {
       area: 'Finance',
-      href: '/finance/health',
-      icon: CircleDollarSign,
-      score: financeScore,
-      title: 'Protect scale capital',
-      description: 'Finance health, capital offers, and risk eligibility show whether the seller can safely scale the route.',
-      metric: `${financeScore}% health`,
-      action: 'Review Finance',
-      accent: 'from-amber-500/15 via-background to-emerald-500/10',
+      title: financeScore >= 80 ? 'Capital guardrail ready' : 'Scale finance needs review',
+      status: scoreStatus(financeScore),
+      owner: 'Finance',
+      entity: `${financeScore}% readiness`,
+      href: '/finance/risk-trust',
     },
     {
       area: 'Customer',
-      href: '/customer/crm-compact',
-      icon: HeartHandshake,
-      score: customerScore,
-      title: 'Own buyer memory',
-      description: 'CRM Compact and Service keep buyer history, follow-up, RFQ, and support context attached.',
+      title: highPriorityTickets.length ? 'High priority service issue' : openTickets.length ? 'Open service queue' : 'Service queue clear',
+      status: highPriorityTickets.length ? 'Critical' as const : openTickets.length ? 'Watch' as const : 'Ready' as const,
+      owner: 'Customer',
+      entity: topTicket?.linkedEntity || 'CRM Compact',
+      href: '/customer/service',
+    },
+    {
+      area: 'Demand',
+      title: demandScore >= 80 ? 'Demand engine ready' : 'Demand proof needs operator review',
+      status: scoreStatus(demandScore),
+      owner: 'Demand',
+      entity: topCampaign?.name || 'Campaign queue',
+      href: '/demand/campaigns',
+    },
+    {
+      area: 'Ecom',
+      title: ecomScore >= 80 ? 'COS route ready' : 'Product and order route needs watch',
+      status: scoreStatus(ecomScore),
+      owner: 'Ecom / COS',
+      entity: `${snapshot.products.length} products`,
+      href: '/ecom/cos/product-master',
+    },
+  ].sort((left, right) => statusRank(left.status) - statusRank(right.status));
+
+  const areaStatus = [
+    {
+      area: 'Intelligence',
+      status: scoreStatus(intelligenceScore),
+      summary: 'Recommendations, VOC and model signals are ready for operator review.',
+      metric: `${snapshot.insightModels.length + snapshot.vocInsights.length} active signals`,
+      blocker: topRecommendation ? topRecommendation.target : 'No blocker',
+      readiness: intelligenceScore,
+      href: '/intelligence/launch-decisions',
+      action: 'Review decisions',
+      icon: Sparkles,
+      risks: snapshot.alerts.filter((alert) => alert.area === 'Intelligence Area').length,
+    },
+    {
+      area: 'Demand',
+      status: scoreStatus(demandScore),
+      summary: 'Campaigns, leads, RFQs and activation plays are connected.',
+      metric: `${snapshot.campaigns.length} campaigns`,
+      blocker: demandScore < 80 ? `${leadToOrderRate}% lead to order` : 'No blocker',
+      readiness: demandScore,
+      href: '/demand/campaigns',
+      action: 'Open campaigns',
+      icon: Megaphone,
+      risks: demandScore < 80 ? 1 : 0,
+    },
+    {
+      area: 'Ecom / COS',
+      status: scoreStatus(ecomScore),
+      summary: 'Catalog, inventory and OMS signals show route readiness.',
+      metric: `${snapshot.inventoryPositions.length} inventory rows`,
+      blocker: highRiskForecasts.length ? `${highRiskForecasts.length} critical SKU` : 'No blocker',
+      readiness: ecomScore,
+      href: '/ecom/cos/product-master',
+      action: 'Check COS',
+      icon: Store,
+      risks: highRiskForecasts.length,
+    },
+    {
+      area: 'Customer',
+      status: scoreStatus(customerScore),
+      summary: 'CRM memory and service queue protect buyer trust.',
       metric: `${snapshot.customers.length} profiles`,
-      action: 'Open CRM Compact',
-      accent: 'from-rose-500/15 via-background to-orange-500/10',
+      blocker: openTickets.length ? `${openTickets.length} open tickets` : 'No blocker',
+      readiness: customerScore,
+      href: '/customer/crm-compact',
+      action: 'Open CRM',
+      icon: UsersRound,
+      risks: openTickets.length,
+    },
+    {
+      area: 'Finance',
+      status: scoreStatus(financeScore),
+      summary: 'Finance health gates whether demand should expand today.',
+      metric: `${financeScore}% readiness`,
+      blocker: financeScore < 80 ? 'Review risk trust' : 'No blocker',
+      readiness: financeScore,
+      href: '/finance/risk-trust',
+      action: 'Review risk',
+      icon: ShieldCheck,
+      risks: financeScore < 80 ? 1 : 0,
     },
   ];
 
-  const guardrails = [
-    ...watchForecasts.slice(0, 2).map((forecast) => ({
-      id: forecast.id,
-      label: 'Ecom guardrail',
-      title: getSkuProductName(forecast.skuCode),
-      detail: `${forecast.ats} ATS vs ${forecast.demand7d} projected 7-day demand. ${forecast.suggestedAction}`,
-      tone: forecast.risk === 'high' ? 'destructive' as const : 'secondary' as const,
-    })),
-    ...openTickets.slice(0, 2).map((ticket) => ({
-      id: ticket.id,
-      label: 'Customer guardrail',
-      title: ticket.subject,
-      detail: `${ticket.linkedEntity} · SLA ${ticket.sla}`,
-      tone: ticket.priority === 'high' ? 'destructive' as const : 'secondary' as const,
-    })),
+  const evidenceItems = [
+    {
+      label: 'Inventory evidence',
+      value: topForecast ? getSkuProductName(topForecast.skuCode) : 'Inventory coverage',
+      detail: topForecast ? `${topForecast.skuCode}: ${topForecast.ats} ATS vs ${topForecast.demand7d} demand.` : 'No pressure forecast detected.',
+      status: topForecast?.risk === 'high' ? 'Critical' as const : topForecast ? 'Watch' as const : 'Ready' as const,
+    },
+    {
+      label: 'Demand evidence',
+      value: topCampaign?.name || 'Demand route',
+      detail: `${compactNumber.format(totalTraffic)} reach, ${totalLeads} leads, ${totalRfqs} RFQs, ${totalOrders} orders.`,
+      status: scoreStatus(demandScore),
+    },
+    {
+      label: 'Customer evidence',
+      value: topTicket?.subject || 'Service queue',
+      detail: topTicket ? `${topTicket.linkedEntity}, SLA ${topTicket.sla}.` : `${repeatCustomers} repeat buyers with clear service queue.`,
+      status: highPriorityTickets.length ? 'Critical' as const : openTickets.length ? 'Watch' as const : 'Ready' as const,
+    },
+    {
+      label: 'AI evidence',
+      value: topRecommendation?.target || 'Recommendation queue',
+      detail: topRecommendation ? `${topRecommendation.confidence}% confidence. ${topRecommendation.action}` : 'No recommendation pending.',
+      status: topRecommendation && topRecommendation.confidence >= 82 ? 'Watch' as const : 'Ready' as const,
+    },
   ];
+
+  const activityItems = [
+    ...snapshot.orderEvents.slice(0, 2).map((event) => ({
+      id: event.id,
+      source: 'OMS',
+      object: event.order_id,
+      detail: event.message,
+      time: event.created_at,
+    })),
+    ...snapshot.activationPlays.slice(0, 2).map((play) => ({
+      id: play.id,
+      source: 'Demand',
+      object: play.audience,
+      detail: play.nextBestAction,
+      time: 'Next run',
+    })),
+    ...snapshot.tickets.slice(0, 2).map((ticket) => ({
+      id: ticket.id,
+      source: 'CRM',
+      object: ticket.linkedEntity,
+      detail: ticket.subject,
+      time: ticket.sla,
+    })),
+  ].slice(0, 6);
 
   return (
     <div className="min-h-full bg-background">
-      <div className="space-y-6 p-4 md:p-6">
-        <DecisionHeader
-          eyebrow="Prime OS control plane"
-          title={topCampaign ? `Scale ${topCampaign.name}` : 'Choose the next closed-loop launch route'}
-          description={topRecommendation?.reasoning || 'PrimeOS joins intelligence, product readiness, demand execution, finance health, and customer memory into one operator recommendation.'}
-          confidence={systemScore}
-          status={scoreCopy(systemScore)}
-          actions={(
-            <>
-              <Button asChild>
+      <div className="space-y-4 p-4 md:p-6">
+        <section data-testid="overview-command-bar" className="rounded-lg border bg-card shadow-sm">
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)_auto] lg:items-center">
+            <div className="min-w-0">
+              <Badge variant="outline" className="mb-3 rounded-full">Today Command Bar</Badge>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Operating Home</h1>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                Mission Control for today: decisions, risks, owners and next actions across Prime OS.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                <span>{attentionCount} actions need attention</span>
+                <span className="text-muted-foreground">/</span>
+                <span>{criticalCount} critical</span>
+                <span className="text-muted-foreground">/</span>
+                <span>{currency.format(revenueAtRisk)} exposure</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className={`size-2 rounded-full ${statusDotClass(systemStatus)}`} />
+                <span>{systemScore}% launch readiness, {watchCount} watch items.</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button asChild size="sm">
                 <Link to="/intelligence/launch-decisions">
-                  Open Launch Decisions
+                  Review decisions
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link to="/demand/campaign-ops">
-                  Execute in Demand
-                  <ArrowRight className="size-4" />
+              <Button asChild size="sm" variant="outline">
+                <Link to="#priority-action-queue">
+                  Open action queue
                 </Link>
               </Button>
-            </>
-          )}
-          evidence={[
-            { label: 'Signal', value: topRecommendation?.target || 'Launch route', detail: topRecommendation ? `${topRecommendation.confidence}% confidence` : 'Decision context ready', tone: 'purple' },
-            { label: 'Demand', value: topPlay?.audience || topCampaign?.targetSegment || 'Buyer audience', detail: topPlay ? `+${topPlay.projectedLift}% projected lift` : `${totalLeads} leads in motion`, tone: 'info' },
-            { label: 'Guardrail', value: topForecast ? scoreCopy(ecomScore) : 'Clear', detail: topForecast ? `${topForecast.risk} stock risk` : 'No stock blocker detected', tone: topForecast?.risk === 'high' ? 'danger' : 'success' },
-          ]}
-          variant="compact"
-        />
+              <Button size="sm" variant="ghost" onClick={openPrimeAi} aria-label="Open Prime AI for Operating Home">
+                <Bot className="size-4" />
+                Ask Prime AI
+              </Button>
+            </div>
+          </div>
+        </section>
 
-        <LinkedEntityStrip
-          entities={[
-            { label: 'SKU', value: heroSku || 'pending', href: '/ecom/cos/product-master', tone: 'info' },
-            { label: 'Campaign', value: topCampaign?.id || 'pending', href: '/demand/campaign-ops', tone: 'purple' },
-            { label: 'CRM', value: topCustomer?.id || 'customer-memory', href: '/customer/crm-compact', tone: 'success' },
-            { label: 'Orders', value: String(totalOrders), href: '/ecom/cos/oms', tone: 'muted' },
-          ]}
-        />
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {healthMetrics.map((metric) => (
+            <HealthMetricCard key={metric.label} {...metric} />
+          ))}
+        </section>
 
-        <OperatingLoop
-          steps={[
-            { label: 'Signal', title: 'Intelligence explains why now', detail: `${snapshot.insightModels.length + snapshot.vocInsights.length} model/VOC signals available.`, href: '/intelligence/launch-decisions', tone: 'purple' },
-            { label: 'Decision', title: 'Operator chooses the route', detail: topCampaign ? topCampaign.name : 'Launch route is ready for review.', href: '/intelligence/launch-decisions', tone: 'info' },
-            { label: 'Handoff', title: 'Demand executes the move', detail: 'Campaign, creator, lead response, and retargeting stay connected.', href: '/demand/campaign-ops', tone: 'default' },
-            { label: 'Outcome', title: 'COS and CRM read back reality', detail: `${totalOrders} orders, ${repeatCustomers} repeat buyers, and ${openTickets.length} service flags.`, href: '/ecom/cos/oms', tone: 'success' },
-          ]}
-        />
-
-        <HandoffRail
-          from="Prime OS Overview"
-          to="Launch Decisions"
-          detail="The overview should not become the workbench. It sends the operator into the specific decision queue with evidence attached."
-          href="/intelligence/launch-decisions"
-        />
-
-        <Card className="overflow-hidden rounded-lg border">
-          <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-emerald-500/10">
-            <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_190px] xl:items-stretch">
-              <div className="relative min-h-[230px] overflow-hidden rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-4 shadow-sm">
-                <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-primary/20 blur-3xl" />
-                <div className="relative flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="rounded-full bg-background/80">Live route</Badge>
-                  <Badge variant={topCampaign?.status === 'active' ? 'default' : 'secondary'}>{topCampaign?.status || 'ready'}</Badge>
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+          <Card id="priority-action-queue" className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardList className="size-5" />
+                    Priority Action Queue
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Top operating actions sorted by severity, urgency and revenue impact.
+                  </p>
                 </div>
-                <div className="relative mt-4 flex items-center gap-3">
-                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
-                    {heroProductImage ? (
-                      <img src={heroProductImage} alt={heroProductLabel} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <ImagePlus className="size-6" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Product route</div>
-                    <div className="mt-2 line-clamp-3 text-base font-semibold">{heroProductLabel}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{heroSku || 'SKU pending'}</div>
-                  </div>
-                </div>
-                <div className="relative mt-4 rounded-2xl border bg-background/80 p-3 shadow-sm">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Buyer memory</div>
-                  <div className="mt-1 text-sm font-semibold">{topCustomer?.name || 'Customer route pending'}</div>
-                  <div className="text-xs text-muted-foreground">{topCustomer?.company || 'CRM Compact will own the next follow-up.'}</div>
-                </div>
+                <Badge variant="outline" className="w-fit">{priorityActions.length} actions</Badge>
               </div>
+            </CardHeader>
+            <CardContent className="divide-y p-0">
+              {priorityActions.map((action, index) => (
+                <PriorityActionRow key={action.id} action={action} rank={index + 1} />
+              ))}
+            </CardContent>
+          </Card>
 
-              <div className="min-w-0">
-                <Badge variant="outline">PrimeOS recommends</Badge>
-                <CardTitle className="mt-3 text-3xl tracking-tight">
-                  {topCampaign ? `Scale ${topCampaign.name}` : 'Pick the next closed-loop launch route'}
+          <aside className="space-y-4">
+            <Card className="rounded-lg border shadow-sm">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Radar className="size-4" />
+                  Risk Radar
                 </CardTitle>
-                <p className="mt-3 max-w-4xl text-base leading-7 text-muted-foreground">
-                  {topRecommendation?.reasoning || 'PrimeOS combines market intelligence, product readiness, campaign execution, finance health, and customer memory into one operating recommendation.'}
-                </p>
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
-                  <OverviewEvidenceCard label="Intelligence" value={topRecommendation?.target || 'Launch route'} detail={topRecommendation ? `${topRecommendation.confidence}% confidence` : 'Decision context ready'} />
-                  <OverviewEvidenceCard label="Demand" value={topPlay?.audience || topCampaign?.targetSegment || 'Buyer audience'} detail={topPlay ? `+${topPlay.projectedLift}% projected lift` : `${totalLeads} leads in motion`} />
-                  <OverviewEvidenceCard label="Guardrail" value={topForecast ? scoreCopy(ecomScore) : 'Clear'} detail={topForecast ? `${topForecast.risk} stock risk` : 'No stock blocker detected'} />
-                </div>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Button asChild>
-                    <Link to="/intelligence/launch-decisions">
-                      Open Launch Decisions
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <Link to="/customer/crm-compact">
-                      Open CRM Compact
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent className="divide-y p-0">
+                {riskRadar.map((item) => (
+                  <RiskRadarRow key={item.area} {...item} />
+                ))}
+              </CardContent>
+            </Card>
 
-              <div className="rounded-3xl border bg-background/80 p-5 text-center shadow-sm">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">System readiness</div>
-                <div className="mt-3 text-5xl font-semibold tracking-tight">{systemScore}%</div>
-                <Badge variant={areaTone(systemScore)} className="mt-3">{scoreCopy(systemScore)}</Badge>
-                <p className="mt-4 text-sm text-muted-foreground">One score across Intelligence, Ecom, Demand, Finance, and Customer.</p>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <SummaryMetricCard label="Revenue" value={currency.format(snapshot.metrics.revenue)} meta={`${repeatCustomers} repeat buyers in CRM memory.`} icon={<ShoppingCart className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Demand reach" value={compactNumber.format(totalTraffic)} meta={`${snapshot.campaigns.length} campaigns · ${totalLeads} leads.`} icon={<Megaphone className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Lead to order" value={`${leadToOrderRate}%`} meta={`${totalLeads} leads · ${totalOrders} orders · ${totalRfqs} RFQs.`} icon={<TrendingUp className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Products covered" value={snapshot.products.length} meta={`${snapshot.inventoryPositions.length} inventory rows across ${snapshot.warehousesCount} warehouses.`} icon={<Boxes className="size-5" />} tone="purple" />
-          <SummaryMetricCard label="Needs attention" value={highRiskForecasts.length + openTickets.length} meta={`${highRiskForecasts.length} SKU risks · ${openTickets.length} service cases.`} icon={<AlertTriangle className="size-5" />} tone={highRiskForecasts.length + openTickets.length ? 'danger' : 'muted'} />
-        </div>
-
-        <section className="grid gap-4 xl:grid-cols-5">
-          {operatingAreas.map((area) => {
-            const Icon = area.icon;
-
-            return (
-              <Link
-                key={area.area}
-                to={area.href}
-                className={`group flex min-h-[260px] flex-col rounded-lg border bg-gradient-to-br ${area.accent} p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="rounded-2xl border bg-background/75 p-2 shadow-sm">
-                    <Icon className="size-5 text-primary" />
-                  </div>
-                  <Badge variant={areaTone(area.score)}>{area.score}%</Badge>
-                </div>
-                <div className="mt-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{area.area}</div>
-                  <div className="mt-2 text-xl font-semibold leading-tight">{area.title}</div>
-                  <p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">{area.description}</p>
-                </div>
-                <div className="mt-auto pt-5">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-medium">{area.metric}</span>
-                    <span className="text-xs text-muted-foreground">{scoreCopy(area.score)}</span>
-                  </div>
-                  <Progress value={area.score} className="mt-2 h-1.5" />
-                  <div className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                    {area.action}
-                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+            <Card className="rounded-lg border shadow-sm">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="size-4" />
+                  Area Status Map
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="divide-y p-0">
+                {areaStatus.map((area) => (
+                  <AreaStatusRow key={area.area} {...area} />
+                ))}
+              </CardContent>
+            </Card>
+          </aside>
         </section>
 
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <CardTitle>Closed-loop execution path</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">This is the mental model: each area has a job, a handoff, and a reason it exists.</p>
-              </div>
-              <Badge variant="outline">PrimeOS loop</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 lg:grid-cols-5">
-              <LoopStep icon={<Bot className="size-5" />} title="Intelligence" detail="Choose the route and explain why." href="/intelligence/launch-decisions" />
-              <LoopStep icon={<PackageCheck className="size-5" />} title="Ecom" detail="Confirm product, stock, order, and fulfillment can support it." href="/ecom/cos/product-master" />
-              <LoopStep icon={<Megaphone className="size-5" />} title="Demand" detail="Create messages, ads, KOL work, SEO, and retargeting." href="/demand/campaign-ops" />
-              <LoopStep icon={<ShieldCheck className="size-5" />} title="Finance" detail="Check cash health, capital offers, and eligibility risk." href="/finance/health" />
-              <LoopStep icon={<UserRoundCheck className="size-5" />} title="Customer" detail="Capture buyer memory, replies, service, and repeat loops." href="/customer/crm-compact" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-          <EvidenceStack
-            items={[
-              { label: 'Revenue context', value: currency.format(snapshot.metrics.revenue), detail: `${repeatCustomers} repeat buyers in CRM memory.`, tone: 'success' },
-              { label: 'Demand proof', value: `${leadToOrderRate}% lead to order`, detail: `${totalLeads} leads, ${totalRfqs} RFQs, ${totalOrders} orders.`, tone: 'info' },
-              { label: 'Product readiness', value: `${snapshot.products.length} products covered`, detail: `${snapshot.inventoryPositions.length} inventory rows across ${snapshot.warehousesCount} warehouses.`, tone: highRiskForecasts.length ? 'warning' : 'success' },
-            ]}
-          />
-
-          <RegistryList
-            items={[
-              ...snapshot.recommendations.slice(0, 3).map((recommendation) => ({
-                id: recommendation.id,
-                label: 'AI',
-                title: recommendation.target,
-                detail: recommendation.action,
-                meta: `${recommendation.confidence}%`,
-                href: '/intelligence/launch-decisions',
-                tone: 'purple' as const,
-              })),
-              ...snapshot.activationPlays.slice(0, 3).map((play) => ({
-                id: play.id,
-                label: 'Demand',
-                title: play.audience,
-                detail: play.nextBestAction,
-                meta: `+${play.projectedLift}%`,
-                href: '/demand/campaign-ops',
-                tone: 'info' as const,
-              })),
-            ]}
-          />
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Next actions</CardTitle>
+        <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="size-4" />
+                Evidence Stack
+              </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              {snapshot.recommendations.slice(0, 3).map((recommendation) => (
-                <OverviewActionCard
-                  key={recommendation.id}
-                  label="AI recommendation"
-                  title={recommendation.target}
-                  detail={recommendation.action}
-                  meta={`${recommendation.confidence}% confidence`}
-                  href="/intelligence/launch-decisions"
-                />
-              ))}
-              {snapshot.activationPlays.slice(0, 3).map((play) => (
-                <OverviewActionCard
-                  key={play.id}
-                  label="Demand play"
-                  title={play.audience}
-                  detail={play.nextBestAction}
-                  meta={`+${play.projectedLift}% projected lift`}
-                  href="/demand/campaign-ops"
-                />
+            <CardContent className="grid gap-3 p-4 md:grid-cols-2">
+              {evidenceItems.map((item) => (
+                <EvidenceCard key={item.label} {...item} />
               ))}
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Guardrails before scale</CardTitle>
+          <Card className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock3 className="size-4" />
+                Recent Operating Events
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {guardrails.length ? guardrails.map((guardrail) => (
-                <div key={guardrail.id} className="rounded-2xl border bg-muted/20 p-3">
+            <CardContent className="divide-y p-0">
+              {activityItems.map((item) => (
+                <div key={item.id} className="p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{guardrail.label}</div>
-                      <div className="mt-1 font-semibold">{guardrail.title}</div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="rounded-full">{item.source}</Badge>
+                        <span className="truncate text-sm font-medium">{item.object}</span>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{item.detail}</p>
                     </div>
-                    <Badge variant={guardrail.tone}>Watch</Badge>
+                    <span className="shrink-0 text-xs text-muted-foreground">{item.time}</span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{guardrail.detail}</p>
                 </div>
-              )) : (
-                <div className="rounded-2xl border bg-emerald-500/10 p-4">
-                  <div className="font-semibold">No major guardrail is blocking scale.</div>
-                  <p className="mt-1 text-sm text-muted-foreground">Ecom, Customer, and Finance signals are currently healthy enough to keep executing.</p>
-                </div>
-              )}
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button asChild variant="outline" className="justify-between">
-                  <Link to="/ecom/cos/inventory-brain">
-                    Check inventory
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="justify-between">
-                  <Link to="/finance/risk-trust">
-                    Check finance risk
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              </div>
+              ))}
             </CardContent>
           </Card>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-3">
-          <OutcomePreview
-            value={currency.format(snapshot.metrics.revenue)}
-            detail="Outcome is read from OMS and CRM context, not a decorative chart."
-          />
-          <GuardrailCard
-            title={highRiskForecasts.length ? 'Inventory pressure before scale' : 'No major scale blocker'}
-            detail={highRiskForecasts.length ? `${highRiskForecasts.length} SKU routes need inventory attention before broader demand.` : 'Current product, customer, and finance signals are clear enough for the next operating move.'}
-            tone={highRiskForecasts.length ? 'warning' : 'success'}
-            status={highRiskForecasts.length ? 'Watch' : 'Clear'}
-          />
-          <OutcomePreview
-            label="Customer memory"
-            value={repeatCustomers}
-            detail="Repeat buyers stay linked back into CRM Compact so Prime OS can learn from demand outcomes."
-            tone="info"
-          />
         </section>
       </div>
     </div>
   );
 }
 
-function OverviewEvidenceCard({
+function HealthMetricCard({
+  label,
+  value,
+  status,
+  context,
+  cause,
+  href,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  status: OperatingStatus;
+  context: string;
+  cause: string;
+  href: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Link to={href} className="group rounded-lg border bg-card p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/20">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+        </div>
+        <div className="rounded-lg border bg-background p-2 text-muted-foreground">
+          <Icon className="size-4" />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <StatusBadge status={status} />
+        <span className="truncate text-xs text-muted-foreground">{context}</span>
+      </div>
+      <p className="mt-2 line-clamp-2 min-h-9 text-sm leading-5 text-muted-foreground">{cause}</p>
+    </Link>
+  );
+}
+
+function PriorityActionRow({ action, rank }: { action: PriorityAction; rank: number }) {
+  return (
+    <div className="grid gap-3 p-4 transition-colors hover:bg-muted/20 lg:grid-cols-[44px_minmax(0,1fr)_auto] lg:items-center">
+      <div className="flex size-9 items-center justify-center rounded-lg border bg-background text-sm font-semibold">
+        {rank}
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={action.risk} />
+          <Badge variant="outline">{action.owner}</Badge>
+          <span className="text-xs text-muted-foreground">{action.object}</span>
+        </div>
+        <h2 className="mt-2 text-base font-semibold leading-tight">{action.title}</h2>
+        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{action.reason}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border bg-background px-2 py-1 text-muted-foreground">
+            Due <span className="font-medium text-foreground">{action.due}</span>
+          </span>
+          <span className="rounded-full border bg-background px-2 py-1 text-muted-foreground">
+            Impact <span className="font-medium text-foreground">{action.impact}</span>
+          </span>
+          <span className="line-clamp-1 rounded-full border bg-background px-2 py-1 text-muted-foreground">
+            Evidence <span className="font-medium text-foreground">{action.evidence}</span>
+          </span>
+        </div>
+      </div>
+      <Button asChild size="sm" variant={action.risk === 'Critical' ? 'default' : 'outline'} className="justify-between">
+        <Link to={action.href}>
+          {action.cta}
+          <ArrowRight className="size-4" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function RiskRadarRow({
+  area,
+  title,
+  status,
+  owner,
+  entity,
+  href,
+}: {
+  area: string;
+  title: string;
+  status: OperatingStatus;
+  owner: string;
+  entity: string;
+  href: string;
+}) {
+  return (
+    <Link to={href} className="block p-3 transition-colors hover:bg-muted/20">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`size-2 rounded-full ${statusDotClass(status)}`} />
+            <span className="text-sm font-semibold">{area}</span>
+          </div>
+          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{title}</p>
+          <div className="mt-2 text-xs text-muted-foreground">{owner} / {entity}</div>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+    </Link>
+  );
+}
+
+function AreaStatusRow({
+  area,
+  status,
+  summary,
+  metric,
+  blocker,
+  readiness,
+  href,
+  action,
+  icon: Icon,
+  risks,
+}: {
+  area: string;
+  status: OperatingStatus;
+  summary: string;
+  metric: string;
+  blocker: string;
+  readiness: number;
+  href: string;
+  action: string;
+  icon: LucideIcon;
+  risks: number;
+}) {
+  return (
+    <Link to={href} className="block p-3 transition-colors hover:bg-muted/20">
+      <div className="flex items-start gap-3">
+        <div className="rounded-lg border bg-background p-2 text-muted-foreground">
+          <Icon className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-semibold">{area}</div>
+            <StatusBadge status={status} />
+          </div>
+          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{summary}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>{metric}</span>
+            <span>{riskLabel(risks)}</span>
+            <span>{blocker}</span>
+          </div>
+          <Progress value={readiness} className="mt-3 h-1.5" />
+          <div className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary">
+            {action}
+            <ArrowRight className="size-4" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function EvidenceCard({
   label,
   value,
   detail,
+  status,
 }: {
   label: string;
   value: string;
   detail: string;
+  status: OperatingStatus;
 }) {
   return (
-    <div className="rounded-2xl border bg-background/75 p-3 shadow-sm">
-      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-      <div className="mt-2 line-clamp-2 text-sm font-semibold">{value}</div>
-      <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{detail}</div>
+    <div className="rounded-lg border bg-muted/10 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="mt-2 line-clamp-1 font-semibold">{value}</div>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{detail}</p>
     </div>
   );
 }
 
-function LoopStep({
-  icon,
-  title,
-  detail,
-  href,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  detail: string;
-  href: string;
-}) {
-  return (
-    <Link to={href} className="group rounded-3xl border bg-muted/20 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="rounded-2xl border bg-background p-2 text-primary shadow-sm">{icon}</div>
-        <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-      </div>
-      <div className="mt-4 font-semibold">{title}</div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p>
-    </Link>
-  );
-}
+function StatusBadge({ status }: { status: OperatingStatus }) {
+  const Icon = status === 'Ready' ? CheckCircle2 : status === 'Watch' ? AlertTriangle : AlertTriangle;
 
-function OverviewActionCard({
-  label,
-  title,
-  detail,
-  meta,
-  href,
-}: {
-  label: string;
-  title: string;
-  detail: string;
-  meta: string;
-  href: string;
-}) {
   return (
-    <Link to={href} className="group rounded-2xl border bg-muted/20 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-          <div className="mt-2 font-semibold">{title}</div>
-        </div>
-        <Badge variant="outline">{meta}</Badge>
-      </div>
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">{detail}</p>
-      <div className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-        Open
-        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-      </div>
-    </Link>
+    <Badge variant="outline" className={`gap-1 rounded-full ${statusClass(status)}`}>
+      <Icon className="size-3" />
+      {status}
+    </Badge>
   );
 }

@@ -41,9 +41,10 @@ export async function mockPrimeBackend(page: Page) {
 export async function installPrimeSession(page: Page) {
   await mockPrimeBackend(page);
   await page.addInitScript(() => {
-    window.sessionStorage.setItem('prime-os-auth-token', 'prime-qa-token');
     window.localStorage.setItem('prime-os-genesis-theme', 'light');
   });
+  await page.goto('/overview');
+  await page.waitForURL(/\/overview$/, { timeout: 10_000 });
 }
 
 export async function expectPrimeShellReady(page: Page) {

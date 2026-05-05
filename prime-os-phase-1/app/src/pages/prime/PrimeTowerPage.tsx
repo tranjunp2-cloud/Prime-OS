@@ -37,7 +37,7 @@ import {
   Upload,
   Youtube,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -223,6 +223,10 @@ const currency = new Intl.NumberFormat('ja-JP', {
 const demandTowerIds: PrimeTowerId[] = ['campaign-ops', 'content-creator-ops', 'lead-response-capture', 'retargeting-outreach'];
 const intelligenceTowerIds: PrimeTowerId[] = ['decision-hub', 'signals', 'creators', 'customers', 'campaigns', 'analytics', 'attribution', 'forecasting', 'ai-operator', 'voc', 'alerts'];
 const financeTowerIds: PrimeTowerId[] = ['offers', 'risk', 'settlement'];
+const DEMAND_CAMPAIGNS_HREF = '/demand/campaigns';
+const DEMAND_CONTENT_SOCIAL_HREF = '/demand/content-social';
+const DEMAND_LEADS_RFQS_HREF = '/demand/leads-rfqs';
+const DEMAND_REENGAGE_HREF = '/demand/re-engage';
 
 function getTowerConfidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot) {
   if (demandTowerIds.includes(towerId)) {
@@ -311,7 +315,7 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): 
       title: campaign.name,
       detail: `${getSkuLabel(campaign.skuCode)} · ${campaign.leads} leads · ${campaign.orders} orders`,
       meta: campaign.status,
-      href: '/demand/campaign-ops',
+      href: DEMAND_CAMPAIGNS_HREF,
       tone: 'info',
     }));
   }
@@ -323,7 +327,7 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): 
       title: play.audience,
       detail: play.nextBestAction,
       meta: `+${play.projectedLift}%`,
-      href: '/demand/campaign-ops',
+      href: DEMAND_CAMPAIGNS_HREF,
       tone: 'purple',
     }));
   }
@@ -623,7 +627,7 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       strength: insight.sentiment === 'positive' ? 82 : insight.sentiment === 'negative' ? 76 : 63,
       freshness: 'today',
       recommendation: insight.action,
-      targetHref: insight.sentiment === 'negative' ? '/customer/service' : '/demand/campaign-ops',
+      targetHref: insight.sentiment === 'negative' ? '/customer/service' : DEMAND_CAMPAIGNS_HREF,
       detail: insight.summary,
     })),
     ...snapshot.forecasts.map((forecast) => ({
@@ -645,7 +649,7 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       strength: Math.min(95, 45 + campaign.orders * 8 + campaign.rfqs * 3),
       freshness: campaign.status,
       recommendation: `${campaign.leads} leads, ${campaign.rfqs} RFQs, ${campaign.orders} orders.`,
-      targetHref: '/demand/campaign-ops',
+      targetHref: DEMAND_CAMPAIGNS_HREF,
       detail: `${campaign.name} is tied to ${getSkuLabel(campaign.skuCode)}.`,
     })),
   ].sort((left, right) => right.strength - left.strength);
@@ -2431,7 +2435,7 @@ function LaunchDecisionPanel() {
                       </div>
                     </div>
                     <Button asChild>
-                      <Link to="/demand/campaign-ops">Send to Campaign Ops</Link>
+                      <Link to={DEMAND_CAMPAIGNS_HREF}>Send to Campaign Ops</Link>
                     </Button>
                   </div>
                 </div>
@@ -2842,7 +2846,14 @@ function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
 function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const queryCampaignId = searchParams.get('campaign');
+  const queryLeadId = searchParams.get('lead');
+  const queryRfqId = searchParams.get('rfq');
+  const queryView = searchParams.get('view');
   const primaryCampaign = snapshot.campaigns[0];
+  const queryCampaign = queryCampaignId ? snapshot.campaigns.find((campaign) => campaign.id === queryCampaignId) : null;
+  const routeCampaign = queryCampaign ?? primaryCampaign;
   const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
   const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
   const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
@@ -2855,14 +2866,16 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const openRfqs = snapshot.rfqs.filter((rfq) => rfq.status !== 'converted');
   const topPlay = snapshot.activationPlays[0];
   const sortedLeads = [...snapshot.leads].sort((left, right) => right.score - left.score);
-  const topLead = sortedLeads[0];
-  const topRfq = openRfqs[0];
-  const primaryProduct = findProductBySku(snapshot, primaryCampaign?.skuCode);
+  const queryLead = queryLeadId ? snapshot.leads.find((lead) => lead.id === queryLeadId) : null;
+  const queryRfq = queryRfqId ? snapshot.rfqs.find((rfq) => rfq.id === queryRfqId) : null;
+  const topLead = queryLead ?? sortedLeads[0];
+  const topRfq = queryRfq ?? openRfqs[0];
+  const primaryProduct = findProductBySku(snapshot, routeCampaign?.skuCode);
   const primaryProductImage = primaryProduct?.images?.[0];
-  const primaryForecast = findForecastBySku(snapshot, primaryCampaign?.skuCode);
+  const primaryForecast = findForecastBySku(snapshot, routeCampaign?.skuCode);
   const roas = totalSpend ? `${(totalRevenue / totalSpend).toFixed(1)}x` : '0x';
-  const launchRoute = primaryCampaign ? getSkuLabel(primaryCampaign.skuCode) : 'Launch route pending';
-  const launchProductName = primaryCampaign ? getSkuProductName(primaryCampaign.skuCode) : 'Product route pending';
+  const launchRoute = routeCampaign ? getSkuLabel(routeCampaign.skuCode) : 'Launch route pending';
+  const launchProductName = routeCampaign ? getSkuProductName(routeCampaign.skuCode) : 'Product route pending';
   const stockGuardrail = primaryForecast
     ? `${primaryForecast.ats} ATS / ${primaryForecast.demand7d} forecast`
     : 'Stock guardrail pending';
@@ -2959,7 +2972,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       title: 'Queue paid ad set for social + marketplace',
       plainGoal: 'Create a ready-to-review ad set from the approved launch route.',
       channel: 'TikTok + Instagram + Rakuten',
-      audience: primaryCampaign?.targetSegment || 'JP stationery buyers',
+      audience: routeCampaign?.targetSegment || 'JP stationery buyers',
       owner: 'Performance - Ken Mori',
       signal: `${formatCompactCount(totalReach)} reachable signals are available now.`,
       setup: [
@@ -2968,7 +2981,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         { label: 'Guardrail', value: stockGuardrail },
       ],
       previewTitle: 'Ad set setup',
-      previewBody: `Creative hook: Premium notebook refill bundle for teams that reorder monthly.\nAudience: ${primaryCampaign?.targetSegment || 'B2B buyers'}\nPlacement: TikTok feed, Instagram Reels, Rakuten sponsored slot.`,
+      previewBody: `Creative hook: Premium notebook refill bundle for teams that reorder monthly.\nAudience: ${routeCampaign?.targetSegment || 'B2B buyers'}\nPlacement: TikTok feed, Instagram Reels, Rakuten sponsored slot.`,
       checklist: ['Use creator proof image', 'Cap budget until stock task is clear', 'Track leads, RFQs, orders'],
       buttonLabel: 'Queue ad set',
       doneLabel: 'Ad set queued',
@@ -3062,7 +3075,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       title: 'Generate creator brief and proof script',
       plainGoal: 'Give the creator a concrete angle, shot list, CTA, and guardrail.',
       channel: 'Creator brief',
-      audience: primaryCampaign?.targetSegment || 'B2B office teams',
+      audience: routeCampaign?.targetSegment || 'B2B office teams',
       owner: 'Content Lead - Emi Kuroda',
       signal: 'Launch route needs creator proof before broader paid scale.',
       setup: [
@@ -3346,31 +3359,40 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       : towerId === 'retargeting-outreach'
         ? retargetingActions
         : campaignActions;
-  const recommendedAction = activeActions[0];
+  const queryActionHint = queryRfq
+    ? 'lead-rfq-reply-draft'
+    : queryLead
+      ? 'lead-assign-sales-owner'
+      : queryView === 'creator-proof'
+        ? 'creator-approve-asset-kit'
+        : queryCampaign
+          ? 'campaign-paid-social-adset'
+          : null;
+  const recommendedAction = activeActions.find((action) => action.id === queryActionHint) ?? activeActions[0];
   const doneCount = activeActions.filter((action) => getActionStatus(action) !== 'ready').length;
 
   const pageCopy = {
     'campaign-ops': {
-      eyebrow: 'Campaign command center',
-      title: 'Pick one seller action and open its setup.',
-      description: 'PrimeOS turns the Intelligence route into messages, ads, SEO content, or stock tasks. The details open in a setup popup so this screen stays simple.',
+      eyebrow: 'Campaigns command bar',
+      title: 'Which campaign can run safely now?',
+      description: 'Pick the next market move with audience, owner, stock guardrail, and outcome readback visible before anything scales.',
       actionTitle: 'Demand actions',
       actionDescription: 'Four complete execution paths generated from the current Intelligence route.',
-      nextHref: '/demand/lead-response-capture',
-      nextLabel: 'Open Lead Capture',
+      nextHref: DEMAND_LEADS_RFQS_HREF,
+      nextLabel: 'Open Leads & RFQs',
     },
     'content-creator-ops': {
-      eyebrow: 'Creator command center',
-      title: 'Book proof, brief it, schedule it, then reuse it.',
-      description: 'The seller can book a KOL, generate the brief, queue a livestream, or approve the asset kit from one compact workspace.',
+      eyebrow: 'Content & Social command bar',
+      title: 'Which proof should become reusable demand?',
+      description: 'Turn creator, content, and social proof into assets Campaigns can reuse across ads, marketplace, SEO, and lead capture.',
       actionTitle: 'Creator actions',
       actionDescription: 'Creator work becomes reusable proof for ads, marketplace pages, and SEO.',
-      nextHref: '/demand/campaign-ops',
-      nextLabel: 'Send Proof To Campaign Ops',
+      nextHref: DEMAND_CAMPAIGNS_HREF,
+      nextLabel: 'Send proof to Campaigns',
     },
     'lead-response-capture': {
-      eyebrow: 'Lead command center',
-      title: 'Turn every response into a buyer task.',
+      eyebrow: 'Leads & RFQs command bar',
+      title: 'Which buyer intent needs an owner now?',
       description: 'Draft replies, assign owners, queue phone/LINE follow-up, and sync context into CRM without hunting through a table.',
       actionTitle: 'Lead actions',
       actionDescription: 'Each response gets a next action, owner, SLA, and CRM memory.',
@@ -3378,8 +3400,8 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       nextLabel: 'Open CRM Compact',
     },
     'retargeting-outreach': {
-      eyebrow: 'Recovery command center',
-      title: 'Recover warm buyers without spamming them.',
+      eyebrow: 'Re-engage command bar',
+      title: 'Who can re-enter without spam?',
       description: 'Create sequences, retargeting audiences, offers, and suppression rules from the same Intelligence-backed route.',
       actionTitle: 'Recovery actions',
       actionDescription: 'Warm buyer behavior becomes a safe follow-up sequence.',
@@ -3392,14 +3414,82 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     description: 'Demand coordinates messages, ads, content, creator proof, lead response, retargeting, and stock guardrails.',
     actionTitle: 'Demand actions',
     actionDescription: 'Concrete seller actions generated from the current Intelligence route.',
-    nextHref: '/demand/campaign-ops',
-    nextLabel: 'Open Campaign Ops',
+    nextHref: DEMAND_CAMPAIGNS_HREF,
+    nextLabel: 'Open Campaigns',
   };
 
+  const demandRouteTabs = [
+    { id: 'campaign-ops', label: 'Campaigns', href: DEMAND_CAMPAIGNS_HREF, detail: 'Message, ad, SEO, stock handoff' },
+    { id: 'content-creator-ops', label: 'Content & Social', href: DEMAND_CONTENT_SOCIAL_HREF, detail: 'Creator proof, briefs, assets' },
+    { id: 'lead-response-capture', label: 'Leads & RFQs', href: DEMAND_LEADS_RFQS_HREF, detail: 'Reply, owner, SLA, CRM sync' },
+    { id: 'retargeting-outreach', label: 'Re-engage', href: DEMAND_REENGAGE_HREF, detail: 'Sequence, offer, suppression' },
+  ];
+
+  const focusedContext = queryCampaignId
+    ? {
+        label: queryCampaign ? 'Campaign focus' : 'Campaign not found',
+        value: queryCampaign?.name || queryCampaignId,
+        detail: queryCampaign ? `${queryCampaign.channel} · ${queryCampaign.targetSegment}` : 'The URL kept this campaign query, but no matching campaign exists.',
+      }
+    : queryRfqId
+      ? {
+          label: queryRfq ? 'RFQ focus' : 'RFQ not found',
+          value: queryRfq?.id.toUpperCase() || queryRfqId,
+          detail: queryRfq ? `${queryRfq.requestedBy} · ${queryRfq.quantity} units · ${queryRfq.status}` : 'The URL kept this RFQ query, but no matching RFQ exists.',
+        }
+      : queryLeadId
+        ? {
+            label: queryLead ? 'Lead focus' : 'Lead not found',
+            value: queryLead?.company || queryLeadId,
+            detail: queryLead ? `${queryLead.contact} · ${queryLead.score} score · ${queryLead.status}` : 'The URL kept this lead query, but no matching lead exists.',
+          }
+        : queryView
+          ? {
+              label: 'View focus',
+              value: queryView === 'creator-proof' ? 'Creator proof' : queryView,
+              detail: 'The route opened with a specific Demand view hint.',
+            }
+          : null;
+
+  const renderDemandRouteTabs = () => (
+    <nav aria-label="Demand tabs" className="grid gap-2 md:grid-cols-4">
+      {demandRouteTabs.map((tab) => {
+        const active = tab.id === towerId;
+        return (
+          <Link
+            key={tab.id}
+            to={tab.href}
+            aria-current={active ? 'page' : undefined}
+            className={[
+              'rounded-2xl border p-3 transition hover:border-primary/40 hover:bg-primary/5',
+              active ? 'border-primary/40 bg-primary/10 text-foreground ring-1 ring-primary/20' : 'bg-background text-muted-foreground',
+            ].join(' ')}
+          >
+            <div className="text-sm font-semibold">{tab.label}</div>
+            <div className="mt-1 line-clamp-1 text-xs">{tab.detail}</div>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  const renderFocusedContext = () => focusedContext ? (
+    <Card className="rounded-lg border border-primary/25 bg-primary/5">
+      <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{focusedContext.label}</div>
+          <div className="mt-1 truncate text-sm font-semibold">{focusedContext.value}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{focusedContext.detail}</p>
+        </div>
+        <Badge variant="outline" className="w-fit shrink-0">URL context kept</Badge>
+      </CardContent>
+    </Card>
+  ) : null;
+
   const renderProductSignal = () => (
-    <div className="rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-4">
+    <div className="rounded-lg border bg-muted/20 p-3">
       <div className="flex items-start gap-3">
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm">
           {primaryProductImage ? (
             <img src={primaryProductImage} alt={launchProductName} className="h-full w-full object-cover" />
           ) : (
@@ -3409,12 +3499,12 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           )}
         </div>
         <div className="min-w-0">
-          <Badge variant="secondary" className="rounded-full bg-background/80">From Intelligence</Badge>
-          <div className="mt-2 line-clamp-2 text-base font-semibold">{launchProductName}</div>
+          <Badge variant="secondary" className="rounded-full bg-background/80">Route product</Badge>
+          <div className="mt-2 line-clamp-2 text-sm font-semibold">{launchProductName}</div>
           <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{launchRoute}</div>
         </div>
       </div>
-      <div className="mt-3 rounded-2xl border bg-background/75 p-3 text-sm">
+      <div className="mt-3 rounded-lg border bg-background/75 p-3 text-sm">
         <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Why now</div>
         <p className="mt-1 font-medium">{topPlay?.trigger || 'Buyer signal and creator proof are aligned.'}</p>
       </div>
@@ -3439,19 +3529,33 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   );
 
   const renderHero = () => (
-    <Card className="overflow-hidden rounded-lg border shadow-sm">
-      <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-stretch">
-        {renderProductSignal()}
-        <div className="flex min-w-0 flex-col justify-between gap-4">
-          <div>
-            <Badge variant="outline" className="w-fit">{pageCopy.eyebrow}</Badge>
-            <CardTitle className="mt-3 text-3xl leading-tight">{pageCopy.title}</CardTitle>
-            <p className="mt-2 max-w-3xl text-base text-muted-foreground">{pageCopy.description}</p>
+    <section data-testid="demand-child-command-bar" className="rounded-lg border bg-card shadow-sm">
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)_auto] xl:items-center">
+        <div className="min-w-0">
+          <Badge variant="outline" className="mb-3 rounded-full">{pageCopy.eyebrow}</Badge>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{pageCopy.title}</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{pageCopy.description}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <Badge variant="outline">{doneCount}/{activeActions.length} queued</Badge>
+            <Badge variant="outline">{recommendedAction.kind}</Badge>
+            <Badge variant="outline">{stockGuardrail}</Badge>
           </div>
-          {renderSystemFlow()}
         </div>
-      </CardContent>
-    </Card>
+        {renderProductSignal()}
+        <div className="flex flex-col gap-2 xl:items-end">
+          <Button size="sm" onClick={() => setSelectedAction(recommendedAction)}>
+            Open recommended setup
+            <ArrowRight className="size-4" />
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link to={pageCopy.nextHref}>{pageCopy.nextLabel}<ArrowRight className="size-4" /></Link>
+          </Button>
+        </div>
+      </div>
+      <div className="border-t p-4">
+        {renderSystemFlow()}
+      </div>
+    </section>
   );
 
   const renderRecommendedAction = () => {
@@ -3506,36 +3610,43 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           <Badge variant="outline" className="w-fit rounded-full">{doneCount}/{activeActions.length} queued</Badge>
         </div>
       </CardHeader>
-      <CardContent className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <CardContent className="divide-y p-0">
         {activeActions.map((action) => {
           const status = getActionStatus(action);
+          const isRecommended = action.id === recommendedAction.id;
           return (
             <button
               key={action.id}
               type="button"
-              className="group flex h-full min-h-[300px] flex-col rounded-3xl border bg-background p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
+              className={[
+                'group grid w-full gap-3 p-4 text-left transition-colors hover:bg-muted/20 lg:grid-cols-[44px_minmax(0,1fr)_minmax(190px,0.45fr)_auto] lg:items-center',
+                isRecommended ? 'bg-primary/5' : '',
+              ].join(' ')}
               onClick={() => setSelectedAction(action)}
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border bg-primary/10 text-primary">{action.icon}</div>
-                <Badge variant={statusToneMap[status]} className="shrink-0 rounded-full px-3">{statusLabel[status]}</Badge>
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">{action.icon}</div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={statusToneMap[status]} className="shrink-0 rounded-full px-3">{statusLabel[status]}</Badge>
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{action.stage} · {action.kind}</span>
+                  {isRecommended ? <Badge variant="outline">Recommended</Badge> : null}
+                </div>
+                <div className="mt-2 text-base font-semibold leading-tight">
+                  <span className="line-clamp-2">{action.title}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">{action.plainGoal}</p>
               </div>
-              <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{action.stage} · {action.kind}</div>
-              <div className="mt-2 min-h-[3.5rem] text-lg font-semibold leading-tight">
-                <span className="line-clamp-2">{action.title}</span>
-              </div>
-              <p className="mt-2 min-h-[3rem] line-clamp-2 text-sm leading-6 text-muted-foreground">{action.plainGoal}</p>
-              <div className="mt-4 grid gap-2 text-xs">
-                <div className="min-w-0 rounded-2xl border bg-muted/20 px-3 py-2">
+              <div className="grid gap-2 text-xs">
+                <div className="min-w-0 rounded-lg border bg-background px-3 py-2">
                   <div className="uppercase tracking-[0.12em] text-muted-foreground">Channel</div>
                   <div className="mt-1 truncate font-medium">{action.channel}</div>
                 </div>
-                <div className="min-w-0 rounded-2xl border bg-muted/20 px-3 py-2">
+                <div className="min-w-0 rounded-lg border bg-background px-3 py-2">
                   <div className="uppercase tracking-[0.12em] text-muted-foreground">Owner</div>
                   <div className="mt-1 truncate font-medium">{action.owner}</div>
                 </div>
               </div>
-              <div className="mt-auto flex items-center justify-between pt-4 text-sm font-medium text-primary">
+              <div className="flex items-center gap-2 text-sm font-medium text-primary lg:justify-end">
                 <span>Open setup</span>
                 <ArrowRight className="size-4 transition group-hover:translate-x-1" />
               </div>
@@ -3575,14 +3686,16 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
 
       <Card className="rounded-lg border">
         <CardHeader className="pb-3">
-          <CardTitle>Execution proof</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">Enough proof to act, not a dashboard to interpret.</p>
+          <CardTitle>Proof & readback</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Enough proof to act, plus where the result goes next.</p>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <RuntimeContextCard label="Reach" value={formatCompactCount(totalReach)} detail="Traffic plus social/content signals." />
           <RuntimeContextCard label="Lead proof" value={`${totalLeads} / ${totalRfqs}`} detail="Leads and RFQs captured." />
           <RuntimeContextCard label="Revenue proof" value={`${totalOrders} orders`} detail={`${currency.format(totalRevenue)} at ${roas} ROAS.`} />
           <RuntimeContextCard label="Stock" value={stockGuardrail} detail="Guardrail before scale." />
+          <RuntimeContextCard label="Readback" value={recommendedAction.nextSystem} detail="Queued actions keep owner, source, and destination visible." />
+          <RuntimeContextCard label="Safety" value="Local draft only" detail="No email, ad, social post, creator booking, or stock mutation is sent externally." />
         </CardContent>
       </Card>
     </div>
@@ -3590,6 +3703,8 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
 
   return (
     <div className="space-y-4">
+      {renderDemandRouteTabs()}
+      {renderFocusedContext()}
       {renderHero()}
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         {renderRecommendedAction()}
@@ -3963,7 +4078,7 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
                 </Link>
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link to="/demand/lead-response-capture">
+                <Link to={DEMAND_LEADS_RFQS_HREF}>
                   Create follow-up
                   <ArrowRight className="size-4" />
                 </Link>
@@ -4225,7 +4340,7 @@ function CrmCustomerProfileDialog({
                 </div>
                 <div className="grid w-full gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
                   <Button asChild className="w-full whitespace-nowrap sm:w-auto">
-                    <Link to="/demand/lead-response-capture">Create follow-up</Link>
+                    <Link to={DEMAND_LEADS_RFQS_HREF}>Create follow-up</Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full whitespace-nowrap sm:w-auto">
                     <Link to="/intelligence/trends">Send to Trends</Link>
@@ -6084,7 +6199,7 @@ function RuntimeCreatorProfileDialog({
                       <Link to={INTELLIGENCE_DECISIONS_HREF}>Add to launch</Link>
                     </Button>
                     <Button asChild variant="outline" className="w-full sm:w-auto">
-                      <Link to="/demand/content-creator-ops">Open Creator Ops</Link>
+                      <Link to={DEMAND_CONTENT_SOCIAL_HREF}>Open Creator Ops</Link>
                     </Button>
                   </div>
                 </div>
@@ -6219,7 +6334,7 @@ function RuntimeCreatorProfileDialog({
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="w-full justify-between">
-                      <Link to="/demand/content-creator-ops">
+                      <Link to={DEMAND_CONTENT_SOCIAL_HREF}>
                         Open Content &amp; Creator Ops
                         <ArrowRight className="size-4" />
                       </Link>
@@ -6245,7 +6360,7 @@ function RuntimeCreatorProfileDialog({
 function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
   if (plan.approvalStatus === 'approved') {
     return {
-      href: '/demand/campaign-ops',
+      href: DEMAND_CAMPAIGNS_HREF,
       label: 'Send approved launch to Campaign Ops',
       shortLabel: 'Send',
       detail: 'This launch is already approved and ready for demand execution.',
@@ -6254,7 +6369,7 @@ function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
 
   if (plan.approvalStatus === 'review') {
     return {
-      href: '/demand/content-creator-ops',
+      href: DEMAND_CONTENT_SOCIAL_HREF,
       label: 'Open Content & Creator Ops',
       shortLabel: 'Review',
       detail: 'This launch still needs execution context before it can move live.',
@@ -6398,7 +6513,7 @@ function CompactCreatorsRuntimePanel({
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link to="/demand/content-creator-ops">
+              <Link to={DEMAND_CONTENT_SOCIAL_HREF}>
                 Open Creator Ops
                 <ArrowRight className="size-4" />
               </Link>
@@ -7428,15 +7543,15 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   signals: { decide: 'Which signals are real enough to become action?', handoff: 'Convert validated evidence into a launch, fix, follow-up, or suppression decision.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   creators: { decide: 'Which creator should help sell this product?', handoff: 'PrimeOS explains the fit and sends the best route into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   customers: { decide: 'Pick the customer trend to activate now.', handoff: 'Send the trend into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
-  campaigns: { decide: 'Launch, review, hold, or no-go?', handoff: 'If Go, send it to Campaign Ops. If not, clear the one blocker.', handoffHref: '/demand/campaign-ops' },
+  campaigns: { decide: 'Launch, review, hold, or no-go?', handoff: 'If Go, send it to Campaign Ops. If not, clear the one blocker.', handoffHref: DEMAND_CAMPAIGNS_HREF },
   analytics: { decide: 'Where is my funnel breaking and what is working?', handoff: 'Findings feed into Launch Decisions and AI Operator.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   attribution: { decide: 'Which channel is actually driving orders, not just clicks?', handoff: 'Attribution data guides approval inside Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
-  forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: '/demand/campaign-ops' },
-  voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: '/demand/campaign-ops' },
+  forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: DEMAND_CAMPAIGNS_HREF },
+  voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: DEMAND_CAMPAIGNS_HREF },
   alerts: { decide: 'What needs my attention right now across the entire system?', handoff: 'Each alert links to the responsible tower for resolution.', handoffHref: '/intelligence/ai-operator' },
   'ai-operator': { decide: 'What should the system do next based on everything it knows?', handoff: 'Recommendations route to the tower that owns the action.', handoffHref: '/overview' },
-  'campaign-ops': { decide: 'What should the seller execute now: message, ad, SEO content, or stock task?', handoff: 'Executed actions create leads, RFQs, creator work, and Ecom guardrails.', handoffHref: '/demand/lead-response-capture' },
-  'content-creator-ops': { decide: 'Which KOL, brief, live slot, or asset kit should be created now?', handoff: 'Approved proof feeds Campaign Ops, ads, SEO, and marketplace content.', handoffHref: '/demand/campaign-ops' },
+  'campaign-ops': { decide: 'What should the seller execute now: message, ad, SEO content, or stock task?', handoff: 'Executed actions create leads, RFQs, creator work, and Ecom guardrails.', handoffHref: DEMAND_LEADS_RFQS_HREF },
+  'content-creator-ops': { decide: 'Which KOL, brief, live slot, or asset kit should be created now?', handoff: 'Approved proof feeds Campaign Ops, ads, SEO, and marketplace content.', handoffHref: DEMAND_CAMPAIGNS_HREF },
   'lead-response-capture': { decide: 'Which buyer needs a reply, owner, phone follow-up, or CRM sync now?', handoff: 'Qualified intent becomes CRM memory, quote work, and repeat outreach.', handoffHref: '/customer/crm-compact' },
   'retargeting-outreach': { decide: 'Which warm buyer should receive a sequence, retargeting ad, offer, or suppression?', handoff: 'Recovered buyers move into CRM Compact and order loops.', handoffHref: '/customer/crm-compact' },
   'crm-compact': { decide: 'Which customer record needs follow-up, ownership, or service attention next?', handoff: 'Customer memory feeds Trends Intelligence for smarter targeting.', handoffHref: '/intelligence/trends' },
@@ -7453,33 +7568,207 @@ export function PrimeDemandHubPage() {
   const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
   const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
   const totalOrders = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.orders, 0);
+  const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
+  const totalRevenue = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.revenue, 0);
   const openRfqs = snapshot.rfqs.filter((rfq) => rfq.status !== 'converted').length;
+  const openLeads = snapshot.leads.filter((lead) => lead.status !== 'converted').length;
   const reengageEligible = snapshot.activationPlays.length;
   const sourceVolume = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
-  const blockedGuardrails = snapshot.forecasts.filter((forecast) => forecast.risk === 'high').length + snapshot.tickets.filter((ticket) => ticket.status !== 'resolved').length;
+  const highRiskForecasts = snapshot.forecasts.filter((forecast) => forecast.risk === 'high');
+  const openTickets = snapshot.tickets.filter((ticket) => ticket.status !== 'resolved');
+  const blockedGuardrails = highRiskForecasts.length + openTickets.length;
   const primaryCampaign = snapshot.campaigns[0];
   const primaryPlay = snapshot.activationPlays[0];
+  const topForecast = highRiskForecasts[0] ?? snapshot.forecasts.find((forecast) => forecast.risk === 'medium') ?? snapshot.forecasts[0];
+  const topLead = [...snapshot.leads].sort((left, right) => right.score - left.score)[0];
+  const topRfq = snapshot.rfqs.find((rfq) => rfq.status !== 'converted') ?? snapshot.rfqs[0];
+  const responseBacklog = openLeads + openRfqs;
+  const leadToOrderRate = snapshot.metrics.leadToOrderRate;
+  const hubReadiness = Math.max(42, Math.min(94, 60 + activeCampaigns * 6 + Math.min(16, leadToOrderRate) - blockedGuardrails * 7));
+  const hubStatus = blockedGuardrails ? 'Watch guardrails' : 'Ready to scale';
 
-  const evidence: EvidenceItem[] = [
+  const healthCards = [
     {
-      label: 'Source',
-      value: `${formatCompactCount(sourceVolume)} signals`,
-      detail: `${snapshot.socialStreams.length} acquisition/content sources are feeding Demand.`,
+      label: 'Source quality',
+      value: formatCompactCount(sourceVolume),
+      meta: `${snapshot.socialStreams.length} tracked origins`,
+      icon: <Globe className="size-5" />,
       tone: 'info',
     },
     {
-      label: 'Response',
-      value: `${totalLeads} leads / ${totalRfqs} RFQs`,
-      detail: 'Lead and RFQ intent is read from the same campaign backbone.',
+      label: 'Campaign readiness',
+      value: `${activeCampaigns}/${snapshot.campaigns.length}`,
+      meta: primaryCampaign ? primaryCampaign.name : 'No campaign route',
+      icon: <Megaphone className="size-5" />,
+      tone: 'purple',
+    },
+    {
+      label: 'Response queue',
+      value: responseBacklog,
+      meta: `${openLeads} leads, ${openRfqs} RFQs open`,
+      icon: <UserRoundCheck className="size-5" />,
       tone: 'success',
     },
     {
-      label: 'Guardrail',
-      value: blockedGuardrails ? `${blockedGuardrails} blockers` : 'Clear',
-      detail: blockedGuardrails ? 'COS stock or service context must stay visible before scale.' : 'No high-risk blocker in the current route.',
+      label: 'Re-engage safety',
+      value: reengageEligible,
+      meta: 'Warm-buyer plays with suppression',
+      icon: <Target className="size-5" />,
+      tone: 'warning',
+    },
+    {
+      label: 'Outcome readback',
+      value: `${totalOrders} orders`,
+      meta: currency.format(totalRevenue),
+      icon: <ClipboardList className="size-5" />,
       tone: blockedGuardrails ? 'warning' : 'success',
     },
+  ] as const;
+
+  const priorityMoves = [
+    topForecast && topForecast.risk === 'high' ? {
+      id: `guardrail-${topForecast.id}`,
+      severity: 'Critical',
+      label: 'Guardrail',
+      title: `Pause scale until ${topForecast.skuCode} stock is safe`,
+      detail: `${topForecast.ats} ATS vs ${topForecast.demand7d} projected demand. ${topForecast.suggestedAction}`,
+      owner: 'Demand + Ecom',
+      href: '/ecom/cos/inventory-brain',
+      cta: 'Check stock',
+      evidence: 'COS guardrail',
+    } : null,
+    primaryCampaign ? {
+      id: `campaign-${primaryCampaign.id}`,
+      severity: blockedGuardrails ? 'Watch' : 'Ready',
+      label: 'Campaign',
+      title: `Review ${primaryCampaign.name}`,
+      detail: `${primaryCampaign.targetSegment} through ${primaryCampaign.channel}; ${primaryCampaign.leads} leads, ${primaryCampaign.rfqs} RFQs, ${primaryCampaign.orders} orders.`,
+      owner: 'Campaigns',
+      href: DEMAND_CAMPAIGNS_HREF,
+      cta: 'Open campaigns',
+      evidence: `${formatCompactCount(primaryCampaign.traffic)} traffic`,
+    } : null,
+    topRfq ? {
+      id: `rfq-${topRfq.id}`,
+      severity: topRfq.status === 'draft' ? 'Watch' : 'Ready',
+      label: 'Response',
+      title: `Read ${topRfq.requestedBy} RFQ`,
+      detail: `${topRfq.quantity} units, ${currency.format(topRfq.value)}, status ${topRfq.status}.`,
+      owner: 'Leads & RFQs',
+      href: `${DEMAND_LEADS_RFQS_HREF}?rfq=${encodeURIComponent(topRfq.id)}`,
+      cta: 'Open RFQ',
+      evidence: 'Buyer intent',
+    } : null,
+    primaryPlay ? {
+      id: `play-${primaryPlay.id}`,
+      severity: 'Ready',
+      label: 'Re-entry',
+      title: primaryPlay.audience,
+      detail: `${primaryPlay.nextBestAction} Projected lift ${primaryPlay.projectedLift}%.`,
+      owner: 'Re-engage',
+      href: DEMAND_REENGAGE_HREF,
+      cta: 'Open play',
+      evidence: primaryPlay.trigger,
+    } : null,
+  ].filter(Boolean) as Array<{
+    id: string;
+    severity: 'Critical' | 'Watch' | 'Ready';
+    label: string;
+    title: string;
+    detail: string;
+    owner: string;
+    href: string;
+    cta: string;
+    evidence: string;
+  }>;
+
+  const pipelineSteps = [
+    {
+      label: 'Sources',
+      value: formatCompactCount(sourceVolume),
+      detail: 'Find origin quality before adding spend.',
+      href: '/demand/sources',
+      icon: <Globe className="size-4" />,
+    },
+    {
+      label: 'Campaigns',
+      value: String(activeCampaigns),
+      detail: 'Package objective, audience, offer, guardrail.',
+      href: DEMAND_CAMPAIGNS_HREF,
+      icon: <Megaphone className="size-4" />,
+    },
+    {
+      label: 'Content',
+      value: `${snapshot.socialStreams.length} streams`,
+      detail: 'Turn proof into assets and CTAs.',
+      href: DEMAND_CONTENT_SOCIAL_HREF,
+      icon: <PenLine className="size-4" />,
+    },
+    {
+      label: 'Leads/RFQs',
+      value: String(responseBacklog),
+      detail: 'Assign owner, SLA, CRM handoff.',
+      href: DEMAND_LEADS_RFQS_HREF,
+      icon: <UserRoundCheck className="size-4" />,
+    },
+    {
+      label: 'Re-engage',
+      value: String(reengageEligible),
+      detail: 'Recover warm buyers with suppression.',
+      href: DEMAND_REENGAGE_HREF,
+      icon: <Target className="size-4" />,
+    },
   ];
+
+  const guardrails = [
+    {
+      label: 'Stock',
+      value: topForecast ? `${topForecast.ats}/${topForecast.demand7d}` : 'Clear',
+      detail: topForecast ? `${topForecast.skuCode} is ${topForecast.risk} risk.` : 'No inventory guardrail detected.',
+      tone: topForecast?.risk === 'high' ? 'destructive' : topForecast?.risk === 'medium' ? 'secondary' : 'outline',
+    },
+    {
+      label: 'Service',
+      value: openTickets.length ? `${openTickets.length} open` : 'Clear',
+      detail: openTickets[0]?.subject || 'No service issue blocks outreach.',
+      tone: openTickets.length ? 'secondary' : 'outline',
+    },
+    {
+      label: 'Suppression',
+      value: reengageEligible ? 'On' : 'Pending',
+      detail: 'Converted buyers, open cases, and assigned RFQs stay excluded.',
+      tone: 'outline',
+    },
+  ] as const;
+
+  const evidence = [
+    {
+      label: 'Source proof',
+      value: `${formatCompactCount(totalTraffic)} campaign traffic`,
+      meta: `${formatCompactCount(sourceVolume)} source signals feeding Demand.`,
+    },
+    {
+      label: 'Response proof',
+      value: `${totalLeads} leads / ${totalRfqs} RFQs`,
+      meta: topLead ? `${topLead.company} is top scored at ${topLead.score}.` : 'No lead scored yet.',
+    },
+    {
+      label: 'Outcome proof',
+      value: `${totalOrders} orders`,
+      meta: `${currency.format(totalRevenue)} read back to Intelligence.`,
+    },
+    {
+      label: 'Next handoff',
+      value: blockedGuardrails ? 'Fix guardrail' : 'Scale campaign',
+      meta: blockedGuardrails ? 'Keep COS/customer context visible before scale.' : 'Demand can push the current route safely.',
+    },
+  ];
+
+  const severityClass = (severity: 'Critical' | 'Watch' | 'Ready') => {
+    if (severity === 'Critical') return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300';
+    if (severity === 'Watch') return 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+    return 'border-emerald-500/30 bg-background text-emerald-700 dark:text-emerald-300';
+  };
 
   const loop: OperatingLoopStep[] = [
     {
@@ -7514,32 +7803,44 @@ export function PrimeDemandHubPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <div className="space-y-6 p-4 md:p-6">
-        <DecisionHeader
-          eyebrow="Demand Area operating workspace"
-          title="Demand Hub"
-          description="Coordinate sources, campaigns, content, leads/RFQs, and re-engagement from one growth-input loop."
-          confidence={blockedGuardrails ? 78 : 86}
-          status={blockedGuardrails ? 'Watch guardrails' : 'Ready'}
-          actions={(
-            <>
-              <Button asChild>
-                <Link to="/demand/campaigns">
-                  Open Campaigns
+      <div className="space-y-4 p-4 md:p-6">
+        <section data-testid="demand-command-bar" className="rounded-lg border bg-card shadow-sm">
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.68fr)_auto] lg:items-center">
+            <div className="min-w-0">
+              <Badge variant="outline" className="mb-3 rounded-full">Demand Command Bar</Badge>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Demand Hub</h1>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                Decide which source, campaign, content, lead/RFQ, or re-entry move should run next, with guardrails visible before scale.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                <span>{hubReadiness}% readiness</span>
+                <span className="text-muted-foreground">/</span>
+                <span>{priorityMoves.length} moves</span>
+                <span className="text-muted-foreground">/</span>
+                <span>{blockedGuardrails} guardrails</span>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                {hubStatus}: {totalLeads} leads, {totalRfqs} RFQs, {totalOrders} orders read back from Demand.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button asChild size="sm">
+                <Link to="#priority-demand-queue">
+                  Open priority queue
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button asChild size="sm" variant="outline">
                 <Link to="/intelligence/launch-decisions">
                   Start from Intelligence
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-            </>
-          )}
-          evidence={evidence}
-          variant="compact"
-        />
+            </div>
+          </div>
+        </section>
 
         <LinkedEntityStrip
           entities={[
@@ -7551,54 +7852,135 @@ export function PrimeDemandHubPage() {
         />
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <SummaryMetricCard label="Active campaigns" value={activeCampaigns} meta="Planned demand pushes." icon={<Megaphone className="size-5" />} tone="purple" />
-          <SummaryMetricCard label="Source signals" value={formatCompactCount(sourceVolume)} meta="Acquisition/content intent." icon={<Globe className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Open leads/RFQs" value={openRfqs + totalLeads} meta="Needs owner/SLA." icon={<UserRoundCheck className="size-5" />} tone="success" />
-          <SummaryMetricCard label="Re-engage plays" value={reengageEligible} meta="Warm buyer routes." icon={<Target className="size-5" />} tone="warning" />
-          <SummaryMetricCard label="Guardrails" value={blockedGuardrails} meta="Stock/service blockers." icon={<ClipboardList className="size-5" />} tone={blockedGuardrails ? 'warning' : 'success'} />
+          {healthCards.map((card) => (
+            <SummaryMetricCard key={card.label} label={card.label} value={card.value} meta={card.meta} icon={card.icon} tone={card.tone} />
+          ))}
         </div>
 
-        <OperatingLoop steps={loop} />
-
-        <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Today demand moves</CardTitle>
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+          <Card id="priority-demand-queue" className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardList className="size-5" />
+                    Priority Demand Queue
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Ranked by guardrail risk, buyer intent, and next owner clarity.
+                  </p>
+                </div>
+                <Badge variant="outline" className="w-fit">{priorityMoves.length} moves</Badge>
+              </div>
             </CardHeader>
-            <CardContent className="grid gap-3">
-              {[
-                {
-                  label: 'Launch move',
-                  title: primaryCampaign?.name || 'Campaign route pending',
-                  detail: `${primaryCampaign?.targetSegment || 'Target audience'} · ${primaryCampaign ? getSkuLabel(primaryCampaign.skuCode) : 'SKU pending'}`,
-                  href: '/demand/campaigns',
-                },
-                {
-                  label: 'Response move',
-                  title: `${openRfqs} RFQs need commercial read`,
-                  detail: 'Draft reply, assign owner, and sync CRM memory before intent cools.',
-                  href: '/demand/leads-rfqs',
-                },
-                {
-                  label: 'Recovery move',
-                  title: primaryPlay?.audience || 'Warm buyer recovery',
-                  detail: primaryPlay?.nextBestAction || 'Use suppression before outreach.',
-                  href: '/demand/re-engage',
-                },
-              ].map((move) => (
-                <Link key={move.label} to={move.href} className="block rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
-                  <div className="text-metadata">{move.label}</div>
-                  <div className="mt-1 text-sm font-semibold">{move.title}</div>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{move.detail}</p>
+            <CardContent className="divide-y p-0">
+              {priorityMoves.map((move, index) => (
+                <Link key={move.id} to={move.href} className="grid gap-3 p-4 transition-colors hover:bg-muted/20 lg:grid-cols-[44px_minmax(0,1fr)_auto] lg:items-center">
+                  <div className="flex size-9 items-center justify-center rounded-lg border bg-background text-sm font-semibold">
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className={severityClass(move.severity)}>{move.severity}</Badge>
+                      <Badge variant="outline">{move.owner}</Badge>
+                      <span className="text-xs text-muted-foreground">{move.label}</span>
+                    </div>
+                    <h2 className="mt-2 text-base font-semibold leading-tight">{move.title}</h2>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{move.detail}</p>
+                    <div className="mt-3 line-clamp-1 text-xs text-muted-foreground">Evidence: {move.evidence}</div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-medium text-primary lg:justify-end">
+                    <span>{move.cta}</span>
+                    <ArrowRight className="size-4" />
+                  </div>
                 </Link>
               ))}
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Outcome readback</CardTitle>
+          <aside className="space-y-4">
+            <Card className="rounded-lg border shadow-sm">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ScanSearch className="size-4" />
+                  Guardrail Rail
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="divide-y p-0">
+                {guardrails.map((item) => (
+                  <div key={item.label} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold">{item.label}</div>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                      </div>
+                      <Badge variant={item.tone} className="shrink-0">{item.value}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg border shadow-sm">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <PanelsTopLeft className="size-4" />
+                  Demand Pipeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 p-3">
+                {pipelineSteps.map((step) => (
+                  <Link key={step.label} to={step.href} className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">{step.icon}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold">{step.label}</div>
+                        <div className="shrink-0 text-xs text-muted-foreground">{step.value}</div>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{step.detail}</p>
+                    </div>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          </aside>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+          <Card className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <RadioTower className="size-4" />
+                Growth Input Loop
+              </CardTitle>
             </CardHeader>
+            <CardContent className="p-4">
+              <OperatingLoop steps={loop} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ClipboardList className="size-4" />
+                Evidence Stack
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+              {evidence.map((item) => (
+                <EvidenceCard key={item.label} label={item.label} value={item.value} meta={item.meta} />
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        <Card className="rounded-lg border shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp className="size-4" />
+              Outcome Readback
+            </CardTitle>
+          </CardHeader>
             <CardContent>
               <Table variant="embedded">
                 <TableHeader>
@@ -7624,7 +8006,6 @@ export function PrimeDemandHubPage() {
               </Table>
             </CardContent>
           </Card>
-        </section>
       </div>
     </div>
   );
