@@ -1,0 +1,1590 @@
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  AlertTriangle,
+  Building2,
+  CircleUserRound,
+  CopyCheck,
+  Mail,
+  MapPin,
+  PackageCheck,
+  Phone,
+  Plus,
+  ReceiptText,
+  Search,
+  ShieldCheck,
+  ShoppingBag,
+  Tag,
+  Truck,
+  UserRoundCheck,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
+import { useToast } from '@/hooks/use-toast';
+import type { PrimeSnapshot } from '@/lib/prime/prime-data';
+import {
+  buildCustomerProfileFloor,
+  detectIdentityMatches,
+  filterCustomerAccounts,
+  getAccountMatches,
+  type AccountStatus,
+  type ContactRole,
+  type CustomerAccount,
+  type CustomerAccountFilters,
+  type CustomerContact,
+  type CustomerLifecycle,
+  type CustomerOwner,
+  type CustomerTag,
+  type CustomerType,
+  type FutureModulePlaceholder,
+  type IdentityMatch,
+  type PreferredChannel,
+} from '@/lib/prime/customer-profile-floor';
+
+type AccountFormState = Pick<CustomerAccount,
+  'companyName' | 'displayName' | 'customerType' | 'lifecycle' | 'status' | 'ownerId' | 'primaryEmail' | 'website' | 'industry' | 'country' | 'source'
+>;
+
+type ContactFormState = Pick<CustomerContact,
+  'fullName' | 'title' | 'role' | 'email' | 'phone' | 'preferredChannel' | 'isPrimary'
+>;
+
+type CustomerSubFloor = 'overview' | 'account' | 'identity' | 'tags';
+
+const currency = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 });
+
+const lifecycleOptions: Array<{ value: CustomerLifecycle; label: string }> = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'prospect', label: 'Prospect' },
+  { value: 'active', label: 'Active' },
+  { value: 'retention', label: 'Retention' },
+  { value: 'at_risk', label: 'At risk' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
+const customerTypeOptions: Array<{ value: CustomerType; label: string }> = [
+  { value: 'b2b', label: 'B2B' },
+  { value: 'marketplace', label: 'Marketplace buyer' },
+  { value: 'distributor', label: 'Distributor' },
+  { value: 'creator', label: 'Creator' },
+];
+
+const customerTypeLabels: Record<CustomerType, string> = {
+  b2b: 'B2B',
+  marketplace: 'Marketplace buyer',
+  distributor: 'Distributor',
+  creator: 'Creator',
+};
+
+function normalizeCustomerAccount(account: CustomerAccount): CustomerAccount {
+  if ((account.customerType as string) !== 'b2c') return account;
+
+  return {
+    ...account,
+    customerType: 'marketplace',
+    tags: Array.from(new Set(account.tags.map((tagId) => tagId === 'tag-b2c' ? 'tag-marketplace-buyer' : tagId))),
+    industry: account.industry === 'Consumer commerce' ? 'Marketplace commerce' : account.industry,
+    profile: account.profile ? {
+      ...account.profile,
+      segmentLabel: 'Marketplace buyer',
+      buyingIntent: account.profile.buyingIntent.replace(/^Consumer purchase profile/, 'Marketplace purchase profile'),
+    } : account.profile,
+  };
+}
+
+const contactRoleOptions: Array<{ value: ContactRole; label: string }> = [
+  { value: 'decision_maker', label: 'Decision maker' },
+  { value: 'buyer', label: 'Buyer' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'ops', label: 'Operations' },
+  { value: 'support', label: 'Support' },
+  { value: 'other', label: 'Other' },
+];
+
+const channelOptions: Array<{ value: PreferredChannel; label: string }> = [
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'line', label: 'LINE' },
+  { value: 'zalo', label: 'Zalo' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+];
+
+const defaultFilters: CustomerAccountFilters = {
+  query: '',
+  tagId: 'all',
+  ownerId: 'all',
+  lifecycle: 'all',
+  customerType: 'all',
+};
+
+const customerSubFloors: Array<{ id: CustomerSubFloor; label: string; detail: string }> = [
+  { id: 'overview', label: 'Overview', detail: 'Floor health, next actions, and profile readiness.' },
+  { id: 'account', label: 'Account Profile', detail: 'Account list, profile, ownership, lifecycle, and contacts.' },
+  { id: 'identity', label: 'Identity Matching', detail: 'Duplicate account/contact review queue.' },
+  { id: 'tags', label: 'Customer Tags', detail: 'Segment tags and account assignment.' },
+];
+
+function resolveSubFloor(value: string | null): CustomerSubFloor {
+  if (value === 'account' || value === 'contact') return 'account';
+  if (value === 'identity' || value === 'tags') return value;
+  return 'overview';
+}
+
+function humanize(value: string) {
+  return value.replace(/_/g, ' ');
+}
+
+function lifecycleBadgeVariant(lifecycle: CustomerLifecycle) {
+  if (lifecycle === 'at_risk' || lifecycle === 'inactive') return 'warning';
+  if (lifecycle === 'lead' || lifecycle === 'prospect') return 'secondary';
+  return 'default';
+}
+
+function accountStatusVariant(status: AccountStatus) {
+  if (status === 'watch') return 'warning';
+  if (status === 'archived') return 'secondary';
+  return 'outline';
+}
+
+function ownerName(owners: CustomerOwner[], ownerId: string) {
+  return owners.find((owner) => owner.id === ownerId)?.name ?? 'Unassigned';
+}
+
+function tagById(tags: CustomerTag[], tagId: string) {
+  return tags.find((tag) => tag.id === tagId);
+}
+
+function makeBlankAccountForm(ownerId: string): AccountFormState {
+  return {
+    companyName: '',
+    displayName: '',
+    customerType: 'b2b',
+    lifecycle: 'prospect',
+    status: 'active',
+    ownerId,
+    primaryEmail: '',
+    website: '',
+    industry: '',
+    country: 'Japan',
+    source: 'Manual CRM entry',
+  };
+}
+
+function formFromAccount(account: CustomerAccount): AccountFormState {
+  return {
+    companyName: account.companyName,
+    displayName: account.displayName,
+    customerType: account.customerType,
+    lifecycle: account.lifecycle,
+    status: account.status,
+    ownerId: account.ownerId,
+    primaryEmail: account.primaryEmail,
+    website: account.website,
+    industry: account.industry,
+    country: account.country,
+    source: account.source,
+  };
+}
+
+function makeBlankContactForm(): ContactFormState {
+  return {
+    fullName: '',
+    title: '',
+    role: 'buyer',
+    email: '',
+    phone: '',
+    preferredChannel: 'email',
+    isPrimary: false,
+  };
+}
+
+function buildAccountFromForm(form: AccountFormState, tags: string[] = []): CustomerAccount {
+  const suffix = Date.now().toString(36);
+  return {
+    id: `acct-manual-${suffix}`,
+    accountCode: `ACC-${suffix.toUpperCase().slice(-5)}`,
+    companyName: form.companyName,
+    displayName: form.displayName || form.companyName,
+    customerType: form.customerType,
+    lifecycle: form.lifecycle,
+    status: form.status,
+    ownerId: form.ownerId,
+    tags,
+    primaryEmail: form.primaryEmail,
+    website: form.website,
+    industry: form.industry,
+    country: form.country,
+    source: form.source,
+    revenue: 0,
+    orderCount: 0,
+    identityCompleteness: Math.min(92, 52 + (form.primaryEmail ? 12 : 0) + (form.website ? 12 : 0) + (form.industry ? 8 : 0)),
+    notes: ['Created in Customer Profile Floor mock state'],
+  };
+}
+
+function resolveAccountIdFromCustomerParam(accounts: CustomerAccount[], customerParam: string | null) {
+  if (!customerParam) return accounts[0]?.id ?? '';
+  return accounts.find((account) => account.id === customerParam)?.id
+    ?? accounts.find((account) => account.id === `acct-${customerParam}`)?.id
+    ?? accounts.find((account) => account.accountCode === customerParam)?.id
+    ?? accounts[0]?.id
+    ?? '';
+}
+
+export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) {
+  const seed = useMemo(() => buildCustomerProfileFloor(snapshot), [snapshot]);
+  const normalizedSeedAccounts = useMemo(() => seed.accounts.map(normalizeCustomerAccount), [seed.accounts]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const customerParam = searchParams.get('customer');
+  const activeSubFloor = resolveSubFloor(searchParams.get('floor'));
+  const { toast } = useToast();
+  const [accounts, setAccounts] = useState(normalizedSeedAccounts);
+  const [contacts, setContacts] = useState(seed.contacts);
+  const [selectedAccountId, setSelectedAccountId] = useState(() => resolveAccountIdFromCustomerParam(normalizedSeedAccounts, customerParam));
+  const [filters, setFilters] = useState<CustomerAccountFilters>(defaultFilters);
+  const [accountDialogMode, setAccountDialogMode] = useState<'create' | 'edit' | null>(null);
+  const [accountForm, setAccountForm] = useState<AccountFormState>(() => makeBlankAccountForm(seed.owners[0]?.id ?? ''));
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [contactForm, setContactForm] = useState<ContactFormState>(() => makeBlankContactForm());
+  const [tagToAdd, setTagToAdd] = useState('none');
+  const requestedAccountId = useMemo(() => resolveAccountIdFromCustomerParam(accounts, customerParam), [accounts, customerParam]);
+
+  useEffect(() => {
+    setAccounts((current) => current.map(normalizeCustomerAccount));
+  }, []);
+
+  useEffect(() => {
+    setAccounts(normalizedSeedAccounts);
+  }, [normalizedSeedAccounts]);
+
+  const matches = useMemo(() => detectIdentityMatches(accounts, contacts), [accounts, contacts]);
+  const filteredAccounts = useMemo(() => filterCustomerAccounts(accounts, seed.tags, filters), [accounts, filters, seed.tags]);
+  const selectedAccount = filteredAccounts.find((account) => account.id === selectedAccountId) ?? filteredAccounts[0] ?? null;
+  const selectedAccountRecord = accounts.find((account) => account.id === selectedAccountId) ?? accounts[0] ?? null;
+  const selectedRecordContacts = selectedAccountRecord ? contacts.filter((contact) => contact.accountId === selectedAccountRecord.id) : [];
+  const selectedRecordMatches = selectedAccountRecord ? getAccountMatches(matches, selectedAccountRecord, contacts) : [];
+  const atRiskCount = accounts.filter((account) => account.lifecycle === 'at_risk' || account.status === 'watch').length;
+  const ownerCoverage = accounts.length ? Math.round((accounts.filter((account) => Boolean(account.ownerId)).length / accounts.length) * 100) : 0;
+  const primaryContactCoverage = accounts.length ? Math.round((accounts.filter((account) => contacts.some((contact) => contact.accountId === account.id && contact.isPrimary)).length / accounts.length) * 100) : 0;
+
+  useEffect(() => {
+    if (!customerParam) return;
+    if (!requestedAccountId) return;
+    setSelectedAccountId(requestedAccountId);
+    setFilters(defaultFilters);
+  }, [customerParam, requestedAccountId]);
+
+  useEffect(() => {
+    if (filteredAccounts.length === 0) return;
+    if (filteredAccounts.some((account) => account.id === selectedAccountId)) return;
+    setSelectedAccountId(filteredAccounts[0].id);
+  }, [filteredAccounts, selectedAccountId]);
+
+  function setActiveSubFloor(subFloor: CustomerSubFloor) {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('floor', subFloor);
+    setSearchParams(nextParams);
+  }
+
+  function openCreateAccount() {
+    setAccountForm(makeBlankAccountForm(seed.owners[0]?.id ?? ''));
+    setAccountDialogMode('create');
+  }
+
+  function openAccountProfile(account: CustomerAccount) {
+    setSelectedAccountId(account.id);
+    setProfileDialogOpen(true);
+  }
+
+  function openEditAccount(account: CustomerAccount) {
+    setAccountForm(formFromAccount(account));
+    setAccountDialogMode('edit');
+  }
+
+  function saveAccount() {
+    if (!accountForm.companyName.trim() || !accountForm.primaryEmail.trim()) {
+      toast({ title: 'Account needs a company and email' });
+      return;
+    }
+
+    if (accountDialogMode === 'create') {
+      const nextAccount = buildAccountFromForm(accountForm, ['tag-identity-review']);
+      setAccounts((current) => [nextAccount, ...current]);
+      setSelectedAccountId(nextAccount.id);
+      toast({ title: 'Account created in mock CRM floor' });
+    }
+
+    if (accountDialogMode === 'edit' && selectedAccountRecord) {
+      setAccounts((current) => current.map((account) => account.id === selectedAccountRecord.id ? {
+        ...account,
+        ...accountForm,
+        displayName: accountForm.displayName || accountForm.companyName,
+        identityCompleteness: Math.min(98, account.identityCompleteness + 4),
+      } : account));
+      toast({ title: 'Account updated' });
+    }
+
+    setAccountDialogMode(null);
+  }
+
+  function openCreateContact() {
+    setEditingContactId(null);
+    setContactForm(makeBlankContactForm());
+    setContactDialogOpen(true);
+  }
+
+  function openEditContact(contact: CustomerContact) {
+    setEditingContactId(contact.id);
+    setContactForm({
+      fullName: contact.fullName,
+      title: contact.title,
+      role: contact.role,
+      email: contact.email,
+      phone: contact.phone,
+      preferredChannel: contact.preferredChannel,
+      isPrimary: contact.isPrimary,
+    });
+    setContactDialogOpen(true);
+  }
+
+  function saveContact() {
+    if (!selectedAccountRecord || !contactForm.fullName.trim() || !contactForm.email.trim()) {
+      toast({ title: 'Contact needs a name and email' });
+      return;
+    }
+
+    setContacts((current) => {
+      const normalized = contactForm.isPrimary
+        ? current.map((contact) => contact.accountId === selectedAccountRecord.id ? { ...contact, isPrimary: false } : contact)
+        : current;
+
+      if (editingContactId) {
+        return normalized.map((contact) => contact.id === editingContactId ? { ...contact, ...contactForm } : contact);
+      }
+
+      return [
+        ...normalized,
+        {
+          id: `contact-${selectedAccountRecord.id}-${Date.now().toString(36)}`,
+          accountId: selectedAccountRecord.id,
+          ...contactForm,
+        },
+      ];
+    });
+
+    toast({ title: editingContactId ? 'Contact updated' : 'Contact added' });
+    setContactDialogOpen(false);
+  }
+
+  function makePrimaryContact(contactId: string) {
+    if (!selectedAccountRecord) return;
+
+    setContacts((current) => current.map((contact) => contact.accountId === selectedAccountRecord.id
+      ? { ...contact, isPrimary: contact.id === contactId }
+      : contact));
+    toast({ title: 'Primary contact updated' });
+  }
+
+  function addTagToSelectedAccount() {
+    if (!selectedAccountRecord || tagToAdd === 'none' || selectedAccountRecord.tags.includes(tagToAdd)) return;
+
+    setAccounts((current) => current.map((account) => account.id === selectedAccountRecord.id
+      ? { ...account, tags: [...account.tags, tagToAdd] }
+      : account));
+    setTagToAdd('none');
+  }
+
+  function removeTagFromSelectedAccount(tagId: string) {
+    if (!selectedAccountRecord) return;
+
+    setAccounts((current) => current.map((account) => account.id === selectedAccountRecord.id
+      ? { ...account, tags: account.tags.filter((id) => id !== tagId) }
+      : account));
+  }
+
+  return (
+    <div className="space-y-4" data-testid="customer-profile-floor">
+      <CustomerSubFloorNav
+        activeSubFloor={activeSubFloor}
+        onChange={setActiveSubFloor}
+        counts={{
+          overview: `${ownerCoverage}%`,
+          account: accounts.length,
+          identity: matches.length,
+          tags: seed.tags.length,
+        }}
+      />
+
+      {activeSubFloor === 'overview' ? (
+        <OverviewSubFloor
+          accountsCount={accounts.length}
+          filteredAccountsCount={filteredAccounts.length}
+          ownerCoverage={ownerCoverage}
+          primaryContactCoverage={primaryContactCoverage}
+          identityAlertsCount={matches.length}
+          atRiskCount={atRiskCount}
+          onOpenSubFloor={setActiveSubFloor}
+        />
+      ) : (
+        <SubFloorPageHeader activeSubFloor={activeSubFloor} />
+      )}
+
+      {activeSubFloor === 'account' ? (
+      <section data-testid="account-subfloor">
+        <Card className="rounded-lg border">
+          <CardHeader className="space-y-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <CardTitle>Account list</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Search and filter the customer identity layer before deals, quotes, orders, or intelligence connect.</p>
+              </div>
+              <Button onClick={openCreateAccount}>
+                <Plus className="size-4" />
+                Create account
+              </Button>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <div className="relative xl:col-span-2">
+                <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+                <Input
+                  value={filters.query}
+                  onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+                  placeholder="Search account, code, email..."
+                  className="pl-9"
+                />
+              </div>
+              <FilterSelect label="Tag" value={filters.tagId} onValueChange={(tagId) => setFilters((current) => ({ ...current, tagId }))}>
+                <SelectItem value="all">All tags</SelectItem>
+                {seed.tags.map((tag) => <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>)}
+              </FilterSelect>
+              <FilterSelect label="Owner" value={filters.ownerId} onValueChange={(ownerId) => setFilters((current) => ({ ...current, ownerId }))}>
+                <SelectItem value="all">All owners</SelectItem>
+                {seed.owners.map((owner) => <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>)}
+              </FilterSelect>
+              <FilterSelect label="Lifecycle" value={filters.lifecycle} onValueChange={(lifecycle) => setFilters((current) => ({ ...current, lifecycle }))}>
+                <SelectItem value="all">All lifecycle</SelectItem>
+                {lifecycleOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </FilterSelect>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              <FilterSelect label="Customer type" value={filters.customerType} onValueChange={(customerType) => setFilters((current) => ({ ...current, customerType }))}>
+                <SelectItem value="all">All customer types</SelectItem>
+                {customerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </FilterSelect>
+              <Button variant="outline" onClick={() => setFilters(defaultFilters)}>
+                Reset filters
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="hidden lg:block">
+              <Table variant="embedded">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>EC channel</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Lifecycle</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Contacts</TableHead>
+                    <TableHead className="text-right">Completeness</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAccounts.map((account) => {
+                    const accountContacts = contacts.filter((contact) => contact.accountId === account.id);
+                    const primaryContact = accountContacts.find((contact) => contact.isPrimary);
+
+                    return (
+                      <TableRow
+                        key={account.id}
+                        className={`cursor-pointer transition-colors hover:bg-muted/50 ${selectedAccount?.id === account.id ? 'bg-primary/5' : ''}`}
+                        onClick={() => openAccountProfile(account)}
+                      >
+                        <TableCell>
+                          <button
+                            type="button"
+                            className="min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openAccountProfile(account);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <CustomerAvatar account={account} size="sm" />
+                              <div className="min-w-0">
+                                <div className="font-medium">{account.displayName}</div>
+                                <div className="text-xs text-muted-foreground">{account.accountCode} · {account.primaryEmail}</div>
+                              </div>
+                            </div>
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{account.profile?.primaryEcomChannel ?? account.source}</div>
+                          <div className="text-xs text-muted-foreground">{account.profile?.channelOrderRef ?? 'No channel ref'}</div>
+                        </TableCell>
+                        <TableCell>{customerTypeLabels[account.customerType]}</TableCell>
+                        <TableCell>
+                          <Badge variant={lifecycleBadgeVariant(account.lifecycle)} className="capitalize">{humanize(account.lifecycle)}</Badge>
+                        </TableCell>
+                        <TableCell>{ownerName(seed.owners, account.ownerId)}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{accountContacts.length}</div>
+                          <div className="text-xs text-muted-foreground">{primaryContact?.fullName ?? 'No primary contact'}</div>
+                        </TableCell>
+                        <TableCell className="text-right">{account.identityCompleteness}%</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openAccountProfile(account);
+                            }}
+                          >
+                            Open profile
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="grid gap-3 lg:hidden">
+              {filteredAccounts.map((account) => {
+                const accountContacts = contacts.filter((contact) => contact.accountId === account.id);
+                const primaryContact = accountContacts.find((contact) => contact.isPrimary);
+
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    className={`rounded-lg border p-3 text-left ${selectedAccount?.id === account.id ? 'border-primary bg-primary/5' : 'bg-card'}`}
+                    onClick={() => openAccountProfile(account)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <CustomerAvatar account={account} size="sm" />
+                        <div className="min-w-0">
+                          <div className="font-medium">{account.displayName}</div>
+                          <div className="text-xs text-muted-foreground">{account.accountCode} · {account.primaryEmail}</div>
+                        </div>
+                      </div>
+                      <Badge variant={lifecycleBadgeVariant(account.lifecycle)} className="capitalize">{humanize(account.lifecycle)}</Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                      <span>Owner: {ownerName(seed.owners, account.ownerId)}</span>
+                      <span>Identity: {account.identityCompleteness}%</span>
+                      <span>Contacts: {accountContacts.length}</span>
+                      <span>Primary: {primaryContact?.fullName ?? 'Missing'}</span>
+                      <span>EC channel: {account.profile?.primaryEcomChannel ?? account.source}</span>
+                      <span>Phone: {account.profile?.phone ?? 'No phone'}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {filteredAccounts.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No accounts match the current filters.
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </section>
+      ) : null}
+
+      {activeSubFloor === 'identity' ? (
+        <IdentityMatchingSubFloor
+          account={selectedAccountRecord}
+          accounts={accounts}
+          contacts={contacts}
+          owners={seed.owners}
+          matches={matches}
+          selectedMatches={selectedRecordMatches}
+          selectedAccountId={selectedAccountId}
+          onSelectAccount={setSelectedAccountId}
+        />
+      ) : null}
+
+      {activeSubFloor === 'tags' ? (
+        <CustomerTagsSubFloor
+          account={selectedAccountRecord}
+          accounts={accounts}
+          owners={seed.owners}
+          tags={seed.tags}
+          selectedAccountId={selectedAccountId}
+          tagToAdd={tagToAdd}
+          onSelectAccount={setSelectedAccountId}
+          onTagToAddChange={setTagToAdd}
+          onAddTag={addTagToSelectedAccount}
+          onRemoveTag={removeTagFromSelectedAccount}
+        />
+      ) : null}
+
+      <AccountEditorDialog
+        mode={accountDialogMode}
+        form={accountForm}
+        owners={seed.owners}
+        onFormChange={setAccountForm}
+        onOpenChange={(open) => {
+          if (!open) setAccountDialogMode(null);
+        }}
+        onSave={saveAccount}
+      />
+
+      <AccountProfileDialog
+        open={profileDialogOpen}
+        account={selectedAccountRecord}
+        contacts={selectedRecordContacts}
+        owners={seed.owners}
+        tags={seed.tags}
+        futureModules={seed.futureModules}
+        onOpenChange={setProfileDialogOpen}
+        onEditAccount={() => {
+          if (!selectedAccountRecord) return;
+          setProfileDialogOpen(false);
+          openEditAccount(selectedAccountRecord);
+        }}
+        onAddContact={() => {
+          setProfileDialogOpen(false);
+          openCreateContact();
+        }}
+        onEditContact={(contact) => {
+          setProfileDialogOpen(false);
+          openEditContact(contact);
+        }}
+        onMakePrimaryContact={makePrimaryContact}
+      />
+
+      <ContactEditorDialog
+        open={contactDialogOpen}
+        editing={Boolean(editingContactId)}
+        form={contactForm}
+        onFormChange={setContactForm}
+        onOpenChange={setContactDialogOpen}
+        onSave={saveContact}
+      />
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onValueChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger aria-label={label}>
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent>
+        {children}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function OverviewSubFloor({
+  accountsCount,
+  filteredAccountsCount,
+  ownerCoverage,
+  primaryContactCoverage,
+  identityAlertsCount,
+  atRiskCount,
+  onOpenSubFloor,
+}: {
+  accountsCount: number;
+  filteredAccountsCount: number;
+  ownerCoverage: number;
+  primaryContactCoverage: number;
+  identityAlertsCount: number;
+  atRiskCount: number;
+  onOpenSubFloor: (subFloor: CustomerSubFloor) => void;
+}) {
+  return (
+    <section className="space-y-4" data-testid="overview-subfloor">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Accounts" value={accountsCount} meta={`${filteredAccountsCount} visible after filters.`} icon={<Building2 className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Owner coverage" value={`${ownerCoverage}%`} meta="Every account needs a relationship owner." icon={<UserRoundCheck className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Primary contacts" value={`${primaryContactCoverage}%`} meta="Primary buyer/contact coverage." icon={<CircleUserRound className="size-5" />} tone="purple" />
+        <SummaryMetricCard label="Identity alerts" value={identityAlertsCount} meta={`${atRiskCount} account records on watch.`} icon={<CopyCheck className="size-5" />} tone={identityAlertsCount ? 'warning' : 'success'} />
+      </div>
+
+      <Card className="rounded-lg border">
+        <CardHeader>
+          <CardTitle>Customer Profile overview</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            This overview tracks profile readiness only. Open a sub-page to manage accounts, contacts, duplicate review, or tags.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {customerSubFloors.filter((subFloor) => subFloor.id !== 'overview').map((subFloor) => (
+            <button
+              key={subFloor.id}
+              type="button"
+              className="rounded-lg border bg-muted/20 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              onClick={() => onOpenSubFloor(subFloor.id)}
+            >
+              <div className="text-sm font-semibold">{subFloor.label}</div>
+              <div className="mt-2 text-xs leading-5 text-muted-foreground">{subFloor.detail}</div>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function SubFloorPageHeader({ activeSubFloor }: { activeSubFloor: Exclude<CustomerSubFloor, 'overview'> }) {
+  const subFloor = customerSubFloors.find((item) => item.id === activeSubFloor);
+
+  return (
+    <section className="rounded-lg border bg-card p-4" data-testid="customer-subfloor-page-header">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Customer Profile Floor</div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-normal">{subFloor?.label}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{subFloor?.detail}</p>
+        </div>
+        <Badge variant="outline">Sub-page</Badge>
+      </div>
+    </section>
+  );
+}
+
+function CustomerSubFloorNav({
+  activeSubFloor,
+  onChange,
+  counts,
+}: {
+  activeSubFloor: CustomerSubFloor;
+  onChange: (subFloor: CustomerSubFloor) => void;
+  counts: Record<CustomerSubFloor, number | string>;
+}) {
+  return (
+    <nav aria-label="Customer Profile sub-pages" className="overflow-x-auto rounded-lg border bg-card p-1" data-testid="customer-subfloor-nav">
+      <div className="flex min-w-max gap-1">
+      {customerSubFloors.map((subFloor) => (
+        <button
+          key={subFloor.id}
+          type="button"
+          aria-current={activeSubFloor === subFloor.id ? 'page' : undefined}
+          title={subFloor.detail}
+          className={`inline-flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeSubFloor === subFloor.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+          onClick={() => onChange(subFloor.id)}
+        >
+          <span>{subFloor.label}</span>
+          <Badge variant={activeSubFloor === subFloor.id ? 'secondary' : 'outline'}>{counts[subFloor.id]}</Badge>
+        </button>
+      ))}
+      </div>
+    </nav>
+  );
+}
+
+function AccountSelector({
+  accounts,
+  owners,
+  selectedAccountId,
+  onSelectAccount,
+}: {
+  accounts: CustomerAccount[];
+  owners: CustomerOwner[];
+  selectedAccountId: string;
+  onSelectAccount: (accountId: string) => void;
+}) {
+  return (
+    <Select value={selectedAccountId} onValueChange={onSelectAccount}>
+      <SelectTrigger aria-label="Select account">
+        <SelectValue placeholder="Select account" />
+      </SelectTrigger>
+      <SelectContent>
+        {accounts.map((account) => (
+          <SelectItem key={account.id} value={account.id}>
+            {account.displayName} · {ownerName(owners, account.ownerId)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function IdentityMatchingSubFloor({
+  account,
+  accounts,
+  contacts,
+  owners,
+  matches,
+  selectedMatches,
+  selectedAccountId,
+  onSelectAccount,
+}: {
+  account: CustomerAccount | null;
+  accounts: CustomerAccount[];
+  contacts: CustomerContact[];
+  owners: CustomerOwner[];
+  matches: IdentityMatch[];
+  selectedMatches: IdentityMatch[];
+  selectedAccountId: string;
+  onSelectAccount: (accountId: string) => void;
+}) {
+  return (
+    <section className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]" data-testid="identity-subfloor">
+      <Card className="rounded-lg border">
+        <CardHeader>
+          <CardTitle>Identity Matching</CardTitle>
+          <p className="text-sm text-muted-foreground">Review-only duplicate detection. No merge is executed here.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <AccountSelector accounts={accounts} owners={owners} selectedAccountId={selectedAccountId} onSelectAccount={onSelectAccount} />
+          <SmallMetric label="Total alerts" value={String(matches.length)} />
+          <SmallMetric label="Selected account alerts" value={String(selectedMatches.length)} />
+          {account ? <SmallMetric label="Account" value={account.displayName} /> : null}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-lg border">
+        <CardHeader>
+          <CardTitle>Duplicate review queue</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Potential duplicate account/contact warnings with confidence and matching reasons.</p>
+        </CardHeader>
+        <CardContent>
+          <IdentityMatchAlerts matches={selectedMatches} accounts={accounts} contacts={contacts} />
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function CustomerTagsSubFloor({
+  account,
+  accounts,
+  owners,
+  tags,
+  selectedAccountId,
+  tagToAdd,
+  onSelectAccount,
+  onTagToAddChange,
+  onAddTag,
+  onRemoveTag,
+}: {
+  account: CustomerAccount | null;
+  accounts: CustomerAccount[];
+  owners: CustomerOwner[];
+  tags: CustomerTag[];
+  selectedAccountId: string;
+  tagToAdd: string;
+  onSelectAccount: (accountId: string) => void;
+  onTagToAddChange: (tagId: string) => void;
+  onAddTag: () => void;
+  onRemoveTag: (tagId: string) => void;
+}) {
+  return (
+    <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]" data-testid="tags-subfloor">
+      <Card className="rounded-lg border">
+        <CardHeader>
+          <CardTitle>Customer Tags</CardTitle>
+          <p className="text-sm text-muted-foreground">Assign seeded segment tags. Tag taxonomy is local mock state in V1.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <AccountSelector accounts={accounts} owners={owners} selectedAccountId={selectedAccountId} onSelectAccount={onSelectAccount} />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Select value={tagToAdd} onValueChange={onTagToAddChange}>
+              <SelectTrigger aria-label="Add customer tag">
+                <SelectValue placeholder="Choose tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Choose tag</SelectItem>
+                {tags.filter((tag) => !account?.tags.includes(tag.id)).map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={onAddTag} disabled={!account}>Add tag</Button>
+          </div>
+          <div className="grid gap-2">
+            {account?.tags.map((tagId) => {
+              const tag = tagById(tags, tagId);
+              if (!tag) return null;
+              return (
+                <div key={tag.id} className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3">
+                  <Badge variant="outline" className={tag.colorClass}>{tag.label}</Badge>
+                  <Button size="sm" variant="outline" onClick={() => onRemoveTag(tag.id)}>Remove</Button>
+                </div>
+              );
+            })}
+            {account && account.tags.length === 0 ? <EmptyBlock text="No tags assigned to this account." /> : null}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-lg border">
+        <CardHeader>
+          <CardTitle>Tag taxonomy</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Categories and segment usage placeholders for later Demand/Intelligence integration.</p>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          {tags.map((tag) => (
+            <div key={tag.id} className="rounded-lg border bg-muted/20 p-3">
+              <Badge variant="outline" className={tag.colorClass}>{tag.label}</Badge>
+              <div className="mt-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">{tag.category}</div>
+              <div className="mt-2 text-sm text-muted-foreground">{tag.usage}</div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function AccountProfileDialog({
+  open,
+  account,
+  contacts,
+  owners,
+  tags,
+  futureModules,
+  onOpenChange,
+  onEditAccount,
+  onAddContact,
+  onEditContact,
+  onMakePrimaryContact,
+}: {
+  open: boolean;
+  account: CustomerAccount | null;
+  contacts: CustomerContact[];
+  owners: CustomerOwner[];
+  tags: CustomerTag[];
+  futureModules: FutureModulePlaceholder[];
+  onOpenChange: (open: boolean) => void;
+  onEditAccount: () => void;
+  onAddContact: () => void;
+  onEditContact: (contact: CustomerContact) => void;
+  onMakePrimaryContact: (contactId: string) => void;
+}) {
+  if (!account) return null;
+
+  const primaryContact = contacts.find((contact) => contact.isPrimary);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-5xl overflow-y-auto" data-testid="account-profile-dialog">
+        <DialogHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <CustomerAvatar account={account} size="lg" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Customer Profile Floor</Badge>
+                <Badge variant={accountStatusVariant(account.status)} className="capitalize">{account.status}</Badge>
+              </div>
+              <DialogTitle className="mt-3 text-2xl">{account.displayName}</DialogTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {account.accountCode} · {account.industry} · {account.country}
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={onEditAccount}>Edit account</Button>
+          </div>
+          <DialogDescription>
+            Account identity, ownership, lifecycle, contacts, and future module placeholders in one record view.
+          </DialogDescription>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {account.tags.map((tagId) => {
+              const tag = tagById(tags, tagId);
+              if (!tag) return null;
+              return <Badge key={tag.id} variant="outline" className={tag.colorClass}>{tag.label}</Badge>;
+            })}
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <IdentityFact icon={<Building2 className="size-4" />} label="Company" value={account.companyName} detail={account.website} />
+          <IdentityFact icon={<UserRoundCheck className="size-4" />} label="Owner" value={ownerName(owners, account.ownerId)} detail="Relationship owner" />
+          <IdentityFact icon={<ShieldCheck className="size-4" />} label="Identity completeness" value={`${account.identityCompleteness}%`} detail="Profile, owner, contact, and source coverage" />
+          <IdentityFact icon={<Mail className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.email ?? 'Add a primary contact'} />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <SmallMetric label="Lifecycle" value={humanize(account.lifecycle)} />
+          <SmallMetric label="Customer type" value={customerTypeLabels[account.customerType]} />
+          <SmallMetric label="Revenue read" value={currency.format(account.revenue)} />
+        </div>
+
+        {account.profile ? <CustomerPortraitSection account={account} /> : null}
+
+        <section className="rounded-lg border">
+          <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold">Contacts</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Primary indicator, role, email, phone, and communication preference.</p>
+            </div>
+            <Button onClick={onAddContact}>
+              <Plus className="size-4" />
+              Add contact
+            </Button>
+          </div>
+          <div className="grid gap-3 p-4">
+            {contacts.map((contact) => (
+              <ContactCard key={contact.id} contact={contact} onEdit={() => onEditContact(contact)} onMakePrimary={() => onMakePrimaryContact(contact.id)} />
+            ))}
+            {contacts.length === 0 ? <EmptyBlock text="No contacts yet. Add a primary buyer before connecting Demand or RFQ flows." /> : null}
+          </div>
+        </section>
+
+        <div className="grid gap-3">
+          <div>
+            <div className="text-sm font-medium">Profile notes</div>
+            <p className="text-xs text-muted-foreground">Account and contact identity live together here. Identity matching and tags remain separate review workspaces.</p>
+          </div>
+          <div className="grid gap-2">
+            {account.notes.map((note) => (
+              <div key={note} className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{note}</div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <div className="text-sm font-medium">Future links</div>
+            <p className="text-xs text-muted-foreground">Read-only placeholders. These modules are not owned by Customer Profile Floor V1.</p>
+          </div>
+          <FutureModulePlaceholders modules={futureModules} />
+        </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CustomerAvatar({ account, size }: { account: CustomerAccount; size: 'sm' | 'lg' }) {
+  const profile = account.profile;
+  const name = profile?.customerName ?? account.displayName;
+  const sizeClass = size === 'lg' ? 'size-16' : 'size-10';
+  const textClass = size === 'lg' ? 'text-base' : 'text-xs';
+
+  if (account.customerType === 'b2b') {
+    return (
+      <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200`}>
+        <Building2 className={size === 'lg' ? 'size-8' : 'size-5'} aria-hidden="true" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 ${textClass} font-semibold text-primary`}>
+      <span>{initials(name)}</span>
+      {profile?.avatarUrl ? (
+        <img
+          src={profile.avatarUrl}
+          alt={`${name} profile image`}
+          className="absolute inset-0 size-full object-cover"
+          loading="lazy"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CustomerPortraitSection({ account }: { account: CustomerAccount }) {
+  const profile = account.profile;
+  if (!profile) return null;
+
+  return (
+    <section className="rounded-lg border" data-testid="customer-portrait-section">
+      <div className="border-b p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <CustomerAvatar account={account} size="lg" />
+            <div className="min-w-0">
+            <h3 className="text-base font-semibold">Customer portrait</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{profile.profileSummary}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline">{profile.primaryEcomChannel}</Badge>
+              {profile.channelMix.map((channel) => <Badge key={channel} variant="secondary">{channel}</Badge>)}
+            </div>
+            </div>
+          </div>
+          <Badge variant="outline">{profile.segmentLabel}</Badge>
+        </div>
+      </div>
+      <div className="grid gap-3 p-4 lg:grid-cols-3">
+        <PortraitBlock
+          icon={<CircleUserRound className="size-4" />}
+          label="Identity"
+          title={profile.customerName}
+          lines={[profile.customerEmail, profile.phone, profile.buyingIntent]}
+        />
+        <PortraitBlock
+          icon={<MapPin className="size-4" />}
+          label="Address"
+          title={profile.location}
+          lines={[profile.shippingAddress, `Postal: ${profile.postalCode || 'N/A'}`]}
+        />
+        <PortraitBlock
+          icon={<ReceiptText className="size-4" />}
+          label="EC channel"
+          title={profile.primaryEcomChannel}
+          lines={[`Channel ref: ${profile.channelOrderRef ?? 'N/A'}`, `Campaign: ${profile.sourceCampaignName}`, `Campaign channel: ${profile.sourceCampaignChannel}`]}
+        />
+        <PortraitBlock
+          icon={<ReceiptText className="size-4" />}
+          label="COS readback"
+          title={profile.lastOrderId ?? 'No order yet'}
+          lines={[`${profile.lastOrderStatus} · ${profile.lastLifecycleStage}`, `Tracking: ${profile.trackingNumber ?? 'N/A'}`, profile.cosReadiness]}
+        />
+        <PortraitBlock
+          icon={<ShoppingBag className="size-4" />}
+          label="Buying value"
+          title={formatMoney(account.revenue, profile.lastOrderCurrency)}
+          lines={[`${account.orderCount} orders`, `${formatMoney(profile.averageOrderValue, profile.lastOrderCurrency)} AOV`, `${profile.totalUnits} units`]}
+        />
+        <PortraitBlock
+          icon={<Truck className="size-4" />}
+          label="Fulfillment"
+          title={profile.preferredShipping}
+          lines={[`Warehouse: ${profile.warehouseId ?? 'N/A'}`, `Last order: ${profile.lastOrderDate ? formatProfileDate(profile.lastOrderDate) : 'N/A'}`, `Shipping fee: ${formatMoney(profile.shippingValue, profile.lastOrderCurrency)}`]}
+        />
+      </div>
+
+      <div className="grid gap-3 border-t p-4 lg:grid-cols-2">
+        <DetailList
+          title="Customer fields"
+          items={[
+            ['Name', profile.customerName],
+            ['Email', profile.customerEmail],
+            ['Phone', profile.phone],
+            ['City', profile.city],
+            ['Prefecture', profile.prefecture || 'N/A'],
+            ['Country', profile.country],
+            ['Shipping address', profile.shippingAddress],
+          ]}
+        />
+        <DetailList
+          title="EC / COS order fields"
+          items={[
+            ['Primary EC channel', profile.primaryEcomChannel],
+            ['EC channel mix', profile.channelMix.join(', ') || 'N/A'],
+            ['Channel order ref', profile.channelOrderRef ?? 'N/A'],
+            ['Last order total', formatMoney(profile.lastOrderValue, profile.lastOrderCurrency)],
+            ['Subtotal', formatMoney(profile.subtotalValue, profile.lastOrderCurrency)],
+            ['Discount', formatMoney(profile.discountValue, profile.lastOrderCurrency)],
+            ['Tracking number', profile.trackingNumber ?? 'N/A'],
+          ]}
+        />
+        <ProductAffinityList products={profile.favoriteProducts} currencyCode={profile.lastOrderCurrency} />
+        <RecentOrdersList orders={profile.recentOrders} />
+        <RecentEventsList events={profile.recentEvents} />
+        <PortraitBlock
+          icon={<AlertTriangle className="size-4" />}
+          label="Service / risk"
+          title={profile.riskSignal}
+          lines={[
+            `${profile.openServiceCaseCount}/${profile.serviceCaseCount} open service cases`,
+            profile.latestServiceCase,
+            profile.riskFlags.length ? `Risk flags: ${profile.riskFlags.join(', ')}` : 'No risk flags',
+            'CRM owns identity only; COS remains order source.',
+          ]}
+        />
+      </div>
+
+      <div className="grid gap-3 border-t p-4 lg:grid-cols-2">
+        <TextStack title="Customer timeline" lines={profile.timeline} />
+        <TextStack title="Profile notes" lines={account.notes} />
+      </div>
+    </section>
+  );
+}
+
+function DetailList({ title, items }: { title: string; items: Array<[string, string]> }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="text-sm font-medium">{title}</div>
+      <div className="mt-3 grid gap-2">
+        {items.map(([label, value]) => (
+          <div key={label} className="grid gap-1 text-xs sm:grid-cols-[130px_minmax(0,1fr)]">
+            <div className="text-muted-foreground">{label}</div>
+            <div className="min-w-0 break-words font-medium">{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProductAffinityList({ products, currencyCode }: { products: NonNullable<CustomerAccount['profile']>['favoriteProducts']; currencyCode: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <PackageCheck className="size-4" />
+        Product affinity
+      </div>
+      <div className="mt-3 grid gap-2">
+        {products.length ? products.map((product) => (
+          <div key={`${product.productName}-${product.sku}`} className="rounded-md border bg-background p-2">
+            <div className="text-sm font-medium">{product.productName}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{product.sku} · {product.quantity} units · {formatMoney(product.revenue, currencyCode)}</div>
+          </div>
+        )) : <div className="text-xs text-muted-foreground">No product affinity yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function RecentOrdersList({ orders }: { orders: NonNullable<CustomerAccount['profile']>['recentOrders'] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="text-sm font-medium">Recent orders</div>
+      <div className="mt-3 grid gap-2">
+        {orders.length ? orders.map((order) => (
+          <div key={order.orderNumber} className="rounded-md border bg-background p-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium">{order.orderNumber}</div>
+              <Badge variant="outline">{order.channel}</Badge>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">{order.status} · {order.lifecycleStage} · {formatMoney(order.total, order.currency)} · {formatProfileDate(order.orderDate)}</div>
+            <div className="mt-1 text-xs text-muted-foreground">Tracking: {order.trackingNumber ?? 'N/A'}</div>
+          </div>
+        )) : <div className="text-xs text-muted-foreground">No COS order linked yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function RecentEventsList({ events }: { events: NonNullable<CustomerAccount['profile']>['recentEvents'] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="text-sm font-medium">Recent COS events</div>
+      <div className="mt-3 grid gap-2">
+        {events.length ? events.map((event) => (
+          <div key={`${event.eventType}-${event.createdAt}-${event.message}`} className="rounded-md border bg-background p-2">
+            <div className="text-sm font-medium">{event.eventType}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{event.message}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{event.actorType} · {formatProfileDate(event.createdAt)}</div>
+          </div>
+        )) : <div className="text-xs text-muted-foreground">No COS event captured yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function TextStack({ title, lines }: { title: string; lines: string[] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="text-sm font-medium">{title}</div>
+      <div className="mt-3 grid gap-2">
+        {lines.length ? lines.map((line) => (
+          <div key={line} className="rounded-md border bg-background p-2 text-xs text-muted-foreground">{line}</div>
+        )) : <div className="text-xs text-muted-foreground">No entries yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function PortraitBlock({ icon, label, title, lines }: { icon: ReactNode; label: string; title: string; lines: string[] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-2 min-w-0 break-words text-sm font-medium">{title}</div>
+      <div className="mt-2 space-y-1">
+        {lines.filter(Boolean).map((line) => (
+          <div key={line} className="min-w-0 break-words text-xs text-muted-foreground">{line}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function IdentityFact({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-2 min-w-0 break-words text-sm font-medium">{value}</div>
+      <div className="mt-1 min-w-0 break-words text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function SmallMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-background p-3">
+      <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-sm font-medium capitalize">{value}</div>
+    </div>
+  );
+}
+
+function ContactCard({ contact, onEdit, onMakePrimary }: { contact: CustomerContact; onEdit: () => void; onMakePrimary: () => void }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-medium">{contact.fullName}</div>
+            {contact.isPrimary ? <Badge>Primary</Badge> : null}
+            <Badge variant="outline" className="capitalize">{humanize(contact.role)}</Badge>
+          </div>
+          <div className="mt-1 text-sm text-muted-foreground">{contact.title}</div>
+          <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+            <span className="inline-flex min-w-0 items-center gap-2"><Mail className="size-3" /> <span className="truncate">{contact.email}</span></span>
+            <span className="inline-flex min-w-0 items-center gap-2"><Phone className="size-3" /> <span className="truncate">{contact.phone}</span></span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!contact.isPrimary ? <Button size="sm" variant="outline" onClick={onMakePrimary}>Make primary</Button> : null}
+          <Button size="sm" variant="outline" onClick={onEdit}>Edit</Button>
+        </div>
+      </div>
+      <div className="mt-3 text-xs text-muted-foreground">Preferred channel: <span className="font-medium capitalize text-foreground">{contact.preferredChannel}</span></div>
+    </div>
+  );
+}
+
+function IdentityMatchAlerts({ matches, accounts, contacts }: { matches: IdentityMatch[]; accounts: CustomerAccount[]; contacts: CustomerContact[] }) {
+  if (matches.length === 0) return <EmptyBlock text="No duplicate account or contact warnings for this account." />;
+
+  return (
+    <div className="grid gap-3">
+      {matches.map((match) => {
+        const entityName = getMatchEntityName(match.entityType, match.entityId, accounts, contacts);
+        const candidateName = getMatchEntityName(match.entityType, match.candidateId, accounts, contacts);
+        return (
+          <div key={match.id} className="rounded-lg border border-warning/30 bg-warning/10 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <AlertTriangle className="size-4 text-warning" />
+                  Potential duplicate {match.entityType}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">{entityName} may match {candidateName}.</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {match.reasons.map((reason) => <Badge key={`${match.id}-${reason}`} variant="outline">{reason}</Badge>)}
+                </div>
+              </div>
+              <div className="shrink-0 text-sm font-semibold">{match.confidence}%</div>
+            </div>
+            <div className="mt-3 rounded-lg border bg-background/70 p-3 text-xs text-muted-foreground">
+              Merge suggestion only. No merge action runs in Customer Profile Floor V1.
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function getMatchEntityName(entityType: IdentityMatch['entityType'], id: string, accounts: CustomerAccount[], contacts: CustomerContact[]) {
+  if (entityType === 'account') return accounts.find((account) => account.id === id)?.displayName ?? id;
+  return contacts.find((contact) => contact.id === id)?.fullName ?? id;
+}
+
+function initials(value: string) {
+  return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'CP';
+}
+
+function formatProfileDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+}
+
+function formatMoney(amount: number, currencyCode: string) {
+  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: currencyCode || 'JPY', maximumFractionDigits: 0 }).format(amount);
+}
+
+function FutureModulePlaceholders({ modules }: { modules: FutureModulePlaceholder[] }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {modules.map((module) => (
+        <div key={module.id} className="rounded-lg border bg-muted/20 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">{module.label}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{module.detail}</div>
+            </div>
+            <Badge variant={module.status === 'not_connected' ? 'secondary' : 'outline'}>{module.owner}</Badge>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyBlock({ text }: { text: string }) {
+  return <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{text}</div>;
+}
+
+function AccountEditorDialog({
+  mode,
+  form,
+  owners,
+  onFormChange,
+  onOpenChange,
+  onSave,
+}: {
+  mode: 'create' | 'edit' | null;
+  form: AccountFormState;
+  owners: CustomerOwner[];
+  onFormChange: (form: AccountFormState) => void;
+  onOpenChange: (open: boolean) => void;
+  onSave: () => void;
+}) {
+  return (
+    <Dialog open={Boolean(mode)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Create account' : 'Edit account'}</DialogTitle>
+          <DialogDescription>Manage customer identity, ownership, lifecycle, and profile basics only.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextField label="Company name" value={form.companyName} onChange={(companyName) => onFormChange({ ...form, companyName })} />
+          <TextField label="Display name" value={form.displayName} onChange={(displayName) => onFormChange({ ...form, displayName })} />
+          <TextField label="Primary email" value={form.primaryEmail} onChange={(primaryEmail) => onFormChange({ ...form, primaryEmail })} />
+          <TextField label="Website" value={form.website} onChange={(website) => onFormChange({ ...form, website })} />
+          <TextField label="Industry" value={form.industry} onChange={(industry) => onFormChange({ ...form, industry })} />
+          <TextField label="Country" value={form.country} onChange={(country) => onFormChange({ ...form, country })} />
+          <TextField label="Source" value={form.source} onChange={(source) => onFormChange({ ...form, source })} />
+          <SelectField label="Owner" value={form.ownerId} onValueChange={(ownerId) => onFormChange({ ...form, ownerId })}>
+            {owners.map((owner) => <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>)}
+          </SelectField>
+          <SelectField label="Customer type" value={form.customerType} onValueChange={(customerType) => onFormChange({ ...form, customerType: customerType as CustomerType })}>
+            {customerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+          </SelectField>
+          <SelectField label="Lifecycle" value={form.lifecycle} onValueChange={(lifecycle) => onFormChange({ ...form, lifecycle: lifecycle as CustomerLifecycle })}>
+            {lifecycleOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+          </SelectField>
+          <SelectField label="Status" value={form.status} onValueChange={(status) => onFormChange({ ...form, status: status as AccountStatus })}>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="watch">Watch</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={onSave}>{mode === 'create' ? 'Create account' : 'Save changes'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ContactEditorDialog({
+  open,
+  editing,
+  form,
+  onFormChange,
+  onOpenChange,
+  onSave,
+}: {
+  open: boolean;
+  editing: boolean;
+  form: ContactFormState;
+  onFormChange: (form: ContactFormState) => void;
+  onOpenChange: (open: boolean) => void;
+  onSave: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{editing ? 'Edit contact' : 'Add contact'}</DialogTitle>
+          <DialogDescription>Contacts stay under the selected account. Outreach automation comes later.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextField label="Full name" value={form.fullName} onChange={(fullName) => onFormChange({ ...form, fullName })} />
+          <TextField label="Title" value={form.title} onChange={(title) => onFormChange({ ...form, title })} />
+          <TextField label="Email" value={form.email} onChange={(email) => onFormChange({ ...form, email })} />
+          <TextField label="Phone" value={form.phone} onChange={(phone) => onFormChange({ ...form, phone })} />
+          <SelectField label="Role" value={form.role} onValueChange={(role) => onFormChange({ ...form, role: role as ContactRole })}>
+            {contactRoleOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+          </SelectField>
+          <SelectField label="Preferred channel" value={form.preferredChannel} onValueChange={(preferredChannel) => onFormChange({ ...form, preferredChannel: preferredChannel as PreferredChannel })}>
+            {channelOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+          </SelectField>
+          <button
+            type="button"
+            className={`rounded-lg border p-3 text-left text-sm ${form.isPrimary ? 'border-primary bg-primary/10' : 'bg-muted/20'}`}
+            onClick={() => onFormChange({ ...form, isPrimary: !form.isPrimary })}
+          >
+            <div className="font-medium">Primary contact</div>
+            <div className="mt-1 text-xs text-muted-foreground">Only one primary contact is allowed per account.</div>
+          </button>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={onSave}>{editing ? 'Save contact' : 'Add contact'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
+function SelectField({ label, value, onValueChange, children }: { label: string; value: string; onValueChange: (value: string) => void; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {children}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}

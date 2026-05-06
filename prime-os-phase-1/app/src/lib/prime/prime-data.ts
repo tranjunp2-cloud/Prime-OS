@@ -293,10 +293,10 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   'crm-compact': {
     id: 'crm-compact',
     area: 'Customer Area',
-    tower: 'CRM Compact',
-    promise: 'Manage customer records, ownership, follow-up, timeline, service memory, and B2B context in one compact workbench.',
-    reuseSource: 'New Prime OS wrapper, derived from COS orders, returns, and generated leads.',
-    floors: ['Record list', 'Owner', 'Follow-up queue', 'Timeline', 'Notes', 'Service memory', 'B2B account extension'],
+    tower: 'CRM Tower',
+    promise: 'Manage the Customer Profile Floor: accounts, contacts, owners, lifecycle, tags, and identity matching before heavier CRM workflows connect.',
+    reuseSource: 'New Prime OS wrapper, seeded from COS orders, returns, and generated leads.',
+    floors: ['Customer Profile', 'Account', 'Contact', 'Identity Matching', 'Customer Tags'],
   },
   service: {
     id: 'service',
@@ -488,6 +488,50 @@ function buildCampaigns(products: Product[], orders: Order[], inventoryPositions
 
 function buildCustomers(orders: Order[], campaigns: PrimeCampaign[]): PrimeCustomer[] {
   const customerMap = new Map<string, PrimeCustomer>();
+  const b2bFactoryAccounts: PrimeCustomer[] = [
+    {
+      id: 'cust_osaka_factory_supply',
+      name: 'Haruto Nakamura',
+      company: 'Osaka Factory Supply Works',
+      email: 'procurement@osaka-factory.example',
+      segment: 'B2B replenishment',
+      lifecycle: 'active',
+      totalOrders: 4,
+      totalRevenue: 684000,
+      lastOrderId: null,
+      b2bAccount: 'B2B-001',
+      notes: ['Monthly factory stationery replenishment', 'Requires consolidated invoice and carton-level delivery notes'],
+      timeline: ['B2B account restored from factory buyer seed set', 'Next action: confirm May replenishment volume'],
+    },
+    {
+      id: 'cust_nagoya_parts_mfg',
+      name: 'Mei Kobayashi',
+      company: 'Nagoya Parts Manufacturing Co.',
+      email: 'buyer@nagoya-parts.example',
+      segment: 'B2B replenishment',
+      lifecycle: 'retention',
+      totalOrders: 6,
+      totalRevenue: 925000,
+      lastOrderId: null,
+      b2bAccount: 'B2B-002',
+      notes: ['Factory floor office kits for shift supervisors', 'Prefers email confirmation before RFQ conversion'],
+      timeline: ['Repeat B2B buyer restored for replenishment testing', 'Next action: review retention bundle pricing'],
+    },
+    {
+      id: 'cust_saitama_packaging_factory',
+      name: 'Daichi Suzuki',
+      company: 'Saitama Packaging Factory',
+      email: 'ops@saitama-packaging.example',
+      segment: 'B2B replenishment',
+      lifecycle: 'lead',
+      totalOrders: 0,
+      totalRevenue: 0,
+      lastOrderId: null,
+      b2bAccount: 'B2B-003',
+      notes: ['Factory operations lead requesting sample kits', 'Needs RFQ qualification before COS order creation'],
+      timeline: ['Lead restored from B2B factory seed set', 'Next action: qualify replenishment cadence'],
+    },
+  ];
 
   orders.forEach((order, index) => {
     const identity = resolveOrderCustomer(order, index);
@@ -508,7 +552,7 @@ function buildCustomers(orders: Order[], campaigns: PrimeCampaign[]): PrimeCusto
       name: identity.name,
       company: identity.company,
       email: identity.email,
-      segment: index % 3 === 0 ? 'B2B replenishment' : index % 3 === 1 ? 'Marketplace buyer' : 'Creator commerce',
+      segment: 'Marketplace buyer',
       lifecycle: order.status === 'returned' ? 'at-risk' : order.status === 'completed' ? 'retention' : 'active',
       totalOrders: 1,
       totalRevenue: order.total_amount || 0,
@@ -546,7 +590,9 @@ function buildCustomers(orders: Order[], campaigns: PrimeCampaign[]): PrimeCusto
     });
   });
 
-  return Array.from(customerMap.values()).slice(0, 8);
+  b2bFactoryAccounts.forEach((account) => customerMap.set(account.email, account));
+
+  return Array.from(customerMap.values());
 }
 
 function buildLeads(campaigns: PrimeCampaign[], customers: PrimeCustomer[]): PrimeLead[] {
