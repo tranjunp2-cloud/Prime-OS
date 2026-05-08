@@ -1,0 +1,502 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Intelligence Board Workspace Research</title><style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.65;margin:0;background:#f6f8fb;color:#172033}
+main{max-width:980px;margin:0 auto;padding:48px 24px;background:white}
+h1{font-size:36px;line-height:1.15;margin:0 0 24px}h2{margin-top:44px;border-top:1px solid #e6eaf0;padding-top:26px}h3{margin-top:28px}
+p{color:#374151}li{margin:6px 0}pre{background:#0f172a;color:#e5e7eb;border-radius:14px;padding:18px;overflow:auto;line-height:1.35}
+img{max-width:100%;border-radius:14px;box-shadow:0 10px 30px rgba(15,23,42,.14);border:1px solid #e5e7eb}figure{margin:24px 0 8px}.caption{font-size:14px;color:#64748b;margin-top:0}
+main>p:nth-of-type(1){background:#eaf4ff;border:1px solid #bfdbfe;border-radius:14px;padding:16px;color:#1e3a8a}
+</style></head><body><main><h1>Design Research: Intelligence Agent Board Workspace</h1>
+
+<h2>TL;DR</h2>
+
+<p>Nên thiết kế `Intelligence Area` như một **agent work board**, gần Jira/Trello/Linear hơn dashboard BI. Board không chỉ là Kanban trang trí; mỗi card phải là một `DecisionPackage` có agent owner, evidence, confidence, risk, next Demand action, handoff status. Pattern mạnh nhất cho Prime OS: **left agent/status rail + center board/list + right evidence drawer + bottom action rail**.</p>
+
+<h2>Current State</h2>
+
+<figure><img src="references/current-state.png" alt="Current State"></figure>
+<p class="caption"><em>Prime OS current Intelligence state: nhiều dashboard/card giúp nhìn tổng quan, nhưng chưa đủ mạnh như một nơi agent làm việc, báo cáo, review, rồi đẩy dữ liệu sang Demand.</em></p>
+
+<h2>Recommendations / Next Steps</h2>
+
+<h3>1. Build `Intelligence Workspace` as Board-first, not Dashboard-first</h3>
+
+<p>Use board/list lanes inspired by Jira/Trello, but adapt lane meaning for Intelligence:</p>
+
+<li>`Running`</li>
+<li>`Needs Review`</li>
+<li>`Ready for Demand`</li>
+<li>`Sent to Demand`</li>
+<li>`Outcome Learned`</li>
+<li>optional `Blocked`</li>
+
+<p>Each card is not a generic task. Each card is a **DecisionPackage**.</p>
+
+<pre>
+┌───────────────────────────────────────────────────────────────────────┐
+│ Intelligence Workspace                         Ready 6 | Blocked 2    │
+├───────────────┬───────────────┬───────────────┬───────────────┬───────┤
+│ Running       │ Needs Review  │ Ready Demand  │ Sent Demand   │Learned│
+│ ┌───────────┐ │ ┌───────────┐ │ ┌───────────┐ │ ┌───────────┐ │ ...   │
+│ │Agent run  │ │ │Finding    │ │ │DecisionPkg│ │ │Campaign   │ │       │
+│ │Market     │ │ │Persona    │ │ │Sendable   │ │ │accepted   │ │       │
+│ │52% conf   │ │ │Evidence 4 │ │ │Impact ¥   │ │ │Readback   │ │       │
+│ └───────────┘ │ └───────────┘ │ └───────────┘ │ └───────────┘ │       │
+└───────────────┴───────────────┴───────────────┴───────────────┴───────┘
+</pre>
+
+<p>Why: Trello/Jira boards work because they represent state transition. Intelligence needs exactly that: raw signal → agent work → reviewed decision → Demand handoff → learning.</p>
+
+<h3>2. Add Right Evidence Drawer For Trust</h3>
+
+<p>Clicking any board card should open a side drawer. Do not expand huge cards inline.</p>
+
+<p>Drawer sections:</p>
+
+<li>`Finding`</li>
+<li>`Why now`</li>
+<li>`Evidence stack`</li>
+<li>`Confidence + freshness`</li>
+<li>`Guardrails`</li>
+<li>`Rejected alternatives`</li>
+<li>`Demand handoff payload`</li>
+
+<pre>
+┌──────────────────────── Board ────────────────────────┬───────────────┐
+│ [Needs Review] [Ready for Demand] [Sent]              │ Evidence      │
+│                                                       │ Finding       │
+│ ┌ Decision card ┐                                     │ Confidence 86 │
+│ │ Market signal │  selected                           │ Sources 5     │
+│ │ Demand action │ ───────────────────────────────────▶│ Guardrail ATS │
+│ └───────────────┘                                     │ Payload       │
+│                                                       │ [Send Demand] │
+└───────────────────────────────────────────────────────┴───────────────┘
+</pre>
+
+<p>Why: AI/agent trust comes from visible proof, not from prettier charts.</p>
+
+<h3>3. Keep Agent Runs Visible As Workers, Not Hidden Automation</h3>
+
+<p>Use a left rail or top strip showing agent work:</p>
+
+<li>`Market Scout`</li>
+<li>`Persona Analyst`</li>
+<li>`Message Strategist`</li>
+<li>`Launch Risk Analyst`</li>
+<li>`VOC Synthesizer`</li>
+
+<p>Each agent chip should show:</p>
+
+<li>state</li>
+<li>last run</li>
+<li>output count</li>
+<li>blocked reason if any</li>
+
+<pre>
+┌───────────────┐
+│ Agent Runs    │
+│ ● Market      │ Running 2m
+│ ● Persona     │ Ready 3
+│ ● Message     │ Review 1
+│ ● Risk        │ Blocked stock
+└───────────────┘
+</pre>
+
+<p>Why: Glean/Linear-like agent patterns make AI work inspectable. Prime OS should not make agent output feel like black-box dashboard magic.</p>
+
+<h3>4. Use `DecisionPackage` Cards, Not Generic Task Cards</h3>
+
+<p>Card anatomy:</p>
+
+<pre>
+┌────────────────────────────────┐
+│ Ready for Demand        86%     │
+│ Launch refill bundle campaign   │
+│ Signal: VOC + creator + orders  │
+│ Impact: +18% projected lift      │
+│ Risk: ATS low                   │
+│ Owner: Demand Campaign Ops      │
+│ [Evidence 5] [Send to Demand]   │
+└────────────────────────────────┘
+</pre>
+
+<p>Required card fields:</p>
+
+<li>status</li>
+<li>finding</li>
+<li>confidence</li>
+<li>impact</li>
+<li>risk</li>
+<li>linked entity</li>
+<li>next owner</li>
+<li>primary action</li>
+
+<p>Why: Standard Kanban cards are too generic. Intelligence cards must encode business decision quality.</p>
+
+<h3>5. Add Sticky Action Rail For Operator Review</h3>
+
+<p>Actions should be stable and predictable:</p>
+
+<li>`Approve`</li>
+<li>`Ask agent to explain`</li>
+<li>`Request more data`</li>
+<li>`Send to Demand`</li>
+<li>`Suppress`</li>
+
+<pre>
+┌─────────────────────────────────────────────────────────────┐
+│ Selected: Launch refill bundle campaign                     │
+│ [Approve] [Ask Agent] [Request Data] [Send to Demand]       │
+└─────────────────────────────────────────────────────────────┘
+</pre>
+
+<p>Why: Board UIs often hide actions in cards. Prime OS needs action discipline: agent recommends, operator reviews, Demand executes.</p>
+
+<h3>6. Make Demand Handoff A Lane And A Detail Object</h3>
+
+<p>Do not make “Send to Demand” only a link. It should create a visible state transition:</p>
+
+<pre>
+Ready for Demand → Sent to Demand → Accepted by Demand → Outcome Learned
+</pre>
+
+<p>Handoff payload preview:</p>
+
+<li>objective</li>
+<li>audience</li>
+<li>product/SKU route</li>
+<li>message angle</li>
+<li>channel</li>
+<li>CTA</li>
+<li>guardrails</li>
+<li>owner recommendation</li>
+
+<p>Why: This is the business bridge between Intelligence and Demand.</p>
+
+<h2>Key Examples</h2>
+
+<h3>Trello — Board Mental Model</h3>
+
+<figure><img src="references/trello-kanban.png" alt="Trello Kanban"></figure>
+<p class="caption"><em>Trello — Kanban board/list metaphor for moving work through state. Useful for Intelligence package state transitions. [Lazyweb]</em></p>
+
+<figure><img src="references/web-trello-task-management.png" alt="Trello Web"></figure>
+<p class="caption"><em>Trello live capture — task management page showing boards/lists/cards as the main working mental model. [Web]</em></p>
+
+<h3>Linear — Agent + Team Work System</h3>
+
+<figure><img src="references/linear-agent-work.png" alt="Linear Agent Work"></figure>
+<p class="caption"><em>Linear — product system for teams and AI agents; useful pattern for making agent output reviewable inside work tracking. [Lazyweb]</em></p>
+
+<figure><img src="references/web-linear-home.png" alt="Linear Web"></figure>
+<p class="caption"><em>Linear live capture — dense, dark, work-forward product UI; good reference for compact rows, status, and agent/team work tone. [Web]</em></p>
+
+<h3>Glean — Agent Library / Orchestration</h3>
+
+<figure><img src="references/glean-agent-library.png" alt="Glean Agent Library"></figure>
+<p class="caption"><em>Glean — searchable/filterable agent cards; useful for Prime OS agent lane design and agent capability discovery. [Lazyweb]</em></p>
+
+<figure><img src="references/web-glean-agent-orchestration.png" alt="Glean Agent Orchestration"></figure>
+<p class="caption"><em>Glean live capture — agent orchestration narrative; useful for modeling multiple specialist agents producing coordinated outputs. [Web]</em></p>
+
+<h3>Zeplin — Approval Workflow</h3>
+
+<figure><img src="references/zeplin-approval-workflow.png" alt="Zeplin Approval Workflow"></figure>
+<p class="caption"><em>Zeplin — approval workflow with assignee, due date, attachment, manage approvals. Good reference for operator approval before handoff. [Lazyweb]</em></p>
+
+<h3>Abyssale — Approval Project Cards</h3>
+
+<figure><img src="references/abyssale-approval-board.png" alt="Abyssale Approval Board"></figure>
+<p class="caption"><em>Abyssale — project cards with status in an approval workflow. Useful for `Needs Review` and `Ready for Demand` lanes. [Lazyweb]</em></p>
+
+<h3>Slack / Atlassian — Work Coordination</h3>
+
+<figure><img src="references/slack-task-management.png" alt="Slack Task Management"></figure>
+<p class="caption"><em>Slack — task updates embedded in communication context; useful for agent comments and operator questions. [Lazyweb]</em></p>
+
+<figure><img src="references/web-atlassian-issue-view.png" alt="Atlassian Issue View"></figure>
+<p class="caption"><em>Atlassian live capture — issue/detail view model; useful for right-side detail panel and evidence/action context. [Web]</em></p>
+
+<h2>Patterns</h2>
+
+<h3>Pattern 1 — State Lanes Beat Category Tabs</h3>
+
+<p>Good board apps use state lanes:</p>
+
+<li>To do</li>
+<li>In progress</li>
+<li>Review</li>
+<li>Done</li>
+
+<p>Prime OS equivalent:</p>
+
+<li>Signal captured</li>
+<li>Agent running</li>
+<li>Needs review</li>
+<li>Ready for Demand</li>
+<li>Sent to Demand</li>
+<li>Outcome learned</li>
+
+<p>This is better than tabs like `VOC`, `Forecasting`, `Attribution`, because operator wants state of decision, not data category.</p>
+
+<h3>Pattern 2 — Cards Need Just Enough Metadata</h3>
+
+<p>Best cards show enough to decide whether to open:</p>
+
+<li>title</li>
+<li>status</li>
+<li>owner</li>
+<li>due/priority</li>
+<li>labels</li>
+<li>short summary</li>
+
+<p>Prime OS cards need:</p>
+
+<li>finding</li>
+<li>agent</li>
+<li>confidence</li>
+<li>impact</li>
+<li>risk</li>
+<li>next owner</li>
+<li>evidence count</li>
+
+<h3>Pattern 3 — Detail Panel Prevents Board Clutter</h3>
+
+<p>Board should stay compact. Deep evidence belongs in drawer.</p>
+
+<p>Use drawer for:</p>
+
+<li>source list</li>
+<li>freshness</li>
+<li>confidence calculation</li>
+<li>rejected alternatives</li>
+<li>demand payload preview</li>
+
+<h3>Pattern 4 — Approval Is A Separate Moment</h3>
+
+<p>Approval workflows show a clear review step. Prime OS should copy this.</p>
+
+<p>Bad:</p>
+
+<pre>
+Agent says → Send immediately
+</pre>
+
+<p>Good:</p>
+
+<pre>
+Agent says → Operator reviews evidence → Approves handoff → Demand accepts
+</pre>
+
+<h3>Pattern 5 — Agent Visibility Matters</h3>
+
+<p>AI-agent UIs that work show:</p>
+
+<li>what agent is doing</li>
+<li>what it produced</li>
+<li>what is waiting for human review</li>
+<li>why it is blocked</li>
+
+<p>Prime OS should expose agent state as first-class UI.</p>
+
+<h2>Anti-Patterns</h2>
+
+<h3>Anti-Pattern 1 — KPI Dashboard Wall</h3>
+
+<p>A dashboard wall makes Intelligence passive. It shows information but does not move work.</p>
+
+<p>Avoid:</p>
+
+<li>many equal KPI cards</li>
+<li>large charts without next action</li>
+<li>generic analytics labels</li>
+<li>no owner/handoff state</li>
+
+<h3>Anti-Pattern 2 — Category-Only Navigation</h3>
+
+<p>Tabs like `VOC`, `Attribution`, `Forecasting`, `Creators` make the product feel like separate tools.</p>
+
+<p>Better:</p>
+
+<li>keep those as filters/lenses</li>
+<li>main object remains DecisionPackage</li>
+
+<h3>Anti-Pattern 3 — Black-Box Agent Output</h3>
+
+<p>If the UI only shows final recommendation, operator will not trust it.</p>
+
+<p>Need:</p>
+
+<li>evidence</li>
+<li>confidence</li>
+<li>source freshness</li>
+<li>alternative rejected</li>
+<li>guardrail</li>
+
+<h3>Anti-Pattern 4 — Handoff As Link Only</h3>
+
+<p>A link to Demand is not a handoff.</p>
+
+<p>A real handoff needs:</p>
+
+<li>payload</li>
+<li>status</li>
+<li>target owner</li>
+<li>accept/reject</li>
+<li>readback</li>
+
+<h2>Unique Angles</h2>
+
+<h3>Trello Angle — Board As Shared Truth</h3>
+
+<p>Trello’s power is not complex UI; it is shared state. Prime OS can use this by making the board the source of operational decision state.</p>
+
+<h3>Linear Angle — AI Output Is Reviewed Work</h3>
+
+<p>Linear frames AI/agent output as something teams review and move forward. This maps strongly to Intelligence agent reports.</p>
+
+<h3>Glean Angle — Agent Capabilities Are Discoverable</h3>
+
+<p>Glean shows agents as cards with search/filter. Prime OS can show agent lanes as business capabilities: Market Scout, Persona Analyst, Message Strategist, Launch Risk Analyst.</p>
+
+<h3>Zeplin/Abyssale Angle — Approval Is A Workflow Object</h3>
+
+<p>Approval UI makes human sign-off explicit. Prime OS needs this because Intelligence should not mutate Demand directly.</p>
+
+<h2>Recommended Prime OS Board Model</h2>
+
+<h3>Top Header</h3>
+
+<pre>
+┌──────────────────────────────────────────────────────┐
+│ Intelligence Workspace                               │
+│ Running 4 | Needs review 3 | Ready Demand 6 | Blocked 2│
+└──────────────────────────────────────────────────────┘
+</pre>
+
+<h3>Main Layout</h3>
+
+<pre>
+┌───────────────┬───────────────────────────────────────┬──────────────────┐
+│ Agent Runs    │ Decision Board                        │ Evidence Drawer  │
+│               │                                       │                  │
+│ Market Scout  │ Running | Review | Ready | Sent       │ Finding          │
+│ Persona       │                                       │ Evidence         │
+│ Message       │ [DecisionPackage cards...]            │ Confidence       │
+│ Risk          │                                       │ Payload          │
+└───────────────┴───────────────────────────────────────┴──────────────────┘
+</pre>
+
+<h3>Card Design</h3>
+
+<pre>
+┌─────────────────────────────┐
+│ READY FOR DEMAND      86%   │
+│ Refill bundle launch route  │
+│ VOC + creator + orders      │
+│ Impact: +18% lift           │
+│ Risk: Stock watch           │
+│ Owner: Demand Campaign Ops  │
+│ [Evidence 5] [Send]         │
+└─────────────────────────────┘
+</pre>
+
+<h3>Detail Drawer</h3>
+
+<pre>
+┌─────────────────────────────┐
+│ Evidence                    │
+│ Source: TikTok comments     │
+│ Freshness: 12m              │
+│ Confidence: 86%             │
+│ Guardrail: 20 ATS / 207 fc  │
+│ Rejected: broad discount    │
+│                             │
+│ Demand Payload              │
+│ Objective: launch campaign  │
+│ Audience: repeat buyers     │
+│ CTA: request quote          │
+│ [Send to Demand]            │
+└─────────────────────────────┘
+</pre>
+
+<h2>Findings</h2>
+
+<h3>1. Jira/Trello Board Pattern Fits Intelligence If Lanes Are Business States</h3>
+
+<p>A simple Kanban board works only if lanes reflect meaningful workflow states. For Prime OS, states should not be generic `Todo/In Progress/Done`. They should represent the Intelligence-to-Demand lifecycle.</p>
+
+<p>Recommended lanes:</p>
+
+<li>`Signal Intake`</li>
+<li>`Agent Running`</li>
+<li>`Needs Review`</li>
+<li>`Ready for Demand`</li>
+<li>`Sent to Demand`</li>
+<li>`Outcome Learned`</li>
+
+<h3>2. Board Cards Must Encode Decision Quality</h3>
+
+<p>Generic cards are too weak. Prime OS card must show decision quality:</p>
+
+<li>confidence</li>
+<li>evidence count</li>
+<li>risk</li>
+<li>owner</li>
+<li>expected impact</li>
+<li>linked entity</li>
+
+<p>This turns board from task tracker into decision-support workspace.</p>
+
+<h3>3. Evidence Drawer Is Non-Negotiable</h3>
+
+<p>Agent recommendations need explainability. A right drawer keeps board compact while allowing deep proof.</p>
+
+<p>The drawer should be the main trust surface.</p>
+
+<h3>4. Approval Flow Should Be First-Class</h3>
+
+<p>The user’s idea says agents work and report, then data goes to Demand. That implies approval step.</p>
+
+<p>Therefore `Needs Review` and `Ready for Demand` should be core lanes.</p>
+
+<h3>5. Demand Handoff Must Be Visible On The Board</h3>
+
+<p>After sending, card should move to `Sent to Demand`, then update to `Accepted`, `Rejected`, or `Outcome Learned`.</p>
+
+<p>This makes closed-loop Prime OS visible.</p>
+
+<h2>Sources</h2>
+
+<h3>Lazyweb Screenshots</h3>
+
+<li>Trello task management board screenshot — Lazyweb, `trello_aa44a730bb0a6668ed8e.png`</li>
+<li>Linear AI/team product system screenshot — Lazyweb, `linear_c2efa1061639e8ab47f7.png`</li>
+<li>Glean agent library screenshot — Lazyweb, `glean_d73634fd0c004edda938.png`</li>
+<li>Zeplin workflow approval screenshot — Lazyweb, `zeplin_a71b309e65316d237444.png`</li>
+<li>Abyssale approval board screenshot — Lazyweb, `abyssale_dc7406cab0bb138e41fa.png`</li>
+<li>Slack task management screenshot — Lazyweb, `slack_bd05f09b0255a2261851.png`</li>
+
+<h3>Web Sources / Captures</h3>
+
+<li>Trello task management: https://trello.com/use-cases/task-management</li>
+<li>Linear: https://linear.app/</li>
+<li>Glean agent orchestration: https://www.glean.com/product/agent-orchestration</li>
+<li>Atlassian Jira issue view docs: https://developer.atlassian.com/cloud/jira/platform/issue-view/</li>
+
+<h2>Final Recommendation</h2>
+
+<p>For Prime OS Intelligence, use a **hybrid Jira/Trello/Linear-style board**:</p>
+
+<li>Trello for lane/card movement.</li>
+<li>Jira/Atlassian for issue/detail drawer semantics.</li>
+<li>Linear for compact, work-forward, agent/team tone.</li>
+<li>Glean for agent capability visibility.</li>
+<li>Zeplin/Abyssale for approval workflow.</li>
+
+<p>Build the V1 screen as:</p>
+
+<pre>
+Agent rail + DecisionPackage board + Evidence drawer + sticky handoff action rail
+</pre>
+
+<p>This best matches the product thesis: Intelligence agents work, report, get reviewed, and pass structured data into Demand.</p></main></body></html>

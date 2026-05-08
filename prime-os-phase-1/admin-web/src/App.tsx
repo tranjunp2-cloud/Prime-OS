@@ -147,6 +147,7 @@ interface ResourceGroup {
 }
 
 const authTokenStorageKey = 'prime-os-admin-token';
+let adminAuthToken: string | null = null;
 const resourceOrder: ResourceKey[] = [
   'intelligenceCreators',
   'intelligenceCustomers',
@@ -2072,10 +2073,7 @@ function LoginScreen({
 }
 
 function App() {
-  const [authToken, setAuthToken] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return window.sessionStorage.getItem(authTokenStorageKey);
-  });
+  const [authToken, setAuthToken] = useState<string | null>(adminAuthToken);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [activeResource, setActiveResource] = useState<ResourceKey>('intelligenceCreators');
@@ -2137,7 +2135,7 @@ function App() {
         body: JSON.stringify({ email, password })
       });
 
-      window.sessionStorage.setItem(authTokenStorageKey, loginResponse.token);
+      adminAuthToken = loginResponse.token;
       setAuthToken(loginResponse.token);
       setSession(loginResponse.session);
       setBackendMessage(`${loginResponse.session.roleLabel} signed in`);
@@ -2150,7 +2148,13 @@ function App() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    const tokenToRevoke = authToken;
+    if (tokenToRevoke) {
+      await requestJson('/api/auth/logout', tokenToRevoke, { method: 'POST' }).catch(() => undefined);
+    }
+
+    adminAuthToken = null;
     window.sessionStorage.removeItem(authTokenStorageKey);
     setAuthToken(null);
     setSession(null);
@@ -2211,6 +2215,7 @@ function App() {
       setBackendMessage(`${sessionResponse.roleLabel} synced • ${formatRelativeTime(metaResponse.updatedAt)}`);
     } catch (nextError) {
       if (nextError instanceof RequestError && nextError.status === 401) {
+        adminAuthToken = null;
         window.sessionStorage.removeItem(authTokenStorageKey);
         setAuthToken(null);
         setLoginError('Session expired. Please sign in again.');

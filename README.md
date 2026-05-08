@@ -10,13 +10,24 @@ PrimeOS repository, cleaned so `prime-os-phase-1/` is the clear primary codebase
 - `research/` - research notes that informed the system map and wrapper strategy
 - `references/` - supporting prototypes, reports, screenshots, and archived legacy docs
 
-## Run The Main App
+## Run Local PrimeOS
+
+Always run both services for local PrimeOS work. The frontend alone is not a complete local build because Account Center and other pages call the backend.
 
 ```bash
-cd prime-os-phase-1/app
+# Terminal 1: backend API
+cd prime-os-phase-1/backend
 npm ci
 npm run dev
+
+# Terminal 2: frontend app
+cd prime-os-phase-1/app
+npm ci
+npm run dev:5177 -- --host 127.0.0.1
 ```
+
+- Frontend: `http://127.0.0.1:5177`
+- Backend: `http://127.0.0.1:8180`
 
 ## Primary Product Scope
 

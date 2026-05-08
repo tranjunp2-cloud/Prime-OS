@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { CopilotTelemetry, GlobalCopilotMessage } from '@/components/copilot/types';
 import {
@@ -48,6 +48,28 @@ export function useGlobalCopilotEngine() {
     setMessages([welcomeMessage]);
     setIsInitialized(true);
   }, [currentContext, isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const welcome = buildWelcomeMessage(currentContext);
+    const welcomeMessage: GlobalCopilotMessage = {
+      id: `welcome-${location.pathname}-${Date.now()}`,
+      role: 'assistant',
+      content: welcome.content,
+      timestamp: new Date(),
+      domain: welcome.domain,
+      intent: welcome.intent,
+      actions: welcome.actions,
+      citations: welcome.citations,
+      followUpPrompts: welcome.followUpPrompts,
+      entityRef: welcome.entityRef,
+      grounding: welcome.grounding,
+      debug: welcome.debug,
+    };
+
+    setMessages([welcomeMessage]);
+  }, [currentContext, isInitialized, location.pathname]);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;

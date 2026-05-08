@@ -43,6 +43,23 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
   }, [initialize, isInitialized]);
 
   useEffect(() => {
+    const openAssistant = () => {
+      if (isDesktopAssistant) {
+        setIsAssistantOpen(true);
+        return;
+      }
+
+      setMobileOpen(true);
+    };
+
+    window.addEventListener('prime-ai:open', openAssistant);
+
+    return () => {
+      window.removeEventListener('prime-ai:open', openAssistant);
+    };
+  }, [isDesktopAssistant]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }

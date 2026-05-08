@@ -190,6 +190,14 @@ async function parseAccountError(response: Response, fallback: string) {
   return body?.error?.message || body?.message || fallback;
 }
 
+function formatAccountNetworkError(error: unknown, backendBase: string) {
+  if (error instanceof TypeError && /fetch/i.test(error.message)) {
+    return `Cannot reach Prime OS backend at ${backendBase || 'the configured API base'}. Start the local backend with npm run dev in prime-os-phase-1/backend, then reload Account Center.`;
+  }
+
+  return error instanceof Error ? error.message : 'Account request failed.';
+}
+
 export default function Account() {
   const { user, session, token } = useAuth();
   const { toast } = useToast();
@@ -224,7 +232,15 @@ export default function Account() {
   const request = useMemo(() => async <T,>(path: string, init?: RequestInit) => {
     const headers = createPrimeAuthHeaders(token);
     if (init?.body) headers.set('Content-Type', 'application/json');
-    const response = await fetch(`${resolvePrimeBackendBase()}${path}`, { ...init, headers });
+    const backendBase = resolvePrimeBackendBase();
+    let response: Response;
+
+    try {
+      response = await fetch(`${backendBase}${path}`, { ...init, headers });
+    } catch (requestError) {
+      throw new Error(formatAccountNetworkError(requestError, backendBase));
+    }
+
     if (!response.ok) {
       throw new Error(await parseAccountError(response, 'Account request failed.'));
     }

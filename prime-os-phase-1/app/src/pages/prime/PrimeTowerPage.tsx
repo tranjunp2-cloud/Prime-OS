@@ -82,6 +82,7 @@ import {
   type OperatingLoopStep,
   type RegistryItem,
 } from '@/components/prime/PrimeOperatingSystem';
+import { CustomerProfileFloor } from '@/components/prime/customer-profile/CustomerProfileFloor';
 import {
   PRIME_TOWER_CONFIGS,
   getPrimeSnapshot,
@@ -94,6 +95,11 @@ import {
   type PrimeSocialStream,
   type PrimeTowerId,
 } from '@/lib/prime/prime-data';
+import {
+  buildIntelligenceWorkspace,
+  type DecisionPackage,
+  type IntelligencePackageStatus,
+} from '@/lib/prime/intelligence-workspace';
 import {
   fetchFinanceControlPlane,
   type CapitalOffersRecord,
@@ -273,6 +279,14 @@ function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot): Evide
     ];
   }
 
+  if (towerId === 'crm-compact') {
+    return [
+      { label: 'Accounts', value: snapshot.customers.length, detail: 'Customer Profile Floor owns account identity, owner, lifecycle, and type.', tone: 'info' },
+      { label: 'Contacts', value: snapshot.customers.length * 2, detail: 'Mock primary and operations contacts sit under each account.', tone: 'success' },
+      { label: 'Identity alerts', value: 1, detail: 'Duplicate suggestions are review-only; no merge action runs here.', tone: 'warning' },
+    ];
+  }
+
   return [
     { label: 'Customers', value: snapshot.customers.length, detail: 'Customer memory anchors follow-up, repeat, and service context.', tone: 'info' },
     { label: 'Orders', value: snapshot.orders.length, detail: 'OMS order preview stays linked but not owned here.', tone: 'success' },
@@ -334,7 +348,7 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): 
 
   return snapshot.customers.slice(0, 5).map((customer) => ({
     id: customer.id,
-    label: 'Customer',
+    label: towerId === 'crm-compact' ? 'Account' : 'Customer',
     title: customer.name,
     detail: `${customer.company} · ${customer.totalOrders} orders`,
     meta: customer.lifecycle,
@@ -457,136 +471,264 @@ function ActivationBoard({ plays }: { plays: PrimeActivationPlay[] }) {
   );
 }
 
+const intelligenceStatusCopy: Record<IntelligencePackageStatus, { label: string; tone: 'default' | 'secondary' | 'outline' | 'warning' | 'success' | 'info' | 'purple' }> = {
+  running: { label: 'Running', tone: 'info' },
+  review_needed: { label: 'Needs review', tone: 'warning' },
+  ready_for_demand: { label: 'Ready for Demand', tone: 'success' },
+  sent_to_demand: { label: 'Sent to Demand', tone: 'purple' },
+  blocked: { label: 'Blocked', tone: 'warning' },
+  outcome_learned: { label: 'Outcome learned', tone: 'default' },
+};
+
+const intelligenceBoardLanes: Array<{ id: 'all' | IntelligencePackageStatus; label: string }> = [
+  { id: 'all', label: 'All packages' },
+  { id: 'running', label: 'Running' },
+  { id: 'review_needed', label: 'Needs review' },
+  { id: 'ready_for_demand', label: 'Ready Demand' },
+  { id: 'blocked', label: 'Blocked' },
+  { id: 'sent_to_demand', label: 'Sent' },
+  { id: 'outcome_learned', label: 'Learned' },
+];
+
+function getPackageStatusBadge(status: IntelligencePackageStatus) {
+  return intelligenceStatusCopy[status] ?? intelligenceStatusCopy.review_needed;
+}
+
 function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
-  const highRiskForecasts = snapshot.forecasts.filter((forecast) => forecast.risk === 'high');
-  const highRiskAlerts = snapshot.alerts.filter((alert) => alert.severity === 'high');
-  const topRecommendation = snapshot.recommendations[0];
-  const decisionRows = [
-    ...snapshot.recommendations.slice(0, 3).map((recommendation) => ({
-      id: recommendation.id,
-      type: 'Launch',
-      title: recommendation.target,
-      detail: recommendation.reasoning,
-      state: recommendation.confidence >= 82 ? 'Go' : 'Review',
-      confidence: recommendation.confidence,
-      owner: 'AI Operator',
-      href: INTELLIGENCE_DECISIONS_HREF,
-    })),
-    ...highRiskForecasts.slice(0, 2).map((forecast) => ({
-      id: forecast.id,
-      type: 'Fix',
-      title: getSkuProductName(forecast.skuCode),
-      detail: forecast.suggestedAction,
-      state: 'Hold',
-      confidence: Math.min(95, Math.round((forecast.demand7d / Math.max(forecast.ats, 1)) * 100)),
-      owner: 'COS',
-      href: '/ecom/cos/inventory-brain',
-    })),
-    ...highRiskAlerts.slice(0, 2).map((alert) => ({
-      id: alert.id,
-      type: 'Investigate',
-      title: alert.title,
-      detail: `Linked entity: ${alert.linkedEntity}`,
-      state: 'Review',
-      confidence: 74,
-      owner: alert.area.replace(' Area', ''),
-      href: '/intelligence/decision-hub?view=alerts',
-    })),
-  ].slice(0, 6);
+  const workspace = useMemo(() => buildIntelligenceWorkspace(snapshot), [snapshot]);
+  const [selectedPackageId, setSelectedPackageId] = useState(workspace.packages[0]?.id ?? '');
+  const [laneFilter, setLaneFilter] = useState<'all' | IntelligencePackageStatus>('all');
+  const filteredPackages = workspace.packages.filter((item) => laneFilter === 'all' || item.status === laneFilter);
+  const selectedPackage = filteredPackages.find((item) => item.id === selectedPackageId)
+    ?? workspace.packages.find((item) => item.id === selectedPackageId)
+    ?? filteredPackages[0]
+    ?? workspace.packages[0];
+
+  useEffect(() => {
+    if (!selectedPackage && workspace.packages[0]) {
+      setSelectedPackageId(workspace.packages[0].id);
+      return;
+    }
+    if (selectedPackage && selectedPackage.id !== selectedPackageId) {
+      setSelectedPackageId(selectedPackage.id);
+    }
+  }, [selectedPackage, selectedPackageId, workspace.packages]);
+
+  const selectPackage = (item: DecisionPackage) => setSelectedPackageId(item.id);
+  const canSendToDemand = selectedPackage?.status === 'ready_for_demand' || selectedPackage?.status === 'review_needed';
+  const selectedStatus = selectedPackage ? getPackageStatusBadge(selectedPackage.status) : null;
+  const operatorNextStep = !selectedPackage
+    ? 'Wait for Intelligence package'
+    : selectedPackage.status === 'blocked'
+      ? 'Resolve guardrail first'
+      : selectedPackage.status === 'outcome_learned'
+        ? 'Review Demand outcome'
+        : 'Review evidence, then send to Demand';
+  const laneCounts: Record<string, number> = {
+    all: workspace.packages.length,
+    running: workspace.packages.filter((item) => item.status === 'running').length,
+    review_needed: workspace.stats.needsReview,
+    ready_for_demand: workspace.stats.readyForDemand,
+    blocked: workspace.stats.blocked,
+    sent_to_demand: workspace.packages.filter((item) => item.status === 'sent_to_demand').length,
+    outcome_learned: workspace.stats.learned,
+  };
+
+  const readbackPackages = workspace.packages.filter((item) => item.readback);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-5">
-        <SummaryMetricCard label="Decisions today" value={decisionRows.length} meta="Launch, fix, follow-up, or investigate." icon={<ClipboardList className="size-5" />} tone="purple" />
-        <SummaryMetricCard label="Signals joined" value={snapshot.socialStreams.length + snapshot.vocInsights.length} meta="Market, VOC, creator, and customer proof." icon={<ScanSearch className="size-5" />} tone="info" />
-        <SummaryMetricCard label="COS guardrails" value={highRiskForecasts.length} meta="Stock and execution blockers." icon={<Gauge className="size-5" />} tone={highRiskForecasts.length ? 'warning' : 'success'} />
-        <SummaryMetricCard label="Outcome readback" value={snapshot.orders.length} meta="OMS orders close the loop." icon={<TrendingUp className="size-5" />} tone="success" />
-        <SummaryMetricCard label="AI drafts" value={snapshot.recommendations.length} meta="Explain, recommend, draft, audit." icon={<Bot className="size-5" />} tone="purple" />
-      </div>
+      <Card className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
+        <CardContent className="space-y-4 p-5 md:p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">AI Decision Review</Badge>
+            <Badge variant={workspace.stats.readyForDemand ? 'success' : workspace.stats.blocked ? 'warning' : 'secondary'}>{workspace.stats.readyForDemand} ready · {workspace.stats.needsReview} review · {workspace.stats.blocked} blocked</Badge>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+            <div className="min-w-0">
+              <div className="text-metadata">Operator workflow</div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Review AI-prepared growth decisions before sending to Demand.</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground md:text-base">
+                Pick one decision package, inspect evidence and blockers, then either send a reviewed payload to Demand or ask the agent for more evidence.
+              </p>
+            </div>
+            <div className="rounded-xl border bg-background/85 p-4">
+              <div className="text-metadata">Selected next step</div>
+              <div className="mt-2 text-lg font-semibold">{operatorNextStep}</div>
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedPackage?.title ?? 'No package selected'}</p>
+              {selectedStatus ? <Badge className="mt-3" variant={selectedStatus.tone}>{selectedStatus.label}</Badge> : null}
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">Needs review</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.needsReview}</div><p className="mt-1 text-xs text-muted-foreground">Human proof check.</p></div>
+            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">Ready to send</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.readyForDemand}</div><p className="mt-1 text-xs text-muted-foreground">Demand-ready payloads.</p></div>
+            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">Blocked</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.blocked}</div><p className="mt-1 text-xs text-muted-foreground">Needs guardrail owner.</p></div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-6">
+            {['Signal', 'Agent run', 'Evidence', 'Decision', 'Demand', 'Readback'].map((step, index) => (
+              <div key={step} className="rounded-lg border bg-muted/20 p-2 text-xs">
+                <span className="font-semibold text-primary">{index + 1}. </span>{step}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Decision queue</CardTitle>
-              <Badge variant="outline">Action, not report</Badge>
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <Card className="rounded-xl border">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Decision Queue</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Select one AI package to review.</p>
+              </div>
+              <Badge variant="outline" className="shrink-0">{filteredPackages.length}</Badge>
+            </div>
+            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+              {intelligenceBoardLanes.map((lane) => (
+                <Button key={lane.id} type="button" size="sm" className="h-8 shrink-0 px-2 text-xs" variant={laneFilter === lane.id ? 'default' : 'outline'} onClick={() => setLaneFilter(lane.id)}>
+                  {lane.label} {laneCounts[lane.id] ?? 0}
+                </Button>
+              ))}
             </div>
           </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Decision</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead className="text-right">Confidence</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead className="text-right">Handoff</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {decisionRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <div className="font-medium">{row.title}</div>
-                      <div className="line-clamp-1 text-xs text-muted-foreground">{row.detail}</div>
-                    </TableCell>
-                    <TableCell>{row.type}</TableCell>
-                    <TableCell><Badge variant={row.state === 'Hold' ? 'warning' : row.state === 'Go' ? 'default' : 'outline'}>{row.state}</Badge></TableCell>
-                    <TableCell className="text-right">{row.confidence}%</TableCell>
-                    <TableCell>{row.owner}</TableCell>
-                    <TableCell className="text-right">
-                      <Link to={row.href} className="inline-flex items-center gap-1 text-primary hover:underline">
-                        Open <ArrowRight className="size-3" />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent className="max-h-[640px] space-y-2 overflow-auto pt-0">
+            {filteredPackages.length ? filteredPackages.map((item) => {
+              const status = getPackageStatusBadge(item.status);
+              const selected = item.id === selectedPackage?.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-current={selected ? 'true' : undefined}
+                  onClick={() => selectPackage(item)}
+                  className={`w-full rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? 'border-primary/60 bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/35 hover:bg-muted/20'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="line-clamp-2 text-sm font-semibold">{item.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.finding}</p>
+                    </div>
+                    <Badge variant={status.tone} className="shrink-0">{status.label}</Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">Conf</div><div className="font-semibold">{item.confidence}%</div></div>
+                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">Risk</div><div className="font-semibold">{item.riskLevel}</div></div>
+                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">Next</div><div className="font-semibold">{item.nextOwner}</div></div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>{item.evidenceReport.agentName}</span>
+                    <span>{item.evidenceReport.generatedAt}</span>
+                  </div>
+                </button>
+              );
+            }) : (
+              <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">No packages in this state.</div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Operator readout</CardTitle>
+        <Card className="min-w-0 rounded-xl border border-primary/20 bg-primary/5">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <CardTitle>Package Review</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Recommendation, evidence, risk, and Demand payload for the selected package.</p>
+              </div>
+              {selectedStatus ? <Badge variant={selectedStatus.tone} className="w-fit shrink-0">{selectedStatus.label}</Badge> : null}
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="text-xs uppercase text-muted-foreground">Explain</div>
-              <p className="mt-2 text-sm font-medium">{topRecommendation?.reasoning || 'PrimeOS is waiting for enough linked signals.'}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="text-xs uppercase text-muted-foreground">Draft action</div>
-              <p className="mt-2 text-sm text-primary">{topRecommendation?.action || 'Open Signals to validate the next decision.'}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="text-xs uppercase text-muted-foreground">Audit note</div>
-              <p className="mt-2 text-sm text-muted-foreground">AI can explain and draft. Demand, Customer, COS, or Finance still owns the action.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <CardContent className="space-y-3 pt-0">
+            {selectedPackage ? (
+              <>
+                <div className="rounded-xl border bg-background p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-metadata">Recommendation</div>
+                      <h3 className="mt-2 text-xl font-semibold">{selectedPackage.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{selectedPackage.finding}</p>
+                    </div>
+                    <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-lg border bg-muted/20 p-2"><div className="text-muted-foreground">Confidence</div><div className="text-lg font-semibold">{selectedPackage.confidence}%</div><Progress value={selectedPackage.confidence} className="mt-1 h-1.5" /></div>
+                      <div className="rounded-lg border bg-muted/20 p-2"><div className="text-muted-foreground">Impact</div><div className="text-sm font-semibold">{selectedPackage.expectedImpact.value}</div></div>
+                    </div>
+                  </div>
+                </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ActivationBoard plays={snapshot.activationPlays.slice(0, 3)} />
-        <Card className="rounded-lg border">
-          <CardHeader>
-            <CardTitle>Outcome learning</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="text-2xl font-semibold">{snapshot.leads.length}</div>
-              <div className="text-sm text-muted-foreground">Leads feeding decisions</div>
-            </div>
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="text-2xl font-semibold">{snapshot.rfqs.length}</div>
-              <div className="text-sm text-muted-foreground">RFQs as conversion proof</div>
-            </div>
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="text-2xl font-semibold">{snapshot.tickets.length}</div>
-              <div className="text-sm text-muted-foreground">Service signals to respect</div>
-            </div>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="space-y-3">
+                    <div className="rounded-xl border bg-background p-4">
+                      <div className="text-metadata">Why now</div>
+                      <p className="mt-2 text-sm font-medium">{selectedPackage.evidenceReport.hypothesis}</p>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">Prepared by {selectedPackage.evidenceReport.agentName} · {selectedPackage.evidenceReport.generatedAt}</p>
+                    </div>
+                    <div className="rounded-xl border bg-background p-4">
+                      <div className="text-metadata">Evidence</div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-3">
+                        {selectedPackage.evidenceReport.evidence.map((item) => (
+                          <div key={`${selectedPackage.id}-${item.label}`} className="rounded-lg border bg-muted/20 p-3 text-xs">
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{item.label}</span><span className="text-muted-foreground">{item.freshness}</span></div>
+                            <p className="mt-2 line-clamp-3 leading-5 text-muted-foreground">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-4">
+                      <div className="text-metadata">Risks / blockers</div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        {selectedPackage.evidenceReport.risks.map((risk) => (
+                          <div key={risk.label} className="rounded-lg border bg-muted/20 p-3 text-xs">
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{risk.label}</span><Badge variant={risk.severity === 'high' ? 'warning' : 'outline'}>{risk.severity}</Badge></div>
+                            <p className="mt-2 leading-5 text-muted-foreground">{risk.mitigation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-xl border bg-background p-4">
+                      <div className="text-metadata">Send to Demand</div>
+                      <div className="mt-3 grid gap-2 text-sm">
+                        <div><span className="font-semibold">Objective:</span> {selectedPackage.handoffPayload.objective}</div>
+                        <div><span className="font-semibold">Audience:</span> {selectedPackage.handoffPayload.audience}</div>
+                        <div><span className="font-semibold">Channel:</span> {selectedPackage.handoffPayload.channel ?? 'Demand Ops'}</div>
+                        <div><span className="font-semibold">CTA:</span> {selectedPackage.handoffPayload.cta ?? 'Review setup'}</div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {selectedPackage.handoffPayload.guardrails.map((guardrail) => <Badge key={guardrail} variant="outline">{guardrail}</Badge>)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-4">
+                      <div className="text-metadata">Why not the other route</div>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{selectedPackage.evidenceReport.rejectedAlternatives[0]?.option}: {selectedPackage.evidenceReport.rejectedAlternatives[0]?.reason}</p>
+                    </div>
+                    {selectedPackage.readback ? (
+                      <div className="rounded-xl border bg-background p-4">
+                        <div className="text-metadata">Demand readback</div>
+                        <p className="mt-2 text-sm font-medium">{selectedPackage.readback.note}</p>
+                        <Badge variant="success" className="mt-3">{selectedPackage.readback.state.replace(/_/g, ' ')}</Badge>
+                      </div>
+                    ) : null}
+                    <div className="sticky bottom-3 flex flex-col gap-2 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur">
+                      <Button disabled={!canSendToDemand} asChild={canSendToDemand}>
+                        {canSendToDemand ? (
+                          <Link to={`${selectedPackage.handoffPayload.targetRoute}?handoff=${encodeURIComponent(selectedPackage.id)}`}>Send to Demand preview <ArrowRight className="size-4" /></Link>
+                        ) : (
+                          <span>{selectedPackage.status === 'running' ? 'Agent still preparing evidence' : selectedPackage.status === 'outcome_learned' ? 'View Demand readback' : 'Blocked: resolve guardrail first'}</span>
+                        )}
+                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" size="sm">Ask follow-up</Button>
+                        <Button variant="outline" size="sm">Request more evidence</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">No AI decision packages yet. Start from Signals.</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -659,76 +801,231 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
   const signals = useMemo(() => buildIntelligenceSignals(snapshot), [snapshot]);
   const [selectedSignalId, setSelectedSignalId] = useState('');
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? signals[0];
+  const highStrengthSignals = signals.filter((signal) => signal.strength >= 80);
+  const guardrailSignals = signals.filter((signal) => signal.family === 'COS guardrail' && signal.strength >= 70);
+  const staleSignals = signals.filter((signal) => !['active', 'live', 'today'].includes(signal.freshness) && !signal.freshness.endsWith('m'));
+  const topSignal = selectedSignal ?? highStrengthSignals[0];
+  const signalReadiness = Math.round(signals.reduce((sum, signal) => sum + signal.strength, 0) / Math.max(signals.length, 1));
+  const [signalFilter, setSignalFilter] = useState('all');
+  const filteredSignals = signals.filter((signal) => {
+    if (signalFilter === 'all') return true;
+    if (signalFilter === 'ready') return signal.strength >= 80;
+    if (signalFilter === 'watch') return signal.strength >= 60 && signal.strength < 80;
+    if (signalFilter === 'blocked') return signal.family === 'COS guardrail' && signal.strength >= 70;
+    return signal.family.toLowerCase().includes(signalFilter);
+  });
+  const triageLanes = [
+    { id: 'ready', label: 'Ready', count: highStrengthSignals.length, detail: 'Decision-grade evidence', tone: 'default' },
+    { id: 'watch', label: 'Watch', count: signals.filter((signal) => signal.strength >= 60 && signal.strength < 80).length, detail: 'Needs one more proof point', tone: 'outline' },
+    { id: 'blocked', label: 'Blocked', count: guardrailSignals.length, detail: 'COS or execution guardrail', tone: 'warning' },
+    { id: 'learning', label: 'Learning', count: signals.filter((signal) => signal.strength < 60).length, detail: 'Collect more context', tone: 'secondary' },
+  ] as const;
+
+  const selectSignal = (signalId: string) => {
+    setSelectedSignalId(signalId);
+  };
 
   return (
     <div className="space-y-4">
+      <Card className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-background via-background to-sky-500/5">
+        <CardContent className="p-0">
+          <div className="grid gap-0 xl:grid-cols-[1.35fr_0.65fr]">
+            <div className="space-y-4 p-5 md:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Signal intelligence cockpit</Badge>
+                <Badge variant={signalReadiness >= 80 ? 'default' : 'warning'}>{signalReadiness}% evidence ready</Badge>
+                <Badge variant="secondary">{highStrengthSignals.length} decision-grade</Badge>
+              </div>
+              <div className="max-w-4xl">
+                <div className="text-metadata">Strongest validated signal</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">{topSignal?.source ?? 'No validated signal yet'}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground md:text-base">{topSignal?.recommendation ?? 'PrimeOS is waiting for enough market, VOC, attribution, or COS evidence to become a decision.'}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <div className="text-metadata">Linked entity</div>
+                  <div className="mt-1 break-all font-semibold">{topSignal?.linkedEntity ?? 'Pending evidence'}</div>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <div className="text-metadata">Signal family</div>
+                  <div className="mt-1 font-semibold">{topSignal?.family ?? 'Market signal'}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">Source: {topSignal?.source ?? 'crawler / API / partner feed'}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <div className="text-metadata">Strength / freshness</div>
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span className="font-semibold">{topSignal?.strength ?? signalReadiness}%</span>
+                    <span className="text-sm text-muted-foreground">{topSignal?.freshness ?? 'live'}</span>
+                  </div>
+                  <Progress value={topSignal?.strength ?? signalReadiness} className="mt-2 h-1.5" />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link to={topSignal?.targetHref ?? INTELLIGENCE_DECISIONS_HREF}>Convert strongest evidence <ArrowRight className="ml-2 size-4" /></Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to={INTELLIGENCE_DECISIONS_HREF}>Open Launch Decisions</Link>
+                </Button>
+              </div>
+            </div>
+            <div className="border-t bg-background/70 p-5 xl:border-l xl:border-t-0">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-metadata">Evidence readiness</div>
+                  <div className="mt-1 text-4xl font-semibold">{signalReadiness}%</div>
+                </div>
+                <ScanSearch className="size-8 text-primary" />
+              </div>
+              <Progress value={signalReadiness} className="mt-4 h-2" />
+              <div className="mt-5 grid gap-2">
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Decision-grade signals</div>
+                  <div className="mt-1 font-semibold">{highStrengthSignals.length} of {signals.length}</div>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Guardrail evidence</div>
+                  <div className="mt-1 font-semibold">{guardrailSignals.length} COS checks</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3 md:grid-cols-4">
-        <SummaryMetricCard label="Validated signals" value={signals.length} meta="Market, VOC, COS, attribution." icon={<ScanSearch className="size-5" />} tone="info" />
-        <SummaryMetricCard label="High strength" value={signals.filter((signal) => signal.strength >= 80).length} meta="Ready for decision review." icon={<Target className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Guardrails" value={snapshot.forecasts.filter((forecast) => forecast.risk !== 'low').length} meta="Forecast and ATS checks." icon={<Gauge className="size-5" />} tone="warning" />
-        <SummaryMetricCard label="VOC linked" value={snapshot.vocInsights.length} meta="Customer voice with business context." icon={<MessageCircle className="size-5" />} tone="purple" />
+        {triageLanes.map((lane) => (
+          <button key={lane.id} type="button" onClick={() => setSignalFilter(lane.id)} className={`rounded-lg border p-3 text-left transition-colors ${signalFilter === lane.id ? 'border-primary/40 bg-primary/5' : 'bg-background hover:border-primary/25'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-metadata">{lane.label}</div>
+              <Badge variant={lane.tone}>{lane.count}</Badge>
+            </div>
+            <div className="mt-1 text-xs font-medium text-muted-foreground">{lane.detail}</div>
+          </button>
+        ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="rounded-lg border">
-          <CardHeader>
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <Card className="min-w-0 rounded-xl border">
+          <CardHeader className="pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Signal registry</CardTitle>
+              <div>
+                <CardTitle>Signal workbench</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Validate by strength, freshness, entity, and route.</p>
+              </div>
               <Badge variant="outline">Evidence before action</Badge>
             </div>
           </CardHeader>
-          <CardContent>
-            <Table variant="embedded">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Signal</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Linked entity</TableHead>
-                  <TableHead className="text-right">Strength</TableHead>
-                  <TableHead>Freshness</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {signals.map((signal) => (
-                  <TableRow
-                    key={signal.id}
-                    onClick={() => setSelectedSignalId(signal.id)}
-                    className={selectedSignal?.id === signal.id ? 'bg-primary/5' : 'cursor-pointer'}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{signal.family}</div>
-                      <div className="line-clamp-1 text-xs text-muted-foreground">{signal.recommendation}</div>
-                    </TableCell>
-                    <TableCell>{signal.source}</TableCell>
-                    <TableCell className="font-mono text-xs">{signal.linkedEntity}</TableCell>
-                    <TableCell className="text-right">{signal.strength}%</TableCell>
-                    <TableCell>{signal.freshness}</TableCell>
+          <CardContent className="space-y-2 pt-0">
+            <div className="flex flex-wrap gap-1.5">
+              {['all', 'ready', 'watch', 'blocked', 'market', 'voc', 'attribution'].map((filter) => (
+                <Button key={filter} type="button" size="sm" className="h-7 px-2 text-xs" variant={signalFilter === filter ? 'default' : 'outline'} onClick={() => setSignalFilter(filter)}>{filter}</Button>
+              ))}
+            </div>
+            <div className="hidden max-h-[300px] w-full max-w-full overflow-auto rounded-lg border md:block">
+              <Table variant="compact" wrapperClassName="w-full max-w-full overflow-visible" className="min-w-[1280px]">
+                <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
+                  <TableRow>
+                    <TableHead className="h-8 text-[10px]">Signal</TableHead>
+                    <TableHead className="h-8 text-[10px]">Source</TableHead>
+                    <TableHead className="h-8 text-[10px]">Linked entity</TableHead>
+                    <TableHead className="h-8 text-right text-[10px]">Strength</TableHead>
+                    <TableHead className="h-8 text-[10px]">Freshness</TableHead>
+                    <TableHead className="h-8 text-right text-[10px]">Route</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredSignals.map((signal, index) => (
+                    <TableRow
+                      key={signal.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectSignal(signal.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          selectSignal(signal.id);
+                        }
+                      }}
+                      className={selectedSignal?.id === signal.id ? 'cursor-pointer bg-primary/5 text-[11px]' : 'cursor-pointer text-[11px]'}
+                    >
+                      <TableCell className="py-1.5">
+                        <div className="flex items-center gap-2"><span className="rounded bg-muted px-1.5 py-0.5 font-identifier text-[10px] text-muted-foreground">#{index + 1}</span><div className="min-w-0"><div className="text-xs font-medium leading-4">{signal.family}</div>
+                        <div className="max-w-[420px] truncate text-[10px] leading-3 text-muted-foreground">{signal.recommendation}</div></div></div>
+                      </TableCell>
+                      <TableCell className="py-1.5 text-[11px] leading-4">{signal.source}</TableCell>
+                      <TableCell className="max-w-[180px] truncate py-1.5 font-mono text-[10px] leading-4">{signal.linkedEntity}</TableCell>
+                      <TableCell className="py-1.5 text-right">
+                        <span className={signal.strength >= 80 ? 'text-[11px] font-semibold text-foreground' : 'text-[11px] text-muted-foreground'}>{signal.strength}%</span>
+                      </TableCell>
+                      <TableCell className="py-1.5"><Badge className="h-4 px-1.5 text-[10px]" variant={signal.freshness === 'live' || signal.freshness === 'today' || signal.freshness.endsWith('m') ? 'outline' : 'warning'}>{signal.freshness}</Badge></TableCell>
+                      <TableCell className="py-1.5 text-right">
+                        <Link to={signal.targetHref} className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={(event) => event.stopPropagation()}>
+                          Convert <ArrowRight className="size-3" />
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="grid max-h-[360px] gap-2 overflow-y-auto md:hidden">
+              {filteredSignals.slice(0, 10).map((signal, index) => (
+                <button key={signal.id} type="button" onClick={() => selectSignal(signal.id)} className={`rounded-lg border p-2.5 text-left transition-colors ${selectedSignal?.id === signal.id ? 'border-primary/40 bg-primary/5' : 'bg-muted/20'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">#{index + 1} · {signal.family} · {signal.freshness}</div>
+                      <div className="mt-1 font-medium">{signal.source}</div>
+                    </div>
+                    <Badge variant={signal.strength >= 80 ? 'default' : signal.strength >= 70 ? 'warning' : 'outline'}>{signal.strength}%</Badge>
+                  </div>
+                  <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{signal.recommendation}</p>
+                  <div className="mt-2 break-all font-mono text-[11px] text-muted-foreground">{signal.linkedEntity}</div>
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border">
+        <Card className="min-w-0 rounded-xl border border-sky-500/20 bg-sky-500/5">
           <CardHeader>
-            <CardTitle>Signal detail</CardTitle>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Signal validation detail</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Selected evidence stays separate from the downstream decision owner.</p>
+              </div>
+              <Badge variant="outline">Validated path</Badge>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {selectedSignal ? (
               <>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">{selectedSignal.family}</div>
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Evidence source</div>
                   <div className="mt-2 text-xl font-semibold">{selectedSignal.source}</div>
                   <p className="mt-2 text-sm text-muted-foreground">{selectedSignal.detail}</p>
                 </div>
-                <div className="rounded-lg border bg-muted/20 p-3">
-                  <div className="text-xs uppercase text-muted-foreground">Why it matters</div>
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Why it matters</div>
                   <p className="mt-2 text-sm font-medium">{selectedSignal.recommendation}</p>
                 </div>
-                <div className="rounded-lg border bg-muted/20 p-3">
-                  <div className="text-xs uppercase text-muted-foreground">Guardrail</div>
-                  <p className="mt-2 text-sm text-muted-foreground">Before action, check COS readiness, customer context, and service/finance blockers.</p>
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Evidence receipt</div>
+                  <div className="mt-3 grid gap-2 text-sm">
+                    {[
+                      ['Source', selectedSignal.source],
+                      ['Entity', selectedSignal.linkedEntity],
+                      ['Quality', selectedSignal.strength >= 80 ? 'decision-grade' : 'needs review'],
+                      ['Route', selectedSignal.targetHref],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center gap-2"><span className="size-2 rounded-full bg-primary" /><span className="text-muted-foreground">{label}</span><span className="font-medium">{value}</span></div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Guardrail</div>
+                  <p className="mt-2 text-sm text-muted-foreground">Before converting, check COS readiness, customer context, and service/finance blockers.</p>
                 </div>
                 <Button asChild className="w-full">
                   <Link to={selectedSignal.targetHref}>
@@ -738,11 +1035,75 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
                 </Button>
               </>
             ) : (
-              <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">No signals are available yet.</div>
+              <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">No signals are available yet.</div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      <Tabs defaultValue="pipeline" className="space-y-3">
+        <TabsList className="grid w-full grid-cols-4 md:w-auto">
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+          <TabsTrigger value="families">Families</TabsTrigger>
+          <TabsTrigger value="guardrails">Guardrails</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
+        </TabsList>
+        <TabsContent value="pipeline">
+          <OperatingLoop
+            steps={[
+              { label: 'Ingest', title: 'Signals arrive from channels', detail: 'Crawler, API, partner feed, VOC, campaign, and inventory evidence land here.', tone: 'info' },
+              { label: 'Validate', title: 'Strength and freshness are checked', detail: 'Only evidence with enough strength becomes decision-grade.', tone: 'purple' },
+              { label: 'Convert', title: 'Route to Launch Decisions', detail: 'Validated evidence becomes launch, fix, follow-up, or suppression input.', href: INTELLIGENCE_DECISIONS_HREF, tone: 'success' },
+              { label: 'Audit', title: 'Evidence stays attached', detail: 'Decision owners can trace source, linked entity, and guardrail context.', href: '/intelligence/signals', tone: 'purple' },
+            ]}
+          />
+        </TabsContent>
+        <TabsContent value="families">
+          <Card className="rounded-lg border">
+            <CardHeader><CardTitle>Signal families</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-4">
+              {['Market signal', 'VOC', 'COS guardrail', 'Attribution'].map((family) => {
+                const familySignals = signals.filter((signal) => signal.family === family);
+                const averageStrength = Math.round(familySignals.reduce((sum, signal) => sum + signal.strength, 0) / Math.max(familySignals.length, 1));
+                return (
+                  <div key={family} className="rounded-lg border bg-muted/20 p-3">
+                    <div className="text-metadata">{family}</div>
+                    <div className="mt-2 text-2xl font-semibold">{familySignals.length}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Avg strength {averageStrength}%</div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="guardrails">
+          <Card className="rounded-lg border">
+            <CardHeader><CardTitle>Guardrail evidence</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {guardrailSignals.map((signal) => (
+                <div key={`guardrail-${signal.id}`} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium">{signal.linkedEntity}</div>
+                    <Badge variant="warning">{signal.strength}% strength</Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{signal.recommendation}</p>
+                </div>
+              ))}
+              {!guardrailSignals.length ? <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No active guardrail evidence.</div> : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="audit">
+          <Card className="rounded-lg border">
+            <CardHeader><CardTitle>Evidence audit</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border bg-muted/20 p-3"><div className="text-metadata">Signal owner</div><p className="mt-2 text-sm font-medium">Intelligence validates evidence; receiving towers own action.</p></div>
+              <div className="rounded-lg border bg-muted/20 p-3"><div className="text-metadata">Conversion rule</div><p className="mt-2 text-sm font-medium">Evidence converts to decision input, not automatic execution.</p></div>
+              <div className="rounded-lg border bg-muted/20 p-3"><div className="text-metadata">Traceability</div><p className="mt-2 text-sm font-medium">Source, linked entity, strength, and freshness stay visible.</p></div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -757,38 +1118,61 @@ function launchDecisionLane(status: string) {
 
 function LaunchDecisionStateBoard({ decisions }: { decisions: IntelligenceLaunchDecisionRecord[] }) {
   const lanes = ['Go', 'Review', 'Hold', 'No-go'];
+  const laneMeta: Record<string, { detail: string; className: string }> = {
+    Go: { detail: 'Approved routes ready for owner execution.', className: 'bg-primary/5' },
+    Review: { detail: 'Needs one human check before action.', className: 'bg-muted/20' },
+    Hold: { detail: 'Blocked by stock, proof, or owner readiness.', className: 'bg-amber-500/10' },
+    'No-go': { detail: 'Rejected or unsafe to launch now.', className: 'bg-destructive/5' },
+  };
 
   return (
-    <Card className="rounded-lg border">
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>Launch decision board</CardTitle>
-          <Badge variant="outline">Go / Review / Hold / No-go</Badge>
+    <Card className="rounded-xl border">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Launch decision board</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Signals cockpit converts evidence into owned launch actions.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{decisions.length} decisions</Badge>
+            <Badge variant="outline">Go / Review / Hold / No-go</Badge>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 lg:grid-cols-4">
-        {lanes.map((lane) => {
-          const laneItems = decisions.filter((decision) => launchDecisionLane(decision.approvalStatus) === lane);
-          return (
-            <div key={lane} className="min-h-32 rounded-lg border bg-muted/20 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-semibold">{lane}</div>
-                <Badge variant={lane === 'Go' ? 'default' : lane === 'Hold' ? 'warning' : lane === 'No-go' ? 'destructive' : 'outline'}>{laneItems.length}</Badge>
-              </div>
-              <div className="mt-3 space-y-2">
-                {laneItems.map((decision) => (
-                  <div key={decision.id} className="rounded-md border bg-background p-2">
-                    <div className="line-clamp-1 text-sm font-medium">{decision.decisionName}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{decision.skuCode} · {decision.confidence}%</div>
+      <CardContent className="overflow-x-auto pb-4">
+        <div className="grid min-w-[1040px] gap-3 xl:min-w-0 xl:grid-cols-4">
+          {lanes.map((lane) => {
+            const laneItems = decisions.filter((decision) => launchDecisionLane(decision.approvalStatus) === lane);
+            return (
+              <div key={lane} className={`min-w-[250px] rounded-xl border p-3 ${laneMeta[lane].className}`}>
+                <div className="sticky top-0 z-10 -mx-3 -mt-3 rounded-t-xl border-b bg-background/95 px-3 py-2 backdrop-blur">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold">{lane}</div>
+                    <Badge variant={lane === 'Go' ? 'default' : lane === 'Hold' ? 'warning' : lane === 'No-go' ? 'destructive' : 'outline'}>{laneItems.length}</Badge>
                   </div>
-                ))}
-                {!laneItems.length ? (
-                  <div className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">No decision in this lane.</div>
-                ) : null}
+                  <p className="mt-1 text-xs text-muted-foreground">{laneMeta[lane].detail}</p>
+                </div>
+                <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                  {laneItems.map((decision) => (
+                    <div key={decision.id} className="rounded-lg border bg-background p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="line-clamp-1 text-sm font-semibold">{decision.decisionName}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{decision.owner || 'Launch owner'} · {decision.skuCode}</div>
+                        </div>
+                        <span className="shrink-0 text-xs font-semibold">{decision.confidence}%</span>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{decision.blocker || decision.expectedResponse || 'No owned launch action here.'}</p>
+                    </div>
+                  ))}
+                  {!laneItems.length ? (
+                    <div className="min-h-24 rounded-lg border border-dashed bg-background/50 p-3 text-xs text-muted-foreground">No owned launch action here.</div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
@@ -975,7 +1359,7 @@ function EvidenceCard({
   meta: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-muted/20 p-3">
+    <div className="rounded-lg border bg-muted/20 p-2.5">
       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
       <div className="mt-2 text-sm font-medium">{value}</div>
       <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
@@ -1423,12 +1807,12 @@ function CreatorIntelligencePanel() {
                 {selectedCreator ? (
                   <>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="rounded-lg border bg-muted/20 p-2.5">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended creator</div>
                         <div className="mt-2 text-sm font-medium">{selectedCreator.name}</div>
                         <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.handle} · {selectedCreator.category}</div>
                       </div>
-                      <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="rounded-lg border bg-muted/20 p-2.5">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Matched SKU</div>
                         <div className="mt-2 text-sm font-medium">{selectedCreator.product}</div>
                         <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.topFollowerSegment}</div>
@@ -2851,6 +3235,9 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const queryLeadId = searchParams.get('lead');
   const queryRfqId = searchParams.get('rfq');
   const queryView = searchParams.get('view');
+  const queryHandoffId = searchParams.get('handoff');
+  const intelligenceWorkspace = useMemo(() => buildIntelligenceWorkspace(snapshot), [snapshot]);
+  const handoffPackage = queryHandoffId ? intelligenceWorkspace.packages.find((item) => item.id === queryHandoffId) : null;
   const primaryCampaign = snapshot.campaigns[0];
   const queryCampaign = queryCampaignId ? snapshot.campaigns.find((campaign) => campaign.id === queryCampaignId) : null;
   const routeCampaign = queryCampaign ?? primaryCampaign;
@@ -2883,6 +3270,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const projectedLift = snapshot.activationPlays.reduce((sum, play) => sum + play.projectedLift, 0);
 
   type DemandActionStatus = 'ready' | 'drafted' | 'queued' | 'assigned';
+  type HandoffDecisionStatus = 'pending' | 'accepted' | 'rejected';
   type DemandExecutionAction = {
     id: string;
     stage: string;
@@ -2906,8 +3294,10 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   };
 
   const [actionStatuses, setActionStatuses] = useState<Record<string, DemandActionStatus>>({});
+  const [handoffDecisions, setHandoffDecisions] = useState<Record<string, HandoffDecisionStatus>>({});
   const [executionLog, setExecutionLog] = useState<Array<{ id: string; title: string; result: string; at: string; owner: string }>>([]);
   const [selectedAction, setSelectedAction] = useState<DemandExecutionAction | null>(null);
+  const handoffDecision = handoffPackage ? handoffDecisions[handoffPackage.id] ?? 'pending' : null;
 
   const statusLabel: Record<DemandActionStatus, string> = {
     ready: 'Ready',
@@ -2921,6 +3311,15 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     drafted: 'default',
     queued: 'default',
     assigned: 'default',
+  };
+
+  const recordHandoffDecision = (status: HandoffDecisionStatus) => {
+    if (!handoffPackage) return;
+    setHandoffDecisions((current) => ({ ...current, [handoffPackage.id]: status }));
+    toast({
+      title: status === 'accepted' ? 'Intelligence handoff accepted' : 'Intelligence handoff rejected',
+      description: status === 'accepted' ? `${handoffPackage.title} is now staged inside Demand.` : `${handoffPackage.title} stays in Intelligence review.`,
+    });
   };
 
   const runDemandAction = (action: DemandExecutionAction) => {
@@ -3359,17 +3758,34 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       : towerId === 'retargeting-outreach'
         ? retargetingActions
         : campaignActions;
-  const queryActionHint = queryRfq
-    ? 'lead-rfq-reply-draft'
-    : queryLead
-      ? 'lead-assign-sales-owner'
-      : queryView === 'creator-proof'
-        ? 'creator-approve-asset-kit'
-        : queryCampaign
-          ? 'campaign-paid-social-adset'
-          : null;
+  const queryActionHint = handoffPackage
+    ? 'campaign-paid-social-adset'
+    : queryRfq
+      ? 'lead-rfq-reply-draft'
+      : queryLead
+        ? 'lead-assign-sales-owner'
+        : queryView === 'creator-proof'
+          ? 'creator-approve-asset-kit'
+          : queryCampaign
+            ? 'campaign-paid-social-adset'
+            : null;
   const recommendedAction = activeActions.find((action) => action.id === queryActionHint) ?? activeActions[0];
   const doneCount = activeActions.filter((action) => getActionStatus(action) !== 'ready').length;
+  const queuedLabel = `${doneCount}/${activeActions.length} queued`;
+  const heroMetrics = [
+    { label: 'Queue', value: queuedLabel, detail: `${recommendedAction.kind} recommended` },
+    { label: 'Owner', value: recommendedAction.owner, detail: `Next system: ${recommendedAction.nextSystem}` },
+    { label: 'Impact', value: roas, detail: `${currency.format(totalRevenue)} revenue proof` },
+    { label: 'Guardrail', value: stockGuardrail, detail: primaryForecast?.risk === 'high' ? 'Hold scale until stock clears.' : 'Safe to review before scale.' },
+  ];
+  const getActionImpact = (action: DemandExecutionAction) => {
+    if (action.id.includes('inventory') || action.id.includes('stock')) return { label: 'Guardrail', value: stockGuardrail };
+    if (action.id.includes('paid') || action.id.includes('adset')) return { label: 'Paid proof', value: roas };
+    if (action.id.includes('message') || action.id.includes('sequence')) return { label: 'Audience', value: `${qualifiedLeads} qualified` };
+    if (action.id.includes('rfq') || action.id.includes('lead')) return { label: 'Response', value: `${totalRfqs} RFQs` };
+    if (action.id.includes('seo') || action.id.includes('content')) return { label: 'Reach', value: formatCompactCount(totalReach) };
+    return { label: 'Lift', value: `+${projectedLift}%` };
+  };
 
   const pageCopy = {
     'campaign-ops': {
@@ -3425,13 +3841,19 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     { id: 'retargeting-outreach', label: 'Re-engage', href: DEMAND_REENGAGE_HREF, detail: 'Sequence, offer, suppression' },
   ];
 
-  const focusedContext = queryCampaignId
+  const focusedContext = handoffPackage
     ? {
-        label: queryCampaign ? 'Campaign focus' : 'Campaign not found',
-        value: queryCampaign?.name || queryCampaignId,
-        detail: queryCampaign ? `${queryCampaign.channel} · ${queryCampaign.targetSegment}` : 'The URL kept this campaign query, but no matching campaign exists.',
+        label: 'Intelligence handoff received',
+        value: handoffPackage.title,
+        detail: `${handoffPackage.confidence}% confidence · ${handoffPackage.handoffPayload.audience} · ${handoffPackage.handoffPayload.objective}`,
       }
-    : queryRfqId
+    : queryCampaignId
+      ? {
+          label: queryCampaign ? 'Campaign focus' : 'Campaign not found',
+          value: queryCampaign?.name || queryCampaignId,
+          detail: queryCampaign ? `${queryCampaign.channel} · ${queryCampaign.targetSegment}` : 'The URL kept this campaign query, but no matching campaign exists.',
+        }
+      : queryRfqId
       ? {
           label: queryRfq ? 'RFQ focus' : 'RFQ not found',
           value: queryRfq?.id.toUpperCase() || queryRfqId,
@@ -3452,7 +3874,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           : null;
 
   const renderDemandRouteTabs = () => (
-    <nav aria-label="Demand tabs" className="grid gap-2 md:grid-cols-4">
+    <nav aria-label="Demand tabs" className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
       {demandRouteTabs.map((tab) => {
         const active = tab.id === towerId;
         return (
@@ -3461,7 +3883,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
             to={tab.href}
             aria-current={active ? 'page' : undefined}
             className={[
-              'rounded-2xl border p-3 transition hover:border-primary/40 hover:bg-primary/5',
+              'min-w-[180px] rounded-2xl border p-3 transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:min-w-0',
               active ? 'border-primary/40 bg-primary/10 text-foreground ring-1 ring-primary/20' : 'bg-background text-muted-foreground',
             ].join(' ')}
           >
@@ -3481,7 +3903,17 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           <div className="mt-1 truncate text-sm font-semibold">{focusedContext.value}</div>
           <p className="mt-1 text-xs text-muted-foreground">{focusedContext.detail}</p>
         </div>
-        <Badge variant="outline" className="w-fit shrink-0">URL context kept</Badge>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {handoffPackage ? <Badge variant={handoffPackage.status === 'blocked' ? 'warning' : 'success'}>{handoffPackage.status.replace(/_/g, ' ')}</Badge> : null}
+          {handoffDecision && handoffDecision !== 'pending' ? <Badge variant={handoffDecision === 'accepted' ? 'success' : 'warning'}>{handoffDecision}</Badge> : null}
+          <Badge variant="outline" className="w-fit shrink-0">{handoffPackage ? 'DecisionPackage payload' : 'URL context kept'}</Badge>
+          {handoffPackage ? (
+            <>
+              <Button type="button" size="sm" className="h-8" onClick={() => recordHandoffDecision('accepted')}>Accept</Button>
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => recordHandoffDecision('rejected')}>Reject</Button>
+            </>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   ) : null;
@@ -3500,7 +3932,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         </div>
         <div className="min-w-0">
           <Badge variant="secondary" className="rounded-full bg-background/80">Route product</Badge>
-          <div className="mt-2 line-clamp-2 text-sm font-semibold">{launchProductName}</div>
+          <div className="mt-1 line-clamp-1 text-xs font-semibold">{launchProductName}</div>
           <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{launchRoute}</div>
         </div>
       </div>
@@ -3530,27 +3962,31 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
 
   const renderHero = () => (
     <section data-testid="demand-child-command-bar" className="rounded-lg border bg-card shadow-sm">
-      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)_auto] xl:items-center">
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)] xl:items-start">
         <div className="min-w-0">
           <Badge variant="outline" className="mb-3 rounded-full">{pageCopy.eyebrow}</Badge>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{pageCopy.title}</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{pageCopy.description}</p>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Badge variant="outline">{doneCount}/{activeActions.length} queued</Badge>
-            <Badge variant="outline">{recommendedAction.kind}</Badge>
-            <Badge variant="outline">{stockGuardrail}</Badge>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {heroMetrics.map((metric) => (
+              <div key={metric.label} className="rounded-xl border bg-background/80 p-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{metric.label}</div>
+                <div className="mt-1 truncate text-sm font-semibold" title={metric.value}>{metric.value}</div>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{metric.detail}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Button size="sm" onClick={() => setSelectedAction(recommendedAction)}>
+              Review & queue recommended action
+              <ArrowRight className="size-4" />
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link to={pageCopy.nextHref}>{pageCopy.nextLabel}<ArrowRight className="size-4" /></Link>
+            </Button>
           </div>
         </div>
         {renderProductSignal()}
-        <div className="flex flex-col gap-2 xl:items-end">
-          <Button size="sm" onClick={() => setSelectedAction(recommendedAction)}>
-            Open recommended setup
-            <ArrowRight className="size-4" />
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link to={pageCopy.nextHref}>{pageCopy.nextLabel}<ArrowRight className="size-4" /></Link>
-          </Button>
-        </div>
       </div>
       <div className="border-t p-4">
         {renderSystemFlow()}
@@ -3568,7 +4004,10 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
               <CardTitle>Recommended now</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">Start with this action. Open setup to review seed data before queueing anything.</p>
             </div>
-            <Badge variant={statusToneMap[status]}>{statusLabel[status]}</Badge>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Badge variant="outline">{recommendedAction.nextSystem}</Badge>
+              <Badge variant={statusToneMap[status]}>{statusLabel[status]}</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -3585,9 +4024,13 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
             <RuntimeContextCard label="Channel" value={recommendedAction.channel} detail="Where the action will run." />
             <RuntimeContextCard label="Owner" value={recommendedAction.owner} detail="Who owns the next step." />
           </div>
+          <div className="rounded-2xl border bg-muted/20 p-3">
+            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Why this now</div>
+            <p className="mt-1 text-sm font-medium">{recommendedAction.signal}</p>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button className="flex-1 justify-between" onClick={() => setSelectedAction(recommendedAction)}>
-              Open setup
+              Review & queue setup
               <ArrowRight className="size-4" />
             </Button>
             <Button asChild variant="outline" className="flex-1 justify-between">
@@ -3614,12 +4057,14 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         {activeActions.map((action) => {
           const status = getActionStatus(action);
           const isRecommended = action.id === recommendedAction.id;
+          const impact = getActionImpact(action);
           return (
             <button
               key={action.id}
               type="button"
+              aria-label={`Open setup for ${action.title}`}
               className={[
-                'group grid w-full gap-3 p-4 text-left transition-colors hover:bg-muted/20 lg:grid-cols-[44px_minmax(0,1fr)_minmax(190px,0.45fr)_auto] lg:items-center',
+                'group grid w-full gap-3 p-4 text-left transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:grid-cols-[44px_minmax(0,1fr)_minmax(190px,0.45fr)_minmax(130px,0.28fr)_auto] lg:items-center',
                 isRecommended ? 'bg-primary/5' : '',
               ].join(' ')}
               onClick={() => setSelectedAction(action)}
@@ -3643,11 +4088,15 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
                 </div>
                 <div className="min-w-0 rounded-lg border bg-background px-3 py-2">
                   <div className="uppercase tracking-[0.12em] text-muted-foreground">Owner</div>
-                  <div className="mt-1 truncate font-medium">{action.owner}</div>
+                  <div className="mt-1 truncate font-medium" title={action.owner}>{action.owner}</div>
                 </div>
               </div>
+              <div className="rounded-lg border bg-background px-3 py-2 text-xs">
+                <div className="uppercase tracking-[0.12em] text-muted-foreground">{impact.label}</div>
+                <div className="mt-1 truncate font-semibold" title={impact.value}>{impact.value}</div>
+              </div>
               <div className="flex items-center gap-2 text-sm font-medium text-primary lg:justify-end">
-                <span>Open setup</span>
+                <span>Review setup</span>
                 <ArrowRight className="size-4 transition group-hover:translate-x-1" />
               </div>
             </button>
@@ -3690,6 +4139,18 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           <p className="mt-1 text-sm text-muted-foreground">Enough proof to act, plus where the result goes next.</p>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
+          {handoffPackage ? (
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Intelligence readback</div>
+                  <div className="mt-1 text-sm font-semibold">{handoffDecision === 'accepted' ? 'Demand accepted the package' : handoffDecision === 'rejected' ? 'Demand rejected the package' : 'Awaiting Demand decision'}</div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{handoffDecision === 'accepted' ? `Package ${handoffPackage.id} can now become a Demand execution draft.` : handoffDecision === 'rejected' ? 'Return this package to Intelligence for more evidence or suppression.' : 'Accept or reject the Intelligence payload before treating it as Demand work.'}</p>
+                </div>
+                <Badge variant={handoffDecision === 'accepted' ? 'success' : handoffDecision === 'rejected' ? 'warning' : 'outline'} className="w-fit shrink-0">{handoffDecision ?? 'pending'}</Badge>
+              </div>
+            </div>
+          ) : null}
           <RuntimeContextCard label="Reach" value={formatCompactCount(totalReach)} detail="Traffic plus social/content signals." />
           <RuntimeContextCard label="Lead proof" value={`${totalLeads} / ${totalRfqs}`} detail="Leads and RFQs captured." />
           <RuntimeContextCard label="Revenue proof" value={`${totalOrders} orders`} detail={`${currency.format(totalRevenue)} at ${roas} ROAS.`} />
@@ -3912,6 +4373,52 @@ function findCreatorBySku(creators: IntelligenceCreatorRecord[] | undefined, sku
   return (creators ?? []).find((creator) => runtimeSkuMatches(creator.linkedSku, skuCode)) ?? null;
 }
 
+function buildSeedLaunchDecisions(snapshot: PrimeSnapshot): IntelligenceLaunchDecisionRecord[] {
+  const statuses = ['approved', 'review', 'hold', 'rejected'];
+  const owners = ['Growth lead · Mika Sato', 'Creator manager · Emi Tan', 'Ops owner · Hana Lee', 'Risk reviewer · Ken Mori'];
+  const creatorNames = ['Mina Sato', 'DeskLab Studio', 'Aki Craft', 'Prime AI Operator'];
+  const decisionNames = [
+    'Office notebook spring route',
+    'Watercolor creator proof push',
+    'Brush bundle stock-gated launch',
+    'Mythical art print guardrail check',
+  ];
+  const blockers = [
+    'Ecom stock and listing health are ready; handoff can move into Demand execution.',
+    'Needs one approved creator usage clip before budget moves from review to live.',
+    'ATS coverage is tight; confirm replenishment date before scaling paid traffic.',
+    'Audience proof is not strong enough yet; collect one more VOC or attribution signal.',
+  ];
+  const expectedResponses = [
+    'Recover B2B office reorder demand within 7 days using owned plus marketplace traffic.',
+    'Lift bundle CTR through creator-led education before premium spring push.',
+    'Protect margin while testing small-batch demand for art supply buyers.',
+    'Avoid wasteful launch spend until customer intent and channel fit improve.',
+  ];
+
+  return snapshot.products.slice(0, 4).map((product, index) => {
+    const campaign = snapshot.campaigns.find((item) => item.productId === product.id);
+    const skuCode = campaign?.skuCode ?? product.skus[0]?.sku_code ?? product.sku_code;
+    const forecast = findForecastBySku(snapshot, skuCode);
+
+    return {
+      id: `seed_launch_${product.id}`,
+      decisionName: decisionNames[index] ?? `${product.name} launch decision`,
+      skuCode,
+      customerSegment: campaign?.targetSegment ?? product.category ?? 'Prime customer segment',
+      creatorName: creatorNames[index] ?? 'Prime AI Operator',
+      approvalStatus: statuses[index] ?? 'review',
+      confidence: Math.max(62, Math.min(94, 91 - index * 7 - (forecast?.risk === 'high' ? 8 : 0))),
+      whyThisLaunch: `${product.name} is linked to ${campaign?.name ?? 'a real Prime OS campaign'} with ${forecast?.demand7d ?? 'tracked'} 7d demand and ${forecast?.ats ?? 'known'} ATS.`,
+      blocker: blockers[index],
+      owner: owners[index] ?? 'Intelligence owner',
+      expectedResponse: expectedResponses[index],
+      updatedAt: new Date(Date.UTC(2026, 4, 6, 4 + index, 30)).toISOString(),
+      createdAt: new Date(Date.UTC(2026, 4, 5, 8 + index, 0)).toISOString(),
+    };
+  });
+}
+
 function extractRuntimeNumbers(value?: string) {
   return (value?.match(/\d[\d,.]*/g) ?? [])
     .map((item) => Number(item.replace(/,/g, '')))
@@ -4005,7 +4512,7 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Case</TableHead>
-                  <TableHead>Linked entity</TableHead>
+                  <TableHead className="h-8 text-[10px]">Linked entity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>SLA</TableHead>
@@ -4861,8 +5368,8 @@ function CompactCapitalReadinessRuntimePanel({
       />
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild><Link to="/finance/capital-offers">Open Capital Offers</Link></Button>
-        <Button asChild variant="outline"><Link to="/finance/risk-trust">Open Risk &amp; Trust</Link></Button>
+        <Button asChild><Link to="/finance/fin-support#lenders">Open Fin Support</Link></Button>
+        <Button asChild variant="outline"><Link to="/finance/fin-support#blockers">Open blockers</Link></Button>
       </div>
     </div>
   );
@@ -4975,7 +5482,7 @@ function CompactCapitalOffersRuntimePanel({
                 <ArrowRight className="size-4" />
               </Button>
               <Button asChild variant="outline">
-                <Link to="/finance/health">Check Finance Health</Link>
+                <Link to="/finance/fin-support#status">Check application status</Link>
               </Button>
             </div>
           </div>
@@ -5152,7 +5659,7 @@ function CompactRiskTrustRuntimePanel({
                 <ArrowRight className="size-4" />
               </Button>
               <Button asChild variant="outline">
-                <Link to="/finance/capital-offers">Recheck offers</Link>
+                <Link to="/finance/fin-support#lenders">Recheck lenders</Link>
               </Button>
             </div>
           </div>
@@ -5321,7 +5828,7 @@ function CompactSettlementRuntimePanel({
                 <ArrowRight className="size-4" />
               </Button>
               <Button asChild variant="outline">
-                <Link to="/finance/capital-offers">Check capital eligibility</Link>
+                <Link to="/finance/fin-support#funding-application-flow">Check funding support</Link>
               </Button>
             </div>
           </div>
@@ -6932,12 +7439,15 @@ function CompactLaunchDecisionsRuntimePanel({
     () => new Map((data?.customers ?? []).map((customer) => [normalizeRuntimeText(customer.segmentName), customer])),
     [data]
   );
-  const launchDecisions = useMemo(() => [...(data?.launchDecisions ?? [])].sort((left, right) => {
+  const seedLaunchDecisions = useMemo(() => buildSeedLaunchDecisions(snapshot), [snapshot]);
+  const sourceLaunchDecisions = data?.launchDecisions?.length ? data.launchDecisions : seedLaunchDecisions;
+  const launchDecisions = useMemo(() => [...sourceLaunchDecisions].sort((left, right) => {
     const leftPriority = launchDecisionPriority(left.approvalStatus);
     const rightPriority = launchDecisionPriority(right.approvalStatus);
     if (leftPriority !== rightPriority) return leftPriority - rightPriority;
     return right.confidence - left.confidence;
-  }), [data]);
+  }), [sourceLaunchDecisions]);
+  const isUsingSeedLaunchDecisions = !data?.launchDecisions?.length && seedLaunchDecisions.length > 0;
   const topDecision = launchDecisions[0] ?? null;
   const [selectedDecisionId, setSelectedDecisionId] = useState('');
 
@@ -6953,7 +7463,7 @@ function CompactLaunchDecisionsRuntimePanel({
   }, [launchDecisions, selectedDecisionId, topDecision]);
 
   if (isLoading) return <IntelligenceRuntimeLoadingState label="launch decisions" />;
-  if (error) return <IntelligenceRuntimeErrorState title="Launch decisions are unavailable" />;
+  if (error && !topDecision) return <IntelligenceRuntimeErrorState title="Launch decisions are unavailable" />;
   if (!topDecision) {
     return (
       <IntelligenceRuntimeEmptyState
@@ -7067,7 +7577,7 @@ function CompactLaunchDecisionsRuntimePanel({
   return (
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border shadow-sm">
-        <CardContent className="grid gap-5 p-4 xl:grid-cols-[280px_minmax(0,1fr)_210px] xl:items-stretch">
+        <CardContent className="grid gap-4 p-3 xl:grid-cols-[220px_minmax(0,1fr)_190px] xl:items-stretch">
           <RuntimeRecommendationVisual
             creator={selectedDecisionCreator}
             product={selectedDecisionProduct}
@@ -7079,32 +7589,35 @@ function CompactLaunchDecisionsRuntimePanel({
           />
 
           <div className="order-1 flex min-w-0 flex-col justify-center xl:order-2">
-            <Badge variant="outline" className="w-fit">PrimeOS recommends</Badge>
-            <CardTitle className="mt-3 text-3xl leading-tight">{decisionVerb}: {selectedDecision.decisionName}</CardTitle>
-            <p className="mt-3 max-w-3xl text-base text-muted-foreground">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="w-fit">PrimeOS recommends</Badge>
+              {isUsingSeedLaunchDecisions ? <Badge variant="secondary">Seeded from real products</Badge> : null}
+            </div>
+            <CardTitle className="mt-2 text-2xl leading-tight">{decisionVerb}: {selectedDecision.decisionName}</CardTitle>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
               {selectedDecision.whyThisLaunch || `${selectedDecision.creatorName} and ${selectedDecision.customerSegment} are the clearest current route into ${runtimeSkuName(selectedDecision.skuCode).toLowerCase()}.`}
             </p>
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
               {evidenceCards.map((evidence) => (
                 <div key={evidence.label} className="rounded-2xl border bg-muted/20 p-3">
                   <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{evidence.label}</div>
-                  <div className="mt-2 line-clamp-2 text-sm font-semibold">{evidence.value}</div>
-                  <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{evidence.detail}</div>
+                  <div className="mt-1 line-clamp-1 text-xs font-semibold">{evidence.value}</div>
+                  <div className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{evidence.detail}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="order-3 flex flex-col justify-between rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-4 text-center shadow-sm">
+          <div className="order-3 flex flex-col justify-between rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-background p-3 text-center shadow-sm">
             <div>
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Decision</div>
-              <div className="mt-3 text-5xl font-semibold leading-none">{selectedDecision.confidence}%</div>
+              <div className="mt-2 text-4xl font-semibold leading-none">{selectedDecision.confidence}%</div>
               <Badge variant={runtimeStatusVariant(selectedDecision.approvalStatus)} className="mt-3 capitalize">
                 {humanizeIntelligenceValue(selectedDecision.approvalStatus)}
               </Badge>
-              <p className="mx-auto mt-4 max-w-[12rem] text-sm text-muted-foreground">{decisionQuestion}</p>
+              <p className="mx-auto mt-3 max-w-[12rem] text-xs text-muted-foreground">{decisionQuestion}</p>
             </div>
-            <div className="mt-5 space-y-2">
+            <div className="mt-4 space-y-2">
               <Button asChild className="w-full px-3">
                 <Link to={launchCta.href}>
                   {launchCta.shortLabel}
@@ -7119,7 +7632,7 @@ function CompactLaunchDecisionsRuntimePanel({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <Card className="rounded-lg border">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">What to do next</CardTitle>
@@ -7179,19 +7692,21 @@ function CompactLaunchDecisionsRuntimePanel({
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle className="text-lg">Other launch candidates</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Keep the queue visible, but do not make the user hunt for the main answer.</p>
+              <CardTitle className="text-lg">Decision queue</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Pick a launch candidate; the cockpit updates without leaving the page.</p>
             </div>
             <Badge variant="outline">{launchDecisions.length} candidates</Badge>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <CardContent className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
           {launchDecisions.map((decision) => (
             <button
               key={decision.id}
               type="button"
               onClick={() => setSelectedDecisionId(decision.id)}
-              className={`rounded-2xl border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${selectedDecision.id === decision.id ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
+              aria-label={`Select launch decision ${decision.decisionName}`}
+              aria-pressed={selectedDecision.id === decision.id}
+              className={`w-full rounded-xl border border-l-4 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selectedDecision.id === decision.id ? 'border-primary/40 border-l-primary bg-primary/5' : 'border-l-transparent bg-muted/10'}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -7258,9 +7773,14 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
   }
 
   if (towerId === 'campaigns') {
+    const seedLaunchDecisions = buildSeedLaunchDecisions(snapshot);
+    const boardLaunchDecisions = intelligenceControlQuery.data?.launchDecisions?.length
+      ? intelligenceControlQuery.data.launchDecisions
+      : seedLaunchDecisions;
+
     return (
       <div className="space-y-4">
-        <LaunchDecisionStateBoard decisions={intelligenceControlQuery.data?.launchDecisions ?? []} />
+        <LaunchDecisionStateBoard decisions={boardLaunchDecisions} />
         <CompactLaunchDecisionsRuntimePanel
           data={intelligenceControlQuery.data}
           isLoading={intelligenceControlQuery.isLoading}
@@ -7554,12 +8074,12 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   'content-creator-ops': { decide: 'Which KOL, brief, live slot, or asset kit should be created now?', handoff: 'Approved proof feeds Campaign Ops, ads, SEO, and marketplace content.', handoffHref: DEMAND_CAMPAIGNS_HREF },
   'lead-response-capture': { decide: 'Which buyer needs a reply, owner, phone follow-up, or CRM sync now?', handoff: 'Qualified intent becomes CRM memory, quote work, and repeat outreach.', handoffHref: '/customer/crm-compact' },
   'retargeting-outreach': { decide: 'Which warm buyer should receive a sequence, retargeting ad, offer, or suppression?', handoff: 'Recovered buyers move into CRM Compact and order loops.', handoffHref: '/customer/crm-compact' },
-  'crm-compact': { decide: 'Which customer record needs follow-up, ownership, or service attention next?', handoff: 'Customer memory feeds Trends Intelligence for smarter targeting.', handoffHref: '/intelligence/trends' },
+    'crm-compact': { decide: 'Which account identity needs owner, contact, tags, or duplicate review first?', handoff: 'Customer Profile becomes the identity foundation for future Demand, Intelligence, Finance, and COS context.', handoffHref: '/intelligence/trends' },
   service: { decide: 'Is this issue resolved and did it affect customer trust?', handoff: 'Resolution updates the CRM Compact timeline.', handoffHref: '/customer/crm-compact' },
-  capital: { decide: 'Is this launch route operationally strong enough to justify capital?', handoff: 'PrimeOS turns the strongest readiness lane into a concrete offer review.', handoffHref: '/finance/capital-offers' },
-  offers: { decide: 'Is this seller eligible for capital, and which offer should they request?', handoff: 'Approved requests flow back into Finance Health so repayment stays visible.', handoffHref: '/finance/health' },
-  risk: { decide: 'What should this seller avoid or fix before asking for more capital?', handoff: 'Cleared eligibility blockers unlock safer Capital Offers.', handoffHref: '/finance/capital-offers' },
-  settlement: { decide: 'Is seller finance healthy enough to keep scaling?', handoff: 'Health recommendations feed Demand, CRM, and the next capital decision.', handoffHref: '/finance/capital-offers' },
+  capital: { decide: 'Is this route operationally strong enough to unlock funding support?', handoff: 'PrimeOS turns readiness proof into Fin Support lender routing.', handoffHref: '/finance/fin-support#funding-application-flow' },
+  offers: { decide: 'Which partner lender is the best fit for this merchant?', handoff: 'Matched lenders, documents, and application status now live in Fin Support.', handoffHref: '/finance/fin-support#lenders' },
+  risk: { decide: 'What should this merchant fix before submitting to lenders?', handoff: 'Cleared eligibility blockers unlock stronger Fin Support matching.', handoffHref: '/finance/fin-support#blockers' },
+  settlement: { decide: 'Is settlement health strong enough for funding review?', handoff: 'Settlement evidence feeds document reuse and application tracking in Fin Support.', handoffHref: '/finance/fin-support#status' },
 };
 
 export function PrimeDemandHubPage() {
@@ -7983,7 +8503,7 @@ export function PrimeDemandHubPage() {
           </CardHeader>
             <CardContent>
               <Table variant="embedded">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                   <TableRow>
                     <TableHead>Campaign</TableHead>
                     <TableHead className="text-right">Leads</TableHead>
@@ -8078,9 +8598,9 @@ export function PrimeDemandSourcesPage() {
             </CardHeader>
             <CardContent>
               <Table variant="embedded">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                   <TableRow>
-                    <TableHead>Source</TableHead>
+                    <TableHead className="h-8 text-[10px]">Source</TableHead>
                     <TableHead>Mode</TableHead>
                     <TableHead className="text-right">Signals</TableHead>
                     <TableHead>Status</TableHead>
@@ -8140,93 +8660,103 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
   const evidence = getTowerEvidence(towerId, snapshot);
   const loop = getTowerLoop(towerId, job, snapshot);
   const registryItems = getTowerRegistryItems(towerId, snapshot);
+  const [searchParams] = useSearchParams();
+  const customerProfileFloor = searchParams.get('floor');
+  const isCustomerProfileSubPage = towerId === 'crm-compact'
+    && (customerProfileFloor === 'account' || customerProfileFloor === 'contact' || customerProfileFloor === 'identity' || customerProfileFloor === 'tags');
+  const showTowerChrome = !isCustomerProfileSubPage;
 
   return (
     <div className="min-h-full bg-background">
       <div className="space-y-6 p-4 md:p-6">
-        <DecisionHeader
-          eyebrow={`${config.area} operating workspace`}
-          title={config.tower}
-          description={job?.decide || config.promise}
-          confidence={confidence}
-          status={confidence >= 80 ? 'Ready' : confidence >= 65 ? 'Watch' : 'Needs action'}
-          actions={(
-            <>
-              {job ? (
-                <Button asChild>
-                  <Link to={job.handoffHref}>
-                    Open handoff
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              ) : null}
-              <Button asChild variant="outline">
-                <Link to="/overview">
-                  Back to loop
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            </>
-          )}
-          evidence={evidence}
-          variant="compact"
-        />
-
-        <LinkedEntityStrip
-          entities={[
-            { label: 'Area', value: config.area, tone: 'purple' },
-            { label: 'Tower', value: config.tower, tone: 'info' },
-            { label: 'Orders', value: String(snapshot.orders.length), href: '/ecom/cos/oms', tone: 'success' },
-            { label: 'Signals', value: String(snapshot.socialStreams.length + snapshot.vocInsights.length), href: '/intelligence/trends', tone: 'muted' },
-          ]}
-        />
-
-        <OperatingLoop steps={loop} />
-
-        {job ? (
-          <HandoffRail
-            from={config.tower}
-            to={job.handoff}
-            detail={config.promise}
-            href={job.handoffHref}
-          />
-        ) : null}
-
-        <section className="grid gap-4 xl:grid-cols-[1fr_1fr_0.8fr]">
-          <EvidenceStack items={evidence} />
-          <RegistryList items={registryItems} />
-          <div className="grid gap-4">
-            <OutcomePreview
-              value={demandTowerIds.includes(towerId) ? snapshot.orders.length : intelligenceTowerIds.includes(towerId) ? snapshot.activationPlays.length : snapshot.customers.length}
-              detail={demandTowerIds.includes(towerId) ? 'Orders read back from OMS after demand execution.' : intelligenceTowerIds.includes(towerId) ? 'Activation plays ready for operator handoff.' : 'Customer/account records available for operating context.'}
-              tone={confidence >= 80 ? 'success' : 'info'}
+        {showTowerChrome ? (
+          <>
+            <DecisionHeader
+              eyebrow={`${config.area} operating workspace`}
+              title={config.tower}
+              description={job?.decide || config.promise}
+              confidence={confidence}
+              status={confidence >= 80 ? 'Ready' : confidence >= 65 ? 'Watch' : 'Needs action'}
+              actions={(
+                <>
+                  {job ? (
+                    <Button asChild>
+                      <Link to={job.handoffHref}>
+                        Open handoff
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                  ) : null}
+                  <Button asChild variant="outline">
+                    <Link to="/overview">
+                      Back to loop
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                </>
+              )}
+              evidence={evidence}
+              variant="compact"
             />
-            <ActionSetupPanel
-              title={job ? 'Continue the accountable handoff' : 'Return to the operating loop'}
-              detail={job?.handoff || 'Use the overview to select the next owner workspace.'}
-              actionLabel={job ? 'Open next tower' : 'Open overview'}
-              href={job?.handoffHref || '/overview'}
-            />
-          </div>
-        </section>
 
-        {job ? (
-          <Card className="rounded-lg border border-primary/20 bg-primary/5">
-            <CardContent className="grid gap-3 p-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <div className="min-w-0">
-                <span className="font-medium">You decide:</span>{' '}
-                <span className="text-muted-foreground">{job.decide}</span>
+            <LinkedEntityStrip
+              entities={[
+                { label: 'Area', value: config.area, tone: 'purple' },
+                { label: 'Tower', value: config.tower, tone: 'info' },
+                { label: 'Orders', value: String(snapshot.orders.length), href: '/ecom/cos/oms', tone: 'success' },
+                { label: 'Signals', value: String(snapshot.socialStreams.length + snapshot.vocInsights.length), href: '/intelligence/trends', tone: 'muted' },
+              ]}
+            />
+
+            <OperatingLoop steps={loop} />
+
+            {job ? (
+              <HandoffRail
+                from={config.tower}
+                to={job.handoff}
+                detail={config.promise}
+                href={job.handoffHref}
+              />
+            ) : null}
+
+            <section className="grid gap-4 xl:grid-cols-[1fr_1fr_0.8fr]">
+              <EvidenceStack items={evidence} />
+              <RegistryList items={registryItems} />
+              <div className="grid gap-4">
+                <OutcomePreview
+                  value={demandTowerIds.includes(towerId) ? snapshot.orders.length : intelligenceTowerIds.includes(towerId) ? snapshot.activationPlays.length : snapshot.customers.length}
+                  detail={demandTowerIds.includes(towerId) ? 'Orders read back from OMS after demand execution.' : intelligenceTowerIds.includes(towerId) ? 'Activation plays ready for operator handoff.' : 'Customer/account records available for operating context.'}
+                  tone={confidence >= 80 ? 'success' : 'info'}
+                />
+                <ActionSetupPanel
+                  title={job ? 'Continue the accountable handoff' : 'Return to the operating loop'}
+                  detail={job?.handoff || 'Use the overview to select the next owner workspace.'}
+                  actionLabel={job ? 'Open next tower' : 'Open overview'}
+                  href={job?.handoffHref || '/overview'}
+                />
               </div>
-              <Link to={job.handoffHref} className="inline-flex items-center gap-1 text-primary hover:underline">
-                {job.handoff} <ArrowRight className="size-3" />
-              </Link>
-            </CardContent>
-          </Card>
+            </section>
+
+            {job ? (
+              <Card className="rounded-lg border border-primary/20 bg-primary/5">
+                <CardContent className="grid gap-3 p-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <span className="font-medium">You decide:</span>{' '}
+                    <span className="text-muted-foreground">{job.decide}</span>
+                  </div>
+                  <Link to={job.handoffHref} className="inline-flex items-center gap-1 text-primary hover:underline">
+                    {job.handoff} <ArrowRight className="size-3" />
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : null}
+          </>
         ) : null}
 
         {financeTowerIds.includes(towerId) ? <FinancePanel towerId={towerId} /> : null}
         {demandTowerIds.includes(towerId) ? <DemandPanel towerId={towerId} /> : null}
-        {towerId === 'crm-compact' || towerId === 'service' ? <CustomerPanel towerId={towerId} /> : null}
+        {towerId === 'crm-compact' ? <CustomerProfileFloor snapshot={snapshot} /> : null}
+        {towerId === 'service' ? <CustomerPanel towerId={towerId} /> : null}
         {intelligenceTowerIds.includes(towerId) ? <IntelligencePanel towerId={towerId} /> : null}
       </div>
     </div>

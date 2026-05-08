@@ -126,4 +126,17 @@ describe('Account page', () => {
     expect(screen.getByText(/Workspace access/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Invite member email/i)).toBeInTheDocument();
   });
+
+  it('shows a local backend recovery hint when Account Center cannot fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    }));
+
+    render(<Account />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Cannot reach Prime OS backend/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/prime-os-phase-1\/backend/i)).toBeInTheDocument();
+  });
 });

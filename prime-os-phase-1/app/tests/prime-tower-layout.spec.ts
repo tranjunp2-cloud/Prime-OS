@@ -6,14 +6,16 @@ const towerRoutes = [
   { path: '/intelligence/signals', heading: 'Signals' },
   { path: '/intelligence/launch-decisions', heading: 'Launch Decisions' },
   { path: '/demand/campaign-ops', heading: 'Campaign Ops' },
-  { path: '/customer/crm-compact', heading: 'CRM Compact' },
+  { path: '/customer/crm-compact', heading: 'CRM Tower' },
 ];
+
+const routeReady = { waitUntil: 'domcontentloaded' } as const;
 
 test.describe('Prime tower shared layout', () => {
   test('/overview keeps the operating-loop hero compact on wide screens', async ({ page }) => {
     await page.setViewportSize({ width: 2048, height: 768 });
     await installPrimeSession(page);
-    await page.goto('/overview');
+    await page.goto('/overview', routeReady);
     await expectPrimeShellReady(page);
 
     const hero = page.getByTestId('overview-command-bar');
@@ -31,7 +33,7 @@ test.describe('Prime tower shared layout', () => {
     test(`${route.path} keeps the tower hero compact on wide screens`, async ({ page }) => {
       await page.setViewportSize({ width: 2048, height: 768 });
       await installPrimeSession(page);
-      await page.goto(route.path);
+      await page.goto(route.path, routeReady);
       await expectPrimeShellReady(page);
 
       await expect(page.getByRole('heading', { name: route.heading })).toHaveCount(1);

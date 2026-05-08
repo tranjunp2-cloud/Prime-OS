@@ -8,6 +8,7 @@ const defaultUserPassword = 'User@PrimeOS2026!';
 const demoCredentialsEnabled = process.env.PRIME_ALLOW_DEMO_CREDENTIALS === 'true';
 const sessionSecret = process.env.PRIME_SESSION_SECRET || (demoCredentialsEnabled ? defaultSessionSecret : '');
 const sessionTtlMs = Number(process.env.PRIME_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
+const revokedSessionIds = new Map();
 
 if (!sessionSecret) {
   throw new Error('PRIME_SESSION_SECRET is required unless PRIME_ALLOW_DEMO_CREDENTIALS=true.');
@@ -157,7 +158,9 @@ export function authenticatePassword(email, password) {
 export function createSessionToken(account) {
   const now = Date.now();
   const expiresAt = now + sessionTtlMs;
+  const sessionId = randomBytes(18).toString('base64url');
   const encodedPayload = base64UrlJson({
+    jti: sessionId,
     sub: account.id,
     email: account.email,
     role: account.role,
@@ -170,6 +173,32 @@ export function createSessionToken(account) {
     token: `${encodedPayload}.${signature}`,
     expiresAt: new Date(expiresAt).toISOString()
   };
+}
+
+function pruneRevokedSessions() {
+  const now = Date.now();
+  for (const [sessionId, expiresAt] of revokedSessionIds.entries()) {
+    if (now > expiresAt) {
+      revokedSessionIds.delete(sessionId);
+    }
+  }
+}
+
+export function revokeSessionToken(token) {
+  try {
+    const [encodedPayload, signature, extra] = String(token || '').split('.');
+    if (!encodedPayload || !signature || extra !== undefined) return false;
+    if (!safeEqual(signature, signPayload(encodedPayload))) return false;
+
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    if (!payload?.jti || !payload?.exp) return false;
+
+    pruneRevokedSessions();
+    revokedSessionIds.set(String(payload.jti), Number(payload.exp));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function verifySessionToken(token) {
@@ -185,7 +214,12 @@ export function verifySessionToken(token) {
 
   try {
     const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-    if (!payload?.sub || !payload?.email || !payload?.role || Date.now() > Number(payload.exp)) {
+    if (!payload?.jti || !payload?.sub || !payload?.email || !payload?.role || Date.now() > Number(payload.exp)) {
+      return null;
+    }
+
+    pruneRevokedSessions();
+    if (revokedSessionIds.has(String(payload.jti))) {
       return null;
     }
 

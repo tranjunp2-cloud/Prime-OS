@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Design Improvement: Prime OS Decision Hub</title>
+  <style>
+    body{margin:0;background:#f7f8fb;color:#16171a;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.6}
+    main{max-width:980px;margin:0 auto;padding:44px 24px 72px}
+    h1{font-size:34px;line-height:1.1;margin:0 0 18px} h2{margin-top:42px;border-top:1px solid #e5e7eb;padding-top:24px} h3{margin-top:32px;font-size:21px}
+    .callout{background:#eaf2ff;border:1px solid #c7dcff;border-radius:16px;padding:18px 20px;margin:18px 0 28px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 12px 28px rgba(15,23,42,.06)}
+    img{max-width:100%;border-radius:14px;border:1px solid #e5e7eb;box-shadow:0 10px 26px rgba(15,23,42,.10)} figcaption{font-size:13px;color:#667085;margin-top:8px}
+    pre{background:#0f172a;color:#e5eefc;border-radius:14px;padding:16px;overflow:auto;font-size:13px} code{font-family:"SFMono-Regular",Consolas,monospace}.meta{color:#667085;font-size:14px}.tag{display:inline-block;border:1px solid #d7d9ff;color:#4f46e5;background:#f2f1ff;border-radius:999px;padding:2px 8px;font-size:12px}
+    ul{padding-left:22px} a{color:#4f46e5;text-decoration:none} a:hover{text-decoration:underline}
+  </style>
+</head>
+<body><main>
+  <span class="tag">Prime OS · Intelligence · Decision Hub</span>
+  <h1>Design Improvement: Prime OS Decision Hub</h1>
+  <section class="callout"><strong>TL;DR:</strong> The screen has strong operating-system density, but hierarchy is too flat. Upgrade it into a decision cockpit: top action brief, evidence-backed queue, explain/action drawer, outcome loop, safer Prime AI placement.</section>
+  <h2>Current State</h2>
+  <figure><img src="references/current.png" alt="Current Prime OS Decision Hub" /><figcaption>Current local capture: readiness, loop cards, evidence, registry, queue, readout, activation plays, Prime AI.</figcaption></figure>
+  <section class="card"><h3>1. Above-fold decision brief ⭐</h3><p>Replace hero + repeated cards with one operator brief: decision health, top blocker, next action, owner, SLA, confidence, why-now evidence.</p><figure><img src="references/lazyweb-attackiq-command-center.png" alt="AttackIQ command center reference" /><figcaption>AttackIQ — unified operations console with monitoring and automation panels. [Lazyweb]</figcaption></figure><pre><code>┌ Decision Hub                         Ready 87%   SLA: 2h ┐
+│ Top decision: SKU close to ATS 20                         │
+│ Evidence: Demand ↑ | ATS ↓ | customer proof               │
+│ Owner: AI Operator → COS          [Open strongest action] │
+└───────────────────────────────────────────────────────────┘</code></pre></section>
+  <section class="card"><h3>2. Evidence-first decision workbench</h3><p>Promote Decision queue into the main work surface with rank, confidence, owner, handoff, evidence chips, risk, and one action per row.</p><figure><img src="references/lazyweb-fieldguide-workflow-table.png" alt="Fieldguide workflow table reference" /><figcaption>Fieldguide — dense workflow table with IDs, statuses, and tags. [Lazyweb]</figcaption></figure><pre><code>┌ Decision Workbench ───────────────────────────────────────┐
+│ # Decision             Evidence      Risk Owner   Action  │
+│ 1 SKU close to ATS 20  Demand+ATS    High AI→COS  Open    │
+│ 2 RMA-4102 launch link Customer+OMS  Med  AI      Review  │
+└───────────────────────────────────────────────────────────┘</code></pre></section>
+  <section class="card"><h3>3. Explain/action side panel</h3><p>Turn Operator readout + floating Prime AI into a contextual drawer for selected decision: explanation, evidence chain, guardrails, draft action, audit note.</p><figure><img src="references/lazyweb-intercom-ai-agent-dashboard.png" alt="Intercom AI agent dashboard reference" /><figcaption>Intercom — AI dashboard with metrics and conversational action surface. [Lazyweb]</figcaption></figure></section>
+  <section class="card"><h3>4. Outcome learning band</h3><p>Convert generic KPI cards into outcome-learning metrics: closed-loop count, confidence trend, stale evidence, projected lift, exceptions.</p><figure><img src="references/lazyweb-userlane-analytics-cards.png" alt="Userlane analytics cards reference" /><figcaption>Userlane — modular analytics cards and progress signals. [Lazyweb]</figcaption></figure></section>
+  <section class="card"><h3>5. Progressive disclosure</h3><p>Default view = queue + explain drawer. Move Loop, Evidence, Activation plays, Audit behind tabs/accordion. Preserve auditability, reduce first-scan load.</p></section>
+  <h2>What Works</h2><ul><li>Strong Prime OS domain loop: signal → decision → handoff → outcome.</li><li>Bounded-context language is visible: Demand, COS, Finance, Customer.</li><li>Visual system aligns with Overview/Demand refresh.</li><li>Mock data is realistic enough for operator QA.</li></ul>
+  <h2>Web References</h2><ul><li><a href="https://www.agenttracehq.com/">AgentTraceHQ</a> — audit trail search pattern.</li><li><a href="https://sealvera.com/">SealVera</a> — AI decision evidence/status pattern.</li><li><a href="https://www.agentreceipt.co/">AgentReceipt</a> — readable action receipt/timeline.</li><li><a href="https://support.zendesk.com/hc/en-us/articles/4408838386842-Overview-of-the-Zendesk-AI-agents-dashboard">Zendesk AI agents dashboard</a> — agent performance dashboard.</li></ul>
+  <h2>Unresolved Questions</h2><ul><li>Single selected decision vs multi-select bulk handoff?</li><li>Prime AI drawer always docked on desktop or opened after row selection?</li></ul>
+</main></body></html>

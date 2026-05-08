@@ -4,6 +4,7 @@ import {
   authenticatePassword,
   createSessionToken,
   listIdentityAccounts,
+  revokeSessionToken,
   toSafeAccount,
   updateIdentityAccount,
   verifySessionToken
@@ -22,6 +23,8 @@ import {
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
+const demoCredentialsEnabled = process.env.PRIME_ALLOW_DEMO_CREDENTIALS === 'true';
+const host = process.env.HOST || (demoCredentialsEnabled ? '127.0.0.1' : '0.0.0.0');
 const configuredAllowedOrigins = String(process.env.PRIME_ALLOWED_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
@@ -33,7 +36,7 @@ const localDevOrigins = [
   'http://localhost:5174'
 ];
 const allowedOrigins = new Set(
-  process.env.PRIME_ALLOW_DEMO_CREDENTIALS === 'true'
+  demoCredentialsEnabled
     ? [...localDevOrigins, ...configuredAllowedOrigins]
     : configuredAllowedOrigins
 );
@@ -213,6 +216,20 @@ function getClientAddress(request) {
   return request.ip || request.socket?.remoteAddress || 'unknown';
 }
 
+function isLoopbackAddress(address) {
+  const normalized = String(address || '').replace(/^::ffff:/, '');
+  return normalized === '127.0.0.1' || normalized === '::1' || normalized === 'localhost';
+}
+
+function rejectRemoteDemoTraffic(request, response, next) {
+  if (!demoCredentialsEnabled || isLoopbackAddress(getClientAddress(request))) {
+    next();
+    return;
+  }
+
+  response.status(403).json({ message: 'Demo credentials are only available from loopback.' });
+}
+
 function getLoginAttemptKey(request, email) {
   return `${getClientAddress(request)}:${String(email || '').trim().toLowerCase()}`;
 }
@@ -256,6 +273,11 @@ function requireAuthenticatedSession(request, response, next) {
 
   if (!account) {
     response.status(401).json({ message: 'Login required. Please sign in again.' });
+    return;
+  }
+
+  if (getMembershipForAccount(toSafeAccount(account)).status !== 'active') {
+    response.status(403).json({ message: 'Account is not active.' });
     return;
   }
 
@@ -320,6 +342,8 @@ app.get('/health', async (_request, response) => {
   });
 });
 
+app.use(rejectRemoteDemoTraffic);
+
 app.post('/api/auth/login', async (request, response) => {
   const { email, password } = request.body ?? {};
 
@@ -335,6 +359,11 @@ app.post('/api/auth/login', async (request, response) => {
     return;
   }
 
+  if (getMembershipForAccount(toSafeAccount(account)).status !== 'active') {
+    response.status(403).json({ message: 'Account is not active.' });
+    return;
+  }
+
   clearLoginAttempts(request, email);
   const token = createSessionToken(account);
   response.json({
@@ -343,7 +372,12 @@ app.post('/api/auth/login', async (request, response) => {
   });
 });
 
-app.post('/api/auth/logout', async (_request, response) => {
+app.post('/api/auth/logout', async (request, response) => {
+  const token = getBearerToken(request);
+  if (token) {
+    revokeSessionToken(token);
+  }
+
   response.json({ ok: true });
 });
 
@@ -634,6 +668,10 @@ app.use((error, _request, response, _next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Prime OS backend listening on http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, host, () => {
+    console.log(`Prime OS backend listening on http://${host}:${port}`);
+  });
+}
+
+export { app };

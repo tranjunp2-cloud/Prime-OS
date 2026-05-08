@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "PRIME_ALLOW_DEMO_CREDENTIALS=true PRIME_SESSION_SECRET=prime-os-local-dev-session-secret PORT=8180 node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",

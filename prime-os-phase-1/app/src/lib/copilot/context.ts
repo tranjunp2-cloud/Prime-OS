@@ -512,6 +512,22 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
     return createAccountSummary();
   }
 
+  if (pathname === '/overview') {
+    return {
+      domain: 'dashboard',
+      title: 'Operating Home',
+      description: 'Mission Control cho status van hanh hom nay: action queue, risk radar, area readiness va evidence stack.',
+      insight: 'Prime AI nen tap trung vao viec giai thich vi sao action duoc uu tien, owner nao can xu ly, risk nao can mo tiep.',
+      citations: ['Current route: /overview', 'Source: Prime operating snapshot'],
+      quickPrompts: [
+        { label: 'Uu tien hom nay', prompt: 'Action nao can xu ly dau tien tren Operating Home?' },
+        { label: 'Giai thich risk', prompt: 'Vi sao risk radar dang can chu y?' },
+        { label: 'Mo decision', prompt: 'Mo Launch Decisions' },
+        { label: 'Mo action queue', prompt: 'Trang nay dung de lam gi?' },
+      ],
+    };
+  }
+
   if (pathname === '/products/new') {
     return {
       domain: 'product',

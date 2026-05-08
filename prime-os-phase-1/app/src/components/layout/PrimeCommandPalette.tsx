@@ -1,6 +1,6 @@
 import { useMemo, type Dispatch } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ExternalLink, LayoutDashboard, Search } from 'lucide-react';
+import { ArrowRight, ExternalLink, LayoutDashboard, Search, Sparkles } from 'lucide-react';
 
 import {
   CommandDialog,
@@ -70,6 +70,15 @@ export function PrimeCommandPalette({ open, onOpenChange }: PrimeCommandPaletteP
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <div className="border-b border-border/65 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">Prime OS global search</div>
+            <div className="text-xs text-muted-foreground">Navigate workspaces, towers, floors, and operator actions.</div>
+          </div>
+          <div className="hidden items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 font-identifier text-[10px] text-muted-foreground sm:flex"><span>⌘</span><span>K</span></div>
+        </div>
+      </div>
       <CommandInput placeholder={shellCopy.commandInputPlaceholder} />
       <CommandList>
         <CommandEmpty>{shellCopy.commandEmpty}</CommandEmpty>
@@ -83,10 +92,13 @@ export function PrimeCommandPalette({ open, onOpenChange }: PrimeCommandPaletteP
                 value={`${route.label} ${route.area} ${route.href}`}
                 onSelect={() => goTo(route)}
               >
-                <Icon className="size-4 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">{route.label}</span>
-                <span className="hidden text-xs text-muted-foreground sm:inline">{route.area}</span>
-                {route.external ? <ExternalLink className="size-3.5 text-muted-foreground" /> : <ArrowRight className="size-3.5 text-muted-foreground" />}
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background/80"><Icon className="size-4 text-muted-foreground" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{route.label}</span>
+                  <span className="command-route-meta block truncate text-xs text-muted-foreground">{route.href}</span>
+                </span>
+                <span className="command-route-chip hidden rounded-full border bg-muted/40 px-2 py-1 text-xs text-muted-foreground sm:inline">{route.area}</span>
+                {route.external ? <ExternalLink className="size-4 text-muted-foreground" /> : <ArrowRight className="size-4 text-muted-foreground" />}
               </CommandItem>
             );
           })}
@@ -94,17 +106,21 @@ export function PrimeCommandPalette({ open, onOpenChange }: PrimeCommandPaletteP
         <CommandSeparator />
         <CommandGroup heading={shellCopy.commandOperatorActions}>
           <CommandItem value={shellCopy.commandSearchEntitiesValue}>
-            <Search className="size-4 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{shellCopy.commandSearchEntitiesLabel}</span>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background/80"><Search className="size-4 text-muted-foreground" /></span>
+            <span className="min-w-0 flex-1"><span className="block truncate font-medium">{shellCopy.commandSearchEntitiesLabel}</span><span className="command-route-meta block truncate text-xs text-muted-foreground">Search product, SKU, order, lead, customer</span></span>
             <CommandShortcut>{shellCopy.commandSoon}</CommandShortcut>
           </CommandItem>
           <CommandItem value={shellCopy.commandReviewLaunchValue}>
-            <LayoutDashboard className="size-4 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{shellCopy.commandReviewLaunchLabel}</span>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background/80"><Sparkles className="size-4 text-muted-foreground" /></span>
+            <span className="min-w-0 flex-1"><span className="block truncate font-medium">{shellCopy.commandReviewLaunchLabel}</span><span className="command-route-meta block truncate text-xs text-muted-foreground">Review next launch decision package</span></span>
             <CommandShortcut>{shellCopy.commandTab}</CommandShortcut>
           </CommandItem>
         </CommandGroup>
       </CommandList>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/65 bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
+        <span>↑↓ select · Enter open · Esc close</span>
+        <span>Results stay inside Prime OS ownership boundaries</span>
+      </div>
     </CommandDialog>
   );
 }

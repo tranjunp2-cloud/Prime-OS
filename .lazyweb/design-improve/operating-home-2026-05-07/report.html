@@ -1,0 +1,157 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PrimeOS Design Improvement</title><style>body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f6f8fb;color:#111827;line-height:1.6}main{max-width:980px;margin:40px auto;padding:0 24px 56px}h1{font-size:36px;line-height:1.1;margin:0 0 24px}h2{margin-top:34px;border-bottom:1px solid #dbe3ef;padding-bottom:8px}h3{margin-top:30px;color:#312e81}.callout{background:#eaf4ff;border:1px solid #bfdbfe;border-radius:16px;padding:18px 20px;box-shadow:0 8px 24px rgba(15,23,42,.05)}img{max-width:100%;border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.14);border:1px solid #e5e7eb;background:white}em{color:#64748b}pre{background:#0f172a;color:#e2e8f0;border-radius:14px;padding:18px;overflow:auto}code{font-family:"SFMono-Regular",Consolas,monospace}li{margin:.25rem 0}.card{background:white;border:1px solid #e5e7eb;border-radius:18px;padding:24px;margin:18px 0;box-shadow:0 10px 28px rgba(15,23,42,.06)}</style></head><body><main>
+<h1>Design Improvement: PrimeOS Operating Home</h1>
+
+<h2>TL;DR</h2><div class="callout">
+<p>The page already has strong operational density, but the hierarchy feels flat: every card competes equally. The highest-impact improvement is to turn the top of the page into a clearer command cockpit: one outcome strip, one primary action lane, then supporting risk/evidence panels.</p>
+
+</div>
+<h2>Current State</h2>
+<p><img src="references/current.png" alt="Current Design"></p>
+<p>*PrimeOS Operating Home: left navigation, global search, top KPI cards, priority action queue, risk radar, area status map, evidence stack, and recent events.*</p>
+
+<h2>Improvement Ideas</h2>
+
+<div class="card"><h3>1. Make The Top Band A True Command Cockpit ⭐</h3>
+<p>Move the key decision summary into a bold, compact command strip with clearer status grouping: Critical exposure, Ready to act, Blocked areas, Primary next action. Keep the KPI cards, but make them secondary to one executive-read line.</p>
+
+<p>Inspired by:</p>
+<p><img src="references/alloy-stock-risks.png" alt="Alloy Stock Risks"></p>
+<p>*Alloy — focuses warehouse risk around a clear stock-risk use case, then routes operators toward issue resolution. [Web + Lazyweb]*</p>
+
+<p>Why this works: PrimeOS is cross-area operations software. The current top section has many metrics, but the operator still has to scan. A command strip would answer: “What matters now, why, and what do I do first?”</p>
+
+<p>Sketch:</p>
+<pre><code>
+┌ Operating Home ─────────────────────────────────────────────┐
+
+│ Critical exposure ¥14.9M  │ 4 actions │ 3 critical │ 1 owner gap │
+
+│ Primary next action: Resolve inventory pressure             │
+
+│ [Check inventory →] [Review finance →] [Ask Prime AI]        │
+
+└──────────────────────────────────────────────────────────────┘
+
+┌ Revenue Risk ┐ ┌ Demand Ready ┐ ┌ Inventory ┐ ┌ Orders ┐ ┌ Issues ┐
+
+</code></pre>
+
+<div class="card"><h3>2. Convert Priority Queue Into A Worklist With Stronger Ownership</h3>
+<p>Give each priority row a visible owner/avatar, domain color rail, SLA/deadline, and current blocker. Keep evidence chips, but add a “why now” sentence and reduce chip noise.</p>
+
+<p>Inspired by:</p>
+<p><img src="references/jira-operations.png" alt="Jira Operations"></p>
+<p>*Jira Operations — frames operations work around ownership, views, forms, automation, and reports. [Web + Lazyweb]*</p>
+
+<p>Why this works: PrimeOS operators need accountability, not only severity. Ownership and blocker state will make the queue more executable for cross-area work.</p>
+
+<p>Sketch:</p>
+<pre><code>
+┌ Priority Action Queue ───────────────────────────────────────┐
+
+│ #1 │ Inventory │ Resolve pressure before campaign scale      │
+
+│    │ Owner: Ecom Ops · SLA today · Blocker: ATS mismatch     │
+
+│    │ Why now: 20 ATS vs 207 demand; ¥4.1M exposure           │
+
+│    │ [Evidence] [Replenishment review]        [Check inv →]  │
+
+└──────────────────────────────────────────────────────────────┘
+
+</code></pre>
+
+<div class="card"><h3>3. Make Risk Radar More Visual And Less List-Like</h3>
+<p>Replace the right-side risk list with a compact radar: severity by Area, blocked dependency arrows, and one expandable detail per risk. Use red only for truly critical items; use amber/green for watch/ready.</p>
+
+<p>Inspired by:</p>
+<p><img src="references/google-status-dashboard.png" alt="Google Status Dashboard"></p>
+<p>*Google Workspace Status Dashboard — uses a matrix/status language so incidents and healthy services are scannable at a glance. [Web + Lazyweb]*</p>
+
+<p>Why this works: PrimeOS spans Demand, Customer, Ecom/COS, Intelligence, Finance. A status matrix makes cross-area health easier to parse than stacked rows.</p>
+
+<p>Sketch:</p>
+<pre><code>
+┌ Risk Radar ─────────────────────────────┐
+
+│ Area        Now      Dependency          │
+
+│ Ecom/COS    CRIT     Inventory → Orders  │
+
+│ Finance     CRIT     Scale capital       │
+
+│ Customer    CRIT     Service trust       │
+
+│ Demand      READY    Campaign engine     │
+
+│ Intelligence READY   Decision evidence   │
+
+└─────────────────────────────────────────┘
+
+</code></pre>
+
+<div class="card"><h3>4. Merge Evidence + Events Into A Timeline Of Proof</h3>
+<p>The Evidence Stack and Recent Operating Events are useful, but separated. Turn them into a chronological “proof timeline” with filters: Evidence, Event, Decision, Owner Action.</p>
+
+<p>Inspired by:</p>
+<p><img src="references/google-status-dashboard.png" alt="Google Status Dashboard"></p>
+<p>*Google Workspace Status Dashboard — incident history and status evidence stay close to health state. [Web + Lazyweb]*</p>
+
+<p>Why this works: Operators need auditability. A unified proof timeline connects “why the system recommends this” with “what just happened.”</p>
+
+<p>Sketch:</p>
+<pre><code>
+┌ Operating Proof Timeline ───────────────────────────────────┐
+
+│ [Evidence] Inventory risk detected — CR-NTB...              │
+
+│ [Event] Order captured — ord_xg4810ts                       │
+
+│ [Decision] Throttle acquisition recommended                 │
+
+│ [Owner] Finance review queued                               │
+
+└──────────────────────────────────────────────────────────────┘
+
+</code></pre>
+
+<div class="card"><h3>5. Add A Density Toggle For Operator Modes</h3>
+<p>Add mode tabs: Command, Investigate, Audit. Command shows only top actions and health; Investigate expands evidence; Audit prioritizes event/proof history.</p>
+
+<p>Inspired by:</p>
+<p><img src="references/google-status-dashboard.png" alt="Google Status Dashboard"></p>
+<p>*Google status views separate incidents, product status, and history with a clear operational reading mode. [Web]*</p>
+
+<p>Why this works: The current screen is dense and good for power users, but the same density is not ideal for every task. Modes let PrimeOS stay scalable without hiding important data.</p>
+
+<p>Sketch:</p>
+<pre><code>
+[Command] [Investigate] [Audit]
+
+Command: top actions + risk map
+
+Investigate: evidence cards + linked records
+
+Audit: chronological events + decision log
+
+</code></pre>
+
+<h2>What&#x27;s Working</h2>
+<ul>
+<li>Strong domain coverage: Demand, Customer, Ecom/COS, Intelligence, Finance all appear on one operating surface.</li>
+<li>Good operational vocabulary: exposure, readiness, SLA, risk, evidence, and next action are already present.</li>
+<li>Priority queue structure is useful: severity + impact + evidence + CTA creates a good base for execution.</li>
+<li>Sidebar and global search create a credible product shell, not a standalone demo.</li>
+</ul>
+
+<h2>All References</h2>
+<ul>
+<li>`current.png` — PrimeOS Operating Home current screenshot.</li>
+<li>`alloy-stock-risks.png` — warehouse stock-risk pattern for focusing command intent.</li>
+<li>`jira-operations.png` — operations work management and ownership framing.</li>
+<li>`google-status-dashboard.png` — status matrix and incident-health language.</li>
+</ul>
+
+<h2>Source Notes</h2>
+<p>Lazyweb searches used: enterprise operations command center dashboard, SaaS admin dashboard priority queue risk alerts, operations dashboard priority action queue. Live web screenshots were captured from Alloy, Atlassian Jira, and Google Workspace Status Dashboard.</p>
+</main></body></html>

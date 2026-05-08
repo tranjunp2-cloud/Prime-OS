@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -129,7 +129,13 @@ async function ensureDatabase() {
     if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
       await writeFile(dbPath, JSON.stringify(normalized, null, 2));
     }
-  } catch {
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      const backupPath = `${dbPath}.invalid-${Date.now()}`;
+      await copyFile(dbPath, backupPath).catch(() => undefined);
+      throw new Error(`Unable to load PrimeOS database. Preserved current file at ${backupPath}.`);
+    }
+
     await writeFile(dbPath, JSON.stringify(cloneSeedDatabase(), null, 2));
   }
 }

@@ -178,7 +178,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'Customer' as const,
     title: customer.name,
     detail: `${customer.company} · ${customer.segment} · ${customer.lifecycle}`,
-    href: `/customer/crm-compact?customer=${encodeURIComponent(customer.id)}`,
+    href: `/customer/crm-compact?floor=account&customer=${encodeURIComponent(customer.id)}`,
     keywords: buildSearchText([
       customer.name,
       customer.company,
@@ -196,7 +196,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'Lead' as const,
     title: lead.company,
     detail: `${lead.contact} · ${lead.score} lead score · ${lead.status}`,
-    href: `/demand/lead-response-capture?lead=${encodeURIComponent(lead.id)}`,
+    href: `/demand/leads-rfqs?lead=${encodeURIComponent(lead.id)}`,
     keywords: buildSearchText([
       lead.id,
       lead.company,
@@ -214,7 +214,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'RFQ' as const,
     title: rfq.id.toUpperCase(),
     detail: `${rfq.requestedBy} · ${rfq.quantity} units · ${rfq.status}`,
-    href: `/demand/lead-response-capture?rfq=${encodeURIComponent(rfq.id)}`,
+    href: `/demand/leads-rfqs?rfq=${encodeURIComponent(rfq.id)}`,
     keywords: buildSearchText([rfq.id, rfq.requestedBy, rfq.status, rfq.skuId, rfq.quantity]),
     priority: 72,
   }));
@@ -224,7 +224,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'Campaign' as const,
     title: campaign.name,
     detail: `${campaign.channel} · ${campaign.targetSegment} · ${campaign.status}`,
-    href: `/demand/campaign-ops?campaign=${encodeURIComponent(campaign.id)}`,
+    href: `/demand/campaigns?campaign=${encodeURIComponent(campaign.id)}`,
     keywords: buildSearchText([
       campaign.name,
       campaign.channel,

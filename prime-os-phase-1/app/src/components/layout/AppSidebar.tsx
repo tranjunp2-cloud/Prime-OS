@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -105,6 +105,7 @@ function SidebarFolder({
   const isActive = activeIds.has(node.id);
   const label = getShellNavLabel(locale, node.id, node.label);
   const badge = node.badge ? getShellNavBadge(locale, node.badge) : null;
+  const navigate = useNavigate();
   const [open, setOpen] = useState(isActive);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileTop, setMobileTop] = useState(80);
@@ -152,6 +153,12 @@ function SidebarFolder({
   }, [mobileOpen]);
 
   const handleToggle = () => {
+    const href = node.href ? getPrimeNodeHref(node) : '';
+
+    if (href && !node.external && !/^https?:\/\//.test(href)) {
+      navigate(href);
+    }
+
     setOpen((value) => !value);
 
     if (!window.matchMedia('(max-width: 767px)').matches) {
@@ -349,7 +356,7 @@ function AreaSection({
 export function AppSidebar() {
   const { locale } = useI18n();
   const location = useLocation();
-  const routeKey = location.pathname === '/account' ? `${location.pathname}${location.hash}` : location.pathname;
+  const routeKey = `${location.pathname}${location.search}${location.pathname === '/account' ? location.hash : ''}`;
   const activePath = getPrimeNavPath(routeKey);
   const activeIds = new Set(activePath.map((node) => node.id));
   const [overviewNode, ...areaNodes] = primeNavigation;

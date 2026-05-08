@@ -27,9 +27,14 @@ export function GlobalCopilotSurface({
   onClear,
 }: GlobalCopilotSurfaceProps) {
   const isAccountContext = context.title === 'Account Center';
+  const isOperatingHomeContext = context.title === 'Operating Home';
   const assistantLabel = isAccountContext ? 'Admin AI' : 'Prime AI';
-  const assistantBadge = isAccountContext ? 'IAM Guardrail' : 'Growth Advisor';
-  const assistantDescription = isAccountContext ? 'Access, permission, audit.' : 'Insight, recommendation, action.';
+  const assistantBadge = isAccountContext ? 'IAM Guardrail' : isOperatingHomeContext ? 'Mission Control' : 'Growth Advisor';
+  const assistantDescription = isAccountContext
+    ? 'Access, permission, audit.'
+    : isOperatingHomeContext
+      ? 'Action queue, risk radar, evidence.'
+      : 'Insight, recommendation, action.';
   const showDebug = (
     import.meta.env.DEV
     && typeof window !== 'undefined'

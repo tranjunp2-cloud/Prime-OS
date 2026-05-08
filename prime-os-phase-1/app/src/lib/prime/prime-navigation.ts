@@ -4,6 +4,7 @@ import {
   BellRing,
   Bot,
   Boxes,
+  Building2,
   ClipboardList,
   CircleDollarSign,
   Globe,
@@ -18,9 +19,9 @@ import {
   Shield,
   ShoppingCart,
   Store,
+  Tag,
   Target,
   Truck,
-  UserRound,
   UserRoundCheck,
   Workflow,
   Settings2,
@@ -213,7 +214,19 @@ export const primeNavigation: PrimeNavNode[] = [
     kind: 'area',
     icon: HeartHandshake,
     children: [
-      { id: 'crm-compact', label: 'CRM Compact', kind: 'tower', href: '/customer/crm-compact', icon: HeartHandshake },
+      {
+        id: 'crm-compact',
+        label: 'Customer Profile',
+        kind: 'tower',
+        href: '/customer/crm-compact?floor=overview',
+        matchPaths: ['/customer/crm-compact'],
+        icon: HeartHandshake,
+        children: [
+          { id: 'customer-account', label: 'Account Profile', kind: 'floor', href: '/customer/crm-compact?floor=account', matchPaths: ['/customer/crm-compact?floor=contact'], icon: Building2 },
+          { id: 'identity-matching', label: 'Identity Matching', kind: 'floor', href: '/customer/crm-compact?floor=identity', icon: ScanSearch },
+          { id: 'customer-tags', label: 'Customer Tags', kind: 'floor', href: '/customer/crm-compact?floor=tags', icon: Tag },
+        ],
+      },
       { id: 'service', label: 'Service', kind: 'tower', href: '/customer/service', icon: ClipboardList },
     ],
   },
@@ -226,9 +239,29 @@ export const primeNavigation: PrimeNavNode[] = [
   },
 ];
 
-const routeMatches = (pathname: string, href: string) => (
-  pathname === href || pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}#`)
-);
+const splitRoute = (route: string) => {
+  const [pathAndSearch, hash = ''] = route.split('#');
+  const [pathname, search = ''] = pathAndSearch.split('?');
+  return { pathname, search, hash };
+};
+
+const routeMatches = (routeKey: string, href: string) => {
+  const current = splitRoute(routeKey);
+  const target = splitRoute(href);
+
+  if (target.search) {
+    if (current.pathname !== target.pathname) return false;
+
+    const currentParams = new URLSearchParams(current.search);
+    const targetParams = new URLSearchParams(target.search);
+    return Array.from(targetParams.entries()).every(([key, value]) => currentParams.get(key) === value);
+  }
+
+  const samePath = current.pathname === target.pathname || current.pathname.startsWith(`${target.pathname}/`);
+  const sameHash = !target.hash || current.hash === target.hash;
+
+  return samePath && sameHash;
+};
 
 const nodeMatchCandidates = (node: PrimeNavNode) => (
   [node.href, ...(node.matchPaths || [])].filter(Boolean) as string[]

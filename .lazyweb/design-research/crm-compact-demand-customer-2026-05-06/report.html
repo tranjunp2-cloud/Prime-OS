@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Design Research: CRM Compact cho Demand -> Customer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7fb;
+      --paper: #ffffff;
+      --ink: #111827;
+      --muted: #5b6472;
+      --line: #e2e8f0;
+      --callout: #eaf3ff;
+      --callout-line: #bad7ff;
+      --accent: #4f46e5;
+      --green: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 44px 24px 72px;
+    }
+    h1, h2, h3 {
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 36px;
+    }
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 24px;
+      border-top: 1px solid var(--line);
+      padding-top: 24px;
+    }
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 18px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+    }
+    strong {
+      color: var(--ink);
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .callout {
+      background: var(--callout);
+      border: 1px solid var(--callout-line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 18px 0 22px;
+    }
+    .callout p {
+      margin: 0;
+      color: #17324d;
+    }
+    figure {
+      margin: 22px 0 34px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+    }
+    figure img {
+      display: block;
+      width: 100%;
+      max-height: 620px;
+      object-fit: cover;
+      object-position: top;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #0f111a;
+    }
+    figure.current img {
+      max-height: none;
+    }
+    figcaption {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    pre {
+      overflow: auto;
+      background: #0f172a;
+      color: #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0 8px;
+    }
+    .meta div {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--muted);
+    }
+    .meta b {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .source-list {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .source-list li {
+      margin: 6px 0;
+    }
+    .tag {
+      color: var(--green);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    @media (max-width: 720px) {
+      main { padding: 28px 16px 52px; }
+      h1 { font-size: 28px; }
+      .meta { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <p class="tag">Prime OS / Customer Area / CRM Compact</p>
+  <h1>Design Research: CRM Compact cho Demand -> Customer</h1>
+
+  <h2>TL;DR</h2>
+  <div class="callout">
+    <p>CRM Compact khong nen copy template CRM sales pipeline chung. Mau phu hop nhat cho Prime OS la <strong>account action workspace</strong>: danh sach customer can xu ly, panel 360 cua record dang chon, ly do diem fit/risk, next action co owner, va duong handoff Demand -> Customer -> Intelligence ro rang.</p>
+  </div>
+
+  <h2>Current State</h2>
+  <figure class="current">
+    <img src="references/current-state.png" alt="Prime OS CRM Compact current state">
+    <figcaption>Prime OS Customer Area -> CRM Compact, route duoc demand/customer context nap vao mot workbench compact.</figcaption>
+  </figure>
+
+  <h2>Project Context</h2>
+  <div class="meta">
+    <div><b>Project</b>Prime OS, Customer Area, CRM Compact Tower.</div>
+    <div><b>Business goal</b>Bien demand signal va buyer memory thanh follow-up/retention/replenishment action co owner.</div>
+    <div><b>Operator</b>Commerce growth/customer operator, Demand owner, Service owner, Intelligence reviewer.</div>
+    <div><b>Boundary</b>Customer giu memory; Demand tao opportunity; COS giu execution truth; Intelligence doc outcome.</div>
+  </div>
+
+  <h2>Recommendations / Next Steps</h2>
+  <ol>
+    <li><strong>Chuyen "Compare customer records" thanh Account Action Queue</strong> - dung table dense, co filter lanes <code>Needs follow-up</code>, <code>B2B replenishment</code>, <code>Service watch</code>, <code>Demand handoff ready</code>.</li>
+    <li><strong>Dung list-detail-action thay vi hero card lon</strong> - table la navigation; selected Customer 360 la noi ra quyet dinh.</li>
+    <li><strong>Giai thich diem <code>Customer fit 96%</code> bang reason codes</strong> - fit/revenue/recency/service risk/demand signal phai co source facts.</li>
+    <li><strong>Lam Demand handoff visible o tung record</strong> - record nao, signal nao, payload nao, owner nao, next tower nao.</li>
+    <li><strong>Prime AI nen la command drawer co guardrail</strong> - hien draft, required checks, owner approval, expected outcome, rollback/handoff result.</li>
+  </ol>
+
+  <h3>Queue Shape</h3>
+  <pre><code>+--------------------------------------------------------------------------------+
+| Account Action Queue     [Needs follow-up] [B2B] [Service watch] [Demand ready] |
++---------------------+---------+-----------+----------+-----------+--------------+
+| Customer            | Owner   | Fit/Risk  | Why now  | Source    | Next action  |
+| Emma / Kansai       | Hana    | 96 / Low  | reorder  | campaign  | Follow-up -> |
++---------------------+---------+-----------+----------+-----------+--------------+</code></pre>
+
+  <h3>Selected Record Shape</h3>
+  <pre><code>+---------------------------+-----------------------------------------------+
+| Prioritized records       | Emma Thompson                                  |
+| > Emma  96  reorder       | Memory: Kansai Office Supply / 29 orders      |
+|   Wei   92  marketplace   | Timeline: campaign -> order -> service note   |
+|   Lisa  88  retention     | Product route: CR-NTB-BLK-A5-A4               |
+|                           | [Draft follow-up] [Send to Trends] [Assign]   |
++---------------------------+-----------------------------------------------+</code></pre>
+
+  <h2>Key Examples</h2>
+  <figure>
+    <img src="references/clay-relationship-timeline.png" alt="Clay relationship timeline CRM">
+    <figcaption>Clay - unified contacts, relationship timeline, reminders, follow-up memory, searchable interaction history. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/folk-agency-crm.png" alt="Folk agency CRM dashboard">
+    <figcaption>Folk - agency CRM preview with pipeline, activity feed, contact panels; useful for compact relationship workflow. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/pendo-churn-prediction.png" alt="Pendo churn prediction dashboard">
+    <figcaption>Pendo - churn prediction flow shows prioritized insights, definitions, analytics, and quick deeper-analysis actions. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/userpilot-expansion-revenue.png" alt="Userpilot expansion revenue dashboard">
+    <figcaption>Userpilot - expansion revenue dashboard identifies customers ready for upgrade/action using data-backed readiness. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/common-room-actions-pipelines.png" alt="Common Room actions pipelines">
+    <figcaption>Common Room - action pipelines with CRM/sheet integrations; good model for explicit handoff routes. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/keyplay-salesforce-icp.png" alt="Keyplay Salesforce ICP signals">
+    <figcaption>Keyplay - ICP/account signals surfaced inside Salesforce; useful pattern for keeping Demand/account intelligence close to CRM. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/anydo-sales-crm.png" alt="Any.do sales CRM">
+    <figcaption>Any.do - classic CRM customer pipeline/table; good for density, but Prime OS should add ownership, impact, and cross-area handoff. [Lazyweb]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/web-hubspot-crm.png" alt="HubSpot CRM live web capture">
+    <figcaption>HubSpot CRM product page captured live; reinforces contacts, deals, tasks, and unified CRM workspace expectations. [Web]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/web-salesforce-crm.png" alt="Salesforce CRM live web capture">
+    <figcaption>Salesforce CRM page captured live; useful benchmark for Customer 360 positioning, but too broad for Prime OS compact scope. [Web]</figcaption>
+  </figure>
+  <figure>
+    <img src="references/web-gainsight-cs.png" alt="Gainsight customer success live web capture">
+    <figcaption>Gainsight Customer Success page captured live; relevant for health, retention, and customer success operating patterns. [Web]</figcaption>
+  </figure>
+
+  <h2>Patterns</h2>
+  <ul>
+    <li><strong>Queue first, profile second, action third.</strong> What needs attention -> why this account -> next accountable action.</li>
+    <li><strong>Scores need reason codes.</strong> Fit/health/risk should reveal source facts, not just a percent.</li>
+    <li><strong>Timeline is operating memory.</strong> Interaction history, reminders, product/service context, and follow-up state belong together.</li>
+    <li><strong>Owner and SLA are first-class.</strong> Show who owns next move, by when, and what tower receives/returns outcome.</li>
+    <li><strong>CRM integrates, it does not absorb everything.</strong> Product truth stays Product Master; order state stays OMS; service execution stays Service/Fulfillment.</li>
+  </ul>
+
+  <h2>Anti-Patterns</h2>
+  <ul>
+    <li>Generic sales pipeline columns only: lead/deal stages do not explain Prime OS customer memory.</li>
+    <li>Card farm above a flat table: looks polished but slows operator decision-making.</li>
+    <li>AI CTA without audit: Prime AI must show why, source, allowed action, and owner approval.</li>
+    <li>Hidden Demand source: record should reveal which campaign, lead, RFQ, retargeting rule, or trend created the follow-up.</li>
+    <li>Score theater: <code>96%</code> without reason, freshness, or risk becomes decorative.</li>
+  </ul>
+
+  <h2>Unique Angles for Prime OS</h2>
+  <ul>
+    <li><strong>Customer memory as a routing object:</strong> a compact payload that can move to Demand, Service, OMS, or Trends Intelligence.</li>
+    <li><strong>Commerce-native CRM:</strong> product route, channel, order count, revenue, replenishment timing, service watch, and campaign source together.</li>
+    <li><strong>Decision readiness, not CRM completeness:</strong> optimize for "can the operator make the next accountable move now?"</li>
+  </ul>
+
+  <h2>Suggested Screen Shape</h2>
+  <pre><code>+----------------------------------------------------------------------------------+
+| CRM Compact                                             Decision readiness 84%     |
+| Customer memory -> follow-up -> owner -> outcome                                  |
++----------------------------------------------------------------------------------+
+| Lanes: [Needs follow-up] [B2B replenishment] [Service watch] [Demand handoff]      |
++------------------------------------------+---------------------------------------+
+| Account Action Queue                     | Selected Customer 360                 |
+| Emma Thompson   96  reorder   Hana ->    | Buyer memory / timeline / product     |
+| Wei Chen        92  marketplace Ito ->   | route / service watch / demand source |
+| Lisa Nguyen     88  retention  Mika ->   |                                       |
+| Sakura Yamamoto 84  B2B        Ken  ->   | Prime AI recommended action           |
++------------------------------------------+---------------------------------------+
+| Handoff trail: Campaign -> CRM Compact -> Trends Intelligence -> Demand outcome   |
++----------------------------------------------------------------------------------+</code></pre>
+
+  <h2>Sources</h2>
+  <ul class="source-list">
+    <li>Lazyweb database searches on 2026-05-06: Clay, Folk, Pendo, Userpilot, Common Room, Keyplay, Any.do CRM/dashboard references.</li>
+    <li><a href="https://www.hubspot.com/products/crm">HubSpot CRM product page</a>, captured live on 2026-05-06.</li>
+    <li><a href="https://www.salesforce.com/crm/">Salesforce CRM page</a>, captured live on 2026-05-06.</li>
+    <li><a href="https://www.gainsight.com/customer-success/">Gainsight Customer Success page</a>, captured live on 2026-05-06.</li>
+    <li>Current Prime OS route captured locally: <code>http://127.0.0.1:5188/customer/crm-compact</code>.</li>
+  </ul>
+</main>
+</body>
+</html>

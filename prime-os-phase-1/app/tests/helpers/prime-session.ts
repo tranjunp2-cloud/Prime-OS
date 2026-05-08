@@ -43,8 +43,7 @@ export async function installPrimeSession(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('prime-os-genesis-theme', 'light');
   });
-  await page.goto('/overview');
-  await page.waitForURL(/\/overview$/, { timeout: 10_000 });
+  await page.goto('/overview', { waitUntil: 'domcontentloaded' });
 }
 
 export async function expectPrimeShellReady(page: Page) {
