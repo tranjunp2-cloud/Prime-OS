@@ -25,6 +25,7 @@ import UIRegressionReview from "./pages/UIRegressionReview";
 import { AppLayout } from "./components/layout/AppLayout";
 import { LegacyEntityRedirect, LegacyPathRedirect } from "./components/routing/LegacyEntityRedirect";
 import { PrimeOverview } from "./pages/prime/PrimeOverview";
+import { PrimeFinSupportPage } from "./pages/prime/PrimeFinSupportPage";
 import { PrimeDemandHubPage, PrimeDemandSourcesPage, PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "./pages/prime/CommerceSurfacePage";
 import { CosPolicyRulePage } from "./pages/prime/CosPolicyRulePage";
@@ -115,14 +116,16 @@ const App = () => {
                     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
                     <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />
 
-                    <Route path="/finance/health" element={<PrimeTowerPage towerId="settlement" />} />
-                    <Route path="/finance/capital-offers" element={<PrimeTowerPage towerId="offers" />} />
-                    <Route path="/finance/risk-trust" element={<PrimeTowerPage towerId="risk" />} />
-                    <Route path="/finance/capital-readiness" element={<Navigate to="/finance/capital-offers" replace />} />
-                    <Route path="/finance/settlement-repayment" element={<Navigate to="/finance/health" replace />} />
-                    <Route path="/finance/capital" element={<Navigate to="/finance/capital-offers" replace />} />
-                    <Route path="/finance/lending" element={<Navigate to="/finance/capital-offers" replace />} />
-                    <Route path="/finance/risk" element={<Navigate to="/finance/risk-trust" replace />} />
+                    <Route path="/finance" element={<Navigate to="/finance/fin-support" replace />} />
+                    <Route path="/finance/fin-support" element={<PrimeFinSupportPage />} />
+                    <Route path="/finance/health" element={<Navigate to="/finance/fin-support#status" replace />} />
+                    <Route path="/finance/capital-offers" element={<Navigate to="/finance/fin-support#lenders" replace />} />
+                    <Route path="/finance/risk-trust" element={<Navigate to="/finance/fin-support#blockers" replace />} />
+                    <Route path="/finance/capital-readiness" element={<Navigate to="/finance/fin-support#funding-application-flow" replace />} />
+                    <Route path="/finance/settlement-repayment" element={<Navigate to="/finance/fin-support#status" replace />} />
+                    <Route path="/finance/capital" element={<Navigate to="/finance/fin-support#lenders" replace />} />
+                    <Route path="/finance/lending" element={<Navigate to="/finance/fin-support#lenders" replace />} />
+                    <Route path="/finance/risk" element={<Navigate to="/finance/fin-support#blockers" replace />} />
 
                     <Route path="/ecom/commerce-surface" element={<CommerceSurfacePage />} />
                     <Route path="/ecom/cos/product-master" element={<Products />} />
