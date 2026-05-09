@@ -19,7 +19,6 @@ import {
   Shield,
   ShoppingCart,
   Store,
-  Tag,
   Target,
   Truck,
   UserRoundCheck,
@@ -222,9 +221,8 @@ export const primeNavigation: PrimeNavNode[] = [
         matchPaths: ['/customer/crm-compact'],
         icon: HeartHandshake,
         children: [
-          { id: 'customer-account', label: 'Account Profile', kind: 'floor', href: '/customer/crm-compact?floor=account', matchPaths: ['/customer/crm-compact?floor=contact'], icon: Building2 },
+          { id: 'customer-account', label: 'Account Profile', kind: 'floor', href: '/customer/crm-compact?floor=account', matchPaths: ['/customer/crm-compact?floor=contact', '/customer/crm-compact?floor=tags'], icon: Building2 },
           { id: 'identity-matching', label: 'Identity Matching', kind: 'floor', href: '/customer/crm-compact?floor=identity', icon: ScanSearch },
-          { id: 'customer-tags', label: 'Customer Tags', kind: 'floor', href: '/customer/crm-compact?floor=tags', icon: Tag },
         ],
       },
       { id: 'service', label: 'Service', kind: 'tower', href: '/customer/service', icon: ClipboardList },

@@ -7,14 +7,31 @@ test.describe.configure({ mode: 'serial' });
 const a11yRoutes = [
   '/auth',
   '/overview',
+  '/intelligence/decision-hub',
   '/intelligence/launch-decisions',
-  '/demand/campaign-ops',
-  '/customer/crm-compact',
+  '/demand/leads-rfqs?lead=lead_1_1',
+  '/customer/crm-compact?floor=overview',
+  '/customer/crm-compact?floor=account',
+  '/finance/fin-support#documents',
+  '/finance/fin-support#status',
   '/ecom/cos/product-master',
   '/ecom/cos/oms',
   '/ecom/cos/fulfillment',
   '/ecom/cos/returns',
 ];
+
+const detailJourneys = [
+  { name: 'OMS order detail', listRoute: '/ecom/cos/oms', targetUrl: /\/ecom\/cos\/oms\/[^/]+$/ },
+  { name: 'Return detail', listRoute: '/ecom/cos/returns', targetUrl: /\/ecom\/cos\/returns\/[^/]+$/ },
+];
+
+async function expectNoAxeViolations(page: import('@playwright/test').Page) {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
 
 test.describe('accessibility smoke', () => {
   for (const route of a11yRoutes) {
@@ -28,16 +45,27 @@ test.describe('accessibility smoke', () => {
       await page.goto(route);
 
       if (route === '/auth') {
-        await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-      } else {
-        await expectPrimeShellReady(page);
+        await expect(page).toHaveURL(/\/overview$/);
       }
+      await expectPrimeShellReady(page);
 
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa'])
-        .analyze();
+      await expectNoAxeViolations(page);
+    });
+  }
 
-      expect(results.violations).toEqual([]);
+  for (const journey of detailJourneys) {
+    test(`${journey.name} has no axe violations in core rules`, async ({ page }) => {
+      await installPrimeSession(page);
+      await page.goto(journey.listRoute);
+      await expectPrimeShellReady(page);
+
+      const firstRow = page.locator('tbody tr').first();
+      await expect(firstRow).toBeVisible({ timeout: 20_000 });
+      await firstRow.click();
+      await expect(page).toHaveURL(journey.targetUrl);
+      await expectPrimeShellReady(page);
+
+      await expectNoAxeViolations(page);
     });
   }
 });
@@ -68,22 +96,11 @@ test('command palette traps keyboard context and closes with Escape', async ({ p
   await expect(dialog).toBeHidden();
 });
 
-test('auth form exposes visible labels and error state', async ({ page }) => {
+test('auth route redirects to the local bypass shell', async ({ page }) => {
   await mockPrimeBackend(page);
-  await page.route('**/api/auth/login', async (route) => {
-    await route.fulfill({
-      status: 401,
-      contentType: 'application/json',
-      body: JSON.stringify({ message: 'Invalid email or password.' }),
-    });
-  });
-
   await page.goto('/auth');
-  await expect(page.getByLabel('Email')).toBeVisible();
-  await expect(page.getByLabel('Password')).toBeVisible();
-  await page.getByLabel('Email').fill('wrong@example.com');
-  await page.getByLabel('Password').fill('bad-password');
-  await page.getByRole('button', { name: 'Sign in' }).click();
 
-  await expect(page.locator('form').getByText('Invalid email or password.')).toBeVisible();
+  await expect(page).toHaveURL(/\/overview$/);
+  await expectPrimeShellReady(page);
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toHaveCount(0);
 });

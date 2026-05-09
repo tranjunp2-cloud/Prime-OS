@@ -21,12 +21,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PartnerWorkspacePanel } from '@/components/prime/PartnerWorkspacePanel';
+import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
 import { getPrimeSnapshot, getSkuProductName } from '@/lib/prime/prime-data';
 
 const currency = new Intl.NumberFormat('ja-JP', {
@@ -176,7 +177,9 @@ function openPrimeAi(context?: Record<string, string>) {
 export function PrimeOverview() {
   const [operatingMode, setOperatingMode] = useState<OperatingMode>('command');
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const snapshot = getPrimeSnapshot();
+  const partnerWorkspace = getPartnerWorkspaceSummary(searchParams.get('role'));
 
   const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
   const totalLeads = snapshot.leads.length;
@@ -604,6 +607,8 @@ export function PrimeOverview() {
           onAskAi={() => openPrimeAi(primeAiContext)}
         />
 
+        {partnerWorkspace ? <PartnerWorkspacePanel summary={partnerWorkspace} /> : null}
+
         <OperatorModeSwitch mode={operatingMode} onModeChange={setOperatingMode} />
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
@@ -751,13 +756,21 @@ function OperatorModeSwitch({
         <div className="text-sm font-semibold">Operator mode</div>
         <p className="text-xs text-muted-foreground">{modeCopy[mode]}</p>
       </div>
-      <Tabs value={mode} onValueChange={(value) => onModeChange(value as OperatingMode)}>
-        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
-          <TabsTrigger value="command">Command</TabsTrigger>
-          <TabsTrigger value="investigate">Investigate</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="grid w-full grid-cols-3 gap-1 rounded-lg border bg-muted p-1 sm:w-auto" role="group" aria-label="Operator mode">
+        {(['command', 'investigate', 'audit'] as OperatingMode[]).map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            variant={mode === option ? 'secondary' : 'ghost'}
+            className="h-8 px-3 capitalize"
+            aria-pressed={mode === option}
+            onClick={() => onModeChange(option)}
+          >
+            {option}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

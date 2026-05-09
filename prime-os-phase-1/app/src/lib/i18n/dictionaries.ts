@@ -389,9 +389,13 @@ export type Dictionary = {
         expandVariants: string;
         variantLabel: string;
         noImageAvailable: string;
+        showImageAria: string;
+        imageViewAlt: string;
         statusLabel: string;
         typeLabel: string;
         salesChannels: string;
+        openChannelListingAria: string;
+        openChannelListingTitle: string;
         channelSku: string;
         lastSynced: string;
         editProduct: string;
@@ -412,6 +416,7 @@ export type Dictionary = {
         dateRange: string;
         colOrderId: string;
         colDate: string;
+        colType: string;
         colCustomer: string;
         colChannel: string;
         colTotal: string;
@@ -439,11 +444,14 @@ export type Dictionary = {
         emptyTitle: string;
         emptyDesc: string;
         detailBack: string;
+        detailBackAria: string;
         detailNotFound: string;
         detailNotFoundDesc: string;
         detailOrder: string;
+        detailReference: string;
         detailPlacedOn: string;
         detailSla: string;
+        errorTitle: string;
         detailAllocate: string;
         detailReserve: string;
         detailSendFulfillment: string;
@@ -529,6 +537,7 @@ export type Dictionary = {
         tableNoDataDesc: string;
         colSku: string;
         colWarehouse: string;
+        colCountry: string;
         colStock: string;
         colReserved: string;
         colInTransit: string;
@@ -743,6 +752,7 @@ export type Dictionary = {
         colCreated: string;
         openReturn: string;
         detailBack: string;
+        detailBackAria: string;
         detailNotFound: string;
         detailNotFoundDesc: string;
         detailOrder: string;
@@ -785,6 +795,7 @@ export type Dictionary = {
         typeMarketplace: string;
         search: string;
         viewDetails: string;
+        items: string;
     };
     controlTower: {
         pageTitle: string;
@@ -1227,9 +1238,13 @@ const enUS: Dictionary = {
         expandVariants: 'Expand variants',
         variantLabel: 'variant',
         noImageAvailable: 'No image available',
+        showImageAria: 'Show image {index} of {total}',
+        imageViewAlt: '{name} view {index}',
         statusLabel: 'Status',
         typeLabel: 'Type',
         salesChannels: 'Sales Channels',
+        openChannelListingAria: 'Open {channel} listing for {name}',
+        openChannelListingTitle: 'Open {channel} listing',
         channelSku: 'Channel SKU',
         lastSynced: 'Last Synced',
         editProduct: 'Edit product',
@@ -1250,6 +1265,7 @@ const enUS: Dictionary = {
         dateRange: 'Date Range',
         colOrderId: 'Order ID',
         colDate: 'Date',
+        colType: 'Type',
         colCustomer: 'Customer',
         colChannel: 'Channel',
         colTotal: 'Total',
@@ -1277,11 +1293,14 @@ const enUS: Dictionary = {
         emptyTitle: 'No orders have arrived yet',
         emptyDesc: 'Orders from your connected channels will appear here once sync is active.',
         detailBack: 'Back to Orders',
+        detailBackAria: 'Back to {label}',
         detailNotFound: 'Order not found',
         detailNotFoundDesc: 'This order may have been removed from the current demo session, or the link is stale.',
         detailOrder: 'Order {id}',
+        detailReference: 'Ref: {ref}',
         detailPlacedOn: 'Placed on {date}',
         detailSla: 'SLA: {days} days',
+        errorTitle: 'Error',
         detailAllocate: 'Allocate Warehouse',
         detailReserve: 'Reserve Inventory',
         detailSendFulfillment: 'Send to Fulfillment',
@@ -1367,6 +1386,7 @@ const enUS: Dictionary = {
         tableNoDataDesc: 'Add inventory to see stock levels',
         colSku: 'SKU',
         colWarehouse: 'Warehouse',
+        colCountry: 'Country',
         colStock: 'Stock',
         colReserved: 'Reserved',
         colInTransit: 'In Transit',
@@ -1581,6 +1601,7 @@ const enUS: Dictionary = {
         colCreated: 'Created',
         openReturn: 'Open return {id}',
         detailBack: 'Back to Returns',
+        detailBackAria: 'Back to {label}',
         detailNotFound: 'Return not found',
         detailNotFoundDesc: 'This return may have been removed from the current demo session, or the link is stale.',
         detailOrder: 'Order: {id}',
@@ -1623,6 +1644,7 @@ const enUS: Dictionary = {
         typeMarketplace: 'Marketplace',
         search: 'Search',
         viewDetails: 'View Details',
+        items: 'items',
     },
     controlTower: {
         pageTitle: 'Control Tower',
@@ -2065,9 +2087,13 @@ const jaJP: Dictionary = {
         expandVariants: 'バリエーションを展開',
         variantLabel: 'バリエーション',
         noImageAvailable: '画像がありません',
+        showImageAria: '{total}枚中{index}枚目の画像を表示',
+        imageViewAlt: '{name} 表示 {index}',
         statusLabel: 'ステータス',
         typeLabel: 'タイプ',
         salesChannels: '販売チャネル',
+        openChannelListingAria: '{name} の {channel} 出品を開く',
+        openChannelListingTitle: '{channel} 出品を開く',
         channelSku: 'チャネル SKU',
         lastSynced: '最終同期',
         editProduct: '商品を編集',
@@ -2088,6 +2114,7 @@ const jaJP: Dictionary = {
         dateRange: '期間',
         colOrderId: '注文ID',
         colDate: '日付',
+        colType: 'タイプ',
         colCustomer: '顧客',
         colChannel: 'チャネル',
         colTotal: '合計',
@@ -2115,11 +2142,14 @@ const jaJP: Dictionary = {
         emptyTitle: '注文はまだありません',
         emptyDesc: '接続済みチャネルからの注文は、同期が有効になるとここに表示されます。',
         detailBack: '注文一覧に戻る',
+        detailBackAria: '{label} に戻る',
         detailNotFound: '注文が見つかりません',
         detailNotFoundDesc: 'この注文は現在のデモセッションから削除されたか、リンクが無効になっている可能性があります。',
         detailOrder: '注文 {id}',
+        detailReference: '参照: {ref}',
         detailPlacedOn: '{date} の注文',
         detailSla: 'SLA: {days} 日',
+        errorTitle: 'エラー',
         detailAllocate: '倉庫を割り当て',
         detailReserve: '在庫を引当',
         detailSendFulfillment: '発送センターに転送',
@@ -2205,6 +2235,7 @@ const jaJP: Dictionary = {
         tableNoDataDesc: '在庫レベルを表示するには在庫を追加してください',
         colSku: 'SKU',
         colWarehouse: '倉庫',
+        colCountry: '国',
         colStock: '在庫',
         colReserved: '引当済み',
         colInTransit: '移動中',
@@ -2419,6 +2450,7 @@ const jaJP: Dictionary = {
         colCreated: '作成日',
         openReturn: '返品 {id} を開く',
         detailBack: '返品一覧に戻る',
+        detailBackAria: '{label} に戻る',
         detailNotFound: '返品が見つかりません',
         detailNotFoundDesc: 'この返品は現在のデモセッションから削除されたか、リンクが無効になっている可能性があります。',
         detailOrder: '注文: {id}',
@@ -2461,6 +2493,7 @@ const jaJP: Dictionary = {
         typeMarketplace: 'マーケットプレイス',
         search: '検索',
         viewDetails: '詳細を見る',
+        items: '件',
     },
     controlTower: {
         pageTitle: 'コントロールタワー',
@@ -2903,9 +2936,13 @@ const viVN: Dictionary = {
         expandVariants: 'Mở rộng biến thể',
         variantLabel: 'biến thể',
         noImageAvailable: 'Không có hình ảnh',
+        showImageAria: 'Hiển thị ảnh {index} trên {total}',
+        imageViewAlt: '{name} góc nhìn {index}',
         statusLabel: 'Trạng thái',
         typeLabel: 'Loại',
         salesChannels: 'Kênh bán',
+        openChannelListingAria: 'Mở listing {channel} của {name}',
+        openChannelListingTitle: 'Mở listing {channel}',
         channelSku: 'SKU trên kênh',
         lastSynced: 'Đồng bộ gần nhất',
         editProduct: 'Sửa sản phẩm',
@@ -2926,6 +2963,7 @@ const viVN: Dictionary = {
         dateRange: 'Khoảng thời gian',
         colOrderId: 'Mã Đơn',
         colDate: 'Ngày',
+        colType: 'Loại',
         colCustomer: 'Khách Hàng',
         colChannel: 'Kênh',
         colTotal: 'Tổng',
@@ -2953,11 +2991,14 @@ const viVN: Dictionary = {
         emptyTitle: 'Chưa có đơn hàng nào',
         emptyDesc: 'Đơn từ các kênh đã kết nối sẽ xuất hiện tại đây khi đồng bộ hoạt động.',
         detailBack: 'Quay lại',
+        detailBackAria: 'Quay lại {label}',
         detailNotFound: 'Không tìm thấy đơn hàng',
         detailNotFoundDesc: 'Đơn này có thể đã bị xóa khỏi phiên demo hiện tại hoặc đường dẫn không còn hợp lệ.',
         detailOrder: 'Đơn hàng {id}',
+        detailReference: 'Tham chiếu: {ref}',
         detailPlacedOn: 'Đặt vào {date}',
         detailSla: 'Thời gian cam kết (SLA): {days} ngày',
+        errorTitle: 'Lỗi',
         detailAllocate: 'Phân bổ nhà kho',
         detailReserve: 'Giữ trước tồn kho',
         detailSendFulfillment: 'Gửi yêu cầu đóng gói',
@@ -3043,6 +3084,7 @@ const viVN: Dictionary = {
         tableNoDataDesc: 'Thêm hàng tồn kho để xem mức tồn kho',
         colSku: 'SKU',
         colWarehouse: 'Nhà kho',
+        colCountry: 'Quốc gia',
         colStock: 'Tồn kho',
         colReserved: 'Đã giữ',
         colInTransit: 'Đang giao',
@@ -3257,6 +3299,7 @@ const viVN: Dictionary = {
         colCreated: 'Ngày tạo',
         openReturn: 'Mở phiếu trả hàng {id}',
         detailBack: 'Quay lại trả hàng',
+        detailBackAria: 'Quay lại {label}',
         detailNotFound: 'Không tìm thấy phiếu trả',
         detailNotFoundDesc: 'Phiếu trả này có thể đã bị xóa khỏi phiên demo hiện tại hoặc đường dẫn không còn hợp lệ.',
         detailOrder: 'Đơn: {id}',
@@ -3299,6 +3342,7 @@ const viVN: Dictionary = {
         typeMarketplace: 'Sàn Thương Mại',
         search: 'Tìm kiếm',
         viewDetails: 'Xem Chi Tiết',
+        items: 'mục',
     },
     controlTower: {
         pageTitle: 'Tháp Điều Khiển',

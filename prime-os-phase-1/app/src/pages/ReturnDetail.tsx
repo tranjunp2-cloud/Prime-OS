@@ -21,6 +21,7 @@ import { useState } from 'react';
 import type { ReturnItemUiModel } from '@/lib/contracts/returns';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedMoney, formatMessage } from '@/lib/i18n/format';
+import { getLocalizedDispositionLabel } from '@/lib/i18n/ops-labels';
 
 export default function ReturnDetail() {
   const { id } = useParams<{ id: string }>();
@@ -73,7 +74,13 @@ export default function ReturnDetail() {
       <PageHeader
         title={
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="size-8" onClick={goBack} aria-label={`Back to ${backLabel}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={goBack}
+              aria-label={formatMessage(t('returnsPage.detailBackAria'), { label: backLabel })}
+            >
               <ArrowLeft className="size-4" />
             </Button>
             <span>RMA {ret.display_rma}</span>
@@ -174,7 +181,9 @@ export default function ReturnDetail() {
                     </TableCell>
                     <TableCell>
                       {item.disposition ? (
-                        <Badge variant="outline" className="text-xs">{item.disposition}</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {getLocalizedDispositionLabel(item.disposition, t)}
+                        </Badge>
                       ) : '—'}
                     </TableCell>
                     <TableCell>

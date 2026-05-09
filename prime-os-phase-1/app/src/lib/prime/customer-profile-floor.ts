@@ -39,6 +39,11 @@ export type CustomerAccount = {
   orderCount: number;
   identityCompleteness: number;
   notes: string[];
+  lifecycleStage: CustomerLifecycleStage;
+  timelineEvents: CustomerTimelineEvent[];
+  followUps: CustomerFollowUp[];
+  rfqQuoteLinks: CustomerRFQQuoteLink[];
+  serviceCases: CustomerServiceCase[];
   profile?: CustomerAccountProfile;
 };
 
@@ -111,6 +116,99 @@ export type CustomerRecentEvent = {
   message: string;
   actorType: string;
   createdAt: string;
+};
+
+export type CustomerSourceOwner = 'Customer' | 'Customer Service' | 'Demand' | 'Ecom/COS' | 'Finance' | 'Intelligence';
+
+export type CustomerTimelineEventType =
+  | 'customer_memory'
+  | 'lead'
+  | 'rfq'
+  | 'order'
+  | 'order_event'
+  | 'service_case'
+  | 'return_refund'
+  | 'finance_signal'
+  | 'intelligence_signal'
+  | 'follow_up';
+
+export type CustomerTimelineEvent = {
+  id: string;
+  customerId: string;
+  sourceOfTruthOwner: CustomerSourceOwner;
+  readModelOwner: 'Customer';
+  sourceEntityType: 'customer' | 'lead' | 'rfq' | 'order' | 'order_event' | 'service_case' | 'return' | 'finance_profile' | 'intelligence_signal' | 'follow_up';
+  sourceEntityId: string;
+  occurredAt: string;
+  eventType: CustomerTimelineEventType;
+  summary: string;
+  ownerId: string;
+  nextAction: string;
+  businessImpact: string;
+  href?: string;
+  auditId?: string;
+};
+
+export type CustomerLifecycleStage = {
+  customerId: string;
+  stage: CustomerLifecycle;
+  ownerId: string;
+  nextAction: string;
+  reason: string;
+  updatedAt: string;
+  sourceOfTruthOwner: 'Customer';
+  readModelOwner: 'Customer';
+};
+
+export type CustomerFollowUp = {
+  id: string;
+  customerId: string;
+  ownerId: string;
+  status: 'open' | 'waiting' | 'blocked' | 'done';
+  priority: 'normal' | 'high';
+  dueAt: string;
+  sourceOfTruthOwner: 'Customer';
+  readModelOwner: 'Customer';
+  source: CustomerSourceOwner;
+  sourceEntityId: string;
+  allowedAction: string;
+  humanApprovalBoundary: string;
+  nextAction: string;
+  businessImpact: string;
+  href?: string;
+};
+
+export type CustomerRFQQuoteLink = {
+  id: string;
+  customerId: string;
+  leadId: string | null;
+  rfqId: string | null;
+  orderId: string | null;
+  skuId: string | null;
+  status: 'new' | 'qualified' | 'rfq_sent' | 'draft' | 'quoted' | 'converted';
+  quantity: number | null;
+  value: number | null;
+  sourceOfTruthOwner: 'Demand';
+  readModelOwner: 'Customer';
+  handoff: string;
+  href: string;
+};
+
+export type CustomerServiceCase = {
+  id: string;
+  customerId: string;
+  orderId: string | null;
+  rmaId: string | null;
+  status: 'open' | 'waiting_ops' | 'resolved';
+  priority: 'normal' | 'high';
+  sla: string;
+  ownerId: string;
+  pendingAction: string;
+  sourceOfTruthOwner: 'Customer Service';
+  readModelOwner: 'Customer';
+  linkedEntity: string;
+  intelligenceHandoff: string;
+  href: string;
 };
 
 export type CustomerContact = {
@@ -311,6 +409,422 @@ function topProducts(items: PrimeSnapshot['orderItems']): CustomerProductAffinit
   return [...products.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 4);
 }
 
+function phase2Date(index: number, offset: number) {
+  return `2026-05-${String(Math.min(28, 2 + index + offset)).padStart(2, '0')}T09:00:00.000Z`;
+}
+
+function buildLifecycleStage({
+  customer,
+  lifecycle,
+  ownerId,
+  serviceCases,
+  rfq,
+  index,
+}: {
+  customer: PrimeSnapshot['customers'][number];
+  lifecycle: CustomerLifecycle;
+  ownerId: string;
+  serviceCases: PrimeSnapshot['tickets'];
+  rfq: PrimeSnapshot['rfqs'][number] | undefined;
+  index: number;
+}): CustomerLifecycleStage {
+  const openServiceCase = serviceCases.find((ticket) => ticket.status !== 'resolved');
+
+  if (openServiceCase) {
+    return {
+      customerId: customer.id,
+      stage: 'at_risk',
+      ownerId,
+      nextAction: 'Resolve service blocker before the next commercial touch.',
+      reason: `${openServiceCase.subject} is still ${openServiceCase.status.replace('_', ' ')}.`,
+      updatedAt: phase2Date(index, 4),
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    };
+  }
+
+  if (rfq && rfq.status !== 'converted') {
+    return {
+      customerId: customer.id,
+      stage: lifecycle === 'lead' ? 'prospect' : lifecycle,
+      ownerId,
+      nextAction: 'Review RFQ status and confirm the quote-to-order route.',
+      reason: `RFQ ${rfq.id} is ${rfq.status}.`,
+      updatedAt: phase2Date(index, 3),
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    };
+  }
+
+  if (lifecycle === 'lead') {
+    return {
+      customerId: customer.id,
+      stage: lifecycle,
+      ownerId,
+      nextAction: 'Qualify the lead and assign the first account follow-up.',
+      reason: 'Demand intent exists but no COS order has been linked yet.',
+      updatedAt: phase2Date(index, 2),
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    };
+  }
+
+  if (lifecycle === 'retention') {
+    return {
+      customerId: customer.id,
+      stage: lifecycle,
+      ownerId,
+      nextAction: 'Prepare retention or replenishment outreach from order history.',
+      reason: 'Repeat buying context is visible and ready for a next-touch decision.',
+      updatedAt: phase2Date(index, 2),
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    };
+  }
+
+  return {
+    customerId: customer.id,
+    stage: lifecycle,
+    ownerId,
+    nextAction: 'Confirm the next account touch and keep Demand/COS context attached.',
+    reason: 'Customer has enough identity, owner, and commerce context for an operator decision.',
+    updatedAt: phase2Date(index, 2),
+    sourceOfTruthOwner: 'Customer',
+    readModelOwner: 'Customer',
+  };
+}
+
+function buildCustomerServiceCases(tickets: PrimeSnapshot['tickets'], ownerId: string): CustomerServiceCase[] {
+  return tickets.map((ticket) => ({
+    id: ticket.id,
+    customerId: ticket.customerId,
+    orderId: ticket.orderId,
+    rmaId: ticket.rmaId,
+    status: ticket.status,
+    priority: ticket.priority,
+    sla: ticket.sla,
+    ownerId,
+    pendingAction: ticket.status === 'resolved'
+      ? 'Confirm the resolution note is reflected in the customer timeline.'
+      : ticket.priority === 'high'
+        ? 'Escalate with COS return context before further outreach.'
+        : 'Send an update to the customer and keep OMS context attached.',
+    sourceOfTruthOwner: 'Customer Service',
+    readModelOwner: 'Customer',
+    linkedEntity: ticket.linkedEntity,
+    intelligenceHandoff: ticket.status === 'resolved'
+      ? 'Resolved service case can become positive trust feedback.'
+      : 'Open service issue should feed VOC and Intelligence risk signals.',
+    href: '/customer/service',
+  }));
+}
+
+function buildRfqQuoteLinks({
+  customer,
+  lead,
+  rfq,
+}: {
+  customer: PrimeSnapshot['customers'][number];
+  lead: PrimeSnapshot['leads'][number] | undefined;
+  rfq: PrimeSnapshot['rfqs'][number] | undefined;
+}): CustomerRFQQuoteLink[] {
+  if (!lead && !rfq) return [];
+
+  return [{
+    id: `continuity-${customer.id}-${rfq?.id ?? lead?.id ?? 'lead'}`,
+    customerId: customer.id,
+    leadId: lead?.id ?? rfq?.leadId ?? null,
+    rfqId: rfq?.id ?? null,
+    orderId: rfq?.orderId ?? null,
+    skuId: rfq?.skuId ?? lead?.skuId ?? null,
+    status: rfq?.status ?? lead?.status ?? 'new',
+    quantity: rfq?.quantity ?? null,
+    value: rfq?.value ?? null,
+    sourceOfTruthOwner: 'Demand',
+    readModelOwner: 'Customer',
+    handoff: rfq?.orderId
+      ? 'RFQ converted; Customer reads the OMS order link without owning order state.'
+      : 'Demand owns lead/RFQ state; Customer keeps the continuity preview for operator context.',
+    href: '/demand/leads-rfqs',
+  }];
+}
+
+function buildFollowUps({
+  customer,
+  lifecycleStage,
+  serviceCases,
+  rfqQuoteLinks,
+  customerOrders,
+  index,
+}: {
+  customer: PrimeSnapshot['customers'][number];
+  lifecycleStage: CustomerLifecycleStage;
+  serviceCases: CustomerServiceCase[];
+  rfqQuoteLinks: CustomerRFQQuoteLink[];
+  customerOrders: PrimeSnapshot['orders'];
+  index: number;
+}): CustomerFollowUp[] {
+  const serviceCase = serviceCases.find((ticket) => ticket.status !== 'resolved');
+  const rfqLink = rfqQuoteLinks.find((link) => link.status !== 'converted');
+  const dueAt = phase2Date(index, 6);
+
+  if (serviceCase) {
+    return [{
+      id: `followup-service-${serviceCase.id}`,
+      customerId: customer.id,
+      ownerId: serviceCase.ownerId,
+      status: serviceCase.priority === 'high' ? 'blocked' : 'open',
+      priority: serviceCase.priority,
+      dueAt,
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+      source: 'Customer Service',
+      sourceEntityId: serviceCase.id,
+      allowedAction: 'Create a service recovery follow-up after the case owner confirms the blocker.',
+      humanApprovalBoundary: 'Operator must approve customer-facing recovery copy.',
+      nextAction: serviceCase.pendingAction,
+      businessImpact: 'Prevents a service issue from becoming a failed Demand or Finance proof point.',
+      href: serviceCase.href,
+    }];
+  }
+
+  if (rfqLink) {
+    return [{
+      id: `followup-rfq-${rfqLink.id}`,
+      customerId: customer.id,
+      ownerId: lifecycleStage.ownerId,
+      status: 'open',
+      priority: 'high',
+      dueAt,
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+      source: 'Demand',
+      sourceEntityId: rfqLink.rfqId ?? rfqLink.leadId ?? customer.id,
+      allowedAction: 'Ask the buyer to confirm quantity, quote expectation, and order timing.',
+      humanApprovalBoundary: 'Operator must approve quote language; Customer does not edit RFQ terms.',
+      nextAction: lifecycleStage.nextAction,
+      businessImpact: 'Keeps Demand intent connected to the account before Commerce execution starts.',
+      href: rfqLink.href,
+    }];
+  }
+
+  return [{
+    id: `followup-lifecycle-${customer.id}`,
+    customerId: customer.id,
+    ownerId: lifecycleStage.ownerId,
+    status: lifecycleStage.stage === 'retention' ? 'waiting' : 'open',
+    priority: lifecycleStage.stage === 'at_risk' ? 'high' : 'normal',
+    dueAt,
+    sourceOfTruthOwner: 'Customer',
+    readModelOwner: 'Customer',
+    source: 'Customer',
+    sourceEntityId: customer.id,
+    allowedAction: customerOrders.length ? 'Send the next-touch note with latest OMS context attached.' : 'Qualify the account before any COS handoff.',
+    humanApprovalBoundary: 'Operator approves timing and message before Demand or Intelligence receives feedback.',
+    nextAction: lifecycleStage.nextAction,
+    businessImpact: lifecycleStage.reason,
+    href: '/customer/crm-compact?floor=account',
+  }];
+}
+
+function buildTimelineEvents({
+  customer,
+  ownerId,
+  lead,
+  rfq,
+  customerOrders,
+  orderEvents,
+  serviceCases,
+  lifecycleStage,
+  followUps,
+  sourceCampaign,
+  vocInsight,
+  index,
+}: {
+  customer: PrimeSnapshot['customers'][number];
+  ownerId: string;
+  lead: PrimeSnapshot['leads'][number] | undefined;
+  rfq: PrimeSnapshot['rfqs'][number] | undefined;
+  customerOrders: PrimeSnapshot['orders'];
+  orderEvents: PrimeSnapshot['orderEvents'];
+  serviceCases: CustomerServiceCase[];
+  lifecycleStage: CustomerLifecycleStage;
+  followUps: CustomerFollowUp[];
+  sourceCampaign: PrimeSnapshot['campaigns'][number] | undefined;
+  vocInsight: PrimeSnapshot['vocInsights'][number] | undefined;
+  index: number;
+}): CustomerTimelineEvent[] {
+  const events: CustomerTimelineEvent[] = [];
+  const lastOrder = latestOrder(customerOrders);
+
+  customer.timeline.slice(0, 2).forEach((entry, entryIndex) => {
+    events.push({
+      id: `timeline-memory-${customer.id}-${entryIndex}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'customer',
+      sourceEntityId: customer.id,
+      occurredAt: phase2Date(index, entryIndex),
+      eventType: 'customer_memory',
+      summary: entry,
+      ownerId,
+      nextAction: lifecycleStage.nextAction,
+      businessImpact: lifecycleStage.reason,
+      href: '/customer/crm-compact?floor=account',
+    });
+  });
+
+  if (lead) {
+    events.push({
+      id: `timeline-lead-${lead.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Demand',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'lead',
+      sourceEntityId: lead.id,
+      occurredAt: phase2Date(index, 1),
+      eventType: 'lead',
+      summary: `${lead.source} lead is ${lead.status} with score ${lead.score}.`,
+      ownerId,
+      nextAction: 'Confirm account context before Demand follow-up.',
+      businessImpact: 'Demand intent now has a customer owner and account memory.',
+      href: '/demand/leads-rfqs',
+    });
+  }
+
+  if (rfq) {
+    events.push({
+      id: `timeline-rfq-${rfq.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Demand',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'rfq',
+      sourceEntityId: rfq.id,
+      occurredAt: phase2Date(index, 2),
+      eventType: 'rfq',
+      summary: `RFQ ${rfq.status} for ${rfq.quantity} units and ${rfq.value.toLocaleString('ja-JP')} JPY.`,
+      ownerId,
+      nextAction: rfq.orderId ? 'Open converted OMS order context.' : 'Confirm quote expectation with Demand owner.',
+      businessImpact: 'Keeps quote continuity visible without moving quote ownership into Customer.',
+      href: '/demand/leads-rfqs',
+    });
+  }
+
+  if (lastOrder) {
+    events.push({
+      id: `timeline-order-${lastOrder.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Ecom/COS',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'order',
+      sourceEntityId: lastOrder.id,
+      occurredAt: lastOrder.order_date || phase2Date(index, 3),
+      eventType: 'order',
+      summary: `OMS order ${lastOrder.order_id} is ${lastOrder.status} at ${lastOrder.lifecycle_stage}.`,
+      ownerId,
+      nextAction: 'Use the order state as context only; OMS remains owner of order lifecycle.',
+      businessImpact: 'Gives Customer the latest commerce evidence before outreach.',
+      href: `/ecom/cos/oms/${lastOrder.id}`,
+      auditId: lastOrder.order_id,
+    });
+  }
+
+  orderEvents.slice(0, 2).forEach((event) => {
+    events.push({
+      id: `timeline-order-event-${event.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Ecom/COS',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'order_event',
+      sourceEntityId: event.id,
+      occurredAt: event.created_at,
+      eventType: 'order_event',
+      summary: `${event.event_type}: ${event.message}`,
+      ownerId,
+      nextAction: 'Keep event as evidence, not Customer-owned order state.',
+      businessImpact: 'Preserves COS auditability in the relationship timeline.',
+      href: lastOrder ? `/ecom/cos/oms/${lastOrder.id}` : '/ecom/cos/oms',
+      auditId: event.id,
+    });
+  });
+
+  serviceCases.forEach((serviceCase) => {
+    events.push({
+      id: `timeline-service-${serviceCase.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Customer Service',
+      readModelOwner: 'Customer',
+      sourceEntityType: serviceCase.rmaId ? 'return' : 'service_case',
+      sourceEntityId: serviceCase.id,
+      occurredAt: phase2Date(index, 4),
+      eventType: serviceCase.rmaId ? 'return_refund' : 'service_case',
+      summary: `${serviceCase.linkedEntity}: ${serviceCase.status.replace('_', ' ')} service case.`,
+      ownerId: serviceCase.ownerId,
+      nextAction: serviceCase.pendingAction,
+      businessImpact: serviceCase.intelligenceHandoff,
+      href: serviceCase.href,
+      auditId: serviceCase.rmaId ?? serviceCase.id,
+    });
+  });
+
+  if (customer.totalRevenue > 0) {
+    events.push({
+      id: `timeline-finance-${customer.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Finance',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'finance_profile',
+      sourceEntityId: customer.b2bAccount,
+      occurredAt: phase2Date(index, 5),
+      eventType: 'finance_signal',
+      summary: `${customer.totalRevenue.toLocaleString('ja-JP')} JPY commerce history can support finance readiness evidence.`,
+      ownerId,
+      nextAction: 'Finance may read this evidence; Customer does not decide funding eligibility.',
+      businessImpact: 'Links relationship history to trust readiness without making a credit claim.',
+      href: '/finance/fin-support#status',
+    });
+  }
+
+  if (vocInsight || sourceCampaign) {
+    events.push({
+      id: `timeline-intelligence-${vocInsight?.id ?? sourceCampaign?.id ?? customer.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Intelligence',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'intelligence_signal',
+      sourceEntityId: vocInsight?.id ?? sourceCampaign?.id ?? customer.id,
+      occurredAt: phase2Date(index, 6),
+      eventType: 'intelligence_signal',
+      summary: vocInsight?.summary ?? `${sourceCampaign?.name ?? 'Campaign'} signal is attached to customer context.`,
+      ownerId,
+      nextAction: vocInsight?.action ?? 'Use signal as readback evidence before the next follow-up.',
+      businessImpact: 'Turns customer outcome into an Intelligence feedback signal.',
+      href: '/intelligence/signals?view=customer-trends',
+    });
+  }
+
+  followUps.slice(0, 1).forEach((followUp) => {
+    events.push({
+      id: `timeline-followup-${followUp.id}`,
+      customerId: customer.id,
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+      sourceEntityType: 'follow_up',
+      sourceEntityId: followUp.id,
+      occurredAt: followUp.dueAt,
+      eventType: 'follow_up',
+      summary: followUp.nextAction,
+      ownerId: followUp.ownerId,
+      nextAction: followUp.allowedAction,
+      businessImpact: followUp.businessImpact,
+      href: followUp.href,
+    });
+  });
+
+  return events.sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+}
+
 function buildCustomerAccountProfile({
   customer,
   customerType,
@@ -435,8 +949,30 @@ export function buildCustomerProfileFloor(snapshot: PrimeSnapshot): CustomerProf
     const orderIds = new Set(customerOrders.map((order) => order.id));
     const orderItems = getOrderItems(snapshot, orderIds);
     const orderEvents = getOrderEvents(snapshot, orderIds);
-    const serviceCases = snapshot.tickets.filter((ticket) => ticket.customerId === customer.id);
-    const profile = buildCustomerAccountProfile({ customer, customerType, customerOrders, orderItems, orderEvents, serviceCases, sourceCampaign });
+    const serviceCaseTickets = snapshot.tickets.filter((ticket) => ticket.customerId === customer.id);
+    const lead = snapshot.leads.find((candidate) => candidate.customerId === customer.id);
+    const rfq = snapshot.rfqs.find((candidate) => candidate.customerId === customer.id);
+    const vocInsight = snapshot.vocInsights.find((candidate) => candidate.customerId === customer.id);
+    const ownerId = owners[index % owners.length].id;
+    const lifecycleStage = buildLifecycleStage({ customer, lifecycle, ownerId, serviceCases: serviceCaseTickets, rfq, index });
+    const serviceCases = buildCustomerServiceCases(serviceCaseTickets, ownerId);
+    const rfqQuoteLinks = buildRfqQuoteLinks({ customer, lead, rfq });
+    const followUps = buildFollowUps({ customer, lifecycleStage, serviceCases, rfqQuoteLinks, customerOrders, index });
+    const timelineEvents = buildTimelineEvents({
+      customer,
+      ownerId,
+      lead,
+      rfq,
+      customerOrders,
+      orderEvents,
+      serviceCases,
+      lifecycleStage,
+      followUps,
+      sourceCampaign,
+      vocInsight,
+      index,
+    });
+    const profile = buildCustomerAccountProfile({ customer, customerType, customerOrders, orderItems, orderEvents, serviceCases: serviceCaseTickets, sourceCampaign });
     const displayName = customerType === 'marketplace' ? customer.name : customer.company;
 
     return {
@@ -447,7 +983,7 @@ export function buildCustomerProfileFloor(snapshot: PrimeSnapshot): CustomerProf
       customerType,
       lifecycle,
       status: lifecycle === 'at_risk' ? 'watch' : 'active',
-      ownerId: owners[index % owners.length].id,
+      ownerId,
       tags,
       primaryEmail: customer.email,
       website: customerType === 'marketplace' ? '' : seededWebsite(customer.company, index),
@@ -458,6 +994,11 @@ export function buildCustomerProfileFloor(snapshot: PrimeSnapshot): CustomerProf
       orderCount: customer.totalOrders,
       identityCompleteness,
       notes: [...customer.notes, profile.cosReadiness],
+      lifecycleStage,
+      timelineEvents,
+      followUps,
+      rfqQuoteLinks,
+      serviceCases,
       profile,
     };
   });
@@ -597,7 +1138,10 @@ export function filterCustomerAccounts(accounts: CustomerAccount[], tags: Custom
       || Boolean(account.profile?.phone.toLowerCase().includes(query))
       || Boolean(account.profile?.primaryEcomChannel.toLowerCase().includes(query))
       || Boolean(account.profile?.channelMix.some((channel) => channel.toLowerCase().includes(query)))
-      || Boolean(account.profile?.favoriteProducts.some((product) => product.productName.toLowerCase().includes(query) || product.sku.toLowerCase().includes(query)));
+      || Boolean(account.profile?.favoriteProducts.some((product) => product.productName.toLowerCase().includes(query) || product.sku.toLowerCase().includes(query)))
+      || account.lifecycleStage.nextAction.toLowerCase().includes(query)
+      || account.timelineEvents.some((event) => event.summary.toLowerCase().includes(query) || event.sourceOfTruthOwner.toLowerCase().includes(query))
+      || account.followUps.some((followUp) => followUp.nextAction.toLowerCase().includes(query) || followUp.source.toLowerCase().includes(query));
     const matchesTag = filters.tagId === 'all' || (tagIds.has(filters.tagId) && account.tags.includes(filters.tagId));
     const matchesOwner = filters.ownerId === 'all' || account.ownerId === filters.ownerId;
     const matchesLifecycle = filters.lifecycle === 'all' || account.lifecycle === filters.lifecycle;

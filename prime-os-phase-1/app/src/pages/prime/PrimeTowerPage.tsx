@@ -69,6 +69,10 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
+import { PartnerWorkspacePanel } from '@/components/prime/PartnerWorkspacePanel';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import type { Locale } from '@/lib/i18n/dictionaries';
+import { getShellNavLabel } from '@/lib/i18n/shell-dictionaries';
 import {
   ActionSetupPanel,
   DecisionHeader,
@@ -92,6 +96,7 @@ import {
   type PrimeActivationPlay,
   type PrimeInsightModel,
   type PrimeSnapshot,
+  type PrimeArea,
   type PrimeSocialStream,
   type PrimeTowerId,
 } from '@/lib/prime/prime-data';
@@ -99,6 +104,7 @@ import {
   buildIntelligenceWorkspace,
   type DecisionPackage,
   type IntelligencePackageStatus,
+  type SourceOwner,
 } from '@/lib/prime/intelligence-workspace';
 import {
   fetchFinanceControlPlane,
@@ -123,6 +129,7 @@ import {
   type IntelligenceAsset,
   uploadIntelligenceAsset,
 } from '@/lib/prime/intelligence-assets';
+import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
 
 interface PrimeTowerPageProps {
   towerId: PrimeTowerId;
@@ -234,6 +241,139 @@ const DEMAND_CONTENT_SOCIAL_HREF = '/demand/content-social';
 const DEMAND_LEADS_RFQS_HREF = '/demand/leads-rfqs';
 const DEMAND_REENGAGE_HREF = '/demand/re-engage';
 
+type TowerJob = { decide: string; handoff: string; handoffHref: string };
+
+function getTowerChromeCopy(locale: Locale) {
+  const copy = {
+    'en-US': {
+      areas: {
+        'Demand Area': 'Demand Area',
+        'Customer Area': 'Customer Area',
+        'Ecom Area': 'Ecom Area',
+        'Intelligence Area': 'Intelligence Area',
+        'Finance Area': 'Finance Area',
+      },
+      operatingWorkspace: (area: string) => `${area} operating workspace`,
+      statusReady: 'Ready',
+      statusWatch: 'Watch',
+      statusNeedsAction: 'Needs action',
+      openHandoff: 'Open handoff',
+      backToLoop: 'Back to loop',
+      area: 'Area',
+      tower: 'Tower',
+      orders: 'Orders',
+      signals: 'Signals',
+      outcomeOrders: 'Orders read back from OMS after demand execution.',
+      outcomeIntelligence: 'Activation plays ready for operator handoff.',
+      outcomeCustomer: 'Customer/account records available for operating context.',
+      continueHandoff: 'Continue the accountable handoff',
+      returnLoop: 'Return to the operating loop',
+      openNextTower: 'Open next tower',
+      openOverview: 'Open overview',
+      overviewFallback: 'Use the overview to select the next owner workspace.',
+      youDecide: 'You decide:',
+      openActionOwner: 'Open action owner',
+      viewEvidence: 'View evidence',
+    },
+    'ja-JP': {
+      areas: {
+        'Demand Area': 'デマンド領域',
+        'Customer Area': '顧客領域',
+        'Ecom Area': 'Eコマース領域',
+        'Intelligence Area': 'インテリジェンス領域',
+        'Finance Area': 'ファイナンス領域',
+      },
+      operatingWorkspace: (area: string) => `${area}の運用ワークスペース`,
+      statusReady: '準備完了',
+      statusWatch: '要監視',
+      statusNeedsAction: '対応が必要',
+      openHandoff: '引き渡しを開く',
+      backToLoop: 'ループに戻る',
+      area: '領域',
+      tower: 'タワー',
+      orders: '注文',
+      signals: 'シグナル',
+      outcomeOrders: 'デマンド実行後の注文をOMSから読み戻します。',
+      outcomeIntelligence: 'オペレーターへ引き渡せるアクティベーション施策です。',
+      outcomeCustomer: '運用コンテキストに使える顧客・アカウント記録です。',
+      continueHandoff: '責任ある引き渡しを続ける',
+      returnLoop: '運用ループに戻る',
+      openNextTower: '次のタワーを開く',
+      openOverview: '概要を開く',
+      overviewFallback: '概要から次の担当ワークスペースを選択します。',
+      youDecide: '判断すること:',
+      openActionOwner: '担当アクションを開く',
+      viewEvidence: 'エビデンスを見る',
+    },
+    'vi-VN': {
+      areas: {
+        'Demand Area': 'Khu vực tạo nhu cầu',
+        'Customer Area': 'Khu vực khách hàng',
+        'Ecom Area': 'Khu vực thương mại',
+        'Intelligence Area': 'Khu vực trí tuệ vận hành',
+        'Finance Area': 'Khu vực tài chính',
+      },
+      operatingWorkspace: (area: string) => `Workspace vận hành ${area}`,
+      statusReady: 'Sẵn sàng',
+      statusWatch: 'Cần theo dõi',
+      statusNeedsAction: 'Cần xử lý',
+      openHandoff: 'Mở bàn giao',
+      backToLoop: 'Quay lại vòng vận hành',
+      area: 'Khu vực',
+      tower: 'Tháp',
+      orders: 'Đơn hàng',
+      signals: 'Tín hiệu',
+      outcomeOrders: 'Đơn hàng được đọc lại từ OMS sau khi Demand thực thi.',
+      outcomeIntelligence: 'Các play kích hoạt đã sẵn sàng để operator bàn giao.',
+      outcomeCustomer: 'Hồ sơ khách hàng/tài khoản sẵn sàng cho ngữ cảnh vận hành.',
+      continueHandoff: 'Tiếp tục bàn giao có trách nhiệm',
+      returnLoop: 'Quay lại vòng vận hành',
+      openNextTower: 'Mở tháp tiếp theo',
+      openOverview: 'Mở tổng quan',
+      overviewFallback: 'Dùng trang tổng quan để chọn workspace chịu trách nhiệm tiếp theo.',
+      youDecide: 'Cần quyết định:',
+      openActionOwner: 'Mở nơi phụ trách hành động',
+      viewEvidence: 'Xem bằng chứng',
+    },
+  } as const;
+
+  return copy[locale] ?? copy['en-US'];
+}
+
+function getAreaLabel(locale: Locale, area: PrimeArea) {
+  const copy = getTowerChromeCopy(locale);
+  return copy.areas[area] ?? area;
+}
+
+function getReadinessStatus(locale: Locale, confidence: number) {
+  const copy = getTowerChromeCopy(locale);
+  if (confidence >= 80) return copy.statusReady;
+  if (confidence >= 65) return copy.statusWatch;
+  return copy.statusNeedsAction;
+}
+
+function getPrimeTowerPromise(locale: Locale, towerId: PrimeTowerId, fallback: string) {
+  const copy: Record<Locale, Partial<Record<PrimeTowerId, string>>> = {
+    'en-US': {},
+    'ja-JP': {
+      'decision-hub': '領域横断のシグナルを、次のローンチ、修正、フォローアップ、またはガードレール判断に変換します。',
+      signals: '市場、顧客、クリエイター、VOC、アトリビューション、COSのシグナルが、アクションにできる確度かを示します。',
+      creators: 'どのクリエイターがどの商品に合うか、なぜ合うか、ローンチへ進められるかを示します。',
+      customers: '今重要な顧客トレンド、理由、次に売上を伸ばすための起動アクションを示します。',
+      campaigns: 'クリエイター証拠、顧客トレンド、Ecomガードレール、財務文脈を1つの実行可能なローンチパッケージにします。',
+    },
+    'vi-VN': {
+      'decision-hub': 'Biến tín hiệu liên khu vực thành quyết định launch, sửa lỗi, follow-up hoặc guardrail tiếp theo.',
+      signals: 'Cho biết tín hiệu thị trường, khách hàng, creator, VOC, attribution và COS có đủ chắc để thành hành động không.',
+      creators: 'Cho biết creator nào hợp với sản phẩm nào, vì sao hợp, và có thể đưa vào launch không.',
+      customers: 'Cho biết xu hướng khách hàng nào quan trọng lúc này, vì sao quan trọng, và nên kích hoạt gì tiếp theo để tăng doanh thu.',
+      campaigns: 'Gộp bằng chứng creator, xu hướng khách hàng, guardrail Ecom và bối cảnh tài chính thành một gói launch có thể thực thi.',
+    },
+  };
+
+  return copy[locale]?.[towerId] ?? fallback;
+}
+
 function getTowerConfidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot) {
   if (demandTowerIds.includes(towerId)) {
     return Math.min(94, 62 + snapshot.campaigns.length * 5 + Math.round(snapshot.metrics.leadToOrderRate / 3));
@@ -254,80 +394,371 @@ function getTowerConfidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot) {
   return 72;
 }
 
-function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot): EvidenceItem[] {
+function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale: Locale = 'en-US'): EvidenceItem[] {
+  const copy = {
+    'en-US': {
+      campaigns: 'Campaigns',
+      leadsRfqsAttached: (leads: number, rfqs: number) => `${leads} leads and ${rfqs} RFQs attached.`,
+      orders: 'Orders',
+      revenueContext: (amount: string) => `${amount} revenue context from OMS.`,
+      guardrail: 'Guardrail',
+      guardrailDetail: 'Demand actions must keep COS, finance, and customer controls visible.',
+      signals: 'Signals',
+      intelligenceSignals: 'Social, creator, VOC, and product signals are joined before action.',
+      models: 'Models',
+      modelDetail: 'Mock ML/DL models explain what to activate next.',
+      actions: 'Actions',
+      actionsDetail: 'Recommendations hand off into Demand, Customer, or COS.',
+      revenue: 'Revenue',
+      financeRevenue: 'Finance reads operating reality from OMS.',
+      risk: 'Risk',
+      blockers: (count: number) => `${count} blockers`,
+      riskDetail: 'Inventory and eligibility pressure stay visible before scale.',
+      customers: 'Customers',
+      financeCustomers: 'CRM memory supports repayment and repeat health context.',
+      accounts: 'Accounts',
+      accountDetail: 'Customer Profile Floor owns account identity, owner, lifecycle, and type.',
+      contacts: 'Contacts',
+      contactDetail: 'Mock primary and operations contacts sit under each account.',
+      identityAlerts: 'Identity alerts',
+      identityDetail: 'Duplicate suggestions are review-only; no merge action runs here.',
+      serviceDetail: 'Customer memory anchors follow-up, repeat, and service context.',
+      serviceOrdersDetail: 'OMS order preview stays linked but not owned here.',
+      service: 'Service',
+      serviceContext: 'Service context is previewed without absorbing the Service tower.',
+    },
+    'ja-JP': {
+      campaigns: 'キャンペーン',
+      leadsRfqsAttached: (leads: number, rfqs: number) => `${leads} 件のリードと ${rfqs} 件のRFQが紐づいています。`,
+      orders: '注文',
+      revenueContext: (amount: string) => `${amount} の売上文脈をOMSから取得しています。`,
+      guardrail: 'ガードレール',
+      guardrailDetail: 'デマンド施策ではCOS、財務、顧客の制御を常に見える状態にします。',
+      signals: 'シグナル',
+      intelligenceSignals: 'ソーシャル、クリエイター、VOC、商品シグナルをアクション前に統合します。',
+      models: 'モデル',
+      modelDetail: 'モックML/DLモデルが次に何を起動すべきかを説明します。',
+      actions: 'アクション',
+      actionsDetail: '推奨アクションをDemand、Customer、COSへ引き渡します。',
+      revenue: '売上',
+      financeRevenue: '財務はOMSから運用実態を読み取ります。',
+      risk: 'リスク',
+      blockers: (count: number) => `ブロッカー ${count} 件`,
+      riskDetail: '在庫と適格性の圧力をスケール前に可視化します。',
+      customers: '顧客',
+      financeCustomers: 'CRMメモリが返済とリピート健全性の文脈を支えます。',
+      accounts: 'アカウント',
+      accountDetail: 'Customer Profile FloorがアカウントID、担当、ライフサイクル、種別を所有します。',
+      contacts: '連絡先',
+      contactDetail: '各アカウント配下に主要連絡先と運用連絡先を配置します。',
+      identityAlerts: 'IDアラート',
+      identityDetail: '重複候補はレビュー専用で、ここでは統合処理を実行しません。',
+      serviceDetail: '顧客メモリがフォローアップ、リピート、サービス文脈を支えます。',
+      serviceOrdersDetail: 'OMS注文プレビューはリンクされますが、ここでは所有しません。',
+      service: 'サービス',
+      serviceContext: 'Serviceタワーを吸収せず、サービス文脈をプレビューします。',
+    },
+    'vi-VN': {
+      campaigns: 'Chiến dịch',
+      leadsRfqsAttached: (leads: number, rfqs: number) => `${leads} lead và ${rfqs} RFQ đã được gắn.`,
+      orders: 'Đơn hàng',
+      revenueContext: (amount: string) => `${amount} bối cảnh doanh thu từ OMS.`,
+      guardrail: 'Rào chắn',
+      guardrailDetail: 'Hành động Demand phải luôn nhìn thấy kiểm soát COS, tài chính và khách hàng.',
+      signals: 'Tín hiệu',
+      intelligenceSignals: 'Tín hiệu social, creator, VOC và sản phẩm được nối trước khi hành động.',
+      models: 'Mô hình',
+      modelDetail: 'Mô hình ML/DL mock giải thích nên kích hoạt gì tiếp theo.',
+      actions: 'Hành động',
+      actionsDetail: 'Khuyến nghị được bàn giao sang Demand, Customer hoặc COS.',
+      revenue: 'Doanh thu',
+      financeRevenue: 'Tài chính đọc thực tế vận hành từ OMS.',
+      risk: 'Rủi ro',
+      blockers: (count: number) => `${count} điểm nghẽn`,
+      riskDetail: 'Áp lực tồn kho và điều kiện vốn vẫn được nhìn thấy trước khi scale.',
+      customers: 'Khách hàng',
+      financeCustomers: 'Bộ nhớ CRM hỗ trợ ngữ cảnh hoàn trả vốn và sức khỏe mua lại.',
+      accounts: 'Tài khoản',
+      accountDetail: 'Customer Profile Floor sở hữu định danh account, owner, lifecycle và loại tài khoản.',
+      contacts: 'Liên hệ',
+      contactDetail: 'Liên hệ chính và vận hành mock nằm dưới từng account.',
+      identityAlerts: 'Cảnh báo định danh',
+      identityDetail: 'Gợi ý trùng lặp chỉ để review; không merge tại đây.',
+      serviceDetail: 'Bộ nhớ khách hàng neo follow-up, mua lại và ngữ cảnh dịch vụ.',
+      serviceOrdersDetail: 'Preview đơn OMS vẫn được liên kết nhưng không thuộc sở hữu trang này.',
+      service: 'Dịch vụ',
+      serviceContext: 'Ngữ cảnh dịch vụ chỉ preview, không thay thế Service tower.',
+    },
+  }[locale] ?? {
+    campaigns: 'Campaigns',
+    leadsRfqsAttached: (leads: number, rfqs: number) => `${leads} leads and ${rfqs} RFQs attached.`,
+    orders: 'Orders',
+    revenueContext: (amount: string) => `${amount} revenue context from OMS.`,
+    guardrail: 'Guardrail',
+    guardrailDetail: 'Demand actions must keep COS, finance, and customer controls visible.',
+    signals: 'Signals',
+    intelligenceSignals: 'Social, creator, VOC, and product signals are joined before action.',
+    models: 'Models',
+    modelDetail: 'Mock ML/DL models explain what to activate next.',
+    actions: 'Actions',
+    actionsDetail: 'Recommendations hand off into Demand, Customer, or COS.',
+    revenue: 'Revenue',
+    financeRevenue: 'Finance reads operating reality from OMS.',
+    risk: 'Risk',
+    blockers: (count: number) => `${count} blockers`,
+    riskDetail: 'Inventory and eligibility pressure stay visible before scale.',
+    customers: 'Customers',
+    financeCustomers: 'CRM memory supports repayment and repeat health context.',
+    accounts: 'Accounts',
+    accountDetail: 'Customer Profile Floor owns account identity, owner, lifecycle, and type.',
+    contacts: 'Contacts',
+    contactDetail: 'Mock primary and operations contacts sit under each account.',
+    identityAlerts: 'Identity alerts',
+    identityDetail: 'Duplicate suggestions are review-only; no merge action runs here.',
+    serviceDetail: 'Customer memory anchors follow-up, repeat, and service context.',
+    serviceOrdersDetail: 'OMS order preview stays linked but not owned here.',
+    service: 'Service',
+    serviceContext: 'Service context is previewed without absorbing the Service tower.',
+  };
+
   if (demandTowerIds.includes(towerId)) {
     return [
-      { label: 'Campaigns', value: snapshot.campaigns.length, detail: `${snapshot.leads.length} leads and ${snapshot.rfqs.length} RFQs attached.`, tone: 'info' },
-      { label: 'Orders', value: snapshot.orders.length, detail: `${currency.format(snapshot.metrics.revenue)} revenue context from OMS.`, tone: 'success' },
-      { label: 'Guardrail', value: `${snapshot.alerts.length} alerts`, detail: 'Demand actions must keep COS, finance, and customer controls visible.', tone: snapshot.alerts.length ? 'warning' : 'muted' },
+      { label: copy.campaigns, value: snapshot.campaigns.length, detail: copy.leadsRfqsAttached(snapshot.leads.length, snapshot.rfqs.length), tone: 'info' },
+      { label: copy.orders, value: snapshot.orders.length, detail: copy.revenueContext(currency.format(snapshot.metrics.revenue)), tone: 'success' },
+      { label: copy.guardrail, value: `${snapshot.alerts.length} alerts`, detail: copy.guardrailDetail, tone: snapshot.alerts.length ? 'warning' : 'muted' },
     ];
   }
 
   if (intelligenceTowerIds.includes(towerId)) {
     return [
-      { label: 'Signals', value: snapshot.socialStreams.length + snapshot.vocInsights.length, detail: 'Social, creator, VOC, and product signals are joined before action.', tone: 'purple' },
-      { label: 'Models', value: snapshot.insightModels.length, detail: 'Mock ML/DL models explain what to activate next.', tone: 'info' },
-      { label: 'Actions', value: snapshot.activationPlays.length, detail: 'Recommendations hand off into Demand, Customer, or COS.', tone: 'success' },
+      { label: copy.signals, value: snapshot.socialStreams.length + snapshot.vocInsights.length, detail: copy.intelligenceSignals, tone: 'purple' },
+      { label: copy.models, value: snapshot.insightModels.length, detail: copy.modelDetail, tone: 'info' },
+      { label: copy.actions, value: snapshot.activationPlays.length, detail: copy.actionsDetail, tone: 'success' },
     ];
   }
 
   if (financeTowerIds.includes(towerId)) {
     return [
-      { label: 'Revenue', value: currency.format(snapshot.metrics.revenue), detail: 'Finance reads operating reality from OMS.', tone: 'success' },
-      { label: 'Risk', value: `${snapshot.forecasts.filter((forecast) => forecast.risk === 'high').length} blockers`, detail: 'Inventory and eligibility pressure stay visible before scale.', tone: 'warning' },
-      { label: 'Customers', value: snapshot.customers.length, detail: 'CRM memory supports repayment and repeat health context.', tone: 'info' },
+      { label: copy.revenue, value: currency.format(snapshot.metrics.revenue), detail: copy.financeRevenue, tone: 'success' },
+      { label: copy.risk, value: copy.blockers(snapshot.forecasts.filter((forecast) => forecast.risk === 'high').length), detail: copy.riskDetail, tone: 'warning' },
+      { label: copy.customers, value: snapshot.customers.length, detail: copy.financeCustomers, tone: 'info' },
     ];
   }
 
   if (towerId === 'crm-compact') {
     return [
-      { label: 'Accounts', value: snapshot.customers.length, detail: 'Customer Profile Floor owns account identity, owner, lifecycle, and type.', tone: 'info' },
-      { label: 'Contacts', value: snapshot.customers.length * 2, detail: 'Mock primary and operations contacts sit under each account.', tone: 'success' },
-      { label: 'Identity alerts', value: 1, detail: 'Duplicate suggestions are review-only; no merge action runs here.', tone: 'warning' },
+      { label: copy.accounts, value: snapshot.customers.length, detail: copy.accountDetail, tone: 'info' },
+      { label: copy.contacts, value: snapshot.customers.length * 2, detail: copy.contactDetail, tone: 'success' },
+      { label: copy.identityAlerts, value: 1, detail: copy.identityDetail, tone: 'warning' },
     ];
   }
 
   return [
-    { label: 'Customers', value: snapshot.customers.length, detail: 'Customer memory anchors follow-up, repeat, and service context.', tone: 'info' },
-    { label: 'Orders', value: snapshot.orders.length, detail: 'OMS order preview stays linked but not owned here.', tone: 'success' },
-    { label: 'Service', value: snapshot.tickets.length, detail: 'Service context is previewed without absorbing the Service tower.', tone: 'warning' },
+    { label: copy.customers, value: snapshot.customers.length, detail: copy.serviceDetail, tone: 'info' },
+    { label: copy.orders, value: snapshot.orders.length, detail: copy.serviceOrdersDetail, tone: 'success' },
+    { label: copy.service, value: snapshot.tickets.length, detail: copy.serviceContext, tone: 'warning' },
   ];
 }
 
-function getTowerLoop(towerId: PrimeTowerId, job: { handoffHref: string } | undefined, snapshot: PrimeSnapshot): OperatingLoopStep[] {
+function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot: PrimeSnapshot, locale: Locale = 'en-US'): OperatingLoopStep[] {
+  const copy = {
+    'en-US': {
+      signal: 'Signal',
+      decision: 'Decision',
+      handoff: 'Handoff',
+      outcome: 'Outcome',
+      context: 'Context',
+      demandSignalTitle: 'Warm buyer or launch route appears',
+      demandSignalDetail: (campaigns: number, leads: number) => `${campaigns} campaign routes and ${leads} leads are available.`,
+      demandDecisionTitle: 'Choose message, CTA, and owner',
+      demandDecisionDetail: 'Demand works only after a clear route, audience, and guardrail exist.',
+      demandHandoffTitle: 'Capture and CRM receive response',
+      demandHandoffDetail: 'RFQs, replies, and owner tasks should not disappear into marketing reporting.',
+      demandOutcomeTitle: 'OMS/CRM read back result',
+      demandOutcomeDetail: (orders: number, customers: number) => `${orders} orders and ${customers} customer profiles close the loop.`,
+      intelSignalTitle: 'Signals are joined',
+      intelSignalDetail: 'Creator, trend, VOC, SKU, campaign, and customer signals come together.',
+      intelDecisionTitle: 'Recommend the next move',
+      intelDecisionDetail: 'The tower answers what to do now, not just what happened.',
+      intelHandoffTitle: 'Send action to the owning tower',
+      intelHandoffDetail: 'Demand, COS, Finance, or Customer receives the next step.',
+      intelOutcomeTitle: 'Read execution back',
+      intelOutcomeDetail: 'Orders, RFQs, and CRM outcomes return as evidence.',
+      defaultContextTitle: 'Read the operating record',
+      defaultContextDetail: 'Use linked customer, finance, service, or commerce context.',
+      defaultDecisionTitle: 'Pick the next accountable action',
+      defaultDecisionDetail: 'Every screen should tell the operator what decision it supports.',
+      defaultHandoffTitle: 'Move to the owner tower',
+      defaultHandoffExplicit: 'The next route is explicit.',
+      defaultHandoffStay: 'The handoff remains in this workspace.',
+      defaultOutcomeTitle: 'Preview result and risk',
+      defaultOutcomeDetail: 'Results are read views, not a parallel source of truth.',
+    },
+    'ja-JP': {
+      signal: 'シグナル',
+      decision: '判断',
+      handoff: '引き渡し',
+      outcome: '成果',
+      context: '文脈',
+      demandSignalTitle: '温度の高い買い手またはローンチ経路を検知',
+      demandSignalDetail: (campaigns: number, leads: number) => `${campaigns} 件のキャンペーン経路と ${leads} 件のリードがあります。`,
+      demandDecisionTitle: 'メッセージ、CTA、担当者を選ぶ',
+      demandDecisionDetail: '明確な経路、オーディエンス、ガードレールがある場合のみDemandを動かします。',
+      demandHandoffTitle: 'レスポンスを取得しCRMへ渡す',
+      demandHandoffDetail: 'RFQ、返信、担当タスクをマーケティングレポート内に埋もれさせません。',
+      demandOutcomeTitle: 'OMS/CRMから結果を読み戻す',
+      demandOutcomeDetail: (orders: number, customers: number) => `${orders} 件の注文と ${customers} 件の顧客プロフィールがループを閉じます。`,
+      intelSignalTitle: 'シグナルを統合',
+      intelSignalDetail: 'クリエイター、トレンド、VOC、SKU、キャンペーン、顧客シグナルをまとめます。',
+      intelDecisionTitle: '次の一手を推奨',
+      intelDecisionDetail: '何が起きたかだけでなく、今何をすべきかを示します。',
+      intelHandoffTitle: '担当タワーへアクションを送る',
+      intelHandoffDetail: 'Demand、COS、Finance、Customerのいずれかが次のステップを受け取ります。',
+      intelOutcomeTitle: '実行結果を読み戻す',
+      intelOutcomeDetail: '注文、RFQ、CRMの成果がエビデンスとして戻ります。',
+      defaultContextTitle: '運用記録を読む',
+      defaultContextDetail: '顧客、財務、サービス、コマースのリンク済み文脈を使います。',
+      defaultDecisionTitle: '次の責任あるアクションを選ぶ',
+      defaultDecisionDetail: '各画面は、どの判断を支援するかを示す必要があります。',
+      defaultHandoffTitle: '担当タワーへ移す',
+      defaultHandoffExplicit: '次の経路は明示されています。',
+      defaultHandoffStay: '引き渡しはこのワークスペース内に残ります。',
+      defaultOutcomeTitle: '結果とリスクをプレビュー',
+      defaultOutcomeDetail: '結果は読み取りビューであり、別の正本ではありません。',
+    },
+    'vi-VN': {
+      signal: 'Tín hiệu',
+      decision: 'Quyết định',
+      handoff: 'Bàn giao',
+      outcome: 'Kết quả',
+      context: 'Ngữ cảnh',
+      demandSignalTitle: 'Xuất hiện người mua ấm hoặc tuyến launch',
+      demandSignalDetail: (campaigns: number, leads: number) => `Có ${campaigns} tuyến chiến dịch và ${leads} lead.`,
+      demandDecisionTitle: 'Chọn thông điệp, CTA và owner',
+      demandDecisionDetail: 'Demand chỉ chạy khi có tuyến, audience và guardrail rõ ràng.',
+      demandHandoffTitle: 'Capture và CRM nhận phản hồi',
+      demandHandoffDetail: 'RFQ, phản hồi và task owner không được biến mất trong báo cáo marketing.',
+      demandOutcomeTitle: 'OMS/CRM đọc lại kết quả',
+      demandOutcomeDetail: (orders: number, customers: number) => `${orders} đơn hàng và ${customers} hồ sơ khách hàng đóng vòng vận hành.`,
+      intelSignalTitle: 'Tín hiệu được nối lại',
+      intelSignalDetail: 'Tín hiệu creator, xu hướng, VOC, SKU, campaign và khách hàng được gom lại.',
+      intelDecisionTitle: 'Đề xuất bước tiếp theo',
+      intelDecisionDetail: 'Tháp trả lời cần làm gì bây giờ, không chỉ chuyện gì đã xảy ra.',
+      intelHandoffTitle: 'Gửi hành động sang tháp sở hữu',
+      intelHandoffDetail: 'Demand, COS, Finance hoặc Customer nhận bước tiếp theo.',
+      intelOutcomeTitle: 'Đọc lại kết quả thực thi',
+      intelOutcomeDetail: 'Đơn hàng, RFQ và kết quả CRM quay lại làm bằng chứng.',
+      defaultContextTitle: 'Đọc hồ sơ vận hành',
+      defaultContextDetail: 'Dùng ngữ cảnh khách hàng, tài chính, dịch vụ hoặc commerce đã liên kết.',
+      defaultDecisionTitle: 'Chọn hành động chịu trách nhiệm tiếp theo',
+      defaultDecisionDetail: 'Mỗi màn hình phải nói rõ nó hỗ trợ quyết định nào.',
+      defaultHandoffTitle: 'Chuyển sang tháp sở hữu',
+      defaultHandoffExplicit: 'Tuyến tiếp theo đã rõ.',
+      defaultHandoffStay: 'Bàn giao vẫn nằm trong workspace này.',
+      defaultOutcomeTitle: 'Preview kết quả và rủi ro',
+      defaultOutcomeDetail: 'Kết quả là view đọc lại, không phải nguồn sự thật song song.',
+    },
+  }[locale];
+
   if (demandTowerIds.includes(towerId)) {
     return [
-      { label: 'Signal', title: 'Warm buyer or launch route appears', detail: `${snapshot.campaigns.length} campaign routes and ${snapshot.leads.length} leads are available.`, href: '/intelligence/launch-decisions', tone: 'purple' },
-      { label: 'Decision', title: 'Choose message, CTA, and owner', detail: 'Demand works only after a clear route, audience, and guardrail exist.', tone: 'info' },
-      { label: 'Handoff', title: 'Capture and CRM receive response', detail: 'RFQs, replies, and owner tasks should not disappear into marketing reporting.', href: job?.handoffHref || '/customer/crm-compact', tone: 'default' },
-      { label: 'Outcome', title: 'OMS/CRM read back result', detail: `${snapshot.orders.length} orders and ${snapshot.customers.length} customer profiles close the loop.`, href: '/ecom/cos/oms', tone: 'success' },
+      { label: copy.signal, title: copy.demandSignalTitle, detail: copy.demandSignalDetail(snapshot.campaigns.length, snapshot.leads.length), href: '/intelligence/launch-decisions', tone: 'purple' },
+      { label: copy.decision, title: copy.demandDecisionTitle, detail: copy.demandDecisionDetail, tone: 'info' },
+      { label: copy.handoff, title: copy.demandHandoffTitle, detail: copy.demandHandoffDetail, href: job?.handoffHref || '/customer/crm-compact', tone: 'default' },
+      { label: copy.outcome, title: copy.demandOutcomeTitle, detail: copy.demandOutcomeDetail(snapshot.orders.length, snapshot.customers.length), href: '/ecom/cos/oms', tone: 'success' },
     ];
   }
 
   if (intelligenceTowerIds.includes(towerId)) {
     return [
-      { label: 'Signal', title: 'Signals are joined', detail: 'Creator, trend, VOC, SKU, campaign, and customer signals come together.', tone: 'purple' },
-      { label: 'Decision', title: 'Recommend the next move', detail: 'The tower answers what to do now, not just what happened.', href: '/intelligence/launch-decisions', tone: 'info' },
-      { label: 'Handoff', title: 'Send action to the owning tower', detail: 'Demand, COS, Finance, or Customer receives the next step.', href: job?.handoffHref || '/overview', tone: 'default' },
-      { label: 'Outcome', title: 'Read execution back', detail: 'Orders, RFQs, and CRM outcomes return as evidence.', href: '/overview', tone: 'success' },
+      { label: copy.signal, title: copy.intelSignalTitle, detail: copy.intelSignalDetail, tone: 'purple' },
+      { label: copy.decision, title: copy.intelDecisionTitle, detail: copy.intelDecisionDetail, href: '/intelligence/launch-decisions', tone: 'info' },
+      { label: copy.handoff, title: copy.intelHandoffTitle, detail: copy.intelHandoffDetail, href: job?.handoffHref || '/overview', tone: 'default' },
+      { label: copy.outcome, title: copy.intelOutcomeTitle, detail: copy.intelOutcomeDetail, href: '/overview', tone: 'success' },
     ];
   }
 
   return [
-    { label: 'Context', title: 'Read the operating record', detail: 'Use linked customer, finance, service, or commerce context.', tone: 'info' },
-    { label: 'Decision', title: 'Pick the next accountable action', detail: 'Every screen should tell the operator what decision it supports.', tone: 'purple' },
-    { label: 'Handoff', title: 'Move to the owner tower', detail: job?.handoffHref ? 'The next route is explicit.' : 'The handoff remains in this workspace.', href: job?.handoffHref, tone: 'default' },
-    { label: 'Outcome', title: 'Preview result and risk', detail: 'Results are read views, not a parallel source of truth.', tone: 'success' },
+    { label: copy.context, title: copy.defaultContextTitle, detail: copy.defaultContextDetail, tone: 'info' },
+    { label: copy.decision, title: copy.defaultDecisionTitle, detail: copy.defaultDecisionDetail, tone: 'purple' },
+    { label: copy.handoff, title: copy.defaultHandoffTitle, detail: job?.handoffHref ? copy.defaultHandoffExplicit : copy.defaultHandoffStay, href: job?.handoffHref, tone: 'default' },
+    { label: copy.outcome, title: copy.defaultOutcomeTitle, detail: copy.defaultOutcomeDetail, tone: 'success' },
   ];
 }
 
-function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): RegistryItem[] {
+function getLocalizedActivationPlay(locale: Locale, play: PrimeActivationPlay) {
+  const copy: Record<Locale, Partial<Record<string, { audience: string; nextBestAction: string }>>> = {
+    'en-US': {},
+    'ja-JP': {
+      play_kol_refill: {
+        audience: 'クリエイター再販層',
+        nextBestAction: 'クリエイター証拠クリップと限定インセンティブで、詰め替えバンドルを提案します。',
+      },
+      play_b2b_quote: {
+        audience: 'B2Bオフィスチーム',
+        nextBestAction: 'MOQ説明と高速RFQ CTAを付けた、見積準備済みの商品セットを送ります。',
+      },
+      play_voc_recovery: {
+        audience: '離反リスクのある直近購入者',
+        nextBestAction: 'まずサービス主導の回復メッセージを送り、信頼シグナル改善後にオファーを再導入します。',
+      },
+    },
+    'vi-VN': {
+      play_kol_refill: {
+        audience: 'Nhóm mua lại qua creator',
+        nextBestAction: 'Đẩy đề xuất bundle refill với clip bằng chứng từ creator và ưu đãi giới hạn.',
+      },
+      play_b2b_quote: {
+        audience: 'Đội mua hàng văn phòng B2B',
+        nextBestAction: 'Gửi bộ sản phẩm sẵn sàng báo giá kèm giải thích MOQ và CTA RFQ nhanh.',
+      },
+      play_voc_recovery: {
+        audience: 'Người mua gần đây có rủi ro',
+        nextBestAction: 'Ưu tiên thông điệp phục hồi qua service, rồi giới thiệu lại offer sau khi tín hiệu tin cậy tốt hơn.',
+      },
+    },
+  };
+
+  return copy[locale]?.[play.id] ?? {
+    audience: play.audience,
+    nextBestAction: play.nextBestAction,
+  };
+}
+
+function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale: Locale = 'en-US'): RegistryItem[] {
+  const copy = {
+    'en-US': {
+      campaign: 'Campaign',
+      play: 'Play',
+      account: 'Account',
+      customer: 'Customer',
+      leads: 'leads',
+      orders: 'orders',
+    },
+    'ja-JP': {
+      campaign: 'キャンペーン',
+      play: '施策',
+      account: 'アカウント',
+      customer: '顧客',
+      leads: 'リード',
+      orders: '注文',
+    },
+    'vi-VN': {
+      campaign: 'Chiến dịch',
+      play: 'Play',
+      account: 'Tài khoản',
+      customer: 'Khách hàng',
+      leads: 'lead',
+      orders: 'đơn hàng',
+    },
+  }[locale];
+
   if (demandTowerIds.includes(towerId)) {
     return snapshot.campaigns.slice(0, 5).map((campaign) => ({
       id: campaign.id,
-      label: 'Campaign',
+      label: copy.campaign,
       title: campaign.name,
-      detail: `${getSkuLabel(campaign.skuCode)} · ${campaign.leads} leads · ${campaign.orders} orders`,
+      detail: `${getSkuLabel(campaign.skuCode)} · ${campaign.leads} ${copy.leads} · ${campaign.orders} ${copy.orders}`,
       meta: campaign.status,
       href: DEMAND_CAMPAIGNS_HREF,
       tone: 'info',
@@ -337,9 +768,9 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): 
   if (intelligenceTowerIds.includes(towerId)) {
     return snapshot.activationPlays.slice(0, 5).map((play) => ({
       id: play.id,
-      label: 'Play',
-      title: play.audience,
-      detail: play.nextBestAction,
+      label: copy.play,
+      title: getLocalizedActivationPlay(locale, play).audience,
+      detail: getLocalizedActivationPlay(locale, play).nextBestAction,
       meta: `+${play.projectedLift}%`,
       href: DEMAND_CAMPAIGNS_HREF,
       tone: 'purple',
@@ -348,9 +779,9 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot): 
 
   return snapshot.customers.slice(0, 5).map((customer) => ({
     id: customer.id,
-    label: towerId === 'crm-compact' ? 'Account' : 'Customer',
+    label: towerId === 'crm-compact' ? copy.account : copy.customer,
     title: customer.name,
-    detail: `${customer.company} · ${customer.totalOrders} orders`,
+    detail: `${customer.company} · ${customer.totalOrders} ${copy.orders}`,
     meta: customer.lifecycle,
     href: '/customer/crm-compact',
     tone: 'info',
@@ -480,21 +911,344 @@ const intelligenceStatusCopy: Record<IntelligencePackageStatus, { label: string;
   outcome_learned: { label: 'Outcome learned', tone: 'default' },
 };
 
-const intelligenceBoardLanes: Array<{ id: 'all' | IntelligencePackageStatus; label: string }> = [
-  { id: 'all', label: 'All packages' },
-  { id: 'running', label: 'Running' },
-  { id: 'review_needed', label: 'Needs review' },
-  { id: 'ready_for_demand', label: 'Ready Demand' },
-  { id: 'blocked', label: 'Blocked' },
-  { id: 'sent_to_demand', label: 'Sent' },
-  { id: 'outcome_learned', label: 'Learned' },
-];
+function getDecisionHubCopy(locale: Locale) {
+  const copy = {
+    'en-US': {
+      title: 'AI Decision Review',
+      statusSummary: (ready: number, review: number, blocked: number) => `${ready} ready · ${review} review · ${blocked} blocked`,
+      workflow: 'Operator workflow',
+      headline: 'Review AI-prepared growth decisions before sending to Demand.',
+      description: 'Pick one decision package, inspect evidence and blockers, then either send a reviewed payload to Demand or ask the agent for more evidence.',
+      selectedNextStep: 'Selected next step',
+      noPackage: 'No package selected',
+      operatorNext: {
+        wait: 'Wait for Intelligence package',
+        guardrail: 'Resolve guardrail first',
+        readback: 'Review Demand outcome',
+        review: 'Review evidence, then send to Demand',
+      },
+      needsReview: 'Needs review',
+      needsReviewMeta: 'Human proof check.',
+      readyToSend: 'Ready to send',
+      readyToSendMeta: 'Demand-ready payloads.',
+      blocked: 'Blocked',
+      blockedMeta: 'Needs guardrail owner.',
+      processSteps: ['Signal', 'Agent run', 'Evidence', 'Decision', 'Demand', 'Readback'],
+      queueTitle: 'Decision Queue',
+      queueDescription: 'Select one AI package to review.',
+      noPackages: 'No packages in this state.',
+      reviewTitle: 'Package Review',
+      reviewDescription: 'Recommendation, evidence, risk, and Demand payload for the selected package.',
+      recommendation: 'Recommendation',
+      confidence: 'Confidence',
+      impact: 'Impact',
+      whyNow: 'Why now',
+      preparedBy: 'Prepared by',
+      evidence: 'Evidence',
+      risks: 'Risks / blockers',
+      sendToDemand: 'Send to Demand',
+      objective: 'Objective:',
+      audience: 'Audience:',
+      channel: 'Channel:',
+      cta: 'CTA:',
+      fallbackChannel: 'Demand Ops',
+      fallbackCta: 'Review setup',
+      whyNot: 'Why not the other route',
+      demandReadback: 'Demand readback',
+      sendPreview: 'Send to Demand preview',
+      runningAction: 'Agent still preparing evidence',
+      learnedAction: 'View Demand readback',
+      blockedAction: 'Blocked: resolve guardrail first',
+      askFollowUp: 'Ask follow-up',
+      requestEvidence: 'Request more evidence',
+      emptyState: 'No AI decision packages yet. Start from Signals.',
+      metrics: {
+        conf: 'Conf',
+        risk: 'Risk',
+        next: 'Next',
+      },
+      lanes: {
+        all: 'All packages',
+        running: 'Running',
+        review_needed: 'Needs review',
+        ready_for_demand: 'Ready Demand',
+        blocked: 'Blocked',
+        sent_to_demand: 'Sent',
+        outcome_learned: 'Learned',
+      },
+      statuses: {
+        running: 'Running',
+        review_needed: 'Needs review',
+        ready_for_demand: 'Ready for Demand',
+        sent_to_demand: 'Sent to Demand',
+        blocked: 'Blocked',
+        outcome_learned: 'Outcome learned',
+      },
+    },
+    'ja-JP': {
+      title: 'AI判断レビュー',
+      statusSummary: (ready: number, review: number, blocked: number) => `送信可 ${ready} · 要レビュー ${review} · ブロック ${blocked}`,
+      workflow: 'オペレーターワークフロー',
+      headline: 'Demandへ送る前に、AIが準備した成長判断を確認します。',
+      description: '判断パッケージを選び、エビデンスとブロッカーを確認してから、レビュー済みペイロードをDemandへ送るか、追加エビデンスを依頼します。',
+      selectedNextStep: '選択中の次ステップ',
+      noPackage: 'パッケージ未選択',
+      operatorNext: {
+        wait: 'Intelligenceパッケージを待機',
+        guardrail: '先にガードレールを解消',
+        readback: 'Demandの結果を確認',
+        review: 'エビデンスを確認してDemandへ送信',
+      },
+      needsReview: '要レビュー',
+      needsReviewMeta: '人による証拠確認。',
+      readyToSend: '送信準備完了',
+      readyToSendMeta: 'Demandへ渡せるペイロード。',
+      blocked: 'ブロック中',
+      blockedMeta: 'ガードレール担当が必要。',
+      processSteps: ['シグナル', 'エージェント実行', 'エビデンス', '判断', 'Demand', '読み戻し'],
+      queueTitle: '判断キュー',
+      queueDescription: 'レビューするAIパッケージを1つ選択します。',
+      noPackages: 'この状態のパッケージはありません。',
+      reviewTitle: 'パッケージレビュー',
+      reviewDescription: '選択中パッケージの推奨、エビデンス、リスク、Demandペイロード。',
+      recommendation: '推奨',
+      confidence: '信頼度',
+      impact: 'インパクト',
+      whyNow: '今動く理由',
+      preparedBy: '作成',
+      evidence: 'エビデンス',
+      risks: 'リスク / ブロッカー',
+      sendToDemand: 'Demandへ送信',
+      objective: '目的:',
+      audience: '対象:',
+      channel: 'チャネル:',
+      cta: 'CTA:',
+      fallbackChannel: 'Demand Ops',
+      fallbackCta: '設定を確認',
+      whyNot: '別ルートにしない理由',
+      demandReadback: 'Demand読み戻し',
+      sendPreview: 'Demandプレビューへ送信',
+      runningAction: 'エージェントがエビデンス準備中',
+      learnedAction: 'Demand読み戻しを見る',
+      blockedAction: 'ブロック中: 先にガードレール解消',
+      askFollowUp: '追加質問',
+      requestEvidence: 'エビデンス追加依頼',
+      emptyState: 'AI判断パッケージはまだありません。シグナルから開始してください。',
+      metrics: {
+        conf: '確度',
+        risk: 'リスク',
+        next: '次',
+      },
+      lanes: {
+        all: '全パッケージ',
+        running: '実行中',
+        review_needed: '要レビュー',
+        ready_for_demand: 'Demand送信可',
+        blocked: 'ブロック',
+        sent_to_demand: '送信済み',
+        outcome_learned: '学習済み',
+      },
+      statuses: {
+        running: '実行中',
+        review_needed: '要レビュー',
+        ready_for_demand: 'Demand送信可',
+        sent_to_demand: 'Demand送信済み',
+        blocked: 'ブロック',
+        outcome_learned: '結果学習済み',
+      },
+    },
+    'vi-VN': {
+      title: 'Review quyết định AI',
+      statusSummary: (ready: number, review: number, blocked: number) => `${ready} sẵn sàng · ${review} cần review · ${blocked} bị chặn`,
+      workflow: 'Quy trình operator',
+      headline: 'Review các quyết định tăng trưởng do AI chuẩn bị trước khi gửi sang Demand.',
+      description: 'Chọn một gói quyết định, kiểm tra bằng chứng và blocker, rồi gửi payload đã review sang Demand hoặc yêu cầu agent bổ sung bằng chứng.',
+      selectedNextStep: 'Bước tiếp theo đang chọn',
+      noPackage: 'Chưa chọn gói',
+      operatorNext: {
+        wait: 'Chờ gói Intelligence',
+        guardrail: 'Xử lý guardrail trước',
+        readback: 'Review kết quả Demand',
+        review: 'Review bằng chứng rồi gửi sang Demand',
+      },
+      needsReview: 'Cần review',
+      needsReviewMeta: 'Kiểm chứng bằng chứng bởi người.',
+      readyToSend: 'Sẵn sàng gửi',
+      readyToSendMeta: 'Payload đã sẵn sàng cho Demand.',
+      blocked: 'Bị chặn',
+      blockedMeta: 'Cần owner xử lý guardrail.',
+      processSteps: ['Tín hiệu', 'Agent chạy', 'Bằng chứng', 'Quyết định', 'Demand', 'Đọc lại'],
+      queueTitle: 'Hàng chờ quyết định',
+      queueDescription: 'Chọn một gói AI để review.',
+      noPackages: 'Không có gói ở trạng thái này.',
+      reviewTitle: 'Review gói quyết định',
+      reviewDescription: 'Khuyến nghị, bằng chứng, rủi ro và payload Demand cho gói đang chọn.',
+      recommendation: 'Khuyến nghị',
+      confidence: 'Độ tin cậy',
+      impact: 'Tác động',
+      whyNow: 'Vì sao lúc này',
+      preparedBy: 'Chuẩn bị bởi',
+      evidence: 'Bằng chứng',
+      risks: 'Rủi ro / blocker',
+      sendToDemand: 'Gửi sang Demand',
+      objective: 'Mục tiêu:',
+      audience: 'Tệp nhận:',
+      channel: 'Kênh:',
+      cta: 'CTA:',
+      fallbackChannel: 'Demand Ops',
+      fallbackCta: 'Review thiết lập',
+      whyNot: 'Vì sao không chọn tuyến khác',
+      demandReadback: 'Demand đọc lại',
+      sendPreview: 'Gửi preview sang Demand',
+      runningAction: 'Agent vẫn đang chuẩn bị bằng chứng',
+      learnedAction: 'Xem Demand đọc lại',
+      blockedAction: 'Bị chặn: xử lý guardrail trước',
+      askFollowUp: 'Hỏi tiếp',
+      requestEvidence: 'Yêu cầu thêm bằng chứng',
+      emptyState: 'Chưa có gói quyết định AI. Bắt đầu từ Tín hiệu.',
+      metrics: {
+        conf: 'Tin cậy',
+        risk: 'Rủi ro',
+        next: 'Tiếp',
+      },
+      lanes: {
+        all: 'Tất cả gói',
+        running: 'Đang chạy',
+        review_needed: 'Cần review',
+        ready_for_demand: 'Sẵn sàng Demand',
+        blocked: 'Bị chặn',
+        sent_to_demand: 'Đã gửi',
+        outcome_learned: 'Đã học',
+      },
+      statuses: {
+        running: 'Đang chạy',
+        review_needed: 'Cần review',
+        ready_for_demand: 'Sẵn sàng cho Demand',
+        sent_to_demand: 'Đã gửi sang Demand',
+        blocked: 'Bị chặn',
+        outcome_learned: 'Đã học kết quả',
+      },
+    },
+  } as const;
 
-function getPackageStatusBadge(status: IntelligencePackageStatus) {
-  return intelligenceStatusCopy[status] ?? intelligenceStatusCopy.review_needed;
+  return copy[locale] ?? copy['en-US'];
+}
+
+function getIntelligenceBoardLanes(locale: Locale): Array<{ id: 'all' | IntelligencePackageStatus; label: string }> {
+  const copy = getDecisionHubCopy(locale);
+  return [
+    { id: 'all', label: copy.lanes.all },
+    { id: 'running', label: copy.lanes.running },
+    { id: 'review_needed', label: copy.lanes.review_needed },
+    { id: 'ready_for_demand', label: copy.lanes.ready_for_demand },
+    { id: 'blocked', label: copy.lanes.blocked },
+    { id: 'sent_to_demand', label: copy.lanes.sent_to_demand },
+    { id: 'outcome_learned', label: copy.lanes.outcome_learned },
+  ];
+}
+
+function getPackageStatusBadge(status: IntelligencePackageStatus, locale: Locale = 'en-US') {
+  const fallback = intelligenceStatusCopy[status] ?? intelligenceStatusCopy.review_needed;
+  const copy = getDecisionHubCopy(locale);
+  return {
+    ...fallback,
+    label: copy.statuses[status] ?? fallback.label,
+  };
+}
+
+function localizeDecisionHubText(locale: Locale, value: string | undefined) {
+  if (!value || locale === 'en-US') return value ?? '';
+
+  const exact: Record<Locale, Record<string, string>> = {
+    'en-US': {},
+    'ja-JP': {
+      'B2B office teams': 'B2Bオフィスチーム',
+      'SME procurement': 'SME調達',
+      'Creator resellers': 'クリエイター再販層',
+      'Repeat replenishment': 'リピート補充層',
+      'Market signal': '市場シグナル',
+      'COS guardrail': 'COSガードレール',
+      'Stock risk': '在庫リスク',
+      'Message fit risk': 'メッセージ適合リスク',
+      high: '高',
+      medium: '中',
+      low: '低',
+      'Throttle acquisition and trigger replenishment review': '獲得施策を抑制し、補充レビューを起動',
+      'Request quote / review campaign setup': '見積依頼 / キャンペーン設定を確認',
+      'Hold scale until COS clears.': 'COSがクリアするまで拡大を保留します。',
+      'Human approval required before Demand execution.': 'Demand実行前に人の承認が必要です。',
+      'Scale paid spend immediately': '広告費をすぐ拡大',
+      'Stock guardrail must clear first.': '先に在庫ガードレールをクリアする必要があります。',
+      'Operator should approve message and CTA first.': '先にオペレーターがメッセージとCTAを承認する必要があります。',
+      'Inventory forecast': '在庫予測',
+      'VOC mesh': 'VOCメッシュ',
+      'No VOC signal attached.': 'VOCシグナルは未接続です。',
+      'No forecast attached.': '予測は未接続です。',
+    },
+    'vi-VN': {
+      'B2B office teams': 'Đội mua hàng văn phòng B2B',
+      'SME procurement': 'Nhóm mua sắm SME',
+      'Creator resellers': 'Nhóm bán lại qua creator',
+      'Repeat replenishment': 'Nhóm mua bổ sung lặp lại',
+      'Market signal': 'Tín hiệu thị trường',
+      'COS guardrail': 'Guardrail COS',
+      'Stock risk': 'Rủi ro tồn kho',
+      'Message fit risk': 'Rủi ro độ hợp thông điệp',
+      high: 'cao',
+      medium: 'trung bình',
+      low: 'thấp',
+      'Throttle acquisition and trigger replenishment review': 'Giảm tốc acquisition và kích hoạt review bổ sung hàng',
+      'Request quote / review campaign setup': 'Yêu cầu báo giá / review thiết lập campaign',
+      'Hold scale until COS clears.': 'Giữ scale cho tới khi COS đã clear.',
+      'Human approval required before Demand execution.': 'Cần người duyệt trước khi Demand thực thi.',
+      'Scale paid spend immediately': 'Scale chi tiêu paid ngay',
+      'Stock guardrail must clear first.': 'Guardrail tồn kho phải được clear trước.',
+      'Operator should approve message and CTA first.': 'Operator cần duyệt thông điệp và CTA trước.',
+      'Inventory forecast': 'Dự báo tồn kho',
+      'VOC mesh': 'Lưới VOC',
+      'No VOC signal attached.': 'Chưa gắn tín hiệu VOC.',
+      'No forecast attached.': 'Chưa gắn dự báo.',
+    },
+  };
+
+  const mapped = exact[locale]?.[value];
+  if (mapped) return mapped;
+
+  const numberCloseToAts = value.match(/^7-day demand (\d+) is close to ATS (\d+)\.$/);
+  if (numberCloseToAts) {
+    return locale === 'ja-JP'
+      ? `7日需要 ${numberCloseToAts[1]} がATS ${numberCloseToAts[2]} に近づいています。`
+      : `Nhu cầu 7 ngày ${numberCloseToAts[1]} đang sát ATS ${numberCloseToAts[2]}.`;
+  }
+
+  const campaignHypothesis = value.match(/^Demand should test (.+) with a reviewed campaign package before broader scale\.$/);
+  if (campaignHypothesis) {
+    return locale === 'ja-JP'
+      ? `本格拡大前に、Demandはレビュー済みキャンペーンパッケージで${campaignHypothesis[1]}をテストすべきです。`
+      : `Demand nên test ${campaignHypothesis[1]} bằng gói campaign đã review trước khi scale rộng hơn.`;
+  }
+
+  const officeProof = value.match(/^(.+) is resonating with office buyers because the craft-paper proof is concrete\.$/);
+  if (officeProof) {
+    return locale === 'ja-JP'
+      ? `${officeProof[1]}は、クラフト紙の証拠が具体的なためオフィス購買層に響いています。`
+      : `${officeProof[1]} đang hợp với nhóm mua hàng văn phòng vì bằng chứng craft-paper đủ cụ thể.`;
+  }
+
+  const atsForecast = value.match(/^(\d+) ATS \/ (\d+) forecast$/);
+  if (atsForecast) {
+    return locale === 'ja-JP'
+      ? `ATS ${atsForecast[1]} / 予測 ${atsForecast[2]}`
+      : `ATS ${atsForecast[1]} / dự báo ${atsForecast[2]}`;
+  }
+
+  return value;
 }
 
 function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
+  const { locale } = useI18n();
+  const copy = getDecisionHubCopy(locale);
+  const intelligenceBoardLanes = getIntelligenceBoardLanes(locale);
   const workspace = useMemo(() => buildIntelligenceWorkspace(snapshot), [snapshot]);
   const [selectedPackageId, setSelectedPackageId] = useState(workspace.packages[0]?.id ?? '');
   const [laneFilter, setLaneFilter] = useState<'all' | IntelligencePackageStatus>('all');
@@ -516,14 +1270,14 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
 
   const selectPackage = (item: DecisionPackage) => setSelectedPackageId(item.id);
   const canSendToDemand = selectedPackage?.status === 'ready_for_demand' || selectedPackage?.status === 'review_needed';
-  const selectedStatus = selectedPackage ? getPackageStatusBadge(selectedPackage.status) : null;
+  const selectedStatus = selectedPackage ? getPackageStatusBadge(selectedPackage.status, locale) : null;
   const operatorNextStep = !selectedPackage
-    ? 'Wait for Intelligence package'
+    ? copy.operatorNext.wait
     : selectedPackage.status === 'blocked'
-      ? 'Resolve guardrail first'
+      ? copy.operatorNext.guardrail
       : selectedPackage.status === 'outcome_learned'
-        ? 'Review Demand outcome'
-        : 'Review evidence, then send to Demand';
+        ? copy.operatorNext.readback
+        : copy.operatorNext.review;
   const laneCounts: Record<string, number> = {
     all: workspace.packages.length,
     running: workspace.packages.filter((item) => item.status === 'running').length,
@@ -541,31 +1295,31 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
       <Card className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardContent className="space-y-4 p-5 md:p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">AI Decision Review</Badge>
-            <Badge variant={workspace.stats.readyForDemand ? 'success' : workspace.stats.blocked ? 'warning' : 'secondary'}>{workspace.stats.readyForDemand} ready · {workspace.stats.needsReview} review · {workspace.stats.blocked} blocked</Badge>
+            <Badge variant="outline">{copy.title}</Badge>
+            <Badge variant={workspace.stats.readyForDemand ? 'success' : workspace.stats.blocked ? 'warning' : 'secondary'}>{copy.statusSummary(workspace.stats.readyForDemand, workspace.stats.needsReview, workspace.stats.blocked)}</Badge>
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
             <div className="min-w-0">
-              <div className="text-metadata">Operator workflow</div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Review AI-prepared growth decisions before sending to Demand.</h2>
+              <div className="text-metadata">{copy.workflow}</div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">{copy.headline}</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground md:text-base">
-                Pick one decision package, inspect evidence and blockers, then either send a reviewed payload to Demand or ask the agent for more evidence.
+                {copy.description}
               </p>
             </div>
             <div className="rounded-xl border bg-background/85 p-4">
-              <div className="text-metadata">Selected next step</div>
+              <div className="text-metadata">{copy.selectedNextStep}</div>
               <div className="mt-2 text-lg font-semibold">{operatorNextStep}</div>
-              <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedPackage?.title ?? 'No package selected'}</p>
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedPackage ? localizeDecisionHubText(locale, selectedPackage.title) : copy.noPackage}</p>
               {selectedStatus ? <Badge className="mt-3" variant={selectedStatus.tone}>{selectedStatus.label}</Badge> : null}
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">Needs review</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.needsReview}</div><p className="mt-1 text-xs text-muted-foreground">Human proof check.</p></div>
-            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">Ready to send</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.readyForDemand}</div><p className="mt-1 text-xs text-muted-foreground">Demand-ready payloads.</p></div>
-            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">Blocked</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.blocked}</div><p className="mt-1 text-xs text-muted-foreground">Needs guardrail owner.</p></div>
+            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">{copy.needsReview}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.needsReview}</div><p className="mt-1 text-xs text-muted-foreground">{copy.needsReviewMeta}</p></div>
+            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">{copy.readyToSend}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.readyForDemand}</div><p className="mt-1 text-xs text-muted-foreground">{copy.readyToSendMeta}</p></div>
+            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">{copy.blocked}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.blocked}</div><p className="mt-1 text-xs text-muted-foreground">{copy.blockedMeta}</p></div>
           </div>
           <div className="grid gap-2 md:grid-cols-6">
-            {['Signal', 'Agent run', 'Evidence', 'Decision', 'Demand', 'Readback'].map((step, index) => (
+            {copy.processSteps.map((step, index) => (
               <div key={step} className="rounded-lg border bg-muted/20 p-2 text-xs">
                 <span className="font-semibold text-primary">{index + 1}. </span>{step}
               </div>
@@ -579,8 +1333,8 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CardTitle>Decision Queue</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Select one AI package to review.</p>
+                <CardTitle>{copy.queueTitle}</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.queueDescription}</p>
               </div>
               <Badge variant="outline" className="shrink-0">{filteredPackages.length}</Badge>
             </div>
@@ -594,7 +1348,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
           </CardHeader>
           <CardContent className="max-h-[640px] space-y-2 overflow-auto pt-0">
             {filteredPackages.length ? filteredPackages.map((item) => {
-              const status = getPackageStatusBadge(item.status);
+              const status = getPackageStatusBadge(item.status, locale);
               const selected = item.id === selectedPackage?.id;
               return (
                 <button
@@ -606,15 +1360,15 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="line-clamp-2 text-sm font-semibold">{item.title}</div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.finding}</p>
+                      <div className="line-clamp-2 text-sm font-semibold">{localizeDecisionHubText(locale, item.title)}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{localizeDecisionHubText(locale, item.finding)}</p>
                     </div>
                     <Badge variant={status.tone} className="shrink-0">{status.label}</Badge>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">Conf</div><div className="font-semibold">{item.confidence}%</div></div>
-                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">Risk</div><div className="font-semibold">{item.riskLevel}</div></div>
-                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">Next</div><div className="font-semibold">{item.nextOwner}</div></div>
+                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">{copy.metrics.conf}</div><div className="font-semibold">{item.confidence}%</div></div>
+                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">{copy.metrics.risk}</div><div className="font-semibold">{localizeDecisionHubText(locale, item.riskLevel)}</div></div>
+                    <div className="rounded-lg border bg-muted/20 px-2 py-1"><div className="text-muted-foreground">{copy.metrics.next}</div><div className="font-semibold">{item.nextOwner}</div></div>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span>{item.evidenceReport.agentName}</span>
@@ -623,7 +1377,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                 </button>
               );
             }) : (
-              <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">No packages in this state.</div>
+              <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">{copy.noPackages}</div>
             )}
           </CardContent>
         </Card>
@@ -632,8 +1386,8 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle>Package Review</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Recommendation, evidence, risk, and Demand payload for the selected package.</p>
+                <CardTitle>{copy.reviewTitle}</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.reviewDescription}</p>
               </div>
               {selectedStatus ? <Badge variant={selectedStatus.tone} className="w-fit shrink-0">{selectedStatus.label}</Badge> : null}
             </div>
@@ -644,13 +1398,13 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                 <div className="rounded-xl border bg-background p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
-                      <div className="text-metadata">Recommendation</div>
-                      <h3 className="mt-2 text-xl font-semibold">{selectedPackage.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{selectedPackage.finding}</p>
+                      <div className="text-metadata">{copy.recommendation}</div>
+                      <h3 className="mt-2 text-xl font-semibold">{localizeDecisionHubText(locale, selectedPackage.title)}</h3>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{localizeDecisionHubText(locale, selectedPackage.finding)}</p>
                     </div>
                     <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-lg border bg-muted/20 p-2"><div className="text-muted-foreground">Confidence</div><div className="text-lg font-semibold">{selectedPackage.confidence}%</div><Progress value={selectedPackage.confidence} className="mt-1 h-1.5" /></div>
-                      <div className="rounded-lg border bg-muted/20 p-2"><div className="text-muted-foreground">Impact</div><div className="text-sm font-semibold">{selectedPackage.expectedImpact.value}</div></div>
+                      <div className="rounded-lg border bg-muted/20 p-2"><div className="text-muted-foreground">{copy.confidence}</div><div className="text-lg font-semibold">{selectedPackage.confidence}%</div><Progress value={selectedPackage.confidence} className="mt-1 h-1.5" /></div>
+                      <div className="rounded-lg border bg-muted/20 p-2"><div className="text-muted-foreground">{copy.impact}</div><div className="text-sm font-semibold">{selectedPackage.expectedImpact.value}</div></div>
                     </div>
                   </div>
                 </div>
@@ -658,28 +1412,28 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="space-y-3">
                     <div className="rounded-xl border bg-background p-4">
-                      <div className="text-metadata">Why now</div>
-                      <p className="mt-2 text-sm font-medium">{selectedPackage.evidenceReport.hypothesis}</p>
-                      <p className="mt-2 text-xs leading-5 text-muted-foreground">Prepared by {selectedPackage.evidenceReport.agentName} · {selectedPackage.evidenceReport.generatedAt}</p>
+                      <div className="text-metadata">{copy.whyNow}</div>
+                      <p className="mt-2 text-sm font-medium">{localizeDecisionHubText(locale, selectedPackage.evidenceReport.hypothesis)}</p>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{copy.preparedBy} {selectedPackage.evidenceReport.agentName} · {selectedPackage.evidenceReport.generatedAt}</p>
                     </div>
                     <div className="rounded-xl border bg-background p-4">
-                      <div className="text-metadata">Evidence</div>
+                      <div className="text-metadata">{copy.evidence}</div>
                       <div className="mt-3 grid gap-2 md:grid-cols-3">
                         {selectedPackage.evidenceReport.evidence.map((item) => (
                           <div key={`${selectedPackage.id}-${item.label}`} className="rounded-lg border bg-muted/20 p-3 text-xs">
-                            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{item.label}</span><span className="text-muted-foreground">{item.freshness}</span></div>
-                            <p className="mt-2 line-clamp-3 leading-5 text-muted-foreground">{item.value}</p>
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{localizeDecisionHubText(locale, item.label)}</span><span className="text-muted-foreground">{localizeDecisionHubText(locale, item.freshness)}</span></div>
+                            <p className="mt-2 line-clamp-3 leading-5 text-muted-foreground">{localizeDecisionHubText(locale, item.value)}</p>
                           </div>
                         ))}
                       </div>
                     </div>
                     <div className="rounded-xl border bg-background p-4">
-                      <div className="text-metadata">Risks / blockers</div>
+                      <div className="text-metadata">{copy.risks}</div>
                       <div className="mt-3 grid gap-2 md:grid-cols-2">
                         {selectedPackage.evidenceReport.risks.map((risk) => (
                           <div key={risk.label} className="rounded-lg border bg-muted/20 p-3 text-xs">
-                            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{risk.label}</span><Badge variant={risk.severity === 'high' ? 'warning' : 'outline'}>{risk.severity}</Badge></div>
-                            <p className="mt-2 leading-5 text-muted-foreground">{risk.mitigation}</p>
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{localizeDecisionHubText(locale, risk.label)}</span><Badge variant={risk.severity === 'high' ? 'warning' : 'outline'}>{localizeDecisionHubText(locale, risk.severity)}</Badge></div>
+                            <p className="mt-2 leading-5 text-muted-foreground">{localizeDecisionHubText(locale, risk.mitigation)}</p>
                           </div>
                         ))}
                       </div>
@@ -688,46 +1442,48 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
 
                   <div className="space-y-3">
                     <div className="rounded-xl border bg-background p-4">
-                      <div className="text-metadata">Send to Demand</div>
+                      <div className="text-metadata">{copy.sendToDemand}</div>
                       <div className="mt-3 grid gap-2 text-sm">
-                        <div><span className="font-semibold">Objective:</span> {selectedPackage.handoffPayload.objective}</div>
-                        <div><span className="font-semibold">Audience:</span> {selectedPackage.handoffPayload.audience}</div>
-                        <div><span className="font-semibold">Channel:</span> {selectedPackage.handoffPayload.channel ?? 'Demand Ops'}</div>
-                        <div><span className="font-semibold">CTA:</span> {selectedPackage.handoffPayload.cta ?? 'Review setup'}</div>
+                        <div><span className="font-semibold">{copy.objective}</span> {localizeDecisionHubText(locale, selectedPackage.handoffPayload.objective)}</div>
+                        <div><span className="font-semibold">{copy.audience}</span> {localizeDecisionHubText(locale, selectedPackage.handoffPayload.audience)}</div>
+                        <div><span className="font-semibold">{copy.channel}</span> {selectedPackage.handoffPayload.channel ?? copy.fallbackChannel}</div>
+                        <div><span className="font-semibold">{copy.cta}</span> {localizeDecisionHubText(locale, selectedPackage.handoffPayload.cta ?? copy.fallbackCta)}</div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        {selectedPackage.handoffPayload.guardrails.map((guardrail) => <Badge key={guardrail} variant="outline">{guardrail}</Badge>)}
+                        {selectedPackage.handoffPayload.guardrails.map((guardrail) => <Badge key={guardrail} variant="outline">{localizeDecisionHubText(locale, guardrail)}</Badge>)}
                       </div>
                     </div>
                     <div className="rounded-xl border bg-background p-4">
-                      <div className="text-metadata">Why not the other route</div>
-                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{selectedPackage.evidenceReport.rejectedAlternatives[0]?.option}: {selectedPackage.evidenceReport.rejectedAlternatives[0]?.reason}</p>
+                      <div className="text-metadata">{copy.whyNot}</div>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{localizeDecisionHubText(locale, selectedPackage.evidenceReport.rejectedAlternatives[0]?.option)}: {localizeDecisionHubText(locale, selectedPackage.evidenceReport.rejectedAlternatives[0]?.reason)}</p>
                     </div>
                     {selectedPackage.readback ? (
                       <div className="rounded-xl border bg-background p-4">
-                        <div className="text-metadata">Demand readback</div>
-                        <p className="mt-2 text-sm font-medium">{selectedPackage.readback.note}</p>
+                        <div className="text-metadata">{copy.demandReadback}</div>
+                        <p className="mt-2 text-sm font-medium">{localizeDecisionHubText(locale, selectedPackage.readback.note)}</p>
                         <Badge variant="success" className="mt-3">{selectedPackage.readback.state.replace(/_/g, ' ')}</Badge>
                       </div>
                     ) : null}
+                    <RecommendationEvidencePanel selectedPackage={selectedPackage} />
+                    <FeedbackOutcomeCard selectedPackage={selectedPackage} />
                     <div className="sticky bottom-3 flex flex-col gap-2 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur">
                       <Button disabled={!canSendToDemand} asChild={canSendToDemand}>
                         {canSendToDemand ? (
-                          <Link to={`${selectedPackage.handoffPayload.targetRoute}?handoff=${encodeURIComponent(selectedPackage.id)}`}>Send to Demand preview <ArrowRight className="size-4" /></Link>
+                          <Link to={`${selectedPackage.handoffPayload.targetRoute}?handoff=${encodeURIComponent(selectedPackage.id)}`}>{copy.sendPreview} <ArrowRight className="size-4" /></Link>
                         ) : (
-                          <span>{selectedPackage.status === 'running' ? 'Agent still preparing evidence' : selectedPackage.status === 'outcome_learned' ? 'View Demand readback' : 'Blocked: resolve guardrail first'}</span>
+                          <span>{selectedPackage.status === 'running' ? copy.runningAction : selectedPackage.status === 'outcome_learned' ? copy.learnedAction : copy.blockedAction}</span>
                         )}
                       </Button>
                       <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm">Ask follow-up</Button>
-                        <Button variant="outline" size="sm">Request more evidence</Button>
+                        <Button variant="outline" size="sm">{copy.askFollowUp}</Button>
+                        <Button variant="outline" size="sm">{copy.requestEvidence}</Button>
                       </div>
                     </div>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">No AI decision packages yet. Start from Signals.</div>
+              <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">{copy.emptyState}</div>
             )}
           </CardContent>
         </Card>
@@ -736,10 +1492,89 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
   );
 }
 
+
+function RecommendationEvidencePanel({ selectedPackage }: { selectedPackage: DecisionPackage }) {
+  const evidence = selectedPackage.recommendationEvidence;
+
+  return (
+    <div data-testid="recommendation-evidence-panel" className="rounded-xl border bg-background p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-metadata">Recommendation evidence</div>
+          <p className="mt-1 text-xs text-muted-foreground">Why, source owner, confidence, and guardrail stay attached before action.</p>
+        </div>
+        <Badge variant="outline">{evidence.confidence}% confidence</Badge>
+      </div>
+      <p className="mt-3 text-sm font-medium">{evidence.confidenceReason}</p>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        {evidence.evidenceItems.map((item) => (
+          <div key={item.id} className="rounded-lg border bg-muted/20 p-3 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold">{item.label}</span>
+              <Badge variant={item.quality === 'verified' ? 'success' : item.quality === 'missing' ? 'warning' : 'outline'}>{item.quality}</Badge>
+            </div>
+            <p className="mt-2 line-clamp-3 text-muted-foreground">{item.summary}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant="outline">Owner: {item.owner}</Badge>
+              <Badge variant="outline">Weight {item.weight}</Badge>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 rounded-lg border bg-muted/10 p-3 text-xs text-muted-foreground">
+        Generated by {evidence.generatedBy.runtime}; Prime AI/model output is explanation only, never source truth.
+      </div>
+    </div>
+  );
+}
+
+function FeedbackOutcomeCard({ selectedPackage }: { selectedPackage: DecisionPackage }) {
+  const feedback = selectedPackage.feedback;
+  const outcome = selectedPackage.actionOutcome;
+
+  return (
+    <div data-testid="feedback-readback-card" className="rounded-xl border bg-background p-4">
+      <div className="text-metadata">Feedback and outcome loop</div>
+      {feedback || outcome ? (
+        <div className="mt-3 grid gap-2 text-xs">
+          {feedback ? (
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">{feedback.actorRole}</span>
+                <Badge variant="success">{feedback.decision.replace(/_/g, ' ')}</Badge>
+              </div>
+              <p className="mt-2 text-muted-foreground">{feedback.reason}</p>
+              <p className="mt-2 font-mono text-[10px] text-muted-foreground">Audit: {feedback.auditId}</p>
+            </div>
+          ) : null}
+          {outcome ? (
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">Outcome owner: {outcome.sourceOfTruthOwner}</span>
+                <Badge variant="outline">{outcome.outcomeType.replace(/_/g, ' ')}</Badge>
+              </div>
+              <p className="mt-2 text-muted-foreground">{outcome.learningNote}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {outcome.metrics.map((metric) => (
+                  <Badge key={`${outcome.id}-${metric.name}`} variant="outline">{metric.name}: {metric.value} · {metric.owner}</Badge>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">No operator feedback yet. Keep recommendation in review until owner accepts, rejects, or requests more evidence.</p>
+      )}
+    </div>
+  );
+}
+
 type IntelligenceSignalRow = {
   id: string;
   family: string;
   source: string;
+  sourceOwner: SourceOwner;
+  lineage: string[];
   linkedEntity: string;
   strength: number;
   freshness: string;
@@ -754,6 +1589,8 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       id: stream.id,
       family: 'Market signal',
       source: stream.source,
+      sourceOwner: 'Intelligence' as const,
+      lineage: [stream.source, stream.ingestionMode, 'Launch Decisions'],
       linkedEntity: stream.ingestionMode,
       strength: stream.status === 'healthy' ? 86 : stream.status === 'watch' ? 68 : 44,
       freshness: `${stream.freshnessMinutes}m`,
@@ -765,6 +1602,8 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       id: insight.id,
       family: 'VOC',
       source: insight.source,
+      sourceOwner: 'Customer' as const,
+      lineage: [insight.source, insight.campaignId, 'Customer/VOC'],
       linkedEntity: insight.campaignId,
       strength: insight.sentiment === 'positive' ? 82 : insight.sentiment === 'negative' ? 76 : 63,
       freshness: 'today',
@@ -776,6 +1615,8 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       id: forecast.id,
       family: 'COS guardrail',
       source: 'Inventory Brain',
+      sourceOwner: 'Inventory' as const,
+      lineage: ['Inventory forecast', forecast.skuCode, 'COS guardrail'],
       linkedEntity: getSkuLabel(forecast.skuCode),
       strength: forecast.risk === 'high' ? 92 : forecast.risk === 'medium' ? 70 : 48,
       freshness: 'live',
@@ -787,6 +1628,8 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       id: campaign.id,
       family: 'Attribution',
       source: campaign.channel,
+      sourceOwner: 'Demand' as const,
+      lineage: [campaign.channel, campaign.id, 'Demand outcome'],
       linkedEntity: campaign.skuCode,
       strength: Math.min(95, 45 + campaign.orders * 8 + campaign.rfqs * 3),
       freshness: campaign.status,
@@ -928,6 +1771,7 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
                   <TableRow>
                     <TableHead className="h-8 text-[10px]">Signal</TableHead>
                     <TableHead className="h-8 text-[10px]">Source</TableHead>
+                    <TableHead className="h-8 text-[10px]">Source owner</TableHead>
                     <TableHead className="h-8 text-[10px]">Linked entity</TableHead>
                     <TableHead className="h-8 text-right text-[10px]">Strength</TableHead>
                     <TableHead className="h-8 text-[10px]">Freshness</TableHead>
@@ -954,6 +1798,7 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
                         <div className="max-w-[420px] truncate text-[10px] leading-3 text-muted-foreground">{signal.recommendation}</div></div></div>
                       </TableCell>
                       <TableCell className="py-1.5 text-[11px] leading-4">{signal.source}</TableCell>
+                      <TableCell className="py-1.5 text-[11px] leading-4">{signal.sourceOwner}</TableCell>
                       <TableCell className="max-w-[180px] truncate py-1.5 font-mono text-[10px] leading-4">{signal.linkedEntity}</TableCell>
                       <TableCell className="py-1.5 text-right">
                         <span className={signal.strength >= 80 ? 'text-[11px] font-semibold text-foreground' : 'text-[11px] text-muted-foreground'}>{signal.strength}%</span>
@@ -1009,6 +1854,18 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
                 <div className="rounded-lg border bg-background p-3">
                   <div className="text-metadata">Why it matters</div>
                   <p className="mt-2 text-sm font-medium">{selectedSignal.recommendation}</p>
+                </div>
+                <div data-testid="signal-lineage-trail" className="rounded-lg border bg-background p-3">
+                  <div className="text-metadata">Signal lineage</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    {selectedSignal.lineage.map((step, index) => (
+                      <div key={`${selectedSignal.id}-${step}`} className="flex items-center gap-2">
+                        <Badge variant="outline">{step}</Badge>
+                        {index < selectedSignal.lineage.length - 1 ? <ArrowRight className="size-3 text-muted-foreground" /> : null}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">Source owner: {selectedSignal.sourceOwner}. Intelligence reads and scores this evidence; it does not own the underlying record.</p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
                   <div className="text-metadata">Evidence receipt</div>
@@ -3083,9 +3940,9 @@ function AgeDistributionCard({ creator }: { creator: CreatorProfile }) {
               <span className="font-bold">{bucket.value.toFixed(1)}%</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted/30">
-              <div 
-                className="h-full bg-sky-400 transition-all duration-700 ease-out" 
-                style={{ width: `${bucket.value}%` }} 
+              <div
+                className="h-full bg-sky-400 transition-all duration-700 ease-out"
+                style={{ width: `${bucket.value}%` }}
               />
             </div>
           </div>
@@ -3112,9 +3969,9 @@ function TopCountriesCard({ creator }: { creator: CreatorProfile }) {
               <span className="font-bold">{country.value.toFixed(1)}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
-              <div 
+              <div
                 className={`h-full transition-all duration-700 ease-out ${index === 0 ? 'bg-sky-500' : 'bg-sky-400/60'}`}
-                style={{ width: `${country.value}%` }} 
+                style={{ width: `${country.value}%` }}
               />
             </div>
           </div>
@@ -4492,6 +5349,29 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(topCustomer?.customer.id ?? '');
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const selectedCustomer = crmCustomers.find((record) => record.customer.id === selectedCustomerId) ?? topCustomer;
+  const serviceOwners = ['Ken Mori', 'Mika Sato', 'Hana Lee', 'Daisuke Ito'];
+  const serviceRecords = snapshot.tickets.map((ticket, index) => {
+    const customer = snapshot.customers.find((candidate) => candidate.id === ticket.customerId) ?? snapshot.customers[index % Math.max(snapshot.customers.length, 1)];
+    const order = ticket.orderId ? snapshot.orders.find((candidate) => candidate.id === ticket.orderId) : null;
+    const owner = serviceOwners[index % serviceOwners.length];
+    const pendingAction = ticket.status === 'resolved'
+      ? 'Confirm resolution note in Customer timeline'
+      : ticket.priority === 'high'
+        ? 'Escalate return/COS blocker before outreach'
+        : 'Send customer update and attach OMS context';
+
+    return {
+      ticket,
+      customer,
+      order,
+      owner,
+      pendingAction,
+      intelligenceHandoff: ticket.status === 'resolved'
+        ? 'Resolved case becomes trust recovery evidence.'
+        : 'Open issue feeds VOC and Customer risk signal.',
+    };
+  });
+  const activeServiceRecord = serviceRecords.find((record) => record.ticket.status !== 'resolved') ?? serviceRecords[0] ?? null;
 
   if (towerId === 'service') {
     return (
@@ -4503,6 +5383,34 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
           <SummaryMetricCard label="SLA source" value="Policy" meta="Routes to COS Policy & Rule floor." icon={<Gauge className="size-5" />} tone="purple" />
         </div>
 
+        {activeServiceRecord ? (
+          <Card className="rounded-lg border" data-testid="customer-service-control-panel">
+            <CardHeader>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <Badge variant="outline">Service ownership</Badge>
+                  <CardTitle className="mt-3 text-2xl">{activeServiceRecord.ticket.subject}</CardTitle>
+                  <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                    Service owns case resolution. Customer reads owner, SLA, pending action, and related OMS/RMA context before any follow-up or Intelligence feedback.
+                  </p>
+                </div>
+                <Badge variant={activeServiceRecord.ticket.priority === 'high' ? 'warning' : 'outline'}>{activeServiceRecord.ticket.priority}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <RuntimeContextCard label="Case owner" value={activeServiceRecord.owner} detail="Customer Service DRI" />
+                <RuntimeContextCard label="SLA state" value={activeServiceRecord.ticket.sla} detail={activeServiceRecord.ticket.status.replace('_', ' ')} />
+                <RuntimeContextCard label="Pending action" value={activeServiceRecord.pendingAction} detail="No Demand follow-up until blocker is clear." />
+                <RuntimeContextCard label="Related customer" value={activeServiceRecord.customer?.company ?? 'Unknown customer'} detail={activeServiceRecord.order?.order_id ?? activeServiceRecord.ticket.linkedEntity} />
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Service issue to Intelligence:</span> {activeServiceRecord.intelligenceHandoff}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <Card className="rounded-lg border">
           <CardHeader>
             <CardTitle>Service ticket / case / RMA / SLA</CardTitle>
@@ -4513,19 +5421,28 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
                 <TableRow>
                   <TableHead>Case</TableHead>
                   <TableHead className="h-8 text-[10px]">Linked entity</TableHead>
+                  <TableHead>Owner</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>SLA</TableHead>
+                  <TableHead>Pending action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {snapshot.tickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell className="font-medium">{ticket.subject}</TableCell>
-                    <TableCell>{ticket.linkedEntity}</TableCell>
-                    <TableCell className={statusTone(ticket.status)}>{ticket.status.replace('_', ' ')}</TableCell>
-                    <TableCell className={statusTone(ticket.priority)}>{ticket.priority}</TableCell>
-                    <TableCell>{ticket.sla}</TableCell>
+                {serviceRecords.map((record) => (
+                  <TableRow key={record.ticket.id}>
+                    <TableCell className="font-medium">
+                      <div>{record.ticket.subject}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{record.customer?.company ?? 'Unknown customer'}</div>
+                    </TableCell>
+                    <TableCell>{record.ticket.linkedEntity}</TableCell>
+                    <TableCell>{record.owner}</TableCell>
+                    <TableCell className={statusTone(record.ticket.status)}>{record.ticket.status.replace('_', ' ')}</TableCell>
+                    <TableCell className={statusTone(record.ticket.priority)}>{record.ticket.priority}</TableCell>
+                    <TableCell>{record.ticket.sla}</TableCell>
+                    <TableCell>
+                      <div className="max-w-[240px] text-sm text-muted-foreground">{record.pendingAction}</div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -7606,6 +8523,20 @@ function CompactLaunchDecisionsRuntimePanel({
                 </div>
               ))}
             </div>
+            <div data-testid="launch-decision-state-board" className="mt-4 rounded-2xl border bg-muted/10 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Outcome feedback</div>
+                <Badge variant="outline">Learning loop</Badge>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Demand owns execution, OMS owns order truth, and Intelligence reads the outcome back as future signal evidence.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Badge variant="outline">Decision: {humanizeIntelligenceValue(selectedDecision.approvalStatus)}</Badge>
+                <Badge variant="outline">Confidence {selectedDecision.confidence}%</Badge>
+                <Badge variant="outline">Owner {selectedDecision.owner || 'Launch owner needed'}</Badge>
+              </div>
+            </div>
           </div>
 
           <div className="order-3 flex flex-col justify-between rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-background p-3 text-center shadow-sm">
@@ -8081,6 +9012,112 @@ const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string; hando
   risk: { decide: 'What should this merchant fix before submitting to lenders?', handoff: 'Cleared eligibility blockers unlock stronger Fin Support matching.', handoffHref: '/finance/fin-support#blockers' },
   settlement: { decide: 'Is settlement health strong enough for funding review?', handoff: 'Settlement evidence feeds document reuse and application tracking in Fin Support.', handoffHref: '/finance/fin-support#status' },
 };
+
+function getLocalizedTowerJob(towerId: PrimeTowerId, locale: Locale): TowerJob | undefined {
+  const fallback = towerJobDescriptions[towerId];
+  if (!fallback) return undefined;
+
+  const localized: Record<Locale, Partial<Record<PrimeTowerId, Pick<TowerJob, 'decide' | 'handoff'>>>> = {
+    'en-US': {},
+    'ja-JP': {
+      'decision-hub': {
+        decide: 'オペレーターは今日どのアクションを取るべきか？',
+        handoff: '最も強いシグナルまたは判断パッケージを、エビデンス付きで開きます。',
+      },
+      signals: {
+        decide: 'どのシグナルがアクションにできるほど確かなのか？',
+        handoff: '検証済みエビデンスをローンチ、修正、フォローアップ、または抑制判断へ変換します。',
+      },
+      creators: {
+        decide: 'どのクリエイターがこの商品販売を支援すべきか？',
+        handoff: 'PrimeOSが適合理由を説明し、最適な経路をローンチ判断へ送ります。',
+      },
+      customers: {
+        decide: '今起動すべき顧客トレンドを選びます。',
+        handoff: 'トレンドをローンチ判断へ送ります。',
+      },
+      campaigns: {
+        decide: 'ローンチ、レビュー、保留、または中止か？',
+        handoff: 'GoならCampaign Opsへ送り、そうでなければ1つのブロッカーを解消します。',
+      },
+      analytics: {
+        decide: 'ファネルはどこで壊れており、何が機能しているのか？',
+        handoff: '発見事項はローンチ判断とAI Operatorへ渡されます。',
+      },
+      attribution: {
+        decide: 'クリックではなく、実際に注文を生むチャネルはどれか？',
+        handoff: 'アトリビューションデータがローンチ判断内の承認を支えます。',
+      },
+      forecasting: {
+        decide: '次の7日間の需要に在庫は耐えられるか？',
+        handoff: '高リスクSKUはCampaign Opsのスロットルフラグを起動します。',
+      },
+      voc: {
+        decide: '顧客は何を言っており、それが次の一手にどう影響するか？',
+        handoff: 'VOCフラグはCampaign OpsとServiceへ送られます。',
+      },
+      alerts: {
+        decide: 'システム全体で今注意すべきことは何か？',
+        handoff: '各アラートは解決責任を持つタワーへリンクします。',
+      },
+      'ai-operator': {
+        decide: 'システムが知っている情報から次に何をすべきか？',
+        handoff: '推奨事項はアクションを所有するタワーへルーティングされます。',
+      },
+    },
+    'vi-VN': {
+      'decision-hub': {
+        decide: 'Operator nên xử lý việc gì hôm nay?',
+        handoff: 'Mở tín hiệu hoặc gói quyết định mạnh nhất kèm bằng chứng.',
+      },
+      signals: {
+        decide: 'Tín hiệu nào đủ chắc để trở thành hành động?',
+        handoff: 'Chuyển bằng chứng đã xác thực thành quyết định launch, sửa, follow-up hoặc suppression.',
+      },
+      creators: {
+        decide: 'Creator nào nên hỗ trợ bán sản phẩm này?',
+        handoff: 'PrimeOS giải thích độ phù hợp và gửi tuyến tốt nhất vào Launch Decisions.',
+      },
+      customers: {
+        decide: 'Chọn xu hướng khách hàng cần kích hoạt ngay.',
+        handoff: 'Gửi xu hướng vào Launch Decisions.',
+      },
+      campaigns: {
+        decide: 'Launch, review, giữ lại hay no-go?',
+        handoff: 'Nếu Go thì gửi sang Campaign Ops. Nếu chưa, xử lý một blocker.',
+      },
+      analytics: {
+        decide: 'Funnel đang gãy ở đâu và điểm nào đang hiệu quả?',
+        handoff: 'Insight đi vào Launch Decisions và AI Operator.',
+      },
+      attribution: {
+        decide: 'Kênh nào thực sự tạo đơn hàng, không chỉ tạo click?',
+        handoff: 'Dữ liệu attribution hỗ trợ phê duyệt trong Launch Decisions.',
+      },
+      forecasting: {
+        decide: 'Tồn kho có chịu được 7 ngày nhu cầu tiếp theo không?',
+        handoff: 'SKU rủi ro cao kích hoạt cờ throttle trong Campaign Ops.',
+      },
+      voc: {
+        decide: 'Khách hàng đang nói gì và nó ảnh hưởng gì đến bước tiếp theo?',
+        handoff: 'Cờ VOC đi sang Campaign Ops và Service để xử lý.',
+      },
+      alerts: {
+        decide: 'Điều gì cần chú ý ngay trên toàn hệ thống?',
+        handoff: 'Mỗi cảnh báo liên kết tới tháp chịu trách nhiệm xử lý.',
+      },
+      'ai-operator': {
+        decide: 'Hệ thống nên làm gì tiếp theo dựa trên toàn bộ ngữ cảnh?',
+        handoff: 'Khuyến nghị được route tới tháp sở hữu hành động.',
+      },
+    },
+  };
+
+  return {
+    ...fallback,
+    ...localized[locale]?.[towerId],
+  };
+}
 
 export function PrimeDemandHubPage() {
   const snapshot = getPrimeSnapshot();
@@ -8653,14 +9690,20 @@ export function PrimeDemandSourcesPage() {
 }
 
 export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
+  const { locale } = useI18n();
   const config = PRIME_TOWER_CONFIGS[towerId];
-  const job = towerJobDescriptions[towerId];
+  const chromeCopy = getTowerChromeCopy(locale);
+  const areaLabel = getAreaLabel(locale, config.area);
+  const towerLabel = getShellNavLabel(locale, config.id, config.tower);
+  const promise = getPrimeTowerPromise(locale, towerId, config.promise);
+  const job = getLocalizedTowerJob(towerId, locale);
   const snapshot = getPrimeSnapshot();
   const confidence = getTowerConfidence(towerId, snapshot);
-  const evidence = getTowerEvidence(towerId, snapshot);
-  const loop = getTowerLoop(towerId, job, snapshot);
-  const registryItems = getTowerRegistryItems(towerId, snapshot);
+  const evidence = getTowerEvidence(towerId, snapshot, locale);
+  const loop = getTowerLoop(towerId, job, snapshot, locale);
+  const registryItems = getTowerRegistryItems(towerId, snapshot, locale);
   const [searchParams] = useSearchParams();
+  const partnerWorkspace = getPartnerWorkspaceSummary(searchParams.get('role'));
   const customerProfileFloor = searchParams.get('floor');
   const isCustomerProfileSubPage = towerId === 'crm-compact'
     && (customerProfileFloor === 'account' || customerProfileFloor === 'contact' || customerProfileFloor === 'identity' || customerProfileFloor === 'tags');
@@ -8672,24 +9715,24 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
         {showTowerChrome ? (
           <>
             <DecisionHeader
-              eyebrow={`${config.area} operating workspace`}
-              title={config.tower}
-              description={job?.decide || config.promise}
+              eyebrow={chromeCopy.operatingWorkspace(areaLabel)}
+              title={towerLabel}
+              description={job?.decide || promise}
               confidence={confidence}
-              status={confidence >= 80 ? 'Ready' : confidence >= 65 ? 'Watch' : 'Needs action'}
+              status={getReadinessStatus(locale, confidence)}
               actions={(
                 <>
                   {job ? (
                     <Button asChild>
                       <Link to={job.handoffHref}>
-                        Open handoff
+                        {chromeCopy.openHandoff}
                         <ArrowRight className="size-4" />
                       </Link>
                     </Button>
                   ) : null}
                   <Button asChild variant="outline">
                     <Link to="/overview">
-                      Back to loop
+                      {chromeCopy.backToLoop}
                       <ArrowRight className="size-4" />
                     </Link>
                   </Button>
@@ -8701,10 +9744,10 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
 
             <LinkedEntityStrip
               entities={[
-                { label: 'Area', value: config.area, tone: 'purple' },
-                { label: 'Tower', value: config.tower, tone: 'info' },
-                { label: 'Orders', value: String(snapshot.orders.length), href: '/ecom/cos/oms', tone: 'success' },
-                { label: 'Signals', value: String(snapshot.socialStreams.length + snapshot.vocInsights.length), href: '/intelligence/trends', tone: 'muted' },
+                { label: chromeCopy.area, value: areaLabel, tone: 'purple' },
+                { label: chromeCopy.tower, value: towerLabel, tone: 'info' },
+                { label: chromeCopy.orders, value: String(snapshot.orders.length), href: '/ecom/cos/oms', tone: 'success' },
+                { label: chromeCopy.signals, value: String(snapshot.socialStreams.length + snapshot.vocInsights.length), href: '/intelligence/trends', tone: 'muted' },
               ]}
             />
 
@@ -8712,9 +9755,9 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
 
             {job ? (
               <HandoffRail
-                from={config.tower}
+                from={towerLabel}
                 to={job.handoff}
-                detail={config.promise}
+                detail={promise}
                 href={job.handoffHref}
               />
             ) : null}
@@ -8725,13 +9768,13 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
               <div className="grid gap-4">
                 <OutcomePreview
                   value={demandTowerIds.includes(towerId) ? snapshot.orders.length : intelligenceTowerIds.includes(towerId) ? snapshot.activationPlays.length : snapshot.customers.length}
-                  detail={demandTowerIds.includes(towerId) ? 'Orders read back from OMS after demand execution.' : intelligenceTowerIds.includes(towerId) ? 'Activation plays ready for operator handoff.' : 'Customer/account records available for operating context.'}
+                  detail={demandTowerIds.includes(towerId) ? chromeCopy.outcomeOrders : intelligenceTowerIds.includes(towerId) ? chromeCopy.outcomeIntelligence : chromeCopy.outcomeCustomer}
                   tone={confidence >= 80 ? 'success' : 'info'}
                 />
                 <ActionSetupPanel
-                  title={job ? 'Continue the accountable handoff' : 'Return to the operating loop'}
-                  detail={job?.handoff || 'Use the overview to select the next owner workspace.'}
-                  actionLabel={job ? 'Open next tower' : 'Open overview'}
+                  title={job ? chromeCopy.continueHandoff : chromeCopy.returnLoop}
+                  detail={job?.handoff || chromeCopy.overviewFallback}
+                  actionLabel={job ? chromeCopy.openNextTower : chromeCopy.openOverview}
                   href={job?.handoffHref || '/overview'}
                 />
               </div>
@@ -8741,7 +9784,7 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
               <Card className="rounded-lg border border-primary/20 bg-primary/5">
                 <CardContent className="grid gap-3 p-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                   <div className="min-w-0">
-                    <span className="font-medium">You decide:</span>{' '}
+                    <span className="font-medium">{chromeCopy.youDecide}</span>{' '}
                     <span className="text-muted-foreground">{job.decide}</span>
                   </div>
                   <Link to={job.handoffHref} className="inline-flex items-center gap-1 text-primary hover:underline">
@@ -8750,6 +9793,8 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
                 </CardContent>
               </Card>
             ) : null}
+
+            {partnerWorkspace ? <PartnerWorkspacePanel summary={partnerWorkspace} /> : null}
           </>
         ) : null}
 

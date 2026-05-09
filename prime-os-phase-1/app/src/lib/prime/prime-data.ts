@@ -294,9 +294,9 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
     id: 'crm-compact',
     area: 'Customer Area',
     tower: 'CRM Tower',
-    promise: 'Manage the Customer Profile Floor: accounts, contacts, owners, lifecycle, tags, and identity matching before heavier CRM workflows connect.',
+    promise: 'Manage the Customer Profile Floor: accounts, contacts, owners, lifecycle, account tags, and identity matching before heavier CRM workflows connect.',
     reuseSource: 'New Prime OS wrapper, seeded from COS orders, returns, and generated leads.',
-    floors: ['Customer Profile', 'Account', 'Contact', 'Identity Matching', 'Customer Tags'],
+    floors: ['Customer Profile', 'Account Profile', 'Account Tags', 'Identity Matching'],
   },
   service: {
     id: 'service',

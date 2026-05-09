@@ -130,22 +130,26 @@ test.describe('authenticated route shell', () => {
     await page.goto('/customer/crm-compact', routeReady);
     await expectPrimeShellReady(page);
 
-    await expect(page.getByRole('heading', { name: 'CRM Tower' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Customer Profile', exact: true })).toBeVisible();
     await expect(page.getByTestId('customer-profile-floor')).toBeVisible();
     const primaryNav = page.getByRole('navigation', { name: 'Primary navigation' });
     await expect(primaryNav.locator('a[href="/customer/crm-compact?floor=overview"]')).toHaveCount(0);
     await expect(primaryNav.getByRole('link', { name: 'Account Profile' })).toBeVisible();
     await expect(primaryNav.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(primaryNav.getByRole('link', { name: 'Identity Matching' })).toBeVisible();
-    await expect(primaryNav.getByRole('link', { name: 'Customer Tags' })).toBeVisible();
+    await expect(primaryNav.getByRole('link', { name: 'Customer Tags' })).toHaveCount(0);
     const subfloorNav = page.getByTestId('customer-subfloor-nav');
     await expect(subfloorNav).toBeVisible();
     await expect(subfloorNav.getByRole('button', { name: /Overview/ })).toHaveAttribute('aria-current', 'page');
     await expect(subfloorNav.getByRole('button', { name: /Account Profile/ })).toBeVisible();
     await expect(subfloorNav.getByRole('button', { name: /Contact/ })).toHaveCount(0);
     await expect(subfloorNav.getByRole('button', { name: /Identity Matching/ })).toBeVisible();
-    await expect(subfloorNav.getByRole('button', { name: /Customer Tags/ })).toBeVisible();
+    await expect(subfloorNav.getByRole('button', { name: /Customer Tags/ })).toHaveCount(0);
     await expect(page.getByTestId('overview-subfloor')).toBeVisible();
+    await expect(page.getByTestId('customer-relationship-overview')).toBeVisible();
+    await expect(page.getByTestId('customer-timeline-events')).toBeVisible();
+    await expect(page.getByTestId('customer-follow-up-queue')).toBeVisible();
+    await expect(page.getByTestId('customer-continuity-preview')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Account list' })).toHaveCount(0);
     await expect(page.getByTestId('customer-360-panel')).toHaveCount(0);
     await expect(page.getByText('Contact directory')).toHaveCount(0);
@@ -163,11 +167,24 @@ test.describe('authenticated route shell', () => {
     await expect(page.getByTestId('account-subfloor')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Account list' })).toBeVisible();
     await expect(page.getByTestId('account-profile-dialog')).toHaveCount(0);
-    await page.getByRole('button', { name: /Kansai Office Supply/ }).first().click();
+    await page.getByRole('button', { name: 'Open profile' }).first().click();
     await expect(page.getByTestId('account-profile-dialog')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Contacts' })).toBeVisible();
     await expect(page.getByTestId('customer-portrait-section')).toBeVisible();
+    await expect(page.getByTestId('customer-timeline-events')).toBeVisible();
+    await expect(page.getByTestId('customer-follow-up-queue')).toBeVisible();
+    await expect(page.getByTestId('customer-continuity-preview')).toBeVisible();
+    await expect(page.getByTestId('customer-service-case-preview')).toBeVisible();
     await expect(page.getByTestId('account-profile-dialog').getByText('COS readback')).toBeVisible();
+    await page.getByRole('button', { name: 'Edit account' }).click();
+    await expect(page.getByTestId('account-tag-editor')).toBeVisible();
+    await expect(page.getByTestId('account-tag-editor').getByRole('heading', { name: 'Segment tags' })).toBeVisible();
+    await page.getByTestId('account-tag-editor').getByRole('button', { name: 'New segment tag' }).click();
+    await page.getByLabel('Tag label').fill('VIP wholesale');
+    await page.getByLabel('Usage note').fill('High-priority wholesale segment for account profile workflows.');
+    await page.getByRole('button', { name: 'Create and assign' }).click();
+    await expect(page.getByTestId('account-tag-editor').getByText('VIP wholesale')).toBeVisible();
+    await expect(page.getByText('Tag taxonomy')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('account-profile-dialog')).toHaveCount(0);
 
@@ -181,18 +198,19 @@ test.describe('authenticated route shell', () => {
     await expect(page.getByTestId('identity-subfloor')).toBeVisible();
     await expect(page.getByText('Duplicate review queue')).toBeVisible();
 
-    await subfloorNav.getByRole('button', { name: /Customer Tags/ }).click();
-    await expect(page).toHaveURL(/floor=tags/);
-    await expect(page.getByTestId('tags-subfloor')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Tag taxonomy' })).toBeVisible();
+    await page.goto('/customer/crm-compact?floor=tags', routeReady);
+    await expectPrimeShellReady(page);
+    await expect(page.getByTestId('customer-subfloor-page-header').getByRole('heading', { name: 'Account Profile' })).toBeVisible();
+    await expect(page.getByTestId('account-subfloor')).toBeVisible();
+    await expect(page.getByTestId('tags-subfloor')).toHaveCount(0);
   });
 
   test('focuses Customer Profile Floor from customer query context', async ({ page }) => {
     await page.goto('/customer/crm-compact?floor=account&customer=cust_wei_chen_example_cn', routeReady);
     await expectPrimeShellReady(page);
 
-    await page.getByRole('button', { name: /Tokyo Creative Studio/ }).first().click();
-    await expect(page.getByTestId('account-profile-dialog').getByRole('heading', { name: 'Tokyo Creative Studio' })).toBeVisible();
+    await page.getByRole('button', { name: 'Open profile' }).first().click();
+    await expect(page.getByTestId('account-profile-dialog')).toBeVisible();
   });
 
   test('keeps Customer 360 bounded by empty account filters', async ({ page }) => {
@@ -202,6 +220,86 @@ test.describe('authenticated route shell', () => {
     await page.getByPlaceholder('Search account, code, email...').fill('no-such-account');
     await expect(page.getByText('No accounts match the current filters.')).toBeVisible();
     await expect(page.getByTestId('customer-360-panel')).toHaveCount(0);
+  });
+
+  test('shows Customer Service ownership, SLA, and Intelligence handoff context', async ({ page }) => {
+    await page.goto('/customer/service', routeReady);
+    await expectPrimeShellReady(page);
+
+    await expect(page.getByTestId('customer-service-control-panel')).toBeVisible();
+    const servicePanel = page.getByTestId('customer-service-control-panel');
+    await expect(servicePanel.getByText('Case owner')).toBeVisible();
+    await expect(servicePanel.getByText('SLA state')).toBeVisible();
+    await expect(servicePanel.getByText('Pending action', { exact: true })).toBeVisible();
+    await expect(page.getByText('Service issue to Intelligence:')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Owner' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Pending action' })).toBeVisible();
+  });
+
+  test('shows Finance trust profile, commerce evidence, and bank review guardrails', async ({ page }) => {
+    await page.goto('/finance/fin-support', routeReady);
+    await expectPrimeShellReady(page);
+
+    await expect(page.getByRole('heading', { name: /Prepare a funding review package/ })).toBeVisible();
+    const trustProfile = page.getByTestId('finance-trust-profile');
+    await expect(trustProfile).toBeVisible();
+    await expect(trustProfile.getByText('Financial Trust Profile')).toBeVisible();
+    await expect(trustProfile.getByRole('heading', { name: 'Receivables / payout snapshot' })).toBeVisible();
+    const evidencePack = page.getByTestId('commerce-evidence-pack');
+    await expect(evidencePack).toBeVisible();
+    await expect(evidencePack.getByText('Orders and OMS events')).toBeVisible();
+    await expect(evidencePack.getByText('Settlement and repayment lanes')).toBeVisible();
+    await expect(evidencePack.getByText('Invoices and RFQ receivables')).toBeVisible();
+    await expect(evidencePack.getByText('Logistics / export records')).toBeVisible();
+    await expect(evidencePack.getByText('Marketplace health')).toBeVisible();
+    const bankReview = page.getByTestId('bank-review-summary');
+    await expect(bankReview).toBeVisible();
+    await expect(bankReview.getByText('No approval promise', { exact: true })).toBeVisible();
+    await expect(bankReview.getByText(/Preview only: no approval promise/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Potential Review Routes' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Readiness Signals' })).toBeVisible();
+  });
+
+  test('shows Phase 5 Intelligence evidence, lineage, and outcome loop', async ({ page }) => {
+    await page.goto('/intelligence/decision-hub', routeReady);
+    await expectPrimeShellReady(page);
+    await expect(page.getByTestId('recommendation-evidence-panel')).toBeVisible();
+    await expect(page.getByText('Recommendation evidence')).toBeVisible();
+    await expect(page.getByText(/Prime AI\/model output is explanation only/)).toBeVisible();
+    await expect(page.getByTestId('feedback-readback-card')).toBeVisible();
+
+    await page.goto('/intelligence/signals', routeReady);
+    await expectPrimeShellReady(page);
+    await expect(page.getByTestId('signal-lineage-trail')).toBeVisible();
+    await expect(page.getByText('Signal lineage')).toBeVisible();
+    await expect(page.getByText(/Intelligence reads and scores this evidence/)).toBeVisible();
+
+    await page.goto('/intelligence/launch-decisions', routeReady);
+    await expectPrimeShellReady(page);
+    await expect(page.getByTestId('launch-decision-state-board')).toBeVisible();
+    await expect(page.getByText('Outcome feedback')).toBeVisible();
+    await expect(page.getByText(/Demand owns execution, OMS owns order truth/)).toBeVisible();
+  });
+
+  test('shows Phase 4 partner workspaces with view and action boundaries', async ({ page }) => {
+    const roleSurfaces = [
+      { url: '/overview?role=factory', testId: 'partner-workspace-factory', heading: 'Factory owner operating view', boundary: /cannot edit OMS, Inventory, Finance, or Customer source truth/ },
+      { url: '/overview?role=agency', testId: 'partner-workspace-agency', heading: 'Agency operator delegated workspace', boundary: /cannot change product truth, order state, finance readiness/ },
+      { url: '/finance/fin-support?role=bank', testId: 'partner-workspace-bank', heading: 'Bank reviewer evidence workspace', boundary: /does not approve credit, underwrite, commit terms, or disburse funds/ },
+      { url: '/demand/leads-rfqs?role=lead-provider', testId: 'partner-workspace-lead-provider', heading: 'Lead provider contribution view', boundary: /cannot access full CRM, Finance, OMS, or customer private records/ },
+      { url: '/intelligence/signals?view=creators&role=creator-agency', testId: 'partner-workspace-creator-agency', heading: 'Creator agency performance view', boundary: /cannot change SKU truth, pricing, order state, or finance readiness/ },
+    ];
+
+    for (const surface of roleSurfaces) {
+      await page.goto(surface.url, routeReady);
+      await expectPrimeShellReady(page);
+      const workspace = page.getByTestId(surface.testId);
+      await expect(workspace).toBeVisible();
+      await expect(workspace.getByRole('heading', { name: surface.heading })).toBeVisible();
+      await expect(workspace.getByText('View / action boundary')).toBeVisible();
+      await expect(workspace.getByText('Partner handoffs')).toBeVisible();
+      await expect(workspace.getByText(surface.boundary)).toBeVisible();
+    }
   });
 
   test('opens canonical Demand focused context directly', async ({ page }) => {

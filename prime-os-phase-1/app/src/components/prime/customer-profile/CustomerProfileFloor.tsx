@@ -63,14 +63,14 @@ import {
 } from '@/lib/prime/customer-profile-floor';
 
 type AccountFormState = Pick<CustomerAccount,
-  'companyName' | 'displayName' | 'customerType' | 'lifecycle' | 'status' | 'ownerId' | 'primaryEmail' | 'website' | 'industry' | 'country' | 'source'
+  'companyName' | 'displayName' | 'customerType' | 'lifecycle' | 'status' | 'ownerId' | 'tags' | 'primaryEmail' | 'website' | 'industry' | 'country' | 'source'
 >;
 
 type ContactFormState = Pick<CustomerContact,
   'fullName' | 'title' | 'role' | 'email' | 'phone' | 'preferredChannel' | 'isPrimary'
 >;
 
-type CustomerSubFloor = 'overview' | 'account' | 'identity' | 'tags';
+type CustomerSubFloor = 'overview' | 'account' | 'identity';
 
 const currency = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 });
 
@@ -130,6 +130,22 @@ const channelOptions: Array<{ value: PreferredChannel; label: string }> = [
   { value: 'whatsapp', label: 'WhatsApp' },
 ];
 
+const tagCategoryOptions: Array<{ value: CustomerTag['category']; label: string }> = [
+  { value: 'segment', label: 'Segment' },
+  { value: 'lifecycle', label: 'Lifecycle' },
+  { value: 'risk', label: 'Risk' },
+  { value: 'channel', label: 'Channel' },
+  { value: 'priority', label: 'Priority' },
+];
+
+const tagColorByCategory: Record<CustomerTag['category'], string> = {
+  segment: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200',
+  lifecycle: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200',
+  risk: 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-200',
+  channel: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200',
+  priority: 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200',
+};
+
 const defaultFilters: CustomerAccountFilters = {
   query: '',
   tagId: 'all',
@@ -140,14 +156,13 @@ const defaultFilters: CustomerAccountFilters = {
 
 const customerSubFloors: Array<{ id: CustomerSubFloor; label: string; detail: string }> = [
   { id: 'overview', label: 'Overview', detail: 'Floor health, next actions, and profile readiness.' },
-  { id: 'account', label: 'Account Profile', detail: 'Account list, profile, ownership, lifecycle, and contacts.' },
+  { id: 'account', label: 'Account Profile', detail: 'Account list, profile edit, ownership, lifecycle, contacts, and tags.' },
   { id: 'identity', label: 'Identity Matching', detail: 'Duplicate account/contact review queue.' },
-  { id: 'tags', label: 'Customer Tags', detail: 'Segment tags and account assignment.' },
 ];
 
 function resolveSubFloor(value: string | null): CustomerSubFloor {
-  if (value === 'account' || value === 'contact') return 'account';
-  if (value === 'identity' || value === 'tags') return value;
+  if (value === 'account' || value === 'contact' || value === 'tags') return 'account';
+  if (value === 'identity') return value;
   return 'overview';
 }
 
@@ -175,6 +190,10 @@ function tagById(tags: CustomerTag[], tagId: string) {
   return tags.find((tag) => tag.id === tagId);
 }
 
+function slugify(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'segment';
+}
+
 function makeBlankAccountForm(ownerId: string): AccountFormState {
   return {
     companyName: '',
@@ -183,6 +202,7 @@ function makeBlankAccountForm(ownerId: string): AccountFormState {
     lifecycle: 'prospect',
     status: 'active',
     ownerId,
+    tags: ['tag-identity-review'],
     primaryEmail: '',
     website: '',
     industry: '',
@@ -199,6 +219,7 @@ function formFromAccount(account: CustomerAccount): AccountFormState {
     lifecycle: account.lifecycle,
     status: account.status,
     ownerId: account.ownerId,
+    tags: account.tags,
     primaryEmail: account.primaryEmail,
     website: account.website,
     industry: account.industry,
@@ -240,6 +261,36 @@ function buildAccountFromForm(form: AccountFormState, tags: string[] = []): Cust
     orderCount: 0,
     identityCompleteness: Math.min(92, 52 + (form.primaryEmail ? 12 : 0) + (form.website ? 12 : 0) + (form.industry ? 8 : 0)),
     notes: ['Created in Customer Profile Floor mock state'],
+    lifecycleStage: {
+      customerId: `manual-${suffix}`,
+      stage: form.lifecycle,
+      ownerId: form.ownerId,
+      nextAction: 'Qualify the account and attach Demand or COS evidence before handoff.',
+      reason: 'Manual mock account needs source evidence before it can support the V1 proof loop.',
+      updatedAt: '2026-05-09T09:00:00.000Z',
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    },
+    timelineEvents: [],
+    followUps: [{
+      id: `followup-manual-${suffix}`,
+      customerId: `manual-${suffix}`,
+      ownerId: form.ownerId,
+      status: 'open',
+      priority: 'normal',
+      dueAt: '2026-05-12T09:00:00.000Z',
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+      source: 'Customer',
+      sourceEntityId: `manual-${suffix}`,
+      allowedAction: 'Attach a qualified lead, RFQ, or COS order before cross-area handoff.',
+      humanApprovalBoundary: 'Operator approves the first outreach because no source evidence exists yet.',
+      nextAction: 'Complete account qualification.',
+      businessImpact: 'Prevents a manually created account from becoming unsupported customer truth.',
+      href: '/customer/crm-compact?floor=account',
+    }],
+    rfqQuoteLinks: [],
+    serviceCases: [],
   };
 }
 
@@ -261,6 +312,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
   const { toast } = useToast();
   const [accounts, setAccounts] = useState(normalizedSeedAccounts);
   const [contacts, setContacts] = useState(seed.contacts);
+  const [tags, setTags] = useState(seed.tags);
   const [selectedAccountId, setSelectedAccountId] = useState(() => resolveAccountIdFromCustomerParam(normalizedSeedAccounts, customerParam));
   const [filters, setFilters] = useState<CustomerAccountFilters>(defaultFilters);
   const [accountDialogMode, setAccountDialogMode] = useState<'create' | 'edit' | null>(null);
@@ -269,7 +321,6 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [contactForm, setContactForm] = useState<ContactFormState>(() => makeBlankContactForm());
-  const [tagToAdd, setTagToAdd] = useState('none');
   const requestedAccountId = useMemo(() => resolveAccountIdFromCustomerParam(accounts, customerParam), [accounts, customerParam]);
 
   useEffect(() => {
@@ -280,8 +331,12 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
     setAccounts(normalizedSeedAccounts);
   }, [normalizedSeedAccounts]);
 
+  useEffect(() => {
+    setTags(seed.tags);
+  }, [seed.tags]);
+
   const matches = useMemo(() => detectIdentityMatches(accounts, contacts), [accounts, contacts]);
-  const filteredAccounts = useMemo(() => filterCustomerAccounts(accounts, seed.tags, filters), [accounts, filters, seed.tags]);
+  const filteredAccounts = useMemo(() => filterCustomerAccounts(accounts, tags, filters), [accounts, filters, tags]);
   const selectedAccount = filteredAccounts.find((account) => account.id === selectedAccountId) ?? filteredAccounts[0] ?? null;
   const selectedAccountRecord = accounts.find((account) => account.id === selectedAccountId) ?? accounts[0] ?? null;
   const selectedRecordContacts = selectedAccountRecord ? contacts.filter((contact) => contact.accountId === selectedAccountRecord.id) : [];
@@ -331,7 +386,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
     }
 
     if (accountDialogMode === 'create') {
-      const nextAccount = buildAccountFromForm(accountForm, ['tag-identity-review']);
+      const nextAccount = buildAccountFromForm(accountForm, accountForm.tags);
       setAccounts((current) => [nextAccount, ...current]);
       setSelectedAccountId(nextAccount.id);
       toast({ title: 'Account created in mock CRM floor' });
@@ -408,21 +463,18 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
     toast({ title: 'Primary contact updated' });
   }
 
-  function addTagToSelectedAccount() {
-    if (!selectedAccountRecord || tagToAdd === 'none' || selectedAccountRecord.tags.includes(tagToAdd)) return;
+  function createSegmentTag(label: string, category: CustomerTag['category'], usage: string) {
+    const nextTag: CustomerTag = {
+      id: `tag-${slugify(label)}-${Date.now().toString(36)}`,
+      label: label.trim(),
+      category,
+      colorClass: tagColorByCategory[category],
+      usage: usage.trim() || 'Custom account segment managed inside Account Profile.',
+    };
 
-    setAccounts((current) => current.map((account) => account.id === selectedAccountRecord.id
-      ? { ...account, tags: [...account.tags, tagToAdd] }
-      : account));
-    setTagToAdd('none');
-  }
-
-  function removeTagFromSelectedAccount(tagId: string) {
-    if (!selectedAccountRecord) return;
-
-    setAccounts((current) => current.map((account) => account.id === selectedAccountRecord.id
-      ? { ...account, tags: account.tags.filter((id) => id !== tagId) }
-      : account));
+    setTags((current) => [...current, nextTag]);
+    setAccountForm((current) => ({ ...current, tags: Array.from(new Set([...current.tags, nextTag.id])) }));
+    toast({ title: 'Segment tag created and assigned' });
   }
 
   return (
@@ -434,7 +486,6 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
           overview: `${ownerCoverage}%`,
           account: accounts.length,
           identity: matches.length,
-          tags: seed.tags.length,
         }}
       />
 
@@ -446,7 +497,14 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
           primaryContactCoverage={primaryContactCoverage}
           identityAlertsCount={matches.length}
           atRiskCount={atRiskCount}
+          account={selectedAccountRecord}
+          contacts={selectedRecordContacts}
+          owners={seed.owners}
           onOpenSubFloor={setActiveSubFloor}
+          onOpenAccount={() => {
+            if (!selectedAccountRecord) return;
+            openAccountProfile(selectedAccountRecord);
+          }}
         />
       ) : (
         <SubFloorPageHeader activeSubFloor={activeSubFloor} />
@@ -478,7 +536,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
               </div>
               <FilterSelect label="Tag" value={filters.tagId} onValueChange={(tagId) => setFilters((current) => ({ ...current, tagId }))}>
                 <SelectItem value="all">All tags</SelectItem>
-                {seed.tags.map((tag) => <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>)}
+                {tags.map((tag) => <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>)}
               </FilterSelect>
               <FilterSelect label="Owner" value={filters.ownerId} onValueChange={(ownerId) => setFilters((current) => ({ ...current, ownerId }))}>
                 <SelectItem value="all">All owners</SelectItem>
@@ -634,26 +692,13 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
         />
       ) : null}
 
-      {activeSubFloor === 'tags' ? (
-        <CustomerTagsSubFloor
-          account={selectedAccountRecord}
-          accounts={accounts}
-          owners={seed.owners}
-          tags={seed.tags}
-          selectedAccountId={selectedAccountId}
-          tagToAdd={tagToAdd}
-          onSelectAccount={setSelectedAccountId}
-          onTagToAddChange={setTagToAdd}
-          onAddTag={addTagToSelectedAccount}
-          onRemoveTag={removeTagFromSelectedAccount}
-        />
-      ) : null}
-
       <AccountEditorDialog
         mode={accountDialogMode}
         form={accountForm}
         owners={seed.owners}
+        tags={tags}
         onFormChange={setAccountForm}
+        onCreateTag={createSegmentTag}
         onOpenChange={(open) => {
           if (!open) setAccountDialogMode(null);
         }}
@@ -665,7 +710,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
         account={selectedAccountRecord}
         contacts={selectedRecordContacts}
         owners={seed.owners}
-        tags={seed.tags}
+        tags={tags}
         futureModules={seed.futureModules}
         onOpenChange={setProfileDialogOpen}
         onEditAccount={() => {
@@ -726,7 +771,11 @@ function OverviewSubFloor({
   primaryContactCoverage,
   identityAlertsCount,
   atRiskCount,
+  account,
+  contacts,
+  owners,
   onOpenSubFloor,
+  onOpenAccount,
 }: {
   accountsCount: number;
   filteredAccountsCount: number;
@@ -734,7 +783,11 @@ function OverviewSubFloor({
   primaryContactCoverage: number;
   identityAlertsCount: number;
   atRiskCount: number;
+  account: CustomerAccount | null;
+  contacts: CustomerContact[];
+  owners: CustomerOwner[];
   onOpenSubFloor: (subFloor: CustomerSubFloor) => void;
+  onOpenAccount: () => void;
 }) {
   return (
     <section className="space-y-4" data-testid="overview-subfloor">
@@ -745,11 +798,23 @@ function OverviewSubFloor({
         <SummaryMetricCard label="Identity alerts" value={identityAlertsCount} meta={`${atRiskCount} account records on watch.`} icon={<CopyCheck className="size-5" />} tone={identityAlertsCount ? 'warning' : 'success'} />
       </div>
 
+      {account ? (
+        <CustomerRelationshipOverview
+          account={account}
+          contacts={contacts}
+          owners={owners}
+          onOpenAccount={onOpenAccount}
+          onOpenSubFloor={onOpenSubFloor}
+        />
+      ) : (
+        <EmptyBlock text="No customer account is available yet. Create an account before connecting Demand, COS, Service, Finance, or Intelligence context." />
+      )}
+
       <Card className="rounded-lg border">
         <CardHeader>
           <CardTitle>Customer Profile overview</CardTitle>
           <p className="text-sm text-muted-foreground">
-            This overview tracks profile readiness only. Open a sub-page to manage accounts, contacts, duplicate review, or tags.
+            This overview starts from relationship context. Open a sub-page to manage account records, contacts, duplicate review, or tags.
           </p>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -767,6 +832,63 @@ function OverviewSubFloor({
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function CustomerRelationshipOverview({
+  account,
+  contacts,
+  owners,
+  onOpenAccount,
+  onOpenSubFloor,
+}: {
+  account: CustomerAccount;
+  contacts: CustomerContact[];
+  owners: CustomerOwner[];
+  onOpenAccount: () => void;
+  onOpenSubFloor: (subFloor: CustomerSubFloor) => void;
+}) {
+  const primaryContact = contacts.find((contact) => contact.isPrimary);
+  const timelineOwners = new Set(account.timelineEvents.map((event) => event.sourceOfTruthOwner));
+
+  return (
+    <Card className="rounded-lg border" data-testid="customer-relationship-overview">
+      <CardHeader className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">Relationship context</Badge>
+              <Badge variant={lifecycleBadgeVariant(account.lifecycleStage.stage)} className="capitalize">{humanize(account.lifecycleStage.stage)}</Badge>
+              <Badge variant="secondary">{timelineOwners.size} source owners</Badge>
+            </div>
+            <CardTitle className="mt-3 text-2xl">{account.displayName}</CardTitle>
+            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+              {account.profile?.profileSummary ?? account.lifecycleStage.reason}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={onOpenAccount}>Open profile</Button>
+            <Button size="sm" variant="outline" onClick={() => onOpenSubFloor('account')}>Manage account</Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <IdentityFact icon={<UserRoundCheck className="size-4" />} label="Owner" value={ownerName(owners, account.lifecycleStage.ownerId)} detail="Customer owns lifecycle and follow-up accountability" />
+          <IdentityFact icon={<CircleUserRound className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.preferredChannel ?? 'Add contact before outreach'} />
+          <IdentityFact icon={<ReceiptText className="size-4" />} label="Next action" value={account.lifecycleStage.nextAction} detail={account.lifecycleStage.reason} />
+          <IdentityFact icon={<ShieldCheck className="size-4" />} label="Why it matters" value={account.followUps[0]?.businessImpact ?? 'Relationship context is ready'} detail="Operator can see impact before Demand/COS handoff" />
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+          <CustomerTimelineEventList events={account.timelineEvents.slice(0, 6)} owners={owners} compact />
+          <div className="grid gap-4">
+            <FollowUpQueue followUps={account.followUps} owners={owners} />
+            <ContinuityPreview account={account} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -891,87 +1013,6 @@ function IdentityMatchingSubFloor({
   );
 }
 
-function CustomerTagsSubFloor({
-  account,
-  accounts,
-  owners,
-  tags,
-  selectedAccountId,
-  tagToAdd,
-  onSelectAccount,
-  onTagToAddChange,
-  onAddTag,
-  onRemoveTag,
-}: {
-  account: CustomerAccount | null;
-  accounts: CustomerAccount[];
-  owners: CustomerOwner[];
-  tags: CustomerTag[];
-  selectedAccountId: string;
-  tagToAdd: string;
-  onSelectAccount: (accountId: string) => void;
-  onTagToAddChange: (tagId: string) => void;
-  onAddTag: () => void;
-  onRemoveTag: (tagId: string) => void;
-}) {
-  return (
-    <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]" data-testid="tags-subfloor">
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <CardTitle>Customer Tags</CardTitle>
-          <p className="text-sm text-muted-foreground">Assign seeded segment tags. Tag taxonomy is local mock state in V1.</p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <AccountSelector accounts={accounts} owners={owners} selectedAccountId={selectedAccountId} onSelectAccount={onSelectAccount} />
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Select value={tagToAdd} onValueChange={onTagToAddChange}>
-              <SelectTrigger aria-label="Add customer tag">
-                <SelectValue placeholder="Choose tag" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Choose tag</SelectItem>
-                {tags.filter((tag) => !account?.tags.includes(tag.id)).map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={onAddTag} disabled={!account}>Add tag</Button>
-          </div>
-          <div className="grid gap-2">
-            {account?.tags.map((tagId) => {
-              const tag = tagById(tags, tagId);
-              if (!tag) return null;
-              return (
-                <div key={tag.id} className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3">
-                  <Badge variant="outline" className={tag.colorClass}>{tag.label}</Badge>
-                  <Button size="sm" variant="outline" onClick={() => onRemoveTag(tag.id)}>Remove</Button>
-                </div>
-              );
-            })}
-            {account && account.tags.length === 0 ? <EmptyBlock text="No tags assigned to this account." /> : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-lg border">
-        <CardHeader>
-          <CardTitle>Tag taxonomy</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">Categories and segment usage placeholders for later Demand/Intelligence integration.</p>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          {tags.map((tag) => (
-            <div key={tag.id} className="rounded-lg border bg-muted/20 p-3">
-              <Badge variant="outline" className={tag.colorClass}>{tag.label}</Badge>
-              <div className="mt-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">{tag.category}</div>
-              <div className="mt-2 text-sm text-muted-foreground">{tag.usage}</div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </section>
-  );
-}
-
 function AccountProfileDialog({
   open,
   account,
@@ -1047,7 +1088,7 @@ function AccountProfileDialog({
           <SmallMetric label="Revenue read" value={currency.format(account.revenue)} />
         </div>
 
-        {account.profile ? <CustomerPortraitSection account={account} /> : null}
+        {account.profile ? <CustomerPortraitSection account={account} owners={owners} /> : null}
 
         <section className="rounded-lg border">
           <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1071,7 +1112,7 @@ function AccountProfileDialog({
         <div className="grid gap-3">
           <div>
             <div className="text-sm font-medium">Profile notes</div>
-            <p className="text-xs text-muted-foreground">Account and contact identity live together here. Identity matching and tags remain separate review workspaces.</p>
+            <p className="text-xs text-muted-foreground">Account, contact identity, and segment tags live together here. Identity matching remains a separate review workspace.</p>
           </div>
           <div className="grid gap-2">
             {account.notes.map((note) => (
@@ -1125,7 +1166,7 @@ function CustomerAvatar({ account, size }: { account: CustomerAccount; size: 'sm
   );
 }
 
-function CustomerPortraitSection({ account }: { account: CustomerAccount }) {
+function CustomerPortraitSection({ account, owners }: { account: CustomerAccount; owners: CustomerOwner[] }) {
   const profile = account.profile;
   if (!profile) return null;
 
@@ -1228,8 +1269,17 @@ function CustomerPortraitSection({ account }: { account: CustomerAccount }) {
       </div>
 
       <div className="grid gap-3 border-t p-4 lg:grid-cols-2">
-        <TextStack title="Customer timeline" lines={profile.timeline} />
+        <CustomerTimelineEventList events={account.timelineEvents} owners={owners} />
+        <div className="grid gap-3">
+          <FollowUpQueue followUps={account.followUps} owners={owners} />
+          <ContinuityPreview account={account} />
+          <ServiceCasePreview serviceCases={account.serviceCases} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 border-t p-4 lg:grid-cols-2">
         <TextStack title="Profile notes" lines={account.notes} />
+        <TextStack title="Legacy customer memory" lines={profile.timeline} />
       </div>
     </section>
   );
@@ -1302,6 +1352,125 @@ function RecentEventsList({ events }: { events: NonNullable<CustomerAccount['pro
             <div className="mt-1 text-xs text-muted-foreground">{event.actorType} · {formatProfileDate(event.createdAt)}</div>
           </div>
         )) : <div className="text-xs text-muted-foreground">No COS event captured yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function CustomerTimelineEventList({
+  events,
+  owners = [],
+  compact = false,
+}: {
+  events: CustomerAccount['timelineEvents'];
+  owners?: CustomerOwner[];
+  compact?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3" data-testid="customer-timeline-events">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium">Unified customer timeline</div>
+          <p className="mt-1 text-xs text-muted-foreground">Read model only. Source truth remains in Demand, Ecom/COS, Service, Finance, or Intelligence.</p>
+        </div>
+        <Badge variant="outline">{events.length} events</Badge>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {events.length ? events.map((event) => (
+          <div key={event.id} className="rounded-md border bg-background p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={event.sourceOfTruthOwner === 'Customer' ? 'secondary' : 'outline'}>{event.sourceOfTruthOwner}</Badge>
+                  <span className="text-xs text-muted-foreground">{formatProfileDate(event.occurredAt)}</span>
+                </div>
+                <div className="mt-2 text-sm font-medium">{event.summary}</div>
+              </div>
+              <Badge variant="outline" className="capitalize">{humanize(event.eventType)}</Badge>
+            </div>
+            <div className={`mt-2 grid gap-2 text-xs text-muted-foreground ${compact ? '' : 'sm:grid-cols-3'}`}>
+              <span>Owner: {ownerName(owners, event.ownerId)}</span>
+              <span>Next: {event.nextAction}</span>
+              <span>Impact: {event.businessImpact}</span>
+            </div>
+          </div>
+        )) : <EmptyBlock text="No timeline events yet. Attach a Demand lead, COS order, service case, or finance signal before using this account in the V1 proof loop." />}
+      </div>
+    </div>
+  );
+}
+
+function FollowUpQueue({ followUps, owners }: { followUps: CustomerAccount['followUps']; owners: CustomerOwner[] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3" data-testid="customer-follow-up-queue">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium">Follow-up queue</div>
+          <p className="mt-1 text-xs text-muted-foreground">Customer owns the action queue; source domains keep their own state.</p>
+        </div>
+        <Badge variant="outline">{followUps.length} actions</Badge>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {followUps.length ? followUps.map((followUp) => (
+          <div key={followUp.id} className="rounded-md border bg-background p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium">{followUp.nextAction}</div>
+              <Badge variant={followUp.priority === 'high' ? 'warning' : 'outline'}>{followUp.priority}</Badge>
+            </div>
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <span>Owner: {ownerName(owners, followUp.ownerId)}</span>
+              <span>Due: {formatProfileDate(followUp.dueAt)} · Status: {humanize(followUp.status)}</span>
+              <span>Allowed action: {followUp.allowedAction}</span>
+              <span>Approval: {followUp.humanApprovalBoundary}</span>
+            </div>
+          </div>
+        )) : <EmptyBlock text="No follow-up is queued. Customer needs a next action before it can prove relationship continuity." />}
+      </div>
+    </div>
+  );
+}
+
+function ContinuityPreview({ account }: { account: CustomerAccount }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3" data-testid="customer-continuity-preview">
+      <div className="text-sm font-medium">RFQ / quote / order continuity</div>
+      <div className="mt-3 grid gap-2">
+        {account.rfqQuoteLinks.length ? account.rfqQuoteLinks.map((link) => (
+          <div key={link.id} className="rounded-md border bg-background p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium">{link.rfqId ?? link.leadId ?? 'Demand continuity'}</div>
+              <Badge variant={link.status === 'converted' ? 'default' : 'outline'} className="capitalize">{humanize(link.status)}</Badge>
+            </div>
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <span>SKU: {link.skuId ?? 'N/A'} · Quantity: {link.quantity ?? 'N/A'}</span>
+              <span>Value: {link.value ? formatMoney(link.value, 'JPY') : 'N/A'}</span>
+              <span>{link.handoff}</span>
+            </div>
+          </div>
+        )) : <EmptyBlock text="No RFQ or quote continuity yet. Customer can still show lifecycle, service, and COS context." />}
+      </div>
+    </div>
+  );
+}
+
+function ServiceCasePreview({ serviceCases }: { serviceCases: CustomerAccount['serviceCases'] }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3" data-testid="customer-service-case-preview">
+      <div className="text-sm font-medium">Service ownership / SLA</div>
+      <div className="mt-3 grid gap-2">
+        {serviceCases.length ? serviceCases.map((serviceCase) => (
+          <div key={serviceCase.id} className="rounded-md border bg-background p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium">{serviceCase.linkedEntity}</div>
+              <Badge variant={serviceCase.priority === 'high' ? 'warning' : 'outline'}>{serviceCase.status.replace('_', ' ')}</Badge>
+            </div>
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <span>SLA: {serviceCase.sla}</span>
+              <span>Pending: {serviceCase.pendingAction}</span>
+              <span>{serviceCase.intelligenceHandoff}</span>
+            </div>
+          </div>
+        )) : <EmptyBlock text="No service case blocks the next customer action." />}
       </div>
     </div>
   );
@@ -1463,23 +1632,50 @@ function AccountEditorDialog({
   mode,
   form,
   owners,
+  tags,
   onFormChange,
+  onCreateTag,
   onOpenChange,
   onSave,
 }: {
   mode: 'create' | 'edit' | null;
   form: AccountFormState;
   owners: CustomerOwner[];
+  tags: CustomerTag[];
   onFormChange: (form: AccountFormState) => void;
+  onCreateTag: (label: string, category: CustomerTag['category'], usage: string) => void;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
 }) {
+  const [newTagOpen, setNewTagOpen] = useState(false);
+  const [newTagLabel, setNewTagLabel] = useState('');
+  const [newTagCategory, setNewTagCategory] = useState<CustomerTag['category']>('segment');
+  const [newTagUsage, setNewTagUsage] = useState('');
+
+  const toggleTag = (tagId: string) => {
+    const nextTags = form.tags.includes(tagId)
+      ? form.tags.filter((id) => id !== tagId)
+      : [...form.tags, tagId];
+    onFormChange({ ...form, tags: nextTags });
+  };
+
+  const createTag = () => {
+    const label = newTagLabel.trim();
+    if (!label) return;
+
+    onCreateTag(label, newTagCategory, newTagUsage);
+    setNewTagLabel('');
+    setNewTagCategory('segment');
+    setNewTagUsage('');
+    setNewTagOpen(false);
+  };
+
   return (
     <Dialog open={Boolean(mode)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Create account' : 'Edit account'}</DialogTitle>
-          <DialogDescription>Manage customer identity, ownership, lifecycle, and profile basics only.</DialogDescription>
+          <DialogDescription>Manage customer identity, ownership, lifecycle, profile basics, and segment tags in one account edit flow.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <TextField label="Company name" value={form.companyName} onChange={(companyName) => onFormChange({ ...form, companyName })} />
@@ -1504,6 +1700,57 @@ function AccountEditorDialog({
             <SelectItem value="archived">Archived</SelectItem>
           </SelectField>
         </div>
+        <section className="rounded-lg border bg-muted/20 p-4" data-testid="account-tag-editor">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Segment tags</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Tags are account profile metadata. Use them for Demand, Intelligence, and service segmentation later.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{form.tags.length} assigned</Badge>
+              <Button type="button" size="sm" variant="outline" onClick={() => setNewTagOpen((open) => !open)}>
+                <Plus className="size-4" />
+                New segment tag
+              </Button>
+            </div>
+          </div>
+          {newTagOpen ? (
+            <div className="mt-3 grid gap-3 rounded-lg border bg-background p-3 md:grid-cols-[minmax(0,1fr)_180px]">
+              <TextField label="Tag label" value={newTagLabel} onChange={setNewTagLabel} />
+              <SelectField label="Category" value={newTagCategory} onValueChange={(category) => setNewTagCategory(category as CustomerTag['category'])}>
+                {tagCategoryOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </SelectField>
+              <TextField label="Usage note" value={newTagUsage} onChange={setNewTagUsage} />
+              <div className="flex items-end gap-2">
+                <Button type="button" className="w-full" onClick={createTag} disabled={!newTagLabel.trim()}>
+                  Create and assign
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {tags.map((tag) => {
+              const selected = form.tags.includes(tag.id);
+
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  aria-pressed={selected}
+                  className={`rounded-lg border bg-background p-3 text-left transition-colors ${selected ? 'border-primary/40 ring-1 ring-primary/30' : 'hover:border-primary/30'}`}
+                  onClick={() => toggleTag(tag.id)}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Badge variant="outline" className={tag.colorClass}>{tag.label}</Badge>
+                    <span className="text-xs font-medium text-muted-foreground">{selected ? 'Assigned' : 'Add'}</span>
+                  </div>
+                  <div className="mt-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">{tag.category}</div>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{tag.usage}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={onSave}>{mode === 'create' ? 'Create account' : 'Save changes'}</Button>
@@ -1568,7 +1815,7 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
@@ -1578,7 +1825,7 @@ function SelectField({ label, value, onValueChange, children }: { label: string;
     <div className="space-y-2">
       <Label>{label}</Label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger>
+        <SelectTrigger aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

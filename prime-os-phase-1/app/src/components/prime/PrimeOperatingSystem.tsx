@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useI18n } from '@/lib/i18n/I18nContext';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,72 @@ const toneClassMap: Record<Tone, string> = {
   muted: 'border-border/70 bg-muted/35 text-muted-foreground',
   purple: 'border-primary/25 bg-primary/10 text-primary',
 };
+
+function getOperatingCopy(locale: string) {
+  const copy = {
+    'en-US': {
+      decisionReadiness: 'Decision readiness',
+      ready: 'Ready',
+      watch: 'Watch',
+      needsAction: 'Needs action',
+      operatingLoop: 'Operating loop',
+      loopPath: 'Signal to decision to action to outcome',
+      open: 'Open',
+      currentOwner: 'Current owner',
+      nextHandoff: 'Next handoff',
+      openHandoff: 'Open handoff',
+      evidenceStack: 'Evidence stack',
+      guardrail: 'Guardrail',
+      outcomePreview: 'Outcome preview',
+      nextOperatorAction: 'Next operator action',
+      operatingRegistry: 'Operating registry',
+    },
+    'ja-JP': {
+      decisionReadiness: '判断準備度',
+      ready: '準備完了',
+      watch: '要監視',
+      needsAction: '対応が必要',
+      operatingLoop: '運用ループ',
+      loopPath: 'シグナルから判断、アクション、成果へ',
+      open: '開く',
+      currentOwner: '現在の担当',
+      nextHandoff: '次の引き渡し',
+      openHandoff: '引き渡しを開く',
+      evidenceStack: 'エビデンススタック',
+      guardrail: 'ガードレール',
+      outcomePreview: '成果プレビュー',
+      nextOperatorAction: '次のオペレーター操作',
+      operatingRegistry: '運用レジストリ',
+    },
+    'vi-VN': {
+      decisionReadiness: 'Mức sẵn sàng quyết định',
+      ready: 'Sẵn sàng',
+      watch: 'Cần theo dõi',
+      needsAction: 'Cần xử lý',
+      operatingLoop: 'Vòng vận hành',
+      loopPath: 'Tín hiệu đến quyết định đến hành động đến kết quả',
+      open: 'Mở',
+      currentOwner: 'Chủ sở hữu hiện tại',
+      nextHandoff: 'Bàn giao tiếp theo',
+      openHandoff: 'Mở bàn giao',
+      evidenceStack: 'Ngăn bằng chứng',
+      guardrail: 'Rào chắn vận hành',
+      outcomePreview: 'Xem trước kết quả',
+      nextOperatorAction: 'Hành động tiếp theo',
+      operatingRegistry: 'Sổ vận hành',
+    },
+  } as const;
+
+  return copy[locale as keyof typeof copy] ?? copy['en-US'];
+}
+
+function localizeStatus(status: string | undefined, copy: ReturnType<typeof getOperatingCopy>) {
+  if (!status) return status;
+  if (status === 'Ready') return copy.ready;
+  if (status === 'Watch') return copy.watch;
+  if (status === 'Needs action') return copy.needsAction;
+  return status;
+}
 
 export type OperatingLoopStep = {
   label: string;
@@ -126,8 +193,11 @@ export function DecisionHeader({
   variant?: 'default' | 'compact';
   className?: string;
 }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
   const confidenceValue = confidence ?? 72;
-  const confidenceBadge = confidenceValue >= 75 ? 'Ready' : 'Watch';
+  const confidenceBadge = confidenceValue >= 75 ? copy.ready : copy.watch;
+  const displayStatus = localizeStatus(status, copy);
 
   if (variant === 'compact') {
     return (
@@ -136,7 +206,7 @@ export function DecisionHeader({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{eyebrow}</Badge>
-              {status ? <Badge>{status}</Badge> : null}
+              {displayStatus ? <Badge>{displayStatus}</Badge> : null}
             </div>
             <h1 className="mt-3 text-2xl font-semibold tracking-normal text-foreground md:text-3xl">{title}</h1>
             <div className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground md:text-base md:leading-7">{description}</div>
@@ -146,7 +216,7 @@ export function DecisionHeader({
           <div className="rounded-lg border border-border/70 bg-[hsl(var(--surface-control))] p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-metadata">Decision readiness</div>
+                <div className="text-metadata">{copy.decisionReadiness}</div>
                 <div className="mt-1 text-3xl font-semibold tracking-normal">{confidenceValue}%</div>
               </div>
               <Badge variant={confidenceValue >= 75 ? 'default' : 'warning'}>{confidenceBadge}</Badge>
@@ -176,14 +246,14 @@ export function DecisionHeader({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{eyebrow}</Badge>
-            {status ? <Badge>{status}</Badge> : null}
+            {displayStatus ? <Badge>{displayStatus}</Badge> : null}
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-normal text-foreground md:text-3xl">{title}</h2>
           <div className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground md:text-base md:leading-7">{description}</div>
           {actions ? <div className="mt-5 flex flex-wrap gap-2">{actions}</div> : null}
         </div>
         <div className="rounded-lg border border-border/70 bg-[hsl(var(--surface-control))] p-4">
-          <div className="text-metadata">Decision readiness</div>
+          <div className="text-metadata">{copy.decisionReadiness}</div>
           <div className="mt-2 flex items-end justify-between gap-3">
             <div className="text-4xl font-semibold tracking-normal">{confidenceValue}%</div>
             <Badge variant={confidenceValue >= 75 ? 'default' : 'warning'}>{confidenceBadge}</Badge>
@@ -207,12 +277,15 @@ export function DecisionHeader({
 }
 
 export function OperatingLoop({ steps, className }: { steps: OperatingLoopStep[]; className?: string }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <Card className={cn('border', className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-base">Operating loop</CardTitle>
-          <Badge variant="outline">Signal to decision to action to outcome</Badge>
+          <CardTitle className="text-base">{copy.operatingLoop}</CardTitle>
+          <Badge variant="outline">{copy.loopPath}</Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -228,7 +301,7 @@ export function OperatingLoop({ steps, className }: { steps: OperatingLoopStep[]
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.detail}</p>
                 {step.href ? (
                   <div className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
-                    Open
+                    {copy.open}
                     <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
                   </div>
                 ) : null}
@@ -256,21 +329,24 @@ export function HandoffRail({
   href: string;
   className?: string;
 }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <div className={cn('surface-solid rounded-lg border border-primary/20 p-3', className)}>
       <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto] md:items-center">
         <div>
-          <div className="text-metadata">Current owner</div>
+          <div className="text-metadata">{copy.currentOwner}</div>
           <div className="mt-1 font-semibold">{from}</div>
         </div>
         <ArrowRight className="hidden size-4 text-primary md:block" />
         <div>
-          <div className="text-metadata">Next handoff</div>
+          <div className="text-metadata">{copy.nextHandoff}</div>
           <div className="mt-1 font-semibold">{to}</div>
           <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to={href}>Open handoff</Link>
+          <Link to={href}>{copy.openHandoff}</Link>
         </Button>
       </div>
     </div>
@@ -278,10 +354,13 @@ export function HandoffRail({
 }
 
 export function EvidenceStack({ items, className }: { items: EvidenceItem[]; className?: string }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <Card className={cn('border', className)}>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Evidence stack</CardTitle>
+        <CardTitle className="text-base">{copy.evidenceStack}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-2">
         {items.map((item) => (
@@ -311,12 +390,15 @@ export function GuardrailCard({
   action?: ReactNode;
   className?: string;
 }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <Card className={cn('border', toneClassMap[tone], className)}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-metadata">Guardrail</div>
+            <div className="text-metadata">{copy.guardrail}</div>
             <div className="mt-1 font-semibold text-foreground">{title}</div>
             <div className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</div>
           </div>
@@ -329,7 +411,7 @@ export function GuardrailCard({
 }
 
 export function OutcomePreview({
-  label = 'Outcome preview',
+  label,
   value,
   detail,
   tone = 'success',
@@ -341,9 +423,12 @@ export function OutcomePreview({
   tone?: Tone;
   className?: string;
 }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <div className={cn('rounded-lg border p-4', toneClassMap[tone], className)}>
-      <div className="text-metadata">{label}</div>
+      <div className="text-metadata">{label ?? copy.outcomePreview}</div>
       <div className="mt-2 text-2xl font-semibold text-foreground">{value}</div>
       {detail ? <div className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</div> : null}
     </div>
@@ -363,11 +448,14 @@ export function ActionSetupPanel({
   href: string;
   className?: string;
 }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <Card className={cn('border border-primary/20 bg-primary/5', className)}>
       <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div>
-          <div className="text-metadata">Next operator action</div>
+          <div className="text-metadata">{copy.nextOperatorAction}</div>
           <div className="mt-1 font-semibold">{title}</div>
           <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
         </div>
@@ -383,10 +471,13 @@ export function ActionSetupPanel({
 }
 
 export function RegistryList({ items, className }: { items: RegistryItem[]; className?: string }) {
+  const { locale } = useI18n();
+  const copy = getOperatingCopy(locale);
+
   return (
     <Card className={cn('border', className)}>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Operating registry</CardTitle>
+        <CardTitle className="text-base">{copy.operatingRegistry}</CardTitle>
       </CardHeader>
       <CardContent className="divide-y divide-border/65 p-0">
         {items.map((item) => {

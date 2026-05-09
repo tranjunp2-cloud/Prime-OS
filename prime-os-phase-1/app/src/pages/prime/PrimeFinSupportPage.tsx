@@ -1,5 +1,6 @@
 import { type ChangeEvent, type DragEvent, type ReactNode, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -37,6 +38,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { PartnerWorkspacePanel } from '@/components/prime/PartnerWorkspacePanel';
 import {
   fetchFinanceControlPlane,
   type CapitalOffersRecord,
@@ -45,6 +47,15 @@ import {
   type RiskTrustRecord,
   type SettlementRepaymentRecord,
 } from '@/lib/prime/finance-control-plane';
+import {
+  buildFinanceTrustProfile,
+  type BankReviewSummary,
+  type CommerceEvidencePack,
+  type CommerceEvidenceStatus,
+  type FinanceDocumentStatus,
+  type FinancialTrustProfile,
+} from '@/lib/prime/finance-trust-profile';
+import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
 import { cn } from '@/lib/utils';
 
@@ -56,8 +67,8 @@ const currency = new Intl.NumberFormat('ja-JP', {
 const fundingDisplayMultiplier = 40;
 
 type FundingStepStatus = 'complete' | 'active' | 'blocked' | 'pending';
-type DocumentStatus = 'missing' | 'uploading' | 'verifying' | 'verified' | 'rejected';
-type ApplicationStatus = 'Draft' | 'Under Review' | 'Need Additional Documents' | 'Bank Reviewing' | 'Approved' | 'Rejected' | 'Disbursed';
+type DocumentStatus = FinanceDocumentStatus;
+type ApplicationStatus = 'Draft' | 'Pre-check Review' | 'Need Additional Documents' | 'Bank Reviewing' | 'Terms Proposed' | 'Rejected';
 type LoanWizardStepId = 'profile' | 'purpose' | 'commerce' | 'documents' | 'routing' | 'review' | 'tracking';
 
 type EligibilitySignal = {
@@ -82,7 +93,7 @@ type LenderMatch = {
   estimatedRange: string;
   matchPercent: number;
   requirements: string[];
-  approvalSpeed: string;
+  reviewWindow: string;
   source: string;
 };
 
@@ -117,7 +128,7 @@ type LoanProfileDraft = {
   representative: string;
   requestedAmount: string;
   fundingPurpose: string;
-  desiredDisbursement: string;
+  targetReviewTiming: string;
   repaymentSource: string;
 };
 
@@ -126,6 +137,13 @@ type LoanWizardStep = {
   title: string;
   summary: string;
   icon: LucideIcon;
+};
+
+type LoanWizardMoodCopy = {
+  title: string;
+  detail: string;
+  reassurance: string;
+  ariaLabel: string;
 };
 
 type JapanLoanDocument = {
@@ -142,10 +160,55 @@ const loanWizardSteps: LoanWizardStep[] = [
   { id: 'purpose', title: 'Funding purpose', summary: 'Amount, use of funds, timing, repayment source.', icon: Banknote },
   { id: 'commerce', title: 'Commerce proof', summary: 'Operational signals PrimeOS can attach to the file.', icon: TrendingUp },
   { id: 'documents', title: 'Document pack', summary: 'Japan SME lending documents uploaded once, reused across lenders.', icon: FileText },
-  { id: 'routing', title: 'Lender routing', summary: 'Partner bank, guarantee-backed, or JFC-style review path.', icon: ShieldCheck },
+  { id: 'routing', title: 'Review routing', summary: 'Partner bank, guarantee-backed, or JFC-style review path.', icon: ShieldCheck },
   { id: 'review', title: 'Review & consent', summary: 'Final pre-check before PrimeOS sends the package.', icon: FileCheck2 },
-  { id: 'tracking', title: 'Track next steps', summary: 'Additional documents, bank review, contract, disbursement.', icon: Clock3 },
+  { id: 'tracking', title: 'Track next steps', summary: 'Additional documents, bank review, contract, lender milestones.', icon: Clock3 },
 ];
+
+const loanWizardMoodCopy: Record<LoanWizardStepId, LoanWizardMoodCopy> = {
+  profile: {
+    title: 'Identity check, kept calm',
+    detail: 'Confirm the registered business once. PrimeOS keeps the lender file tidy as you move.',
+    reassurance: 'Draft saves stay local to the workflow until you submit pre-check.',
+    ariaLabel: 'Animated business profile document being checked',
+  },
+  purpose: {
+    title: 'Funds mapped to work',
+    detail: 'Turn the request into a clear use-of-funds story lenders can evaluate quickly.',
+    reassurance: 'Inventory, campaign, equipment, and working-capital needs stay separated.',
+    ariaLabel: 'Animated funding chips moving toward a use of funds tray',
+  },
+  commerce: {
+    title: 'Operations become proof',
+    detail: 'PrimeOS translates stable orders, payouts, inventory, and service quality into trust signals.',
+    reassurance: 'Commerce evidence supports the file without asking the merchant to rewrite it.',
+    ariaLabel: 'Animated commerce signals flowing into a trust shield',
+  },
+  documents: {
+    title: 'Upload once, reuse often',
+    detail: 'The document pack is organized once, then mapped to each potential review-route requirement.',
+    reassurance: 'Missing or rejected files stay visible before the package is routed.',
+    ariaLabel: 'Animated documents sliding into an upload folder',
+  },
+  routing: {
+    title: 'Lender paths stay visible',
+    detail: 'Partner banks, guarantee routes, and direct review paths stay separate but coordinated.',
+    reassurance: 'PrimeOS routes the same verified package instead of duplicating work.',
+    ariaLabel: 'Animated lender nodes connected by a routing path',
+  },
+  review: {
+    title: 'One more quiet check',
+    detail: 'Review consent, blockers, review routes, and document readiness before pre-check.',
+    reassurance: 'No approval promise is shown; the workflow stays deterministic.',
+    ariaLabel: 'Animated checklist being reviewed before submission',
+  },
+  tracking: {
+    title: 'After submit, no guessing',
+    detail: 'Next actions move into document requests, bank review, and lender milestone tracking.',
+    reassurance: 'Additional document requests return to the same support flow.',
+    ariaLabel: 'Animated funding timeline moving toward lender review milestones',
+  },
+};
 
 const japanLoanDocuments: JapanLoanDocument[] = [
   {
@@ -160,7 +223,7 @@ const japanLoanDocuments: JapanLoanDocument[] = [
     id: 'tax-return',
     label: 'Tax returns / financial statements',
     detail: 'Recent fiscal documents for cashflow and profitability review.',
-    lenderUse: 'Credit review',
+    lenderUse: 'Lender review',
     linkedDocumentId: 'tax-documents',
     fallbackStatus: 'missing',
   },
@@ -183,7 +246,7 @@ const japanLoanDocuments: JapanLoanDocument[] = [
     id: 'settlement',
     label: 'Settlement and marketplace reports',
     detail: 'Commerce-native proof of revenue, refund ratio, account quality, and channel stability.',
-    lenderUse: 'Operational underwriting',
+    lenderUse: 'Operational evidence review',
     linkedDocumentId: 'settlement-records',
     fallbackStatus: 'missing',
   },
@@ -215,7 +278,7 @@ const fallbackFinanceData: FinanceControlPlaneSnapshot = {
       linkedSku: 'CR-NTB-BLK-A5-A4',
       fundingNeed: 280000,
       readinessScore: 88,
-      readinessReason: 'Approved launch, repeat-customer pull, and creator proof already align around one SKU.',
+      readinessReason: 'Validated launch plan, repeat-customer pull, and creator proof already align around one SKU.',
       nextReview: '2026-05-05T09:00:00.000Z',
       status: 'ready',
     },
@@ -324,6 +387,13 @@ function humanize(value?: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function formatShortDate(value?: string) {
+  if (!value) return 'Pending';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Pending';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
 function readinessGrade(score: number) {
   if (score >= 90) return 'A';
   if (score >= 82) return 'A-';
@@ -332,12 +402,20 @@ function readinessGrade(score: number) {
   return 'Review';
 }
 
-function statusClass(status: FundingStepStatus | DocumentStatus | ApplicationStatus) {
-  if (status === 'complete' || status === 'verified' || status === 'Approved' || status === 'Disbursed') {
+function statusClass(status: FundingStepStatus | DocumentStatus | ApplicationStatus | CommerceEvidenceStatus) {
+  if (status === 'complete' || status === 'verified' || status === 'reusable') {
     return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
   }
 
-  if (status === 'active' || status === 'uploading' || status === 'verifying' || status === 'Under Review' || status === 'Bank Reviewing') {
+  if (
+    status === 'active' ||
+    status === 'uploaded' ||
+    status === 'uploading' ||
+    status === 'verifying' ||
+    status === 'Pre-check Review' ||
+    status === 'Bank Reviewing' ||
+    status === 'Terms Proposed'
+  ) {
     return 'border-primary/25 bg-primary/10 text-primary';
   }
 
@@ -377,7 +455,7 @@ function buildLenders(offers: CapitalOffersRecord[], readinessScore: number): Le
       offer.linkedLaunch || 'Linked operating plan',
       `${offer.termDays ?? 45} day review window`,
     ],
-    approvalSpeed: offer.status === 'active' ? '2-4 business days' : '5-7 business days',
+    reviewWindow: offer.status === 'active' ? '2-4 business days' : '5-7 business days',
     source: offer.market,
   }));
 
@@ -388,7 +466,7 @@ function buildLenders(offers: CapitalOffersRecord[], readinessScore: number): Le
     estimatedRange: `${currency.format(10000000 + index * 5000000)}-${currency.format(26000000 + index * 7000000)}`,
     matchPercent: clamp(readinessScore - index * 6),
     requirements: ['Verified settlements', 'Marketplace report', 'Inventory turnover proof'],
-    approvalSpeed: index === 0 ? '3-5 business days' : '5-10 business days',
+    reviewWindow: index === 0 ? '3-5 business days' : '5-10 business days',
     source: 'Partner network',
   }));
 
@@ -402,8 +480,8 @@ function buildDocuments(lenders: LenderMatch[]): FinancingDocument[] {
     { id: 'business-registration', label: 'Business registration', description: 'Company identity and merchant ownership.', banks: bankNames, status: 'verified', progress: 100, fileName: 'business-registration.pdf' },
     { id: 'tax-documents', label: 'Tax documents', description: 'Latest tax filing or equivalent proof.', banks: bankNames, status: 'missing', progress: 0 },
     { id: 'bank-statements', label: 'Bank statements', description: 'Operating cashflow and settlement movement.', banks: bankNames, status: 'verifying', progress: 72, fileName: 'bank-statement-apr.pdf' },
-    { id: 'settlement-records', label: 'Settlement records', description: 'Marketplace payout and repayment reliability.', banks: bankNames, status: 'verified', progress: 100, fileName: 'settlement-ledger.csv' },
-    { id: 'invoice-records', label: 'Invoice records', description: 'B2B order proof and receivables context.', banks: bankNames.slice(0, 2), status: 'missing', progress: 0 },
+    { id: 'settlement-records', label: 'Settlement records', description: 'Marketplace payout and repayment reliability.', banks: bankNames, status: 'reusable', progress: 100, fileName: 'settlement-ledger.csv' },
+    { id: 'invoice-records', label: 'Invoice records', description: 'B2B order proof and receivables context.', banks: bankNames.slice(0, 2), status: 'uploaded', progress: 100, fileName: 'b2b-invoices-may.pdf' },
     { id: 'logistics-records', label: 'Logistics/export records', description: 'Fulfillment reliability and shipping proof.', banks: bankNames.slice(1), status: 'rejected', progress: 100, fileName: 'export-docs.zip', issue: 'Carrier reference is missing.' },
     { id: 'marketplace-reports', label: 'Marketplace reports', description: 'Sales health, refunds, and account quality.', banks: bankNames, status: 'verified', progress: 100, fileName: 'marketplace-health.xlsx' },
   ];
@@ -414,7 +492,7 @@ function buildApplications(lenders: LenderMatch[], docs: FinancingDocument[]): A
 
   return lenders.slice(0, 3).map((lender, index) => ({
     lender: lender.bankName,
-    status: index === 0 && missingCount === 0 ? 'Bank Reviewing' : index === 0 ? 'Need Additional Documents' : index === 1 ? 'Draft' : 'Under Review',
+    status: index === 0 && missingCount === 0 ? 'Bank Reviewing' : index === 0 ? 'Need Additional Documents' : index === 1 ? 'Draft' : 'Pre-check Review',
     timeline: index === 0 ? 'Submitted today' : index === 1 ? 'Ready after tax docs' : 'Partner pre-check active',
     nextAction: index === 0 ? 'Resolve pending documents' : index === 1 ? 'Review requirements' : 'Confirm data consent',
     pending: index === 0 ? `${missingCount} document issues` : lender.requirements[0],
@@ -428,7 +506,9 @@ function openPrimeAi(context: Record<string, string>) {
 }
 
 export function PrimeFinSupportPage() {
+  const [searchParams] = useSearchParams();
   const snapshot = getPrimeSnapshot();
+  const partnerWorkspace = getPartnerWorkspaceSummary(searchParams.get('role'));
   const financeQuery = useQuery({
     queryKey: ['prime-fin-support-control-plane'],
     queryFn: fetchFinanceControlPlane,
@@ -449,15 +529,21 @@ export function PrimeFinSupportPage() {
     representative: primaryReadiness?.owner || 'Finance lead',
     requestedAmount: currency.format((primaryReadiness?.fundingNeed ?? 280000) * fundingDisplayMultiplier),
     fundingPurpose: 'Inventory replenishment and campaign working capital',
-    desiredDisbursement: 'Within 3-4 weeks',
+    targetReviewTiming: 'Target review completion within 3-4 weeks',
     repaymentSource: 'Marketplace settlements and split-repayment lane',
   });
 
   const eligibleRange = rangeFromOffers(controlPlane.capitalOffers, controlPlane.capitalReadiness);
   const mainBlocker = [...controlPlane.riskTrust].sort((left, right) => (right.severity === 'high' ? 1 : 0) - (left.severity === 'high' ? 1 : 0))[0];
   const missingDocs = documents.filter((doc) => doc.status === 'missing' || doc.status === 'rejected').length;
-  const verifiedDocs = documents.filter((doc) => doc.status === 'verified').length;
+  const verifiedDocs = documents.filter((doc) => doc.status === 'verified' || doc.status === 'reusable').length;
   const applications = buildApplications(lenders, documents);
+  const financeTrust = useMemo(() => buildFinanceTrustProfile({
+    snapshot,
+    controlPlane,
+    documents,
+    fundingRange: eligibleRange,
+  }), [controlPlane, documents, eligibleRange, snapshot]);
   const applicationReady = missingDocs === 0;
 
   const eligibilitySignals: EligibilitySignal[] = [
@@ -471,7 +557,7 @@ export function PrimeFinSupportPage() {
 
   const blockers: RiskBlocker[] = controlPlane.riskTrust.map((risk) => ({
     blocker: risk.topRisk || risk.profileName,
-    impact: risk.severity === 'high' ? 'May delay lender approval or reduce funding ceiling.' : 'Needs clearer proof before best lender terms unlock.',
+    impact: risk.severity === 'high' ? 'May delay lender review or lower the indicative request ceiling.' : 'Needs clearer proof before stronger review routes are available.',
     recommendation: risk.recommendedFix || 'Attach stronger operational proof before submission.',
     severity: risk.severity === 'high' ? 'high' : risk.severity === 'medium' ? 'medium' : 'low',
   }));
@@ -480,9 +566,9 @@ export function PrimeFinSupportPage() {
     { label: 'Verify business profile', detail: 'Company identity, owner, market, and payout account.', status: 'complete' },
     { label: 'Connect operational data', detail: 'Orders, fulfillment, inventory, settlement, campaigns, CRM.', status: 'complete' },
     { label: 'Upload required documents', detail: `${verifiedDocs}/${documents.length} documents verified.`, status: missingDocs ? 'active' : 'complete' },
-    { label: 'Review eligibility', detail: `${readinessGrade(readinessScore)} readiness with ${blockers.length} risk blockers.`, status: blockers.some((blocker) => blocker.severity === 'high') ? 'blocked' : 'active' },
-    { label: 'Submit to matched lenders', detail: `${lenders.length} partners ready for routing.`, status: applicationReady ? 'active' : 'pending' },
-    { label: 'Track application status', detail: 'Follow bank review, document requests, approval, disbursement.', status: applications.some((item) => item.status === 'Bank Reviewing') ? 'active' : 'pending' },
+    { label: 'Review readiness', detail: `${readinessGrade(readinessScore)} readiness with ${blockers.length} risk blocker(s).`, status: blockers.some((blocker) => blocker.severity === 'high') ? 'blocked' : 'active' },
+    { label: 'Prepare review package', detail: `${lenders.length} potential review route(s) available after consent.`, status: applicationReady ? 'active' : 'pending' },
+    { label: 'Track lender review', detail: 'Follow document requests, lender-review milestones, and contract handoff state.', status: applications.some((item) => item.status === 'Bank Reviewing') ? 'active' : 'pending' },
   ];
 
   const handleFiles = (files: FileList | null) => {
@@ -534,6 +620,15 @@ export function PrimeFinSupportPage() {
           onAskAi={() => askAi('hero')}
           onOpenLoanWizard={() => setLoanWizardOpen(true)}
         />
+
+        {partnerWorkspace ? <PartnerWorkspacePanel summary={partnerWorkspace} /> : null}
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <FinancialTrustProfilePanel profile={financeTrust.profile} />
+          <BankReviewSummaryPreview summary={financeTrust.bankReviewSummary} />
+        </section>
+
+        <CommerceEvidencePackPanel evidencePack={financeTrust.evidencePack} />
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <FundingApplicationFlow steps={fundingSteps} onAskAi={() => askAi('application-flow')} />
@@ -602,26 +697,26 @@ function FinSupportHero({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="rounded-full">Fin Support</Badge>
-            <Badge variant="outline" className="rounded-full">Embedded funding access</Badge>
+            <Badge variant="outline" className="rounded-full">Funding review package</Badge>
             {loading ? <Badge variant="outline" className="rounded-full">Refreshing</Badge> : null}
             {degraded ? <Badge variant="outline" className="rounded-full">Using local snapshot</Badge> : null}
           </div>
           <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-4xl">
-            Unlock financing with your commerce operations.
+            Prepare a funding review package from your commerce operations.
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-            PrimeOS translates order stability, fulfillment performance, settlement consistency, inventory movement, and customer trust into bank-ready funding support.
+            PrimeOS organizes order stability, fulfillment performance, settlement consistency, inventory movement, and customer trust into evidence for lender review.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button asChild>
               <a href="#funding-application-flow">
-                Apply for Funding Support
+                Prepare Review Package
                 <ArrowRight className="size-4" />
               </a>
             </Button>
             <Button type="button" variant="secondary" onClick={onOpenLoanWizard}>
               <FileCheck2 className="size-4" />
-              Start Loan Profile Wizard
+              Start Funding Readiness Wizard
             </Button>
             <Button type="button" variant="outline" onClick={onAskAi} className="hidden sm:inline-flex">
               <Bot className="size-4" />
@@ -639,8 +734,8 @@ function FinSupportHero({
             </div>
             <Progress value={readinessScore} className="mt-4 h-2" />
           </div>
-          <HeroFact label="Eligible range" value={eligibleRange} icon={<Banknote className="size-4" />} />
-          <HeroFact label="Matched banks" value={String(lenderCount)} icon={<Building2 className="size-4" />} />
+          <HeroFact label="Indicative need range" value={eligibleRange} icon={<Banknote className="size-4" />} />
+          <HeroFact label="Review routes" value={String(lenderCount)} icon={<Building2 className="size-4" />} />
           <HeroFact label="Main blocker" value={blocker} icon={<AlertTriangle className="size-4" />} />
         </div>
       </div>
@@ -699,7 +794,7 @@ function LoanProfileWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl overflow-hidden rounded-2xl p-0">
         <DialogHeader className="border-b px-4 py-4 pr-12 md:px-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="rounded-full">Japan SME pre-check</Badge>
@@ -708,10 +803,10 @@ function LoanProfileWizard({
           </div>
           <DialogTitle className="mt-3 flex items-center gap-2 text-xl">
             <StepIcon className="size-5 text-primary" />
-            Loan Profile Wizard
+            Funding Readiness Wizard
           </DialogTitle>
           <DialogDescription>
-            Build a lender-ready funding file from commerce signals, Japan SME documents, and partner-bank routing.
+            Build a funding review package from commerce signals, Japan SME documents, and partner-bank routing.
           </DialogDescription>
           <Progress value={wizardProgress} className="mt-3 h-1.5" />
         </DialogHeader>
@@ -768,20 +863,23 @@ function LoanProfileWizard({
             </div>
 
             <div className="min-h-0 overflow-y-auto p-4 md:max-h-[calc(100dvh-15rem)] md:p-5">
-              <LoanWizardStepContent
-                stepId={currentStep.id}
-                draft={draft}
-                readinessScore={readinessScore}
-                eligibleRange={eligibleRange}
-                lenders={lenders}
-                primaryLender={primaryLender}
-                blockers={blockers}
-                documents={documents}
-                applications={applications}
-                missingDocumentCount={missingDocumentCount}
-                onFiles={onFiles}
-                onDraftChange={onDraftChange}
-              />
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] xl:items-start">
+                <LoanWizardStepContent
+                  stepId={currentStep.id}
+                  draft={draft}
+                  readinessScore={readinessScore}
+                  eligibleRange={eligibleRange}
+                  lenders={lenders}
+                  primaryLender={primaryLender}
+                  blockers={blockers}
+                  documents={documents}
+                  applications={applications}
+                  missingDocumentCount={missingDocumentCount}
+                  onFiles={onFiles}
+                  onDraftChange={onDraftChange}
+                />
+                <LoanWizardMoodPanel stepId={currentStep.id} stepIndex={stepIndex} />
+              </div>
             </div>
 
             <DialogFooter className="border-t bg-muted/20 px-4 py-3 md:px-5">
@@ -805,6 +903,237 @@ function LoanProfileWizard({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LoanWizardMoodPanel({ stepId, stepIndex }: { stepId: LoanWizardStepId; stepIndex: number }) {
+  const mood = loanWizardMoodCopy[stepId];
+
+  return (
+    <aside className="order-first overflow-hidden rounded-xl border bg-gradient-to-br from-background via-muted/20 to-primary/5 p-3 shadow-sm xl:order-none">
+      <LoanWizardMotionStyles />
+      <div className="flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="whitespace-nowrap">Step {stepIndex + 1} calm flow</span>
+        <Badge variant="outline" className="whitespace-nowrap rounded-full bg-background/70">Saved</Badge>
+      </div>
+      <LoanWizardIllustration stepId={stepId} ariaLabel={mood.ariaLabel} />
+      <div className="mt-3">
+        <h3 className="text-sm font-semibold">{mood.title}</h3>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">{mood.detail}</p>
+      </div>
+      <div className="mt-3 rounded-lg border bg-background/70 p-2 text-xs leading-5 text-muted-foreground">
+        {mood.reassurance}
+      </div>
+    </aside>
+  );
+}
+
+function LoanWizardMotionStyles() {
+  return (
+    <style>
+      {`
+        @keyframes primeLoanFloat {
+          0%, 100% { transform: translate3d(0, 0, 0); }
+          50% { transform: translate3d(0, -7px, 0); }
+        }
+        @keyframes primeLoanSlide {
+          0%, 100% { transform: translate3d(-10px, 0, 0); opacity: .65; }
+          45%, 55% { transform: translate3d(18px, 12px, 0); opacity: 1; }
+        }
+        @keyframes primeLoanPulse {
+          0%, 100% { transform: scale(1); opacity: .72; }
+          50% { transform: scale(1.06); opacity: 1; }
+        }
+        @keyframes primeLoanStamp {
+          0%, 100% { transform: scale(.96) rotate(-2deg); opacity: .78; }
+          45%, 60% { transform: scale(1.03) rotate(0deg); opacity: 1; }
+        }
+        @keyframes primeLoanBar {
+          0%, 100% { transform: scaleY(.55); opacity: .55; }
+          45%, 60% { transform: scaleY(1); opacity: 1; }
+        }
+        @keyframes primeLoanPath {
+          from { stroke-dashoffset: 30; }
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes primeLoanCheck {
+          0%, 28% { transform: scale(.82); opacity: .35; }
+          42%, 100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes primeLoanDot {
+          0%, 100% { transform: translateX(0); opacity: .65; }
+          50% { transform: translateX(76px); opacity: 1; }
+        }
+        .prime-loan-anim .prime-loan-float { animation: primeLoanFloat 3.4s ease-in-out infinite; }
+        .prime-loan-anim .prime-loan-slide { animation: primeLoanSlide 3.2s ease-in-out infinite; }
+        .prime-loan-anim .prime-loan-pulse { animation: primeLoanPulse 2.4s ease-in-out infinite; }
+        .prime-loan-anim .prime-loan-stamp { animation: primeLoanStamp 3s ease-in-out infinite; }
+        .prime-loan-anim .prime-loan-bar { animation: primeLoanBar 2.2s ease-in-out infinite; transform-origin: bottom; }
+        .prime-loan-anim .prime-loan-path { animation: primeLoanPath 2.8s linear infinite; stroke-dasharray: 6 8; }
+        .prime-loan-anim .prime-loan-check { animation: primeLoanCheck 3.2s ease-in-out infinite; }
+        .prime-loan-anim .prime-loan-dot { animation: primeLoanDot 3s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .prime-loan-anim *, .prime-loan-anim .prime-loan-path {
+            animation: none !important;
+            transition: none !important;
+          }
+        }
+      `}
+    </style>
+  );
+}
+
+function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepId; ariaLabel: string }) {
+  const shellClass = 'prime-loan-anim relative mt-3 h-36 overflow-hidden rounded-xl border bg-background/80';
+  const glow = <div className="absolute inset-x-8 top-6 h-20 rounded-full bg-primary/10 blur-2xl" />;
+
+  if (stepId === 'profile') {
+    return (
+      <div className={shellClass} role="img" aria-label={ariaLabel}>
+        {glow}
+        <div className="absolute left-5 top-7 flex size-14 items-center justify-center rounded-xl border bg-card shadow-sm">
+          <Building2 className="size-7 text-primary" />
+        </div>
+        <div className="prime-loan-float absolute right-7 top-6 w-20 rounded-lg border bg-card p-2 shadow-sm">
+          <FileText className="size-5 text-primary" />
+          <div className="mt-2 space-y-1">
+            <span className="block h-1.5 rounded-full bg-muted" />
+            <span className="block h-1.5 w-3/4 rounded-full bg-muted" />
+          </div>
+        </div>
+        <div className="prime-loan-stamp absolute bottom-5 left-8 inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+          <CheckCircle2 className="size-3" />
+          Ready
+        </div>
+      </div>
+    );
+  }
+
+  if (stepId === 'purpose') {
+    return (
+      <div className={shellClass} role="img" aria-label={ariaLabel}>
+        {glow}
+        <div className="absolute bottom-5 left-8 right-8 h-10 rounded-xl border bg-muted/30" />
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className="prime-loan-slide absolute top-8 flex size-10 items-center justify-center rounded-full border bg-amber-500/15 text-amber-700 shadow-sm dark:text-amber-300"
+            style={{ left: `${22 + index * 34}px`, animationDelay: `${index * 180}ms` }}
+          >
+            <CircleDollarSign className="size-5" />
+          </div>
+        ))}
+        <div className="absolute bottom-8 right-9 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+          <Banknote className="size-4 text-primary" />
+          Use of funds
+        </div>
+      </div>
+    );
+  }
+
+  if (stepId === 'commerce') {
+    return (
+      <div className={shellClass} role="img" aria-label={ariaLabel}>
+        {glow}
+        <div className="absolute bottom-7 left-7 flex h-20 items-end gap-2">
+          {[38, 58, 76, 50].map((height, index) => (
+            <span
+              key={height}
+              className="prime-loan-bar w-4 rounded-t-md bg-primary/60"
+              style={{ height, animationDelay: `${index * 140}ms` }}
+            />
+          ))}
+        </div>
+        <div className="prime-loan-pulse absolute right-7 top-9 flex size-16 items-center justify-center rounded-2xl border bg-card shadow-sm">
+          <ShieldCheck className="size-8 text-emerald-600 dark:text-emerald-400" />
+        </div>
+      </div>
+    );
+  }
+
+  if (stepId === 'documents') {
+    return (
+      <div className={shellClass} role="img" aria-label={ariaLabel}>
+        {glow}
+        <div className="absolute bottom-6 left-7 right-7 h-16 rounded-2xl border bg-card shadow-sm">
+          <div className="absolute -top-3 left-5 h-5 w-16 rounded-t-lg border bg-card" />
+          <Upload className="absolute bottom-4 right-5 size-5 text-primary" />
+        </div>
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className="prime-loan-slide absolute top-6 w-14 rounded-lg border bg-background p-2 shadow-sm"
+            style={{ left: `${24 + index * 26}px`, animationDelay: `${index * 200}ms` }}
+          >
+            <span className="block h-1.5 rounded-full bg-muted" />
+            <span className="mt-1 block h-1.5 w-2/3 rounded-full bg-muted" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (stepId === 'routing') {
+    return (
+      <div className={shellClass} role="img" aria-label={ariaLabel}>
+        {glow}
+        <svg className="absolute inset-0 size-full text-primary/45" viewBox="0 0 260 144" aria-hidden="true">
+          <path className="prime-loan-path" d="M58 74 C96 28 146 112 204 60" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+        {[
+          { label: 'A', left: 'left-7', top: 'top-14' },
+          { label: 'B', left: 'left-[108px]', top: 'top-8' },
+          { label: 'C', left: 'right-7', top: 'top-12' },
+        ].map((node, index) => (
+          <div
+            key={node.label}
+            className={cn('prime-loan-pulse absolute flex size-12 items-center justify-center rounded-xl border bg-card shadow-sm', node.left, node.top)}
+            style={{ animationDelay: `${index * 240}ms` }}
+          >
+            <Building2 className="size-6 text-primary" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (stepId === 'review') {
+    return (
+      <div className={shellClass} role="img" aria-label={ariaLabel}>
+        {glow}
+        <div className="absolute inset-x-7 top-6 space-y-2 rounded-xl border bg-card p-3 shadow-sm">
+          {['Identity', 'Documents', 'Consent'].map((item, index) => (
+            <div key={item} className="flex items-center gap-2 rounded-lg bg-muted/25 px-2 py-1.5">
+              <CheckCircle2
+                className="prime-loan-check size-4 text-emerald-600 dark:text-emerald-400"
+                style={{ animationDelay: `${index * 260}ms` }}
+              />
+              <span className="text-xs font-medium text-muted-foreground">{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={shellClass} role="img" aria-label={ariaLabel}>
+      {glow}
+      <div className="absolute left-8 right-8 top-16 h-1 rounded-full bg-muted" />
+      <div className="prime-loan-dot absolute left-8 top-[58px] flex size-5 items-center justify-center rounded-full border bg-primary text-primary-foreground shadow-sm">
+        <span className="size-1.5 rounded-full bg-current" />
+      </div>
+      {['Draft', 'Review', 'Funds'].map((item, index) => (
+        <div
+          key={item}
+          className="absolute top-[78px] text-center text-[11px] font-medium text-muted-foreground"
+          style={{ left: `${24 + index * 75}px` }}
+        >
+          <span className="mx-auto mb-1 block size-2 rounded-full bg-primary/60" />
+          {item}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -840,7 +1169,7 @@ function LoanWizardStepContent({
       <div className="space-y-4">
         <WizardSectionHeader
           title="Confirm registered business identity"
-          detail="Japan SME lenders usually start with legal identity, representative authority, business address, and operating history before underwriting."
+          detail="Japan SME lenders usually start with legal identity, representative authority, business address, and operating history before formal lender review."
         />
         <div className="grid gap-3 md:grid-cols-2">
           <WizardField label="Legal business name" value={draft.legalName} onChange={(value) => onDraftChange('legalName', value)} />
@@ -850,7 +1179,7 @@ function LoanWizardStepContent({
         </div>
         <WizardCallout
           label="PrimeOS role"
-          detail="PrimeOS prepares the funding profile and routes evidence. Final credit approval stays with the lender or guarantee institution."
+          detail="PrimeOS prepares the funding profile and routes evidence. Final credit decision, terms, contract, and any funding movement stay with the lender or guarantee institution."
         />
       </div>
     );
@@ -865,14 +1194,14 @@ function LoanWizardStepContent({
         />
         <div className="grid gap-3 md:grid-cols-2">
           <WizardField label="Requested amount" value={draft.requestedAmount} onChange={(value) => onDraftChange('requestedAmount', value)} />
-          <WizardField label="Desired disbursement timing" value={draft.desiredDisbursement} onChange={(value) => onDraftChange('desiredDisbursement', value)} />
+          <WizardField label="Target review timing" value={draft.targetReviewTiming} onChange={(value) => onDraftChange('targetReviewTiming', value)} />
           <WizardField label="Funding purpose" value={draft.fundingPurpose} onChange={(value) => onDraftChange('fundingPurpose', value)} className="md:col-span-2" />
           <WizardField label="Repayment source" value={draft.repaymentSource} onChange={(value) => onDraftChange('repaymentSource', value)} className="md:col-span-2" />
         </div>
         <div className="grid gap-3 md:grid-cols-3">
-          <MiniFact label="Eligible range" value={eligibleRange} />
-          <MiniFact label="Best lender match" value={primaryLender?.bankName || 'Pending'} />
-          <MiniFact label="Expected review speed" value={primaryLender?.approvalSpeed || 'After pre-check'} />
+          <MiniFact label="Indicative need range" value={eligibleRange} />
+          <MiniFact label="Primary review route" value={primaryLender?.bankName || 'Pending'} />
+          <MiniFact label="Estimated review window" value={primaryLender?.reviewWindow || 'After pre-check'} />
         </div>
       </div>
     );
@@ -890,7 +1219,7 @@ function LoanWizardStepContent({
       <div className="space-y-4">
         <WizardSectionHeader
           title="Attach operating evidence"
-          detail="This is where PrimeOS differs from a finance dashboard: underwriting proof comes from commerce execution, not static KPI reporting."
+          detail="This is where PrimeOS differs from a finance dashboard: lender-review evidence comes from commerce execution, not static KPI reporting."
         />
         <div className="grid gap-3 md:grid-cols-2">
           {proofSignals.map((signal) => (
@@ -999,19 +1328,19 @@ function LoanWizardStepContent({
     return (
       <div className="space-y-4">
         <WizardSectionHeader
-          title="Review package before pre-check"
-          detail="No approval promise. This step confirms consent, missing evidence, and what PrimeOS will send to matched lenders."
+        title="Review package before pre-check"
+          detail="No approval promise. This step confirms consent, missing evidence, and what PrimeOS can share with potential review routes."
         />
         <div className="grid gap-3 md:grid-cols-2">
           <MiniFact label="Applicant" value={draft.legalName} />
           <MiniFact label="Requested amount" value={draft.requestedAmount} />
           <MiniFact label="Funding purpose" value={draft.fundingPurpose} />
-          <MiniFact label="Matched lenders" value={`${lenders.length} partners`} />
+          <MiniFact label="Review routes" value={`${lenders.length} partners`} />
         </div>
         <div className="space-y-2 rounded-lg border bg-background p-3">
           {[
             'Share uploaded documents with selected partner lenders.',
-            'Share PrimeOS operating signals for readiness and eligibility review.',
+            'Share PrimeOS operating signals for readiness review.',
             'Allow additional-document requests to appear in Application Status Tracker.',
           ].map((item) => (
             <div key={item} className="flex items-start gap-2 text-sm">
@@ -1031,15 +1360,15 @@ function LoanWizardStepContent({
     { label: 'Pre-check', detail: 'PrimeOS validates profile, documents, and route fit.' },
     { label: 'Need additional documents', detail: 'Missing tax, statement, invoice, or guarantee documents are requested.' },
     { label: 'Bank / guarantee review', detail: 'Partner lender performs formal credit and guarantee review.' },
-    { label: 'Contract', detail: 'Approved terms move to lender contract and representative confirmation.' },
-    { label: 'Disbursement', detail: 'Funds are sent to the designated operating account.' },
+    { label: 'Contract handoff', detail: 'Any proposed terms move to lender contract and representative confirmation outside PrimeOS decisioning.' },
+    { label: 'Lender milestone', detail: 'Contract, terms, and any funding movement stay owned by the lender.' },
   ];
 
   return (
     <div className="space-y-4">
       <WizardSectionHeader
         title="Track lender lifecycle"
-        detail="After pre-check, the deterministic workflow moves into document requests, lender review, contract, and disbursement tracking."
+        detail="After pre-check, the deterministic workflow moves into document requests, lender review, contract handoff, and lender-owned milestones."
       />
       <div className="space-y-3">
         {timeline.map((item, index) => (
@@ -1110,6 +1439,148 @@ function HeroFact({ label, value, icon }: { label: string; value: string; icon: 
   );
 }
 
+function FinancialTrustProfilePanel({ profile }: { profile: FinancialTrustProfile }) {
+  return (
+    <section id="financial-trust-profile" data-testid="finance-trust-profile" className="rounded-lg border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="rounded-full">Financial Trust Profile</Badge>
+              <Badge variant="outline" className="rounded-full">Commerce-backed</Badge>
+            </div>
+            <h2 className="mt-3 text-lg font-semibold">Financial trust built from operating evidence</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{profile.readinessNarrative}</p>
+          </div>
+          <div className="rounded-lg border bg-background p-3 sm:min-w-44">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Internal readiness</div>
+            <div className="mt-2 flex items-end gap-2">
+              <span className="text-4xl font-semibold">{profile.readinessGrade}</span>
+              <span className="pb-1 text-sm text-muted-foreground">{profile.readinessScore}%</span>
+            </div>
+            <Progress value={profile.readinessScore} className="mt-3 h-2" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid gap-3 md:grid-cols-2">
+          {profile.metrics.map((metric) => (
+            <div key={metric.id} className="rounded-lg border bg-background p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{metric.label}</div>
+                  <div className="mt-1 text-lg font-semibold">{metric.value}</div>
+                </div>
+                <Badge variant="outline" className="bg-muted/30">{metric.sourceOfTruthOwner}</Badge>
+              </div>
+              <p className="mt-2 line-clamp-3 text-sm leading-5 text-muted-foreground">{metric.detail}</p>
+              <Progress value={metric.score} className="mt-3 h-1.5" />
+              <div className="mt-2 text-xs text-muted-foreground">Evidence: {metric.evidenceIds.join(', ')}</div>
+            </div>
+          ))}
+        </div>
+
+        <aside className="rounded-lg border bg-muted/20 p-3">
+          <div className="flex items-center gap-2">
+            <CircleDollarSign className="size-4 text-primary" />
+            <h3 className="text-sm font-semibold">Receivables / payout snapshot</h3>
+          </div>
+          <div className="mt-3 grid gap-2">
+            <MiniFact label="Open receivables" value={currency.format(profile.receivables.openReceivables)} />
+            <MiniFact label="Projected payout" value={currency.format(profile.receivables.projectedPayout)} />
+            <MiniFact label="Next due amount" value={currency.format(profile.receivables.nextDueAmount)} />
+            <MiniFact label="Next due date" value={formatShortDate(profile.receivables.nextDueDate)} />
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            Source owners: {profile.receivables.sourceOwners.join(', ')}. This is a readiness snapshot, not an accounting ledger.
+          </p>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function BankReviewSummaryPreview({ summary }: { summary: BankReviewSummary }) {
+  return (
+    <section id="bank-review-summary" data-testid="bank-review-summary" className="rounded-lg border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="rounded-full">Bank-facing preview</Badge>
+          <Badge variant="outline" className="rounded-full">No approval promise</Badge>
+        </div>
+        <h2 className="mt-3 text-lg font-semibold">{summary.reviewerViewTitle}</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          One summary a reviewer can scan before requesting more evidence or opening formal lender review.
+        </p>
+      </div>
+      <div className="space-y-3 p-3">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <MiniFact label="Readiness" value={summary.readinessLabel} />
+          <MiniFact label="Indicative range" value={summary.fundingRange} />
+          <MiniFact label="Evidence coverage" value={summary.evidenceCoverage} />
+          <MiniFact label="Document state" value={summary.documentSummary} />
+        </div>
+        <div className="rounded-lg border bg-background p-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary blocker</div>
+          <p className="mt-1 text-sm text-muted-foreground">{summary.primaryBlocker}</p>
+        </div>
+        <div className="rounded-lg border bg-background p-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next action</div>
+          <p className="mt-1 text-sm text-muted-foreground">{summary.nextAction}</p>
+        </div>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+          {summary.guardrailCopy}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CommerceEvidencePackPanel({ evidencePack }: { evidencePack: CommerceEvidencePack }) {
+  return (
+    <section id="commerce-evidence-pack" data-testid="commerce-evidence-pack" className="rounded-lg border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="rounded-full">Commerce Evidence Pack</Badge>
+              <Badge variant="outline" className="rounded-full">{evidencePack.reusableDocumentCount} reusable document(s)</Badge>
+              <Badge variant="outline" className="rounded-full">{evidencePack.openIssueCount} open issue(s)</Badge>
+            </div>
+            <h2 className="mt-3 text-lg font-semibold">Evidence lines mapped to source owners</h2>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-muted-foreground">{evidencePack.summary}</p>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-5">
+        {evidencePack.items.map((item) => (
+          <div key={item.id} className="flex min-h-52 flex-col rounded-lg border bg-background p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">{item.label}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{item.sourceOfTruthOwner}</div>
+              </div>
+              <Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge>
+            </div>
+            <p className="mt-3 flex-1 text-sm leading-5 text-muted-foreground">{item.summary}</p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{item.records} record(s)</span>
+              {item.documentId ? <span>{item.documentId}</span> : null}
+            </div>
+            <Button asChild size="sm" variant="outline" className="mt-3 justify-between">
+              <a href={item.linkedRoute}>
+                Open source
+                <ArrowRight className="size-4" />
+              </a>
+            </Button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FundingApplicationFlow({ steps, onAskAi }: { steps: FundingStep[]; onAskAi: () => void }) {
   return (
     <Card id="funding-application-flow" className="rounded-lg border shadow-sm">
@@ -1120,7 +1591,7 @@ function FundingApplicationFlow({ steps, onAskAi }: { steps: FundingStep[]; onAs
               <FileCheck2 className="size-5" />
               Funding Application Flow
             </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">One guided workflow from operational proof to lender submission.</p>
+            <p className="mt-1 text-sm text-muted-foreground">One guided workflow from operational proof to a consented lender-review package.</p>
           </div>
           <Button type="button" size="sm" variant="outline" onClick={onAskAi}>
             <Bot className="size-4" />
@@ -1148,8 +1619,8 @@ function EligibilitySignals({ signals }: { signals: EligibilitySignal[] }) {
   return (
     <section id="eligibility" className="rounded-lg border bg-card shadow-sm">
       <div className="border-b px-4 py-3">
-        <h2 className="text-base font-semibold">Why You Are Eligible</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Operational trust signals that make the business bank-readable.</p>
+        <h2 className="text-base font-semibold">Readiness Signals</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Operational trust signals that make the business easier to review, without implying lender approval.</p>
       </div>
       <div className="grid gap-px bg-border/70 md:grid-cols-2 xl:grid-cols-3">
         {signals.map((signal) => {
@@ -1184,7 +1655,7 @@ function RiskBlockers({ blockers }: { blockers: RiskBlocker[] }) {
           <Gauge className="size-4" />
           Risk Blockers
         </CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">Clear these operating gaps before submitting to stricter lenders.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Clear these operating gaps before routing the package to stricter review paths.</p>
       </CardHeader>
       <CardContent className="divide-y p-0">
         {blockers.map((blocker) => (
@@ -1218,9 +1689,9 @@ function MatchedLenders({ lenders }: { lenders: LenderMatch[] }) {
       <CardHeader className="border-b pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Building2 className="size-4" />
-          Matched Banks / Lenders
+          Potential Review Routes
         </CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">PrimeOS routes merchants to lenders based on operating proof, not static ads.</p>
+        <p className="mt-1 text-sm text-muted-foreground">PrimeOS previews review routes based on operating proof. Route fit is not a lender acceptance or offer.</p>
       </CardHeader>
       <CardContent className="grid gap-3 p-3 md:grid-cols-2">
         {lenders.map((lender) => (
@@ -1230,11 +1701,11 @@ function MatchedLenders({ lenders }: { lenders: LenderMatch[] }) {
                 <div className="font-semibold">{lender.bankName}</div>
                 <div className="mt-1 text-sm text-muted-foreground">{lender.financingType}</div>
               </div>
-              <Badge variant="outline" className="bg-primary/10 text-primary">{lender.matchPercent}% match</Badge>
+              <Badge variant="outline" className="bg-primary/10 text-primary">{lender.matchPercent}% route fit</Badge>
             </div>
             <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
               <MiniFact label="Range" value={lender.estimatedRange} />
-              <MiniFact label="Speed" value={lender.approvalSpeed} />
+              <MiniFact label="Review window" value={lender.reviewWindow} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {lender.requirements.map((requirement) => (
@@ -1277,7 +1748,7 @@ function DocumentSubmissionCenter({
               <Upload className="size-4" />
               Document Submission Center
             </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Upload once. PrimeOS maps reusable documents to matched lender requirements.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Upload once. PrimeOS maps reusable documents to potential review-route requirements.</p>
           </div>
           <Badge variant="outline">{verifiedDocs}/{documents.length} verified</Badge>
         </div>
@@ -1313,7 +1784,7 @@ function DocumentSubmissionCenter({
                 <p className="mt-1 text-sm text-muted-foreground">{doc.description}</p>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <span>{doc.fileName || 'No file attached'}</span>
-                  <span>{doc.banks.length} lender mappings</span>
+                  <span>{doc.banks.length} review-route mappings</span>
                   {doc.issue ? <span className="text-destructive">{doc.issue}</span> : null}
                 </div>
               </div>
@@ -1334,7 +1805,7 @@ function ApplicationStatusTracker({ applications }: { applications: ApplicationI
           <Clock3 className="size-4" />
           Application Status Tracker
         </CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">Track lender review, next action, pending requirements, approval, and disbursement.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Track lender review, next action, pending requirements, and lender-owned milestones.</p>
       </CardHeader>
       <CardContent className="divide-y p-0">
         {applications.map((item) => (
@@ -1383,12 +1854,12 @@ function PrimeAiFundingSupport({
           <Bot className="size-4" />
           Prime AI Support
         </CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">Funding assistant, document helper, eligibility explainer. Core workflow stays deterministic.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Prime AI explains readiness signals and missing evidence. It does not make credit decisions.</p>
       </CardHeader>
       <CardContent className="space-y-3 p-3">
         <div className="grid gap-2">
           {[
-            'Explain rejection reasons',
+            'Explain blocker reasons',
             'Recommend stronger documents',
             'Explain readiness changes',
             'Suggest operating fixes',

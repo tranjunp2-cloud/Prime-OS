@@ -17,7 +17,7 @@ import { getProductById, type Product } from '@/lib/product-store';
 import { getListings } from '@/lib/listing-store';
 import { useDetailNavigation } from '@/hooks/use-detail-navigation';
 import { useI18n } from '@/lib/i18n/I18nContext';
-import { formatLocalizedDate, formatLocalizedMoney } from '@/lib/i18n/format';
+import { formatLocalizedDate, formatLocalizedMoney, formatMessage } from '@/lib/i18n/format';
 
 function mapRemoteProductToLocalShape(remote: {
   id: string;
@@ -224,7 +224,10 @@ export default function ProductDetail() {
                     key={i}
                     type="button"
                     onClick={() => setSelectedImageIndex(i)}
-                    aria-label={`Show image ${i + 1} of ${allImages.length}`}
+                    aria-label={formatMessage(t('products.showImageAria'), {
+                      index: i + 1,
+                      total: allImages.length,
+                    })}
                     aria-pressed={selectedImageIndex === i}
                     className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-muted border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                       selectedImageIndex === i ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-primary'
@@ -233,7 +236,10 @@ export default function ProductDetail() {
                     {!imgError[i] ? (
                       <img
                         src={url}
-                        alt={`${product.name} view ${i + 1}`}
+                        alt={formatMessage(t('products.imageViewAlt'), {
+                          name: product.name,
+                          index: i + 1,
+                        })}
                         className="w-full h-full object-cover"
                         onError={() => setImgError(prev => ({ ...prev, [i]: true }))}
                       />
@@ -299,8 +305,13 @@ export default function ProductDetail() {
                           href={ch.listing_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          aria-label={`Open ${ch.channel} listing for ${product.name}`}
-                          title={`Open ${ch.channel} listing`}
+                          aria-label={formatMessage(t('products.openChannelListingAria'), {
+                            channel: ch.channel,
+                            name: product.name,
+                          })}
+                          title={formatMessage(t('products.openChannelListingTitle'), {
+                            channel: ch.channel,
+                          })}
                         >
                           <ExternalLink className="size-3 text-muted-foreground hover:text-foreground" />
                         </a>

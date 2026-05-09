@@ -82,6 +82,44 @@ const CATEGORIES = [
   'Beauty & Personal Care', 'Home & Living', 'Sports', 'Books', 'Toys',
 ];
 
+const CATEGORY_LABELS: Record<string, Record<string, string>> = {
+  'en-US': Object.fromEntries(CATEGORIES.map((category) => [category, category])),
+  'ja-JP': {
+    Watch: '腕時計',
+    Shoe: '靴',
+    Bag: 'バッグ',
+    Hat: '帽子',
+    Jacket: 'ジャケット',
+    Sunglasses: 'サングラス',
+    Bicycle: '自転車',
+    Headphones: 'ヘッドホン',
+    Electronics: '家電・電子機器',
+    'Food & Beverages': '食品・飲料',
+    'Beauty & Personal Care': '美容・パーソナルケア',
+    'Home & Living': 'ホーム・リビング',
+    Sports: 'スポーツ',
+    Books: '書籍',
+    Toys: '玩具',
+  },
+  'vi-VN': {
+    Watch: 'Đồng hồ',
+    Shoe: 'Giày',
+    Bag: 'Túi',
+    Hat: 'Mũ',
+    Jacket: 'Áo khoác',
+    Sunglasses: 'Kính râm',
+    Bicycle: 'Xe đạp',
+    Headphones: 'Tai nghe',
+    Electronics: 'Điện tử',
+    'Food & Beverages': 'Thực phẩm & đồ uống',
+    'Beauty & Personal Care': 'Làm đẹp & chăm sóc cá nhân',
+    'Home & Living': 'Nhà cửa & đời sống',
+    Sports: 'Thể thao',
+    Books: 'Sách',
+    Toys: 'Đồ chơi',
+  },
+};
+
 const EMPTY_FORM: FormState = {
   gtin: '', mpn: '', model_number: '', brand: '',
   asin: '', manufacturer: '',
@@ -532,6 +570,7 @@ export default function ProductCreatePage() {
       skuExists: 'SKU already exists',
       showAll: '0/{count}',
       mainAlt: 'Main',
+      additionalImageAlt: 'Image {index}',
       removeMainImage: 'Remove main image',
       removeAdditionalImage: 'Remove additional image {index}',
     },
@@ -631,11 +670,12 @@ export default function ProductCreatePage() {
       skuExists: 'SKUは既に存在します',
       showAll: '0/{count}',
       mainAlt: 'メイン画像',
+      additionalImageAlt: '画像 {index}',
       removeMainImage: 'メイン画像を削除',
       removeAdditionalImage: '追加画像 {index} を削除',
     },
     'vi-VN': {
-      productMaster: 'Product Master',
+      productMaster: 'Quản lý sản phẩm',
       editDetails: 'Chỉnh sửa chi tiết sản phẩm',
       createNew: 'Tạo sản phẩm mới',
       cancel: 'Hủy',
@@ -730,6 +770,7 @@ export default function ProductCreatePage() {
       skuExists: 'SKU đã tồn tại',
       showAll: '0/{count}',
       mainAlt: 'Ảnh chính',
+      additionalImageAlt: 'Ảnh {index}',
       removeMainImage: 'Xóa ảnh chính',
       removeAdditionalImage: 'Xóa ảnh bổ sung {index}',
     },
@@ -829,6 +870,7 @@ export default function ProductCreatePage() {
     skuExists: 'SKU already exists',
     showAll: '0/{count}',
     mainAlt: 'Main',
+    additionalImageAlt: 'Image {index}',
     removeMainImage: 'Remove main image',
     removeAdditionalImage: 'Remove additional image {index}',
   };
@@ -857,6 +899,7 @@ export default function ProductCreatePage() {
     used_like_new: 'Used like new',
     used_acceptable: 'Used acceptable',
   };
+  const categoryLabels = CATEGORY_LABELS[locale] ?? CATEGORY_LABELS['en-US'];
 
   // Edit mode: read product ID from URL param (:id) or query (?edit=)
   const queryEdit = new URLSearchParams(location.search).get('edit');
@@ -1248,7 +1291,7 @@ export default function ProductCreatePage() {
                   <Field label={copy.category} required error={errors.category}>
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.category} onChange={e => setField('category', e.target.value)}>
                       <option value="">{copy.selectCategory}</option>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabels[c] ?? c}</option>)}
                     </select>
                   </Field>
                   <Field label={copy.condition}>
@@ -1436,7 +1479,7 @@ export default function ProductCreatePage() {
                   </div>
                 )}
                 <div className="text-xs text-muted-foreground space-y-1 pt-1 border-t">
-                  <p><span className="text-foreground font-medium">{copy.family}:</span> {form.category || '—'}</p>
+                  <p><span className="text-foreground font-medium">{copy.family}:</span> {form.category ? categoryLabels[form.category] ?? form.category : '—'}</p>
                   <p><span className="text-foreground font-medium">{copy.variants}:</span> {form.has_variants ? formatMessage(copy.selected, { count: totalVariants }) : copy.no}</p>
                 </div>
               </CardContent>
@@ -1524,7 +1567,11 @@ export default function ProductCreatePage() {
                     ))}
                     {images.slice(1).map((url, i) => (
                       <div key={url} className="relative aspect-square rounded-md overflow-hidden border">
-                        <img src={url} alt={`Image ${i + 2}`} className="w-full h-full object-cover" />
+                        <img
+                          src={url}
+                          alt={formatMessage(copy.additionalImageAlt, { index: i + 2 })}
+                          className="w-full h-full object-cover"
+                        />
                         <button
                           onClick={() => setImages(imgs => imgs.filter((_, idx) => idx !== i + 1))}
                           aria-label={formatMessage(copy.removeAdditionalImage, { index: i + 2 })}

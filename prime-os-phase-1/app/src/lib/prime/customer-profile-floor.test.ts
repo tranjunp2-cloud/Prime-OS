@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCustomerProfileFloor,
   customerTags,
   detectIdentityMatches,
   filterCustomerAccounts,
   type CustomerAccount,
 } from './customer-profile-floor';
+import { getPrimeSnapshot } from './prime-data';
 
 function account(overrides: Partial<CustomerAccount>): CustomerAccount {
   return {
@@ -26,6 +28,20 @@ function account(overrides: Partial<CustomerAccount>): CustomerAccount {
     orderCount: 0,
     identityCompleteness: 80,
     notes: [],
+    lifecycleStage: {
+      customerId: 'cust-a',
+      stage: 'active',
+      ownerId: 'owner-a',
+      nextAction: 'Confirm next action',
+      reason: 'Test lifecycle',
+      updatedAt: '2026-05-09T09:00:00.000Z',
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    },
+    timelineEvents: [],
+    followUps: [],
+    rfqQuoteLinks: [],
+    serviceCases: [],
     ...overrides,
   };
 }
@@ -68,5 +84,32 @@ describe('customer profile floor helpers', () => {
     });
 
     expect(filtered.map((item) => item.id)).toEqual(['acct-b']);
+  });
+
+  it('builds Phase 2 customer read-model contracts with explicit source owners', () => {
+    const floor = buildCustomerProfileFloor(getPrimeSnapshot());
+    const account = floor.accounts.find((item) => item.timelineEvents.length >= 3) ?? floor.accounts[0];
+
+    expect(account.lifecycleStage).toMatchObject({
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+    });
+    expect(account.followUps[0]).toMatchObject({
+      sourceOfTruthOwner: 'Customer',
+      readModelOwner: 'Customer',
+      customerId: account.lifecycleStage.customerId,
+    });
+    expect(account.followUps[0]?.humanApprovalBoundary).toBeTruthy();
+    expect(account.timelineEvents.every((event) => event.readModelOwner === 'Customer')).toBe(true);
+    expect(new Set(account.timelineEvents.map((event) => event.sourceOfTruthOwner)).size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps typed customer timeline events in stable descending order', () => {
+    const floor = buildCustomerProfileFloor(getPrimeSnapshot());
+    const account = floor.accounts.find((item) => item.timelineEvents.length > 1) ?? floor.accounts[0];
+    const timestamps = account.timelineEvents.map((event) => Date.parse(event.occurredAt));
+
+    expect(timestamps.every((timestamp) => Number.isFinite(timestamp))).toBe(true);
+    expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
   });
 });

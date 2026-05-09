@@ -67,7 +67,7 @@ export default function OrderDetail() {
       await allocateWarehouse.mutateAsync({ orderId: id!, warehouseId });
     },
     onSuccess: () => toast({ title: t('orders.detailAllocate') }),
-    onError: (e) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e) => toast({ title: t('orders.errorTitle'), description: e.message, variant: 'destructive' }),
   });
 
   // Reserve inventory mutation
@@ -80,7 +80,7 @@ export default function OrderDetail() {
       await reserveInventory.mutateAsync({ orderId: id!, warehouseId, items: itemsPayload });
     },
     onSuccess: () => toast({ title: t('orders.detailReserve') }),
-    onError: (e) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e) => toast({ title: t('orders.errorTitle'), description: e.message, variant: 'destructive' }),
   });
 
   // Send to fulfillment mutation
@@ -94,7 +94,7 @@ export default function OrderDetail() {
       await sendToFulfillment.mutateAsync({ orderId: id!, warehouseId, flowType, items: itemsPayload });
     },
     onSuccess: () => toast({ title: t('orders.detailSendFulfillment') }),
-    onError: (e) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e) => toast({ title: t('orders.errorTitle'), description: e.message, variant: 'destructive' }),
   });
 
   // Cancel mutation
@@ -106,7 +106,7 @@ export default function OrderDetail() {
       toast({ title: t('orders.detailCancel') });
       goBack();
     },
-    onError: (e) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e) => toast({ title: t('orders.errorTitle'), description: e.message, variant: 'destructive' }),
   });
 
   const isAnyActionPending = allocateMutation.isPending
@@ -159,7 +159,13 @@ export default function OrderDetail() {
       <PageHeader
         title={
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Back to ${backLabel}`} onClick={goBack}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              aria-label={formatMessage(t('orders.detailBackAria'), { label: backLabel })}
+              onClick={goBack}
+            >
               <ArrowLeft className="size-4" />
             </Button>
             <span>{formatMessage(t('orders.detailOrder'), { id: order.display_order_id })}</span>
@@ -170,7 +176,7 @@ export default function OrderDetail() {
             {order.channel && <ChannelBadge platform={order.channel} />}
             {order.display_channel_order_ref && (
               <Badge variant="outline" className="text-xs font-mono">
-                Ref: {order.display_channel_order_ref}
+                {formatMessage(t('orders.detailReference'), { ref: order.display_channel_order_ref })}
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">

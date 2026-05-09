@@ -5,14 +5,23 @@ test.describe.configure({ mode: 'serial' });
 
 const priorityRoutes = [
   '/overview',
+  '/intelligence/decision-hub',
   '/intelligence/launch-decisions',
-  '/demand/campaign-ops',
-  '/customer/crm-compact',
+  '/demand/leads-rfqs?lead=lead_1_1',
+  '/customer/crm-compact?floor=overview',
+  '/customer/crm-compact?floor=account',
+  '/finance/fin-support#documents',
+  '/finance/fin-support#status',
   '/ecom/cos/product-master',
   '/ecom/cos/inventory-brain',
   '/ecom/cos/oms',
   '/ecom/cos/fulfillment',
   '/ecom/cos/returns',
+];
+
+const detailJourneys = [
+  { name: 'OMS order detail', listRoute: '/ecom/cos/oms', targetUrl: /\/ecom\/cos\/oms\/[^/]+$/ },
+  { name: 'Return detail', listRoute: '/ecom/cos/returns', targetUrl: /\/ecom\/cos\/returns\/[^/]+$/ },
 ];
 
 const viewports = [
@@ -54,11 +63,32 @@ test.describe('responsive shell and route overflow', () => {
     }
   }
 
+  for (const journey of detailJourneys) {
+    test(`${journey.name} has no document overflow at 390x844`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await installPrimeSession(page);
+      await page.goto(journey.listRoute);
+      await expectPrimeShellReady(page);
+
+      const firstRow = page.locator('tbody tr').first();
+      await expect(firstRow).toBeVisible({ timeout: 20_000 });
+      await firstRow.click();
+      await expect(page).toHaveURL(journey.targetUrl);
+      await expectPrimeShellReady(page);
+
+      await expectNoDocumentOverflow(page);
+      await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
+      await expect(page.getByRole('banner')).toBeVisible();
+    });
+  }
+
   test('auth page has no document overflow on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
+    await installPrimeSession(page);
     await page.goto('/auth');
 
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page).toHaveURL(/\/overview$/);
+    await expectPrimeShellReady(page);
     await expectNoDocumentOverflow(page);
   });
 });

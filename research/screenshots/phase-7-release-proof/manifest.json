@@ -1,0 +1,366 @@
+{
+  "generatedAt": "2026-05-09T14:05:47.120Z",
+  "count": 36,
+  "screenshots": [
+    {
+      "id": "01-intelligence-decision-hub",
+      "label": "Intelligence decision hub",
+      "owner": "Intelligence",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/intelligence/decision-hub",
+      "screenshot": "01-intelligence-decision-hub-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "02-demand-leads-rfqs",
+      "label": "Demand lead and RFQ context",
+      "owner": "Demand",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/demand/leads-rfqs?lead=lead_1_1",
+      "screenshot": "02-demand-leads-rfqs-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "03-customer-profile-overview",
+      "label": "Customer profile overview",
+      "owner": "Customer",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=overview",
+      "screenshot": "03-customer-profile-overview-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "04-customer-account-profile",
+      "label": "Customer account profile",
+      "owner": "Customer",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "screenshot": "04-customer-account-profile-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "05-ecom-oms-detail",
+      "label": "OMS order detail",
+      "owner": "Ecom / COS",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/ecom/cos/oms/ord_wnnoynaj",
+      "screenshot": "05-ecom-oms-detail-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "06-ecom-return-detail",
+      "label": "Return detail",
+      "owner": "Ecom / COS",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/ecom/cos/returns/ret_2ox3v8sd",
+      "screenshot": "06-ecom-return-detail-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "07-finance-documents",
+      "label": "Finance evidence documents",
+      "owner": "Finance",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/finance/fin-support#documents",
+      "screenshot": "07-finance-documents-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "08-finance-status",
+      "label": "Finance readiness status",
+      "owner": "Finance",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/finance/fin-support#status",
+      "screenshot": "08-finance-status-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "09-intelligence-launch-decisions",
+      "label": "Intelligence outcome feedback",
+      "owner": "Intelligence",
+      "locale": "en-US",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/intelligence/launch-decisions",
+      "screenshot": "09-intelligence-launch-decisions-desktop-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "01-intelligence-decision-hub",
+      "label": "Intelligence decision hub",
+      "owner": "Intelligence",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/intelligence/decision-hub",
+      "screenshot": "01-intelligence-decision-hub-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "02-demand-leads-rfqs",
+      "label": "Demand lead and RFQ context",
+      "owner": "Demand",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/demand/leads-rfqs?lead=lead_1_1",
+      "screenshot": "02-demand-leads-rfqs-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "03-customer-profile-overview",
+      "label": "Customer profile overview",
+      "owner": "Customer",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=overview",
+      "screenshot": "03-customer-profile-overview-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "04-customer-account-profile",
+      "label": "Customer account profile",
+      "owner": "Customer",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "screenshot": "04-customer-account-profile-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "05-ecom-oms-detail",
+      "label": "OMS order detail",
+      "owner": "Ecom / COS",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/ecom/cos/oms/ord_n71n8o9b",
+      "screenshot": "05-ecom-oms-detail-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "06-ecom-return-detail",
+      "label": "Return detail",
+      "owner": "Ecom / COS",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/ecom/cos/returns/ret_hj6ccsef",
+      "screenshot": "06-ecom-return-detail-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "07-finance-documents",
+      "label": "Finance evidence documents",
+      "owner": "Finance",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/finance/fin-support#documents",
+      "screenshot": "07-finance-documents-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "08-finance-status",
+      "label": "Finance readiness status",
+      "owner": "Finance",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/finance/fin-support#status",
+      "screenshot": "08-finance-status-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "09-intelligence-launch-decisions",
+      "label": "Intelligence outcome feedback",
+      "owner": "Intelligence",
+      "locale": "vi-VN",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/intelligence/launch-decisions",
+      "screenshot": "09-intelligence-launch-decisions-desktop-vi.png",
+      "status": "ok"
+    },
+    {
+      "id": "01-intelligence-decision-hub",
+      "label": "Intelligence decision hub",
+      "owner": "Intelligence",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/intelligence/decision-hub",
+      "screenshot": "01-intelligence-decision-hub-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "02-demand-leads-rfqs",
+      "label": "Demand lead and RFQ context",
+      "owner": "Demand",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/demand/leads-rfqs?lead=lead_1_1",
+      "screenshot": "02-demand-leads-rfqs-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "03-customer-profile-overview",
+      "label": "Customer profile overview",
+      "owner": "Customer",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=overview",
+      "screenshot": "03-customer-profile-overview-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "04-customer-account-profile",
+      "label": "Customer account profile",
+      "owner": "Customer",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "screenshot": "04-customer-account-profile-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "05-ecom-oms-detail",
+      "label": "OMS order detail",
+      "owner": "Ecom / COS",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/ecom/cos/oms/ord_nt89ruxe",
+      "screenshot": "05-ecom-oms-detail-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "06-ecom-return-detail",
+      "label": "Return detail",
+      "owner": "Ecom / COS",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/ecom/cos/returns/ret_pcbfw5k0",
+      "screenshot": "06-ecom-return-detail-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "07-finance-documents",
+      "label": "Finance evidence documents",
+      "owner": "Finance",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/finance/fin-support#documents",
+      "screenshot": "07-finance-documents-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "08-finance-status",
+      "label": "Finance readiness status",
+      "owner": "Finance",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/finance/fin-support#status",
+      "screenshot": "08-finance-status-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "09-intelligence-launch-decisions",
+      "label": "Intelligence outcome feedback",
+      "owner": "Intelligence",
+      "locale": "ja-JP",
+      "viewport": "1440x1000",
+      "url": "http://127.0.0.1:5177/intelligence/launch-decisions",
+      "screenshot": "09-intelligence-launch-decisions-desktop-ja.png",
+      "status": "ok"
+    },
+    {
+      "id": "01-intelligence-decision-hub",
+      "label": "Intelligence decision hub",
+      "owner": "Intelligence",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/intelligence/decision-hub",
+      "screenshot": "01-intelligence-decision-hub-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "02-demand-leads-rfqs",
+      "label": "Demand lead and RFQ context",
+      "owner": "Demand",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/demand/leads-rfqs?lead=lead_1_1",
+      "screenshot": "02-demand-leads-rfqs-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "03-customer-profile-overview",
+      "label": "Customer profile overview",
+      "owner": "Customer",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=overview",
+      "screenshot": "03-customer-profile-overview-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "04-customer-account-profile",
+      "label": "Customer account profile",
+      "owner": "Customer",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "screenshot": "04-customer-account-profile-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "05-ecom-oms-detail",
+      "label": "OMS order detail",
+      "owner": "Ecom / COS",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/ecom/cos/oms/ord_2tglnslt",
+      "screenshot": "05-ecom-oms-detail-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "06-ecom-return-detail",
+      "label": "Return detail",
+      "owner": "Ecom / COS",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/ecom/cos/returns/ret_odpkk54x",
+      "screenshot": "06-ecom-return-detail-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "07-finance-documents",
+      "label": "Finance evidence documents",
+      "owner": "Finance",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/finance/fin-support#documents",
+      "screenshot": "07-finance-documents-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "08-finance-status",
+      "label": "Finance readiness status",
+      "owner": "Finance",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/finance/fin-support#status",
+      "screenshot": "08-finance-status-mobile-en.png",
+      "status": "ok"
+    },
+    {
+      "id": "09-intelligence-launch-decisions",
+      "label": "Intelligence outcome feedback",
+      "owner": "Intelligence",
+      "locale": "en-US",
+      "viewport": "390x844",
+      "url": "http://127.0.0.1:5177/intelligence/launch-decisions",
+      "screenshot": "09-intelligence-launch-decisions-mobile-en.png",
+      "status": "ok"
+    }
+  ]
+}

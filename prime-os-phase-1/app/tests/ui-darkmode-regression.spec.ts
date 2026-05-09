@@ -31,22 +31,22 @@ test.describe('dark mode visual regression', () => {
     await expect(page.locator('html')).toHaveClass(/dark/);
 
     const semanticBackgrounds = await page.evaluate(() => {
-      const findSemanticSurface = (needle: string) => {
-        const candidates = [...document.querySelectorAll('a, div')].filter((element) => element.textContent?.includes(needle));
+      const findCurrentSurface = (needle: string) => {
+        const candidates = [...document.querySelectorAll('a, section, div')]
+          .filter((element) => element.textContent?.includes(needle));
         const element = candidates.find((candidate) => (
-          String(candidate.className).includes('bg-sky-50')
-          || String(candidate.className).includes('bg-emerald-50')
-          || String(candidate.className).includes('bg-amber-50')
-          || String(candidate.className).includes('bg-rose-50')
+          String(candidate.className).includes('bg-card')
+          || String(candidate.className).includes('bg-background')
+          || String(candidate.className).includes('bg-muted')
         ));
         return element ? window.getComputedStyle(element).backgroundColor : null;
       };
 
       return [
-        findSemanticSurface('Operator chooses the route'),
-        findSemanticSurface('COS and CRM read back reality'),
-        findSemanticSurface('SKU'),
-        findSemanticSurface('CRM'),
+        findCurrentSurface('System Health'),
+        findCurrentSurface('Dependency Risk Flow'),
+        findCurrentSurface('Revenue at risk'),
+        findCurrentSurface('Inventory pressure'),
       ];
     });
 
@@ -62,15 +62,18 @@ test.describe('dark mode visual regression', () => {
     await page.goto('/overview');
     await expectPrimeShellReady(page);
 
-    const search = page.getByRole('textbox', { name: 'Global entity search' });
-    const logout = page.getByRole('button', { name: /Logout/ });
+    const search = page.getByRole('combobox', { name: 'Global entity search' });
+    const accountMenu = page.getByRole('button', { name: /Open account menu/ });
     await expect(search).toBeVisible();
-    await expect(logout).toBeVisible();
+    await expect(accountMenu).toBeVisible();
 
     const searchBox = await search.boundingBox();
-    const logoutBox = await logout.boundingBox();
+    const accountMenuBox = await accountMenu.boundingBox();
     expect(searchBox?.width).toBeGreaterThanOrEqual(500);
     expect(searchBox?.width).toBeLessThanOrEqual(700);
-    expect((logoutBox?.x ?? 0) - ((searchBox?.x ?? 0) + (searchBox?.width ?? 0))).toBeGreaterThan(80);
+    expect((accountMenuBox?.x ?? 0) - ((searchBox?.x ?? 0) + (searchBox?.width ?? 0))).toBeGreaterThan(80);
+
+    await accountMenu.click();
+    await expect(page.getByRole('menuitem', { name: /Logout/ })).toBeVisible();
   });
 });

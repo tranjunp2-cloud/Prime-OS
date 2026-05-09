@@ -1,0 +1,603 @@
+{
+  "baseUrl": "http://127.0.0.1:5177",
+  "locale": "vi-VN",
+  "viewport": "1440x1200",
+  "createdAt": "2026-05-08T07:37:49.398Z",
+  "count": 66,
+  "screenshots": [
+    {
+      "index": 1,
+      "type": "page",
+      "name": "overview",
+      "route": "/overview",
+      "finalUrl": "http://127.0.0.1:5177/overview",
+      "file": "001-page-overview.png",
+      "status": "ok"
+    },
+    {
+      "index": 2,
+      "type": "page",
+      "name": "account",
+      "route": "/account",
+      "finalUrl": "http://127.0.0.1:5177/account",
+      "file": "002-page-account.png",
+      "status": "ok"
+    },
+    {
+      "index": 3,
+      "type": "page",
+      "name": "ui-regression",
+      "route": "/__ui-regression",
+      "finalUrl": "http://127.0.0.1:5177/__ui-regression",
+      "file": "003-page-ui-regression.png",
+      "status": "ok"
+    },
+    {
+      "index": 4,
+      "type": "demand",
+      "name": "demand-hub",
+      "route": "/demand/hub",
+      "finalUrl": "http://127.0.0.1:5177/demand/hub",
+      "file": "004-demand-demand-hub.png",
+      "status": "ok"
+    },
+    {
+      "index": 5,
+      "type": "demand",
+      "name": "demand-sources",
+      "route": "/demand/sources",
+      "finalUrl": "http://127.0.0.1:5177/demand/sources",
+      "file": "005-demand-demand-sources.png",
+      "status": "ok"
+    },
+    {
+      "index": 6,
+      "type": "demand",
+      "name": "campaigns",
+      "route": "/demand/campaigns",
+      "finalUrl": "http://127.0.0.1:5177/demand/campaigns",
+      "file": "006-demand-campaigns.png",
+      "status": "ok"
+    },
+    {
+      "index": 7,
+      "type": "demand",
+      "name": "content-social",
+      "route": "/demand/content-social",
+      "finalUrl": "http://127.0.0.1:5177/demand/content-social",
+      "file": "007-demand-content-social.png",
+      "status": "ok"
+    },
+    {
+      "index": 8,
+      "type": "demand",
+      "name": "leads-rfqs",
+      "route": "/demand/leads-rfqs",
+      "finalUrl": "http://127.0.0.1:5177/demand/leads-rfqs",
+      "file": "008-demand-leads-rfqs.png",
+      "status": "ok"
+    },
+    {
+      "index": 9,
+      "type": "demand",
+      "name": "re-engage",
+      "route": "/demand/re-engage",
+      "finalUrl": "http://127.0.0.1:5177/demand/re-engage",
+      "file": "009-demand-re-engage.png",
+      "status": "ok"
+    },
+    {
+      "index": 10,
+      "type": "finance",
+      "name": "fin-support-top",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "010-finance-fin-support-top.png",
+      "status": "ok"
+    },
+    {
+      "index": 11,
+      "type": "finance",
+      "name": "fin-support-application-flow",
+      "route": "/finance/fin-support#funding-application-flow",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support#funding-application-flow",
+      "file": "011-finance-fin-support-application-flow.png",
+      "status": "ok"
+    },
+    {
+      "index": 12,
+      "type": "finance",
+      "name": "fin-support-lenders",
+      "route": "/finance/fin-support#lenders",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support#lenders",
+      "file": "012-finance-fin-support-lenders.png",
+      "status": "ok"
+    },
+    {
+      "index": 13,
+      "type": "finance",
+      "name": "fin-support-documents",
+      "route": "/finance/fin-support#documents",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support#documents",
+      "file": "013-finance-fin-support-documents.png",
+      "status": "ok"
+    },
+    {
+      "index": 14,
+      "type": "finance",
+      "name": "fin-support-status",
+      "route": "/finance/fin-support#status",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support#status",
+      "file": "014-finance-fin-support-status.png",
+      "status": "ok"
+    },
+    {
+      "index": 15,
+      "type": "finance",
+      "name": "fin-support-blockers",
+      "route": "/finance/fin-support#blockers",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support#blockers",
+      "file": "015-finance-fin-support-blockers.png",
+      "status": "ok"
+    },
+    {
+      "index": 16,
+      "type": "customer",
+      "name": "customer-profile-overview",
+      "route": "/customer/crm-compact?floor=overview",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=overview",
+      "file": "016-customer-customer-profile-overview.png",
+      "status": "ok"
+    },
+    {
+      "index": 17,
+      "type": "customer",
+      "name": "customer-profile-account",
+      "route": "/customer/crm-compact?floor=account",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "file": "017-customer-customer-profile-account.png",
+      "status": "ok"
+    },
+    {
+      "index": 18,
+      "type": "customer",
+      "name": "customer-profile-contact",
+      "route": "/customer/crm-compact?floor=contact",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=contact",
+      "file": "018-customer-customer-profile-contact.png",
+      "status": "ok"
+    },
+    {
+      "index": 19,
+      "type": "customer",
+      "name": "customer-profile-tags",
+      "route": "/customer/crm-compact?floor=tags",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=tags",
+      "file": "019-customer-customer-profile-tags.png",
+      "status": "ok"
+    },
+    {
+      "index": 20,
+      "type": "customer",
+      "name": "customer-profile-identity",
+      "route": "/customer/crm-compact?floor=identity",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=identity",
+      "file": "020-customer-customer-profile-identity.png",
+      "status": "ok"
+    },
+    {
+      "index": 21,
+      "type": "customer",
+      "name": "customer-service",
+      "route": "/customer/service",
+      "finalUrl": "http://127.0.0.1:5177/customer/service",
+      "file": "021-customer-customer-service.png",
+      "status": "ok"
+    },
+    {
+      "index": 22,
+      "type": "ecom",
+      "name": "commerce-surface",
+      "route": "/ecom/commerce-surface",
+      "finalUrl": "http://127.0.0.1:5177/ecom/commerce-surface",
+      "file": "022-ecom-commerce-surface.png",
+      "status": "ok"
+    },
+    {
+      "index": 23,
+      "type": "ecom",
+      "name": "product-master",
+      "route": "/ecom/cos/product-master",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/product-master",
+      "file": "023-ecom-product-master.png",
+      "status": "ok"
+    },
+    {
+      "index": 24,
+      "type": "ecom",
+      "name": "product-new",
+      "route": "/ecom/cos/product-master/new",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/product-master/new",
+      "file": "024-ecom-product-new.png",
+      "status": "ok"
+    },
+    {
+      "index": 25,
+      "type": "ecom",
+      "name": "listings",
+      "route": "/ecom/cos/listings",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/listings",
+      "file": "025-ecom-listings.png",
+      "status": "ok"
+    },
+    {
+      "index": 26,
+      "type": "ecom",
+      "name": "inventory-brain",
+      "route": "/ecom/cos/inventory-brain",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/inventory-brain",
+      "file": "026-ecom-inventory-brain.png",
+      "status": "ok"
+    },
+    {
+      "index": 27,
+      "type": "ecom",
+      "name": "warehouses",
+      "route": "/ecom/cos/warehouses",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/warehouses",
+      "file": "027-ecom-warehouses.png",
+      "status": "ok"
+    },
+    {
+      "index": 28,
+      "type": "ecom",
+      "name": "oms",
+      "route": "/ecom/cos/oms",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/oms",
+      "file": "028-ecom-oms.png",
+      "status": "ok"
+    },
+    {
+      "index": 29,
+      "type": "ecom",
+      "name": "fulfillment",
+      "route": "/ecom/cos/fulfillment",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/fulfillment",
+      "file": "029-ecom-fulfillment.png",
+      "status": "ok"
+    },
+    {
+      "index": 30,
+      "type": "ecom",
+      "name": "returns",
+      "route": "/ecom/cos/returns",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/returns",
+      "file": "030-ecom-returns.png",
+      "status": "ok"
+    },
+    {
+      "index": 31,
+      "type": "ecom",
+      "name": "policy-rule",
+      "route": "/ecom/cos/policy-rule",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/policy-rule",
+      "file": "031-ecom-policy-rule.png",
+      "status": "ok"
+    },
+    {
+      "index": 32,
+      "type": "ecom",
+      "name": "policy-sla",
+      "route": "/ecom/cos/policy-rule/sla",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/policy-rule/sla",
+      "file": "032-ecom-policy-sla.png",
+      "status": "ok"
+    },
+    {
+      "index": 33,
+      "type": "ecom",
+      "name": "policy-routing",
+      "route": "/ecom/cos/policy-rule/routing",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/policy-rule/routing",
+      "file": "033-ecom-policy-routing.png",
+      "status": "ok"
+    },
+    {
+      "index": 34,
+      "type": "ecom",
+      "name": "event-audit",
+      "route": "/ecom/cos/event-audit",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/event-audit",
+      "file": "034-ecom-event-audit.png",
+      "status": "ok"
+    },
+    {
+      "index": 35,
+      "type": "intelligence",
+      "name": "decision-hub",
+      "route": "/intelligence/decision-hub",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/decision-hub",
+      "file": "035-intelligence-decision-hub.png",
+      "status": "ok"
+    },
+    {
+      "index": 36,
+      "type": "intelligence",
+      "name": "decision-hub-operator",
+      "route": "/intelligence/decision-hub?view=operator",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/decision-hub?view=operator",
+      "file": "036-intelligence-decision-hub-operator.png",
+      "status": "ok"
+    },
+    {
+      "index": 37,
+      "type": "intelligence",
+      "name": "decision-hub-alerts",
+      "route": "/intelligence/decision-hub?view=alerts",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/decision-hub?view=alerts",
+      "file": "037-intelligence-decision-hub-alerts.png",
+      "status": "ok"
+    },
+    {
+      "index": 38,
+      "type": "intelligence",
+      "name": "decision-hub-analytics",
+      "route": "/intelligence/decision-hub?capability=analytics",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/decision-hub?capability=analytics",
+      "file": "038-intelligence-decision-hub-analytics.png",
+      "status": "ok"
+    },
+    {
+      "index": 39,
+      "type": "intelligence",
+      "name": "signals",
+      "route": "/intelligence/signals",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals",
+      "file": "039-intelligence-signals.png",
+      "status": "ok"
+    },
+    {
+      "index": 40,
+      "type": "intelligence",
+      "name": "signals-creators",
+      "route": "/intelligence/signals?view=creators",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals?view=creators",
+      "file": "040-intelligence-signals-creators.png",
+      "status": "ok"
+    },
+    {
+      "index": 41,
+      "type": "intelligence",
+      "name": "signals-customer-trends",
+      "route": "/intelligence/signals?view=customer-trends",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals?view=customer-trends",
+      "file": "041-intelligence-signals-customer-trends.png",
+      "status": "ok"
+    },
+    {
+      "index": 42,
+      "type": "intelligence",
+      "name": "signals-attribution",
+      "route": "/intelligence/signals?capability=attribution",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals?capability=attribution",
+      "file": "042-intelligence-signals-attribution.png",
+      "status": "ok"
+    },
+    {
+      "index": 43,
+      "type": "intelligence",
+      "name": "signals-forecasting",
+      "route": "/intelligence/signals?capability=forecasting",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals?capability=forecasting",
+      "file": "043-intelligence-signals-forecasting.png",
+      "status": "ok"
+    },
+    {
+      "index": 44,
+      "type": "intelligence",
+      "name": "signals-voc",
+      "route": "/intelligence/signals?capability=voc",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals?capability=voc",
+      "file": "044-intelligence-signals-voc.png",
+      "status": "ok"
+    },
+    {
+      "index": 45,
+      "type": "intelligence",
+      "name": "launch-decisions",
+      "route": "/intelligence/launch-decisions",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/launch-decisions",
+      "file": "045-intelligence-launch-decisions.png",
+      "status": "ok"
+    },
+    {
+      "index": 46,
+      "type": "ecom-detail",
+      "name": "product-detail",
+      "route": "/ecom/cos/product-master/prod_001",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/product-master/prod_001",
+      "file": "046-ecom-detail-product-detail.png",
+      "status": "ok"
+    },
+    {
+      "index": 47,
+      "type": "ecom-detail",
+      "name": "product-edit",
+      "route": "/ecom/cos/product-master/prod_001/edit",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/product-master/prod_001/edit",
+      "file": "047-ecom-detail-product-edit.png",
+      "status": "ok"
+    },
+    {
+      "index": 48,
+      "type": "ecom-detail",
+      "name": "order-detail",
+      "route": "/ecom/cos/oms/ord_wg7z1c8t",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/oms/ord_wg7z1c8t",
+      "file": "048-ecom-detail-order-detail.png",
+      "status": "ok"
+    },
+    {
+      "index": 49,
+      "type": "ecom-detail",
+      "name": "fulfillment-job-detail",
+      "route": "/ecom/cos/fulfillment/jobs/job_job_2112",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/fulfillment/jobs/job_job_2112",
+      "file": "049-ecom-detail-fulfillment-job-detail.png",
+      "status": "ok"
+    },
+    {
+      "index": 50,
+      "type": "ecom-detail",
+      "name": "return-detail",
+      "route": "/ecom/cos/returns/ret_tnuxali0",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/returns/ret_tnuxali0",
+      "file": "050-ecom-detail-return-detail.png",
+      "status": "ok"
+    },
+    {
+      "index": 51,
+      "type": "popup",
+      "name": "command-palette",
+      "route": "/overview",
+      "finalUrl": "http://127.0.0.1:5177/overview",
+      "file": "051-popup-command-palette.png",
+      "status": "ok"
+    },
+    {
+      "index": 52,
+      "type": "popup",
+      "name": "prime-ai-global",
+      "route": "/overview",
+      "finalUrl": "http://127.0.0.1:5177/overview",
+      "file": "052-popup-prime-ai-global.png",
+      "status": "ok"
+    },
+    {
+      "index": 53,
+      "type": "popup",
+      "name": "product-create-dialog",
+      "route": "/ecom/cos/product-master",
+      "finalUrl": "http://127.0.0.1:5177/ecom/cos/product-master",
+      "file": "053-popup-product-create-dialog.png",
+      "status": "ok"
+    },
+    {
+      "index": 54,
+      "type": "popup",
+      "name": "finance-loan-wizard-step-1",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "054-popup-finance-loan-wizard-step-1.png",
+      "status": "ok"
+    },
+    {
+      "index": 55,
+      "type": "popup",
+      "name": "finance-loan-wizard-step-2",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "055-popup-finance-loan-wizard-step-2.png",
+      "status": "ok"
+    },
+    {
+      "index": 56,
+      "type": "popup",
+      "name": "finance-loan-wizard-step-3",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "056-popup-finance-loan-wizard-step-3.png",
+      "status": "ok"
+    },
+    {
+      "index": 57,
+      "type": "popup",
+      "name": "finance-loan-wizard-step-4",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "057-popup-finance-loan-wizard-step-4.png",
+      "status": "ok"
+    },
+    {
+      "index": 58,
+      "type": "popup",
+      "name": "finance-loan-wizard-step-5",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "058-popup-finance-loan-wizard-step-5.png",
+      "status": "ok"
+    },
+    {
+      "index": 59,
+      "type": "popup",
+      "name": "finance-loan-wizard-step-6",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "059-popup-finance-loan-wizard-step-6.png",
+      "status": "ok"
+    },
+    {
+      "index": 60,
+      "type": "popup",
+      "name": "finance-ask-prime-ai",
+      "route": "/finance/fin-support",
+      "finalUrl": "http://127.0.0.1:5177/finance/fin-support",
+      "file": "060-popup-finance-ask-prime-ai.png",
+      "status": "ok"
+    },
+    {
+      "index": 61,
+      "type": "popup",
+      "name": "customer-create-account-dialog",
+      "route": "/customer/crm-compact?floor=account",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "file": "061-popup-customer-create-account-dialog.png",
+      "status": "ok"
+    },
+    {
+      "index": 62,
+      "type": "popup",
+      "name": "customer-create-account-new-segment-tag",
+      "route": "/customer/crm-compact?floor=account",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "file": "062-popup-customer-create-account-new-segment-tag.png",
+      "status": "ok"
+    },
+    {
+      "index": 63,
+      "type": "popup",
+      "name": "customer-account-profile-dialog",
+      "route": "/customer/crm-compact?floor=account",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "file": "063-popup-customer-account-profile-dialog.png",
+      "status": "ok"
+    },
+    {
+      "index": 64,
+      "type": "popup",
+      "name": "customer-edit-account-dialog",
+      "route": "/customer/crm-compact?floor=account",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "file": "064-popup-customer-edit-account-dialog.png",
+      "status": "ok"
+    },
+    {
+      "index": 65,
+      "type": "popup",
+      "name": "customer-add-contact-dialog",
+      "route": "/customer/crm-compact?floor=account",
+      "finalUrl": "http://127.0.0.1:5177/customer/crm-compact?floor=account",
+      "file": "065-popup-customer-add-contact-dialog.png",
+      "status": "ok"
+    },
+    {
+      "index": 66,
+      "type": "popup",
+      "name": "intelligence-creator-shortlist-sheet",
+      "route": "/intelligence/signals?view=creators",
+      "finalUrl": "http://127.0.0.1:5177/intelligence/signals?view=creators",
+      "file": "066-popup-intelligence-creator-shortlist-sheet.png",
+      "status": "ok"
+    }
+  ]
+}

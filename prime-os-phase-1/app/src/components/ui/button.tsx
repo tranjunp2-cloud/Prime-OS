@@ -12,7 +12,7 @@ const buttonVariants = cva(
         default:
           "border-primary bg-primary text-primary-foreground hover:border-[hsl(var(--primary-hover))] hover:bg-[hsl(var(--primary-hover))] hover:shadow-[0_4px_12px_hsl(var(--primary)/0.35)]",
         destructive:
-          "border-destructive/45 bg-transparent text-destructive hover:border-destructive hover:bg-destructive/10",
+          "border-destructive/45 bg-transparent text-red-700 hover:border-destructive hover:bg-destructive/10 dark:text-red-300",
         outline:
           "border-border bg-transparent text-foreground hover:border-muted-foreground/45 hover:bg-accent",
         secondary:
