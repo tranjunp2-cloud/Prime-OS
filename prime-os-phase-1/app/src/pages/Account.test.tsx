@@ -139,4 +139,17 @@ describe('Account page', () => {
     });
     expect(screen.getByText(/prime-os-phase-1\/backend/i)).toBeInTheDocument();
   });
+
+  it('shows a backend recovery hint when local preview returns the SPA shell instead of JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<!doctype html><html></html>', {
+      headers: { 'content-type': 'text/html' },
+    })));
+
+    render(<Account />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/did not return JSON/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/prime-os-phase-1\/backend/i)).toBeInTheDocument();
+  });
 });

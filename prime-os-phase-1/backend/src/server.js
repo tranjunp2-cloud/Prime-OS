@@ -30,10 +30,14 @@ const configuredAllowedOrigins = String(process.env.PRIME_ALLOWED_ORIGINS || '')
   .map((origin) => origin.trim())
   .filter(Boolean);
 const localDevOrigins = [
+  'http://127.0.0.1:4173',
+  'http://localhost:4173',
   'http://127.0.0.1:5173',
   'http://localhost:5173',
   'http://127.0.0.1:5174',
-  'http://localhost:5174'
+  'http://localhost:5174',
+  'http://127.0.0.1:5177',
+  'http://localhost:5177'
 ];
 const allowedOrigins = new Set(
   demoCredentialsEnabled

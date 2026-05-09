@@ -1,6 +1,6 @@
 export const primeAuthTokenStorageKey = 'prime-os-auth-token';
 
-const defaultControlPlaneBase = import.meta.env.DEV ? 'http://127.0.0.1:8180' : '';
+const localControlPlaneBase = 'http://127.0.0.1:8180';
 let primeAuthToken: string | null = null;
 
 export interface PrimeAccount {
@@ -35,7 +35,15 @@ export interface PrimeLoginResponse {
 
 export function resolvePrimeBackendBase() {
   const configured = import.meta.env.VITE_PRIME_ADMIN_API_BASE?.trim();
-  return (configured || defaultControlPlaneBase).replace(/\/$/, '');
+  if (configured) return configured.replace(/\/$/, '');
+
+  if (import.meta.env.DEV) return localControlPlaneBase;
+
+  if (typeof window !== 'undefined' && ['127.0.0.1', 'localhost'].includes(window.location.hostname)) {
+    return localControlPlaneBase;
+  }
+
+  return '';
 }
 
 export function getPrimeAuthToken() {
