@@ -32,6 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -1041,99 +1042,149 @@ function AccountProfileDialog({
   if (!account) return null;
 
   const primaryContact = contacts.find((contact) => contact.isPrimary);
+  const highPriorityFollowUps = account.followUps.filter((followUp) => followUp.priority === 'high').length;
+  const openServiceCases = account.serviceCases.filter((serviceCase) => serviceCase.status !== 'resolved').length;
+  const recentTimelineEvents = account.timelineEvents.slice(0, 3);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-5xl overflow-y-auto" data-testid="account-profile-dialog">
-        <DialogHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 gap-3">
-            <CustomerAvatar account={account} size="lg" />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Customer Profile Floor</Badge>
-                <Badge variant={accountStatusVariant(account.status)} className="capitalize">{account.status}</Badge>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-7xl flex-col overflow-hidden p-0" data-testid="account-profile-dialog">
+        <DialogHeader className="border-b bg-background px-5 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 gap-3">
+              <CustomerAvatar account={account} size="lg" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Customer Profile Floor</Badge>
+                  <Badge variant={accountStatusVariant(account.status)} className="capitalize">{account.status}</Badge>
+                  <Badge variant="secondary">{humanize(account.lifecycle)}</Badge>
+                </div>
+                <DialogTitle className="mt-3 text-2xl leading-tight">{account.displayName}</DialogTitle>
+                <DialogDescription className="mt-1">
+                  {account.accountCode} · {account.industry} · {account.country}
+                </DialogDescription>
               </div>
-              <DialogTitle className="mt-3 text-2xl">{account.displayName}</DialogTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {account.accountCode} · {account.industry} · {account.country}
-              </p>
             </div>
-          </div>
-          <Button variant="outline" onClick={onEditAccount}>Edit account</Button>
-          </div>
-          <DialogDescription>
-            Account identity, ownership, lifecycle, contacts, and future module placeholders in one record view.
-          </DialogDescription>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {account.tags.map((tagId) => {
-              const tag = tagById(tags, tagId);
-              if (!tag) return null;
-              return <Badge key={tag.id} variant="outline" className={tag.colorClass}>{tag.label}</Badge>;
-            })}
+            <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:min-w-[26rem]">
+              <SmallMetric label="Owner" value={ownerName(owners, account.ownerId)} />
+              <SmallMetric label="Revenue read" value={currency.format(account.revenue)} />
+              <SmallMetric label="Open cases" value={String(openServiceCases)} />
+              <SmallMetric label="Priority follow-ups" value={String(highPriorityFollowUps)} />
+            </div>
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <IdentityFact icon={<Building2 className="size-4" />} label="Company" value={account.companyName} detail={account.website} />
-          <IdentityFact icon={<UserRoundCheck className="size-4" />} label="Owner" value={ownerName(owners, account.ownerId)} detail="Relationship owner" />
-          <IdentityFact icon={<ShieldCheck className="size-4" />} label="Identity completeness" value={`${account.identityCompleteness}%`} detail="Profile, owner, contact, and source coverage" />
-          <IdentityFact icon={<Mail className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.email ?? 'Add a primary contact'} />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <SmallMetric label="Lifecycle" value={humanize(account.lifecycle)} />
-          <SmallMetric label="Customer type" value={customerTypeLabels[account.customerType]} />
-          <SmallMetric label="Revenue read" value={currency.format(account.revenue)} />
-        </div>
-
-        {account.profile ? <CustomerPortraitSection account={account} owners={owners} /> : null}
-
-        <section className="rounded-lg border">
-          <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 className="text-base font-semibold">Contacts</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Primary indicator, role, email, phone, and communication preference.</p>
-            </div>
-            <Button onClick={onAddContact}>
-              <Plus className="size-4" />
-              Add contact
-            </Button>
+        <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
+          <div className="border-b px-5">
+            <TabsList className="h-12 w-full justify-start overflow-x-auto rounded-none bg-transparent p-0">
+              {[
+                ['overview', 'Overview'],
+                ['contacts', `Contacts (${contacts.length})`],
+                ['portrait', 'Customer portrait'],
+                ['activity', 'Activity & risk'],
+                ['links', 'Future links'],
+              ].map(([value, label]) => (
+                <TabsTrigger key={value} value={value} className="h-12 rounded-none border-b-2 border-transparent bg-transparent px-3 data-[state=active]:border-primary data-[state=active]:shadow-none">
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
           </div>
-          <div className="grid gap-3 p-4">
-            {contacts.map((contact) => (
-              <ContactCard key={contact.id} contact={contact} onEdit={() => onEditContact(contact)} onMakePrimary={() => onMakePrimaryContact(contact.id)} />
-            ))}
-            {contacts.length === 0 ? <EmptyBlock text="No contacts yet. Add a primary buyer before connecting Demand or RFQ flows." /> : null}
-          </div>
-        </section>
 
-        <div className="grid gap-3">
-          <div>
-            <div className="text-sm font-medium">Profile notes</div>
-            <p className="text-xs text-muted-foreground">Account, contact identity, and segment tags live together here. Identity matching remains a separate review workspace.</p>
-          </div>
-          <div className="grid gap-2">
-            {account.notes.map((note) => (
-              <div key={note} className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{note}</div>
-            ))}
-          </div>
-        </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <TabsContent value="overview" className="m-0 space-y-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <IdentityFact icon={<Building2 className="size-4" />} label="Company" value={account.companyName} detail={account.website} />
+                    <IdentityFact icon={<UserRoundCheck className="size-4" />} label="Owner" value={ownerName(owners, account.ownerId)} detail="Relationship owner" />
+                    <IdentityFact icon={<ShieldCheck className="size-4" />} label="Identity completeness" value={`${account.identityCompleteness}%`} detail="Profile, owner, contact, and source coverage" />
+                    <IdentityFact icon={<Mail className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.email ?? 'Add a primary contact'} />
+                  </div>
 
-        <div className="space-y-3">
-          <div>
-            <div className="text-sm font-medium">Future links</div>
-            <p className="text-xs text-muted-foreground">Read-only placeholders. These modules are not owned by Customer Profile Floor V1.</p>
+                  <section className="rounded-lg border p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold">What matters now</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">High-signal account context without opening the full portrait.</p>
+                      </div>
+                      <Button variant="outline" onClick={onEditAccount}>Edit account</Button>
+                    </div>
+                    <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                      <SmallMetric label="Customer type" value={customerTypeLabels[account.customerType]} />
+                      <SmallMetric label="Orders" value={String(account.orderCount)} />
+                      <SmallMetric label="Lifecycle" value={humanize(account.lifecycle)} />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {account.tags.map((tagId) => {
+                        const tag = tagById(tags, tagId);
+                        if (!tag) return null;
+                        return <Badge key={tag.id} variant="outline" className={tag.colorClass}>{tag.label}</Badge>;
+                      })}
+                    </div>
+                  </section>
+                </div>
+
+                <aside className="space-y-3 xl:sticky xl:top-0 xl:self-start">
+                  <FollowUpQueue followUps={account.followUps.slice(0, 3)} owners={owners} />
+                  <CustomerTimelineEventList events={recentTimelineEvents} owners={owners} compact />
+                </aside>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="contacts" className="m-0">
+              <section className="rounded-lg border">
+                <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold">Contacts</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Primary indicator, role, email, phone, and communication preference.</p>
+                  </div>
+                  <Button onClick={onAddContact}>
+                    <Plus className="size-4" />
+                    Add contact
+                  </Button>
+                </div>
+                <div className="grid gap-3 p-4 lg:grid-cols-2">
+                  {contacts.map((contact) => (
+                    <ContactCard key={contact.id} contact={contact} onEdit={() => onEditContact(contact)} onMakePrimary={() => onMakePrimaryContact(contact.id)} />
+                  ))}
+                  {contacts.length === 0 ? <EmptyBlock text="No contacts yet. Add a primary buyer before connecting Demand or RFQ flows." /> : null}
+                </div>
+              </section>
+            </TabsContent>
+
+            <TabsContent value="portrait" className="m-0">
+              {account.profile ? <CustomerPortraitSection account={account} owners={owners} /> : <EmptyBlock text="No detailed customer portrait is available for this account." />}
+            </TabsContent>
+
+            <TabsContent value="activity" className="m-0 grid gap-4 lg:grid-cols-2">
+              <CustomerTimelineEventList events={account.timelineEvents} owners={owners} />
+              <div className="grid gap-4">
+                <FollowUpQueue followUps={account.followUps} owners={owners} />
+                <ContinuityPreview account={account} />
+                <ServiceCasePreview serviceCases={account.serviceCases} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="links" className="m-0 grid gap-4 lg:grid-cols-2">
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm font-medium">Future links</div>
+                  <p className="text-xs text-muted-foreground">Read-only placeholders. These modules are not owned by Customer Profile Floor V1.</p>
+                </div>
+                <FutureModulePlaceholders modules={futureModules} />
+              </div>
+              <div className="space-y-3">
+                <TextStack title="Profile notes" lines={account.notes} />
+                {account.profile ? <TextStack title="Legacy customer memory" lines={account.profile.timeline} scroll /> : null}
+              </div>
+            </TabsContent>
           </div>
-          <FutureModulePlaceholders modules={futureModules} />
-        </div>
-        </div>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
 }
-
 function CustomerAvatar({ account, size }: { account: CustomerAccount; size: 'sm' | 'lg' }) {
   const profile = account.profile;
   const name = profile?.customerName ?? account.displayName;
@@ -1279,7 +1330,7 @@ function CustomerPortraitSection({ account, owners }: { account: CustomerAccount
 
       <div className="grid gap-3 border-t p-4 lg:grid-cols-2">
         <TextStack title="Profile notes" lines={account.notes} />
-        <TextStack title="Legacy customer memory" lines={profile.timeline} />
+        <TextStack title="Legacy customer memory" lines={profile.timeline} scroll />
       </div>
     </section>
   );
@@ -1476,12 +1527,18 @@ function ServiceCasePreview({ serviceCases }: { serviceCases: CustomerAccount['s
   );
 }
 
-function TextStack({ title, lines }: { title: string; lines: string[] }) {
+function TextStack({ title, lines, limit, scroll = false }: { title: string; lines: string[]; limit?: number; scroll?: boolean }) {
+  const visibleLines = typeof limit === 'number' ? lines.slice(0, limit) : lines;
+  const hiddenCount = Math.max(0, lines.length - visibleLines.length);
+
   return (
     <div className="rounded-lg border bg-muted/20 p-3">
-      <div className="text-sm font-medium">{title}</div>
-      <div className="mt-3 grid gap-2">
-        {lines.length ? lines.map((line) => (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-medium">{title}</div>
+        {hiddenCount ? <Badge variant="outline">+{hiddenCount} archived</Badge> : null}
+      </div>
+      <div className={`mt-3 grid gap-2 ${scroll ? 'max-h-80 overflow-y-auto pr-1' : ''}`}>
+        {visibleLines.length ? visibleLines.map((line) => (
           <div key={line} className="rounded-md border bg-background p-2 text-xs text-muted-foreground">{line}</div>
         )) : <div className="text-xs text-muted-foreground">No entries yet.</div>}
       </div>
