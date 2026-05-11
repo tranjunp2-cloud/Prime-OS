@@ -69,6 +69,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
+import { IntelligenceDragBoard } from '@/components/prime/IntelligenceDragBoard';
 import { PartnerWorkspacePanel } from '@/components/prime/PartnerWorkspacePanel';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import type { Locale } from '@/lib/i18n/dictionaries';
@@ -101,8 +102,12 @@ import {
   type PrimeTowerId,
 } from '@/lib/prime/prime-data';
 import {
+  buildIntelligenceBoard,
   buildIntelligenceWorkspace,
+  moveIntelligenceBoardCard,
   type DecisionPackage,
+  type IntelligenceBoardSnapshot,
+  type IntelligenceBoardLaneId,
   type IntelligencePackageStatus,
   type SourceOwner,
 } from '@/lib/prime/intelligence-workspace';
@@ -8661,7 +8666,10 @@ function CompactLaunchDecisionsRuntimePanel({
 }
 
 function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
-  const snapshot = getPrimeSnapshot();
+  const snapshot = useMemo(() => getPrimeSnapshot(), []);
+  const intelligenceWorkspace = useMemo(() => buildIntelligenceWorkspace(snapshot), [snapshot]);
+  const baseIntelligenceBoard = useMemo(() => buildIntelligenceBoard(intelligenceWorkspace), [intelligenceWorkspace]);
+  const [intelligenceBoard, setIntelligenceBoard] = useState<IntelligenceBoardSnapshot>(baseIntelligenceBoard);
   const intelligenceControlQuery = useQuery({
     queryKey: ['prime-intelligence-control-plane'],
     queryFn: fetchIntelligenceControlPlane,
@@ -8672,6 +8680,36 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
     retry: 1,
     enabled: towerId === 'creators' || towerId === 'customers' || towerId === 'campaigns',
   });
+
+  useEffect(() => {
+    setIntelligenceBoard((currentBoard) => {
+      const currentCardsByPackage = new Map(currentBoard.cards.map((card) => [card.packageId, card]));
+      return {
+        ...baseIntelligenceBoard,
+        cards: baseIntelligenceBoard.cards.map((card) => {
+          const currentCard = currentCardsByPackage.get(card.packageId);
+          return currentCard ? { ...card, laneId: currentCard.laneId, rank: currentCard.rank, boardRevision: currentBoard.boardRevision } : card;
+        }),
+        auditEvents: currentBoard.auditEvents,
+        boardRevision: currentBoard.boardRevision,
+      };
+    });
+  }, [baseIntelligenceBoard]);
+
+  const handleIntelligenceBoardMove = (cardId: string, toLaneId: IntelligenceBoardLaneId, toRank: number) => {
+    setIntelligenceBoard((currentBoard) => moveIntelligenceBoardCard(currentBoard, {
+      id: `move-${cardId}-${Date.now()}`,
+      cardId,
+      toLaneId,
+      toRank,
+      actorId: 'prime-operator',
+      actorRole: 'Intelligence operator',
+      reason: 'Local board triage move.',
+      createdAt: new Date().toISOString(),
+      idempotencyKey: `local-${cardId}-${toLaneId}-${toRank}`,
+      auditId: `audit-local-${cardId}-${toLaneId}`,
+    }));
+  };
 
   if (towerId === 'decision-hub') {
     return <IntelligenceDecisionHubPanel snapshot={snapshot} />;
@@ -8711,6 +8749,7 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
 
     return (
       <div className="space-y-4">
+        <IntelligenceDragBoard board={intelligenceBoard} onMoveCard={handleIntelligenceBoardMove} />
         <LaunchDecisionStateBoard decisions={boardLaunchDecisions} />
         <CompactLaunchDecisionsRuntimePanel
           data={intelligenceControlQuery.data}

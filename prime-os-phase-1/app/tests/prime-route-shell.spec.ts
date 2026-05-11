@@ -276,6 +276,9 @@ test.describe('authenticated route shell', () => {
 
     await page.goto('/intelligence/launch-decisions', routeReady);
     await expectPrimeShellReady(page);
+    await expect(page.getByTestId('intelligence-drag-board')).toBeVisible();
+    await expect(page.getByText('Signal → decision board')).toBeVisible();
+    await expect(page.getByText(/Source truth remains owned by Demand, Customer, Ecom \/ COS, and Finance/)).toBeVisible();
     await expect(page.getByTestId('launch-decision-state-board')).toBeVisible();
     await expect(page.getByText('Outcome feedback')).toBeVisible();
     await expect(page.getByText(/Demand owns execution, OMS owns order truth/)).toBeVisible();

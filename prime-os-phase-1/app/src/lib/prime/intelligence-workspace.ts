@@ -11,10 +11,81 @@ export type SignalCardSourceType = 'market' | 'creator' | 'voc' | 'campaign' | '
 export type IntelligencePackageStatus = 'running' | 'review_needed' | 'ready_for_demand' | 'sent_to_demand' | 'blocked' | 'outcome_learned';
 export type IntelligenceRiskLevel = 'low' | 'medium' | 'high';
 export type IntelligenceAgentStatus = 'running' | 'needs_review' | 'ready' | 'blocked';
+export type IntelligenceBoardLaneId = 'collect' | 'understand' | 'predict' | 'recommend' | 'act_automate';
 export type PrimeArea = 'Intelligence' | 'Demand' | 'Customer' | 'Ecom/COS' | 'Finance';
 export type SourceOwner = 'Intelligence' | 'Demand' | 'Customer' | 'Product Master' | 'OMS' | 'Inventory' | 'Fulfillment/Shipment' | 'Finance' | 'Event & Audit';
 export type LinkedEntityType = 'recommendation' | 'signal' | 'campaign' | 'lead' | 'rfq' | 'customer' | 'product' | 'sku' | 'listing' | 'order' | 'reservation' | 'shipment' | 'return' | 'ticket' | 'finance_profile' | 'domain_event' | 'audit_id';
 export type EvidenceQuality = 'verified' | 'derived' | 'stale' | 'missing' | 'conflicting';
+
+export type IntelligenceBoardLinkedEntity = {
+  type: LinkedEntityType;
+  id: string;
+  owner: SourceOwner;
+  route?: string;
+};
+
+export type IntelligenceBoardCard = {
+  id: string;
+  boardId: 'intelligence-area-board';
+  packageId: string;
+  laneId: IntelligenceBoardLaneId;
+  rank: number;
+  title: string;
+  tower: 'Analytics Tower' | 'Attribution Tower' | 'Forecasting & Optimization Tower' | 'AI Operator Tower' | 'Social Listening & VOC Tower' | 'Automation & Alerts Tower';
+  floor: string;
+  displayStatus: IntelligencePackageStatus;
+  owner: string;
+  nextOwner: DecisionPackage['nextOwner'];
+  nextAction: string;
+  exceptionLevel: IntelligenceRiskLevel;
+  businessImpact: DecisionPackage['expectedImpact'];
+  sourceOfTruthOwner: SourceOwner;
+  readModelOwner: 'Intelligence';
+  linkedEntities: IntelligenceBoardLinkedEntity[];
+  evidenceIds: string[];
+  guardrails: RecommendationEvidence['guardrails'];
+  confidence: number;
+  quality: EvidenceQuality;
+  freshnessAt: string;
+  lastSourceRevision: string;
+  boardRevision: number;
+};
+
+export type IntelligenceBoardMove = {
+  id: string;
+  boardId: IntelligenceBoardCard['boardId'];
+  cardId: string;
+  fromLaneId: IntelligenceBoardLaneId;
+  toLaneId: IntelligenceBoardLaneId;
+  fromRank: number;
+  toRank: number;
+  actorId: string;
+  actorRole: string;
+  reason?: string;
+  createdAt: string;
+  idempotencyKey: string;
+  expectedBoardRevision: number;
+  auditId: string;
+};
+
+export type IntelligenceBoardAuditEvent = IntelligenceBoardMove & {
+  eventType: 'IntelligenceBoardCardMoved';
+  linkedEvidenceIds: string[];
+  linkedSourceEntities: IntelligenceBoardLinkedEntity[];
+  sourceOwnerSnapshot: SourceOwner[];
+  boardRevisionBefore: number;
+  boardRevisionAfter: number;
+};
+
+export type IntelligenceBoardSnapshot = {
+  id: IntelligenceBoardCard['boardId'];
+  area: 'Intelligence Area';
+  readModelOwner: 'Intelligence';
+  lanes: Array<{ id: IntelligenceBoardLaneId; label: string; purpose: string }>;
+  cards: IntelligenceBoardCard[];
+  auditEvents: IntelligenceBoardAuditEvent[];
+  boardRevision: number;
+};
 
 export type SignalLineageInput = {
   owner: SourceOwner;
@@ -216,6 +287,140 @@ const statusFromRisk = (risk: IntelligenceRiskLevel, confidence: number): Intell
   if (confidence >= 84) return 'ready_for_demand';
   return 'review_needed';
 };
+
+export const INTELLIGENCE_BOARD_LANES: IntelligenceBoardSnapshot['lanes'] = [
+  { id: 'collect', label: 'Collect', purpose: 'Capture source-owned signals before analysis.' },
+  { id: 'understand', label: 'Understand', purpose: 'Explain what happened and attach evidence.' },
+  { id: 'predict', label: 'Predict', purpose: 'Connect forecasts, guardrails, and risk.' },
+  { id: 'recommend', label: 'Recommend', purpose: 'Prepare next-best action for the owning area.' },
+  { id: 'act_automate', label: 'Act & Automate', purpose: 'Create handoff intent without mutating source truth.' },
+];
+
+const laneFromPackageStatus = (status: IntelligencePackageStatus): IntelligenceBoardLaneId => {
+  if (status === 'blocked') return 'predict';
+  if (status === 'ready_for_demand') return 'recommend';
+  if (status === 'sent_to_demand' || status === 'outcome_learned') return 'act_automate';
+  if (status === 'review_needed') return 'understand';
+  return 'collect';
+};
+
+const towerFromPackage = (item: DecisionPackage): IntelligenceBoardCard['tower'] => {
+  if (item.status === 'blocked' || item.recommendationEvidence.guardrails.some((guardrail) => guardrail.blocking)) return 'Automation & Alerts Tower';
+  if (item.linkedSignals.some((signal) => signal.sourceType === 'voc' || signal.sourceType === 'creator')) return 'Social Listening & VOC Tower';
+  if (item.recommendedDemandAction === 'request_more_data') return 'Forecasting & Optimization Tower';
+  if (item.confidence >= 86) return 'AI Operator Tower';
+  if (item.linkedSignals.some((signal) => signal.sourceType === 'campaign')) return 'Attribution Tower';
+  return 'Analytics Tower';
+};
+
+const sourceOwnerFromPackage = (item: DecisionPackage): SourceOwner => {
+  const blockingGuardrailOwner = item.recommendationEvidence.guardrails.find((guardrail) => guardrail.blocking)?.owner;
+  const evidenceOwner = item.recommendationEvidence.evidenceItems.find((evidence) => evidence.owner !== 'Intelligence')?.owner;
+  return blockingGuardrailOwner ?? evidenceOwner ?? item.linkedSignals.find((signal) => signal.sourceOfTruthOwner !== 'Intelligence')?.sourceOfTruthOwner ?? 'Intelligence';
+};
+
+const qualityFromPackage = (item: DecisionPackage): EvidenceQuality => {
+  const qualities = item.recommendationEvidence.evidenceItems.map((evidence) => evidence.quality);
+  if (qualities.includes('missing')) return 'missing';
+  if (qualities.includes('stale')) return 'stale';
+  if (qualities.includes('conflicting')) return 'conflicting';
+  if (qualities.includes('derived')) return 'derived';
+  return 'verified';
+};
+
+const boardEntityTypeFromSignal = (type: SignalCard['linkedEntityType']): LinkedEntityType => {
+  if (type === 'creator' || type === 'segment') return 'signal';
+  return type;
+};
+
+const linkedEntitiesFromPackage = (item: DecisionPackage): IntelligenceBoardLinkedEntity[] => {
+  const entities = item.recommendationEvidence.evidenceItems.map((evidence) => ({
+    type: evidence.entityType,
+    id: evidence.entityId,
+    owner: evidence.owner,
+    route: evidence.sourceRoute,
+  }));
+
+  item.linkedSignals.forEach((signal) => {
+    entities.push({ type: boardEntityTypeFromSignal(signal.linkedEntityType), id: signal.linkedEntityId, owner: signal.sourceOfTruthOwner });
+  });
+
+  return entities.filter((entity, index, list) => list.findIndex((candidate) => candidate.type === entity.type && candidate.id === entity.id && candidate.owner === entity.owner) === index);
+};
+
+export function buildIntelligenceBoard(workspace: IntelligenceWorkspaceSnapshot): IntelligenceBoardSnapshot {
+  const cards = workspace.packages.map((item, index): IntelligenceBoardCard => {
+    const sourceOfTruthOwner = sourceOwnerFromPackage(item);
+    const freshnessAt = item.recommendationEvidence.evidenceItems[0]?.freshnessAt ?? item.evidenceReport.generatedAt;
+
+    return {
+      id: `board-card-${item.id}`,
+      boardId: 'intelligence-area-board',
+      packageId: item.id,
+      laneId: laneFromPackageStatus(item.status),
+      rank: index,
+      title: item.title,
+      tower: towerFromPackage(item),
+      floor: item.status === 'blocked' ? 'Guardrail proof' : item.status === 'ready_for_demand' ? 'Convert to decision' : 'Evidence stack',
+      displayStatus: item.status,
+      owner: item.owner,
+      nextOwner: item.nextOwner,
+      nextAction: item.handoffPayload.objective,
+      exceptionLevel: item.riskLevel,
+      businessImpact: item.expectedImpact,
+      sourceOfTruthOwner,
+      readModelOwner: 'Intelligence',
+      linkedEntities: linkedEntitiesFromPackage(item),
+      evidenceIds: item.recommendationEvidence.evidenceItems.map((evidence) => evidence.id),
+      guardrails: item.recommendationEvidence.guardrails,
+      confidence: item.confidence,
+      quality: qualityFromPackage(item),
+      freshnessAt,
+      lastSourceRevision: `${sourceOfTruthOwner}:${item.recommendationEvidence.evidenceItems.map((evidence) => evidence.entityId).join('|')}`,
+      boardRevision: 1,
+    };
+  });
+
+  return {
+    id: 'intelligence-area-board',
+    area: 'Intelligence Area',
+    readModelOwner: 'Intelligence',
+    lanes: INTELLIGENCE_BOARD_LANES,
+    cards,
+    auditEvents: [],
+    boardRevision: 1,
+  };
+}
+
+export function moveIntelligenceBoardCard(
+  board: IntelligenceBoardSnapshot,
+  move: Omit<IntelligenceBoardMove, 'fromLaneId' | 'fromRank' | 'boardId' | 'expectedBoardRevision'>,
+): IntelligenceBoardSnapshot {
+  const card = board.cards.find((item) => item.id === move.cardId);
+  if (!card) return board;
+
+  const boardRevisionAfter = board.boardRevision + 1;
+  const movedCard: IntelligenceBoardCard = { ...card, laneId: move.toLaneId, rank: move.toRank, boardRevision: boardRevisionAfter };
+  const cards = board.cards
+    .filter((item) => item.id !== move.cardId)
+    .concat(movedCard)
+    .sort((left, right) => left.laneId.localeCompare(right.laneId) || left.rank - right.rank);
+  const auditEvent: IntelligenceBoardAuditEvent = {
+    ...move,
+    eventType: 'IntelligenceBoardCardMoved',
+    boardId: board.id,
+    fromLaneId: card.laneId,
+    fromRank: card.rank,
+    expectedBoardRevision: board.boardRevision,
+    linkedEvidenceIds: card.evidenceIds,
+    linkedSourceEntities: card.linkedEntities,
+    sourceOwnerSnapshot: Array.from(new Set(card.linkedEntities.map((entity) => entity.owner).concat(card.sourceOfTruthOwner))),
+    boardRevisionBefore: board.boardRevision,
+    boardRevisionAfter,
+  };
+
+  return { ...board, cards, auditEvents: board.auditEvents.concat(auditEvent), boardRevision: boardRevisionAfter };
+}
 
 function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: PrimeRecommendation, index: number): DecisionPackage {
   const campaign = snapshot.campaigns[index % Math.max(snapshot.campaigns.length, 1)];
