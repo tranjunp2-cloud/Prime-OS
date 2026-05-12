@@ -158,14 +158,14 @@ export default function Inventory() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8">
+    <div className="flex flex-col gap-5 p-4 sm:gap-6 md:p-6 lg:p-8">
       <PageHeader
         title={t('inventory.pageTitle')}
         description={t('inventory.pageDesc')}
         actions={
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-              <SelectTrigger className="w-[200px] text-sm h-9 rounded-lg border-input bg-background">
+              <SelectTrigger className="h-9 w-full rounded-lg border-input bg-background text-sm sm:w-[200px]">
                 <SelectValue placeholder={t('inventory.allWarehouses')} />
               </SelectTrigger>
               <SelectContent>
@@ -177,7 +177,7 @@ export default function Inventory() {
             </Select>
             <Link
               to="/warehouses"
-              className="text-xs text-primary hover:underline self-center"
+              className="self-start text-xs text-primary hover:underline sm:self-center"
             >
               {t('inventory.manageWarehouses')} →
             </Link>
@@ -245,20 +245,22 @@ export default function Inventory() {
           <h2 className="text-base font-semibold">{t('inventory.inventoryHealth')}</h2>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ATSBucketChart warehouseId={activeWarehouseFilter || undefined} topN={12} />
-        </div>
-        <ATSHealthDonut warehouseId={activeWarehouseFilter || undefined} />
+          <div className="min-w-0 lg:col-span-2">
+            <ATSBucketChart warehouseId={activeWarehouseFilter || undefined} topN={8} />
+          </div>
+          <div className="min-w-0">
+            <ATSHealthDonut warehouseId={activeWarehouseFilter || undefined} />
+          </div>
         </div>
       </div>
 
       {/* FBA Inventory Tab */}
       {activeTab === 'fba' && (
         <div className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <Package className="size-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">{t('inventory.fbaSyncSurface')}</h2>
-        </div>
+          <div className="flex items-center gap-2 px-1">
+            <Package className="size-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">{t('inventory.fbaSyncSurface')}</h2>
+          </div>
           <FbaInventorySync
             records={mockFbaRecords}
             onSync={handleFbaSync}
@@ -272,10 +274,10 @@ export default function Inventory() {
       {/* Reservations Tab */}
       {activeTab === 'reservations' && (
         <div className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <ClipboardList className="size-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">{t('inventory.reservationLedgerTitle')}</h2>
-        </div>
+          <div className="flex items-center gap-2 px-1">
+            <ClipboardList className="size-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">{t('inventory.reservationLedgerTitle')}</h2>
+          </div>
           <ReservationLedger />
         </div>
       )}
@@ -283,16 +285,73 @@ export default function Inventory() {
       {/* Local Inventory Table */}
       {activeTab === 'local' && (
         <div className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <Boxes className="size-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">{t('inventory.atsBySku')}</h2>
-        </div>
+          <div className="flex items-center gap-2 px-1">
+            <Boxes className="size-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">{t('inventory.atsBySku')}</h2>
+          </div>
+          <div className="grid gap-3 md:hidden" data-testid="inventory-mobile-sku-cards">
+            {skuRows.length === 0 && !isInitialLoading ? (
+              <EmptyState
+                title={search || warehouseFilter ? t('inventory.emptyFilteredTitle') : t('inventory.emptyEmptyTitle')}
+                description={search || activeWarehouseFilter
+                  ? t('inventory.emptyFilteredDesc')
+                  : t('inventory.emptyEmptyDesc')}
+                icon={<Boxes className="size-5" />}
+                variant={search || activeWarehouseFilter ? 'filtered' : 'empty'}
+                action={search || activeWarehouseFilter ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSearch('');
+                      setWarehouseFilter('');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" asChild>
+                    <Link to="/warehouses">{t('inventory.manageWarehouses')}</Link>
+                  </Button>
+                )}
+                className="min-h-[260px]"
+              />
+            ) : null}
+            {skuRows.map((stats) => (
+              <div key={stats.skuId} className="rounded-2xl border bg-card p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{stats.name}</div>
+                    <SkuBadge sku={stats.skuCode} size="compact" className="mt-2" />
+                  </div>
+                  <InventoryStatusBadge status={stats.health} className="shrink-0 capitalize" />
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl border bg-muted/20 p-2">
+                    <div className="text-[11px] text-muted-foreground">On hand</div>
+                    <div className="mt-1 font-mono text-sm font-semibold">{formatLocalizedNumber(locale, stats.onHand)}</div>
+                  </div>
+                  <div className="rounded-xl border bg-muted/20 p-2">
+                    <div className="text-[11px] text-muted-foreground">Reserved</div>
+                    <div className="mt-1 font-mono text-sm font-semibold">{stats.reserved > 0 ? formatLocalizedNumber(locale, stats.reserved) : '—'}</div>
+                  </div>
+                  <div className="rounded-xl border bg-muted/20 p-2">
+                    <div className="text-[11px] text-muted-foreground">ATS</div>
+                    <div className={`mt-1 font-mono text-sm font-semibold ${stats.ats === 0 ? 'text-rose-700 dark:text-rose-300' : stats.ats < 10 ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'}`}>
+                      {formatLocalizedNumber(locale, stats.ats)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
           <DataTable
             columns={localInventoryColumns}
             data={skuRows}
             keyExtractor={(stats) => stats.skuId}
             isLoading={isInitialLoading}
             wrapperClassName="[&_table]:min-w-[760px]"
+            className="hidden md:block"
             emptyState={!isInitialLoading ? (
               <EmptyState
                 title={search || warehouseFilter ? t('inventory.emptyFilteredTitle') : t('inventory.emptyEmptyTitle')}

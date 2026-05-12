@@ -54,9 +54,9 @@ export function ReservationLedger({ compact = false }: ReservationLedgerProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ReservationStatus | 'all')}>
-          <SelectTrigger className="w-[160px] text-sm h-9">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-[160px]">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -72,7 +72,7 @@ export function ReservationLedger({ compact = false }: ReservationLedgerProps) {
           placeholder="Search SKU, order, warehouse..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="max-w-xs text-sm h-9"
+          className="h-9 w-full text-sm sm:max-w-xs"
         />
       </div>
 
@@ -95,7 +95,8 @@ export function ReservationLedger({ compact = false }: ReservationLedgerProps) {
         </div>
       ) : (
         <div className="border rounded-lg overflow-hidden">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>SKU</TableHead>
@@ -188,6 +189,7 @@ export function ReservationLedger({ compact = false }: ReservationLedgerProps) {
               })}
             </TableBody>
           </Table>
+          </div>
         </div>
       )}
     </div>

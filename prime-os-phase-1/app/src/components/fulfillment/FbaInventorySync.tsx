@@ -109,15 +109,15 @@ export function FbaInventorySync({
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Boxes className="size-5 text-orange-600" />
           <h3 className="font-medium">FBA Inventory Sync</h3>
           <SyncStatusBadge
             status={!isConnected ? 'never' : errorMessage ? 'error' : lastSyncAt ? 'synced' : 'never'}
           />
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
           {lastSyncAt && (
             <span className="text-xs text-muted-foreground">
               Last sync: {new Date(lastSyncAt).toLocaleString('en-GB', {
@@ -160,7 +160,7 @@ export function FbaInventorySync({
 
       {/* Summary Cards */}
       {isConnected && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">PrimeOS Local ATS</p>
@@ -189,7 +189,8 @@ export function FbaInventorySync({
             <CardTitle className="text-sm font-medium">SKU Breakdown</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
+            <div className="overflow-x-auto">
+            <Table className="min-w-[780px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>SKU</TableHead>
@@ -251,6 +252,7 @@ export function FbaInventorySync({
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

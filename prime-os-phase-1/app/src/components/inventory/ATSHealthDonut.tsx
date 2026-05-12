@@ -65,15 +65,16 @@ export function ATSHealthDonut({ warehouseId }: ATSHealthDonutProps) {
             No inventory data available.
           </div>
         ) : (
-          <div className="flex items-center gap-4">
-            <ResponsiveContainer width="50%" height={200}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="h-44 w-full sm:h-52 sm:w-1/2">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
+                  innerRadius="45%"
+                  outerRadius="70%"
                   paddingAngle={3}
                   dataKey="value"
                 >
@@ -91,9 +92,10 @@ export function ATSHealthDonut({ warehouseId }: ATSHealthDonutProps) {
                 />
               </PieChart>
             </ResponsiveContainer>
+            </div>
 
             {/* Legend + summary */}
-            <div className="flex flex-col gap-3 flex-1">
+            <div className="flex flex-1 flex-col gap-3">
               {([
                 ['healthy', 'Healthy', healthCounts.healthy],
                 ['low', 'Low Stock', healthCounts.low],

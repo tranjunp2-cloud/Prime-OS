@@ -82,7 +82,9 @@ export function ATSBucketChart({ warehouseId, topN = 15 }: ATSBucketChartProps) 
         <CardTitle className="text-sm">ATS Breakdown by SKU (Top {chartData.length})</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        <div className="overflow-x-auto pb-2">
+        <div className="h-[300px] min-w-[620px] sm:min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
@@ -111,6 +113,8 @@ export function ATSBucketChart({ warehouseId, topN = 15 }: ATSBucketChartProps) 
             <Bar dataKey="Unfulfillable" fill="#ef4444" radius={[2, 2, 0, 0]} maxBarSize={28} />
           </BarChart>
         </ResponsiveContainer>
+        </div>
+        </div>
       </CardContent>
     </Card>
   );
