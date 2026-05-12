@@ -230,7 +230,7 @@ export const primeNavigation: PrimeNavNode[] = [
   },
   {
     id: 'platform-admin',
-    label: 'Platform Admin',
+    label: 'Admin Setup',
     kind: 'area',
     href: '/account',
     icon: Settings2,

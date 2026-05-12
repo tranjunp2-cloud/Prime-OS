@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getPrimeNavPath,
@@ -359,7 +359,26 @@ export function AppSidebar() {
   const routeKey = `${location.pathname}${location.search}${location.pathname === '/account' ? location.hash : ''}`;
   const activePath = getPrimeNavPath(routeKey);
   const activeIds = new Set(activePath.map((node) => node.id));
-  const [overviewNode, ...areaNodes] = primeNavigation;
+  const [overviewNode] = primeNavigation;
+  const adminSetupNode = primeNavigation.find((node) => node.id === 'platform-admin');
+  const routeContextNode = activePath[0]?.id && !['overview', 'platform-admin'].includes(activePath[0].id)
+    ? activePath[0]
+    : null;
+  const sidebarActiveIds = new Set(activeIds);
+
+  if (activeIds.has('platform-admin')) {
+    sidebarActiveIds.add('settings');
+  }
+
+  const settingsNode: PrimeNavNode | null = adminSetupNode
+    ? {
+        id: 'settings',
+        label: 'Settings',
+        kind: 'area',
+        icon: Settings2,
+        children: [adminSetupNode],
+      }
+    : null;
   const shellCopy = getShellDictionary(locale);
 
   return (
@@ -379,12 +398,11 @@ export function AppSidebar() {
       <nav className="scrollbar-visible flex-1 overflow-y-auto py-3" aria-label={shellCopy.primaryNavigation}>
         <div className="space-y-5 px-2.5 md:px-3">
           <div>
-            <SidebarLink node={overviewNode} activeIds={activeIds} locale={locale} isLeaf />
+            <SidebarLink node={overviewNode} activeIds={sidebarActiveIds} locale={locale} isLeaf />
           </div>
 
-          {areaNodes.map((node) => (
-            <AreaSection key={node.id} node={node} activeIds={activeIds} locale={locale} shellCopy={shellCopy} />
-          ))}
+          {routeContextNode ? <AreaSection node={routeContextNode} activeIds={sidebarActiveIds} locale={locale} shellCopy={shellCopy} /> : null}
+          {settingsNode ? <AreaSection node={settingsNode} activeIds={sidebarActiveIds} locale={locale} shellCopy={shellCopy} /> : null}
         </div>
       </nav>
 

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronDown,
   ClipboardList,
+  Grid3X3,
   Hash,
   LogOut,
   Megaphone,
@@ -36,9 +37,10 @@ import { useI18n } from '@/lib/i18n/I18nContext';
 import { getShellDictionary, getShellNavLabel } from '@/lib/i18n/shell-dictionaries';
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
 import { getPrimeNavPath } from '@/lib/prime/prime-navigation';
+import { flattenPrimeProductSettingsItems, primeProductSettingsGroups, type PrimeProductSettingsGroup, type PrimeProductSettingsItem } from '@/lib/prime/prime-product-settings-nav';
 import { cn } from '@/lib/utils';
 
-type SearchKind = 'Product' | 'SKU' | 'Order' | 'Lead' | 'Customer' | 'RFQ' | 'Campaign' | 'Alert';
+type SearchKind = 'Area' | 'Tower' | 'Floor' | 'Product' | 'SKU' | 'Order' | 'Lead' | 'Customer' | 'RFQ' | 'Campaign' | 'Alert';
 
 interface GlobalSearchResult {
   id: string;
@@ -50,7 +52,146 @@ interface GlobalSearchResult {
   priority: number;
 }
 
+function ProductSettingsFlyout({
+  groups,
+  activeGroupId,
+  onActiveGroupChange,
+  onNavigate,
+}: {
+  groups: PrimeProductSettingsGroup[];
+  activeGroupId: string;
+  onActiveGroupChange: (groupId: string) => void;
+  onNavigate: (item: PrimeProductSettingsItem) => void;
+}) {
+  const activeGroup = groups.find((group) => group.id === activeGroupId) || groups[0];
+  const [activeProductId, setActiveProductId] = useState(activeGroup?.items[0]?.id || '');
+  const activeProduct = activeGroup?.items.find((item) => item.id === activeProductId) || activeGroup?.items[0];
+  const productFunctions = activeProduct?.children || [];
+
+  useEffect(() => {
+    setActiveProductId(activeGroup?.items[0]?.id || '');
+  }, [activeGroup?.id, activeGroup?.items]);
+
+  return (
+    <div
+      className="panel-shadow absolute left-0 top-[calc(100%+0.5rem)] z-[120] grid h-[min(480px,calc(100svh_-_var(--header-height)_-_1rem))] w-[min(980px,calc(100vw_-_var(--sidebar-width-expanded)_-_2rem))] grid-cols-[220px_minmax(220px,250px)_minmax(0,1fr)] overflow-hidden rounded-2xl border border-border/80 bg-card text-sm"
+    >
+      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r border-border/70 bg-muted/20 p-3">
+        <div className="px-2 pb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Suites</div>
+        <div className="grid gap-2">
+          {groups.map((group) => {
+            const Icon = group.icon;
+            const active = group.id === activeGroup?.id;
+
+            return (
+              <button
+                key={group.id}
+                type="button"
+                className={cn(
+                  'group flex w-full min-w-0 items-center gap-3 rounded-xl px-2.5 py-2.5 text-left font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
+                  active ? 'bg-primary/10 text-primary ring-1 ring-primary/25 shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+                onMouseEnter={() => onActiveGroupChange(group.id)}
+                onFocus={() => onActiveGroupChange(group.id)}
+                onClick={() => onActiveGroupChange(group.id)}
+              >
+                <span className={cn('grid size-8 shrink-0 place-items-center rounded-xl border transition-colors', active ? 'border-primary/25 bg-primary/10' : 'border-border bg-background/70 group-hover:border-primary/25')}>
+                  {Icon ? <Icon className="size-4" /> : null}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                <span className="font-identifier shrink-0 rounded-full border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">{group.badgeCount}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r border-border/70 p-3">
+        <div className="px-2 pb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Products</div>
+        <div className="grid gap-2">
+          {activeGroup?.items.map((item) => {
+            const Icon = item.icon;
+            const active = item.id === activeProduct?.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={cn(
+                  'group flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
+                  active ? 'border-primary/30 bg-primary/10 text-primary shadow-sm' : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/70 hover:text-foreground'
+                )}
+                onMouseEnter={() => setActiveProductId(item.id)}
+                onFocus={() => setActiveProductId(item.id)}
+                onClick={() => onNavigate(item)}
+              >
+                <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl border transition-colors', active ? 'border-primary/25 bg-background text-primary' : 'border-border bg-background/70 group-hover:border-primary/25')}>
+                  {Icon ? <Icon className="size-5" /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{item.label}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{item.children.length ? `${item.children.length} functions` : 'Open product'}</span>
+                </span>
+                <ChevronRight className={cn('size-3.5 shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="relative min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
+        <div className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Product functions</div>
+            <h3 className="mt-1 font-display text-xl font-semibold text-foreground">{activeProduct?.label || 'Select product'}</h3>
+            <p className="mt-1 max-w-md text-xs text-muted-foreground">Hover a product to preview its functions. Click any product or function to open the mapped Prime OS route.</p>
+          </div>
+          {activeProduct ? (
+            <button
+              type="button"
+              className="max-w-full shrink-0 whitespace-normal rounded-full border border-border bg-background/80 px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:whitespace-nowrap"
+              onClick={() => onNavigate(activeProduct)}
+            >
+              Open product
+            </button>
+          ) : null}
+        </div>
+
+        {productFunctions.length ? (
+          <div className="relative grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-2.5">
+              {productFunctions.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="group min-h-24 rounded-xl border border-border/80 bg-background/70 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    onClick={() => onNavigate(item)}
+                  >
+                    <span className="mb-2.5 grid size-9 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-transform group-hover:scale-105">
+                      {Icon ? <Icon className="size-5" /> : null}
+                    </span>
+                    <span className="block line-clamp-2 font-display text-sm font-semibold leading-tight text-foreground">{item.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">Complete product function</span>
+                    <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary">Open <ChevronRight className="size-3" /></span>
+                  </button>
+                );
+              })}
+            </div>
+        ) : (
+          <div className="relative rounded-3xl border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
+            Select a product to see its functions, or open the product directly.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const searchKindIcons: Record<SearchKind, ReactNode> = {
+  Area: <Grid3X3 className="size-4" />,
+  Tower: <Grid3X3 className="size-4" />,
+  Floor: <Grid3X3 className="size-4" />,
   Product: <Package className="size-4" />,
   SKU: <Hash className="size-4" />,
   Order: <ShoppingCart className="size-4" />,
@@ -118,6 +259,30 @@ function scoreSearchResult(result: GlobalSearchResult, query: string) {
 
 function buildGlobalSearchResults(): GlobalSearchResult[] {
   const snapshot = getPrimeSnapshot();
+
+  const productSettingsResults = primeProductSettingsGroups.flatMap((group) => {
+    const groupResult: GlobalSearchResult = {
+      id: `area-${group.id}`,
+      kind: 'Area',
+      title: group.label,
+      detail: `Product Settings · ${group.badgeCount} products/towers`,
+      href: group.href,
+      keywords: buildSearchText([group.id, group.label, 'product settings', 'area overview', 'tower catalog']),
+      priority: 95,
+    };
+
+    const itemResults = flattenPrimeProductSettingsItems([group]).map((item) => ({
+      id: `${item.kind}-${item.id}`,
+      kind: item.kind === 'floor' ? 'Floor' as const : 'Tower' as const,
+      title: item.label,
+      detail: `${group.label} · Product Settings · ${item.kind}`,
+      href: item.href,
+      keywords: buildSearchText([item.id, item.label, item.kind, group.label, item.matchPaths.join(' '), 'product settings']),
+      priority: item.kind === 'floor' ? 78 : 88,
+    }));
+
+    return [groupResult, ...itemResults];
+  });
 
   const productResults = snapshot.products.flatMap((product) => {
     const productResult: GlobalSearchResult = {
@@ -253,6 +418,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
   }));
 
   return [
+    ...productSettingsResults,
     ...productResults,
     ...orderResults,
     ...customerResults,
@@ -269,8 +435,11 @@ export function AppLayout() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [productSettingsOpen, setProductSettingsOpen] = useState(false);
+  const [activeProductSettingsGroupId, setActiveProductSettingsGroupId] = useState(primeProductSettingsGroups[0]?.id || '');
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const searchBoxRef = useRef<HTMLDivElement>(null);
+  const productSettingsRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
   const { locale } = useI18n();
   const navigate = useNavigate();
@@ -372,10 +541,45 @@ export function AppLayout() {
     };
   }, [searchOpen]);
 
+  useEffect(() => {
+    if (!productSettingsOpen) {
+      return;
+    }
+
+    const closeIfOutside = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+
+      if (target && productSettingsRef.current?.contains(target)) {
+        return;
+      }
+
+      setProductSettingsOpen(false);
+    };
+
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setProductSettingsOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeIfOutside);
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeIfOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [productSettingsOpen]);
+
   function openSearchResult(result: GlobalSearchResult) {
     setSearchOpen(false);
     setSearchQuery('');
     navigate(result.href);
+  }
+
+  function openProductSettingsItem(item: PrimeProductSettingsItem) {
+    setProductSettingsOpen(false);
+    navigate(item.href);
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -442,8 +646,32 @@ export function AppLayout() {
       <AppSidebar />
       <div className="flex-1 min-w-0 overflow-hidden">
         <GlobalCopilotWorkspace>
-          <header className="sticky top-0 z-30 grid min-h-[var(--header-height)] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-xl md:grid-cols-[minmax(20rem,42rem)_minmax(1rem,1fr)_auto] md:px-6">
-            <div ref={searchBoxRef} className="relative min-w-0 md:w-full">
+          <header className="sticky top-0 z-[100] flex min-h-[var(--header-height)] items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-xl md:px-6">
+            <div ref={productSettingsRef} className="relative hidden shrink-0 md:block">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2 rounded-xl border-primary/20 bg-card px-3 font-semibold shadow-sm"
+                aria-haspopup="dialog"
+                aria-expanded={productSettingsOpen}
+                onClick={() => setProductSettingsOpen((value) => !value)}
+              >
+                <Grid3X3 className="size-4 text-primary" />
+                Product Settings
+                <ChevronDown className={cn('size-3.5 text-muted-foreground transition-transform', productSettingsOpen && 'rotate-180')} />
+              </Button>
+
+              {productSettingsOpen ? (
+                <ProductSettingsFlyout
+                  groups={primeProductSettingsGroups}
+                  activeGroupId={activeProductSettingsGroupId}
+                  onActiveGroupChange={setActiveProductSettingsGroupId}
+                  onNavigate={openProductSettingsItem}
+                />
+              ) : null}
+            </div>
+
+            <div ref={searchBoxRef} className="relative min-w-[16rem] flex-1 md:max-w-[42rem]">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label={shellCopy.searchAriaLabel}
@@ -543,7 +771,7 @@ export function AppLayout() {
                 </div>
               ) : null}
             </div>
-            <nav className="hidden min-w-0 items-center gap-1 text-xs text-muted-foreground md:flex" aria-label="Breadcrumb">
+            <nav className="hidden min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground md:flex" aria-label="Breadcrumb">
               {breadcrumbItems.length > 0 ? breadcrumbItems.map((item, index) => (
                 <span key={item.id} className="flex min-w-0 items-center gap-1">
                   {index > 0 ? <ChevronRight className="size-3 shrink-0" /> : null}
@@ -553,7 +781,7 @@ export function AppLayout() {
                 </span>
               )) : <span aria-hidden="true" />}
             </nav>
-            <div className="flex min-w-0 items-center justify-end gap-3">
+            <div className="flex min-w-0 shrink-0 items-center justify-end gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

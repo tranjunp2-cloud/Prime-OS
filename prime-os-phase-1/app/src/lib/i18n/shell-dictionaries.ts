@@ -27,6 +27,9 @@ const shellEnUS = {
   commandReviewLaunchLabel: 'Review launch decision queue',
   commandTab: 'tab',
   searchKindLabels: {
+    Area: 'Area',
+    Tower: 'Tower',
+    Floor: 'Floor',
     Product: 'Product',
     SKU: 'SKU',
     Order: 'Order',
@@ -71,7 +74,7 @@ const shellEnUS = {
     'customer-account': 'Account Profile',
     'identity-matching': 'Identity Matching',
     service: 'Service',
-    'platform-admin': 'Platform Admin',
+    'platform-admin': 'Admin Setup',
   },
   navBadges: {
     core: 'core',
@@ -107,6 +110,9 @@ const shellJaJP: ShellDictionary = {
   commandReviewLaunchLabel: 'ローンチ判断キューを確認',
   commandTab: 'tab',
   searchKindLabels: {
+    Area: 'エリア',
+    Tower: 'タワー',
+    Floor: 'フロア',
     Product: '商品',
     SKU: 'SKU',
     Order: '注文',
@@ -151,7 +157,7 @@ const shellJaJP: ShellDictionary = {
     'customer-account': 'アカウントプロフィール',
     'identity-matching': 'ID照合',
     service: 'サービス',
-    'platform-admin': 'プラットフォーム管理',
+    'platform-admin': '管理設定',
   },
   navBadges: {
     core: 'コア',
@@ -185,6 +191,9 @@ const shellViVN: ShellDictionary = {
   commandReviewLaunchLabel: 'Xem hàng chờ quyết định launch',
   commandTab: 'tab',
   searchKindLabels: {
+    Area: 'Khu vực',
+    Tower: 'Tower',
+    Floor: 'Floor',
     Product: 'Sản phẩm',
     SKU: 'SKU',
     Order: 'Đơn hàng',
@@ -229,7 +238,7 @@ const shellViVN: ShellDictionary = {
     'customer-account': 'Hồ sơ tài khoản',
     'identity-matching': 'Ghép định danh',
     service: 'Dịch vụ',
-    'platform-admin': 'Quản trị nền tảng',
+    'platform-admin': 'Thiết lập quản trị',
   },
   navBadges: {
     core: 'lõi',
