@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { PageHeader } from '@/components/system/PageHeader';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
-import { getPrimeSnapshot, getSkuLabel } from '@/lib/prime/prime-data';
+import { getPrimeSnapshot, getProductMasterHref, getSkuLabel } from '@/lib/prime/prime-data';
 
 const currency = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -68,7 +68,11 @@ export function CommerceSurfacePage() {
                     <TableRow key={rfq.id}>
                       <TableCell className="font-medium">{rfq.id}</TableCell>
                       <TableCell>{rfq.requestedBy}</TableCell>
-                      <TableCell>{getSkuLabel(rfq.skuId)}</TableCell>
+                      <TableCell>
+                        <Button asChild variant="link" size="sm" className="h-auto p-0 text-left font-medium">
+                          <Link to={getProductMasterHref(rfq.skuId)}>{getSkuLabel(rfq.skuId)}</Link>
+                        </Button>
+                      </TableCell>
                       <TableCell className="text-right">{rfq.quantity}</TableCell>
                       <TableCell className="text-right">{currency.format(rfq.value)}</TableCell>
                       <TableCell>

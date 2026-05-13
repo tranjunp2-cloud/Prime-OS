@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useGlobalCopilotEngine } from '@/hooks/use-global-copilot-engine';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { GlobalCopilotDrawer } from './GlobalCopilotDrawer';
@@ -21,6 +22,8 @@ function readDesktopPreference() {
 
 export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps) {
   const isDesktopAssistant = useMediaQuery('(min-width: 1280px)');
+  const location = useLocation();
+  const hideFloatingAssistant = location.pathname === '/demand/mdec';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(readDesktopPreference);
   const {
@@ -74,7 +77,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
     return (
       <>
         {children}
-        <GlobalCopilotFAB onClick={() => setMobileOpen((value) => !value)} isOpen={mobileOpen} label={fabLabel} />
+        {hideFloatingAssistant ? null : <GlobalCopilotFAB onClick={() => setMobileOpen((value) => !value)} isOpen={mobileOpen} label={fabLabel} />}
         <GlobalCopilotDrawer
           open={mobileOpen}
           onOpenChange={setMobileOpen}
@@ -96,9 +99,9 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
         {children}
       </div>
 
-      <GlobalCopilotFAB onClick={() => setIsAssistantOpen((value) => !value)} isOpen={isAssistantOpen} label={fabLabel} />
+      {hideFloatingAssistant ? null : <GlobalCopilotFAB onClick={() => setIsAssistantOpen((value) => !value)} isOpen={isAssistantOpen} label={fabLabel} />}
 
-      {isAssistantOpen ? (
+      {isAssistantOpen && !hideFloatingAssistant ? (
         <div className="fixed bottom-24 right-6 z-[65] hidden h-[min(78vh,760px)] w-[440px] overflow-hidden rounded-[32px] border border-border/70 bg-card/95 shadow-2xl xl:block">
           <GlobalCopilotSurface
             context={currentContext}

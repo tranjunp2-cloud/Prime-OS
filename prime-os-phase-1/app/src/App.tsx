@@ -26,6 +26,8 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { LegacyEntityRedirect, LegacyPathRedirect } from "./components/routing/LegacyEntityRedirect";
 import { PrimeOverview } from "./pages/prime/PrimeOverview";
 import { PrimeFinSupportPage } from "./pages/prime/PrimeFinSupportPage";
+import { PrimeMdecPage } from "./pages/prime/PrimeMdecPage";
+import { PrimeConsultingAgentPage } from "./pages/prime/PrimeConsultingAgentPage";
 import { PrimeDemandHubPage, PrimeDemandSourcesPage, PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "./pages/prime/CommerceSurfacePage";
 import { CosPolicyRulePage } from "./pages/prime/CosPolicyRulePage";
@@ -99,6 +101,7 @@ const App = () => {
 
                     <Route path="/demand" element={<PrimeDemandHubPage />} />
                     <Route path="/demand/hub" element={<PrimeDemandHubPage />} />
+                    <Route path="/demand/mdec" element={<PrimeMdecPage />} />
                     <Route path="/demand/sources" element={<PrimeDemandSourcesPage />} />
                     <Route path="/demand/campaigns" element={<PrimeTowerPage towerId="campaign-ops" />} />
                     <Route path="/demand/content-social" element={<PrimeTowerPage towerId="content-creator-ops" />} />
@@ -146,20 +149,21 @@ const App = () => {
                     <Route path="/ecom/cos/policy-rule/routing" element={<RoutingPlans />} />
                     <Route path="/ecom/cos/event-audit" element={<CosEventAuditPage />} />
 
-                    <Route path="/intelligence" element={<PrimeTowerPage towerId="decision-hub" />} />
-                    <Route path="/intelligence/decision-hub" element={<PrimeTowerPage towerId="decision-hub" />} />
-                    <Route path="/intelligence/signals" element={<PrimeTowerPage towerId="signals" />} />
-                    <Route path="/intelligence/analytics" element={<Navigate to="/intelligence/decision-hub?capability=analytics" replace />} />
-                    <Route path="/intelligence/ai-operator" element={<Navigate to="/intelligence/decision-hub?view=operator" replace />} />
-                    <Route path="/intelligence/alerts" element={<Navigate to="/intelligence/decision-hub?view=alerts" replace />} />
-                    <Route path="/intelligence/attribution" element={<Navigate to="/intelligence/signals?capability=attribution" replace />} />
-                    <Route path="/intelligence/forecasting" element={<Navigate to="/intelligence/signals?capability=forecasting" replace />} />
-                    <Route path="/intelligence/voc" element={<Navigate to="/intelligence/signals?capability=voc" replace />} />
-                    <Route path="/intelligence/creators" element={<Navigate to="/intelligence/signals?view=creators" replace />} />
-                    <Route path="/intelligence/trends" element={<Navigate to="/intelligence/signals?view=customer-trends" replace />} />
-                    <Route path="/intelligence/customers" element={<Navigate to="/intelligence/signals?view=customer-trends" replace />} />
-                    <Route path="/intelligence/launch-decisions" element={<PrimeTowerPage towerId="campaigns" />} />
-                    <Route path="/intelligence/campaigns" element={<Navigate to="/intelligence/launch-decisions" replace />} />
+                    <Route path="/intelligence" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
+                    <Route path="/intelligence/consulting-agent" element={<PrimeConsultingAgentPage />} />
+                    <Route path="/intelligence/decision-hub" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
+                    <Route path="/intelligence/signals" element={<Navigate to="/intelligence/consulting-agent?tab=signals" replace />} />
+                    <Route path="/intelligence/analytics" element={<Navigate to="/intelligence/consulting-agent?tab=kpi&capability=analytics" replace />} />
+                    <Route path="/intelligence/ai-operator" element={<Navigate to="/intelligence/consulting-agent?tab=kpi&view=operator" replace />} />
+                    <Route path="/intelligence/alerts" element={<Navigate to="/intelligence/consulting-agent?tab=signals&view=alerts" replace />} />
+                    <Route path="/intelligence/attribution" element={<Navigate to="/intelligence/consulting-agent?tab=signals&capability=attribution" replace />} />
+                    <Route path="/intelligence/forecasting" element={<Navigate to="/intelligence/consulting-agent?tab=signals&capability=forecasting" replace />} />
+                    <Route path="/intelligence/voc" element={<Navigate to="/intelligence/consulting-agent?tab=signals&capability=voc" replace />} />
+                    <Route path="/intelligence/creators" element={<Navigate to="/intelligence/consulting-agent?tab=signals&view=creators" replace />} />
+                    <Route path="/intelligence/trends" element={<Navigate to="/intelligence/consulting-agent?tab=signals&view=customer-trends" replace />} />
+                    <Route path="/intelligence/customers" element={<Navigate to="/intelligence/consulting-agent?tab=signals&view=customer-trends" replace />} />
+                    <Route path="/intelligence/launch-decisions" element={<Navigate to="/intelligence/consulting-agent?tab=launch" replace />} />
+                    <Route path="/intelligence/campaigns" element={<Navigate to="/intelligence/consulting-agent?tab=launch" replace />} />
 
                     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
                     <Route path="/products" element={<Navigate to="/ecom/cos/product-master" replace />} />

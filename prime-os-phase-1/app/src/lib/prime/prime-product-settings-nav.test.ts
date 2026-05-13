@@ -22,6 +22,18 @@ describe('primeProductSettingsGroups', () => {
     expect(ids).toContain('fulfillment');
     expect(ids).toContain('policy-rule');
     expect(ids).toContain('event-audit');
+    expect(ids).toContain('consulting-agent');
+    expect(ids).toContain('consulting-agent-kpi');
+    expect(ids).toContain('consulting-agent-signals');
+    expect(ids).toContain('consulting-agent-launch');
+    expect(ids).not.toContain('decision-hub');
+    expect(ids).not.toContain('signals');
+    expect(ids).toContain('mdec');
+    expect(ids).toContain('mdec-main');
+    expect(ids).toContain('mdec-workflow');
+    expect(ids).toContain('mdec-insight');
+    expect(ids).toContain('mdec-escalations');
+    expect(ids).not.toContain('mdec-settings');
     expect(ids).toContain('campaign-ops');
     expect(ids).toContain('crm-compact');
     expect(ids).toContain('fin-support');

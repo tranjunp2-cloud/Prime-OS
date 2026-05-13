@@ -70,6 +70,7 @@ type FundingStepStatus = 'complete' | 'active' | 'blocked' | 'pending';
 type DocumentStatus = FinanceDocumentStatus;
 type ApplicationStatus = 'Draft' | 'Pre-check Review' | 'Need Additional Documents' | 'Bank Reviewing' | 'Terms Proposed' | 'Rejected';
 type LoanWizardStepId = 'profile' | 'purpose' | 'commerce' | 'documents' | 'routing' | 'review' | 'tracking';
+type FinanceSupportTab = 'overview' | 'evidence' | 'documents' | 'routes' | 'applications' | 'audit';
 
 type EligibilitySignal = {
   label: string;
@@ -154,6 +155,16 @@ type JapanLoanDocument = {
   linkedDocumentId?: string;
   fallbackStatus: DocumentStatus;
 };
+
+
+const financeSupportTabs: Array<{ id: FinanceSupportTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'evidence', label: 'Evidence' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'routes', label: 'Review Routes' },
+  { id: 'applications', label: 'Applications' },
+  { id: 'audit', label: 'Audit' },
+];
 
 const loanWizardSteps: LoanWizardStep[] = [
   { id: 'profile', title: 'Business profile', summary: 'Registered identity, representative, operating base.', icon: Building2 },
@@ -506,7 +517,10 @@ function openPrimeAi(context: Record<string, string>) {
 }
 
 export function PrimeFinSupportPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab') as FinanceSupportTab | null;
+  const activeTab: FinanceSupportTab = financeSupportTabs.some((tab) => tab.id === requestedTab) ? requestedTab! : 'overview';
+  const setActiveTab = (tab: FinanceSupportTab) => setSearchParams({ tab });
   const snapshot = getPrimeSnapshot();
   const partnerWorkspace = getPartnerWorkspaceSummary(searchParams.get('role'));
   const financeQuery = useQuery({
@@ -607,50 +621,93 @@ export function PrimeFinSupportPage() {
     setLoanDraft((current) => ({ ...current, [field]: value }));
   };
 
+  const aiActions: Record<FinanceSupportTab, string[]> = {
+    overview: ['Explain readiness score', 'Explain blocker reasons', 'Recommend next best action', 'Draft bank-ready summary'],
+    evidence: ['Explain evidence gaps', 'Suggest stronger evidence', 'Map evidence to review route'],
+    documents: ['Generate missing document checklist', 'Explain rejected documents', 'Suggest reusable documents'],
+    routes: ['Compare routes', 'Explain route fit', 'Recommend route from current evidence'],
+    applications: ['Summarize pending requirements', 'Draft follow-up message', 'Explain application status'],
+    audit: ['Explain score changes', 'Summarize evidence history'],
+  };
+  const auditEvents = [
+    { timestamp: new Date().toISOString(), eventType: 'Readiness score', source: 'Finance control plane', description: `${readinessGrade(readinessScore)} / ${readinessScore}% calculated from commerce evidence.`, actor: 'Prime OS' },
+    ...financeTrust.evidencePack.items.slice(0, 4).map((item) => ({ timestamp: item.lastUpdated || new Date().toISOString(), eventType: 'Evidence verification', source: item.sourceOfTruthOwner, description: `${item.label}: ${humanize(item.status)} with ${item.records} record(s).`, actor: item.sourceOfTruthOwner })),
+    ...documents.slice(0, 4).map((doc) => ({ timestamp: doc.fileName ? '2026-05-13T09:30:00Z' : '2026-05-12T16:00:00Z', eventType: 'Document change', source: doc.banks[0] || 'Document center', description: `${doc.label}: ${humanize(doc.status)}${doc.issue ? ` — ${doc.issue}` : ''}.`, actor: 'Finance operator' })),
+    { timestamp: '2026-05-13T10:15:00Z', eventType: 'AI summary', source: 'Prime AI', description: 'Drafted bank-ready summary preview from verified operating sources.', actor: 'Prime AI' },
+  ];
+
   return (
     <div className="min-h-full bg-background">
-      <div className="space-y-4 p-4 md:p-6">
-        <FinSupportHero
-          readinessScore={readinessScore}
-          eligibleRange={eligibleRange}
-          lenderCount={lenders.length}
-          blocker={mainBlocker?.topRisk || 'No major blocker'}
-          loading={financeQuery.isFetching && Boolean(financeQuery.data)}
-          degraded={!financeQuery.data}
-          onAskAi={() => askAi('hero')}
-          onOpenLoanWizard={() => setLoanWizardOpen(true)}
-        />
+      <div className="space-y-5 p-4 md:p-6">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            <CircleDollarSign className="size-4 text-primary" /> Finance / Fin Support
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Bank-ready funding cockpit</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Prime OS turns commerce operations into bank-reviewable evidence. From operating data to funding readiness.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => setActiveTab('documents')}>Fix blockers</Button>
+              <Button type="button" variant="secondary" onClick={() => setLoanWizardOpen(true)}>Prepare bank-ready package</Button>
+            </div>
+          </div>
+        </div>
 
         {partnerWorkspace ? <PartnerWorkspacePanel summary={partnerWorkspace} /> : null}
+        <FinanceTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <FinancialTrustProfilePanel profile={financeTrust.profile} />
-          <BankReviewSummaryPreview summary={financeTrust.bankReviewSummary} />
-        </section>
-
-        <CommerceEvidencePackPanel evidencePack={financeTrust.evidencePack} />
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <FundingApplicationFlow steps={fundingSteps} onAskAi={() => askAi('application-flow')} />
-          <PrimeAiFundingSupport prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('funding-assistant')} />
-        </section>
-
-        <EligibilitySignals signals={eligibilitySignals} />
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <RiskBlockers blockers={blockers} />
-          <MatchedLenders lenders={lenders} />
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <DocumentSubmissionCenter
-            documents={documents}
-            verifiedDocs={verifiedDocs}
-            onDrop={handleDrop}
-            onFiles={handleFiles}
+        {activeTab === 'overview' ? (
+          <OverviewCockpit
+            readinessScore={readinessScore}
+            eligibleRange={eligibleRange}
+            mainBlocker={mainBlocker?.topRisk || 'No major blocker'}
+            nextAction={financeTrust.bankReviewSummary.nextAction}
+            signals={eligibilitySignals}
+            summary={financeTrust.bankReviewSummary}
+            evidencePack={financeTrust.evidencePack}
+            blockers={blockers}
+            lenders={lenders}
+            onTabChange={setActiveTab}
+            onAskAi={() => askAi('overview')}
           />
-          <ApplicationStatusTracker applications={applications} />
-        </section>
+        ) : null}
+
+        {activeTab === 'evidence' ? (
+          <TwoColumnTab
+            main={<EvidenceTab evidencePack={financeTrust.evidencePack} signals={eligibilitySignals} onTabChange={setActiveTab} />}
+            side={<PrimeAiPanel title="Evidence AI" actions={aiActions.evidence} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('evidence')} />}
+          />
+        ) : null}
+
+        {activeTab === 'documents' ? (
+          <TwoColumnTab
+            main={<DocumentsTab documents={documents} verifiedDocs={verifiedDocs} missingDocs={missingDocs} lenders={lenders} onDrop={handleDrop} onFiles={handleFiles} />}
+            side={<PrimeAiPanel title="Document AI" actions={aiActions.documents} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('documents')} />}
+          />
+        ) : null}
+
+        {activeTab === 'routes' ? (
+          <TwoColumnTab
+            main={<ReviewRoutesTab lenders={lenders} documents={documents} blockers={blockers} />}
+            side={<PrimeAiPanel title="Route AI" actions={aiActions.routes} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('routes')} />}
+          />
+        ) : null}
+
+        {activeTab === 'applications' ? (
+          <TwoColumnTab
+            main={<ApplicationsTab applications={applications} documents={documents} />}
+            side={<PrimeAiPanel title="Application AI" actions={aiActions.applications} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('applications')} />}
+          />
+        ) : null}
+
+        {activeTab === 'audit' ? (
+          <TwoColumnTab
+            main={<AuditTab auditEvents={auditEvents} readinessScore={readinessScore} />}
+            side={<PrimeAiPanel title="Audit AI" actions={aiActions.audit} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('audit')} />}
+          />
+        ) : null}
       </div>
       <LoanProfileWizard
         open={loanWizardOpen}
@@ -671,6 +728,99 @@ export function PrimeFinSupportPage() {
     </div>
   );
 }
+
+
+function FinanceTabs({ activeTab, onChange }: { activeTab: FinanceSupportTab; onChange: (tab: FinanceSupportTab) => void }) {
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card p-1">
+      <div className="flex min-w-max gap-1">
+        {financeSupportTabs.map((tab) => (
+          <button key={tab.id} type="button" onClick={() => onChange(tab.id)} className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', activeTab === tab.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground')}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TwoColumnTab({ main, side }: { main: ReactNode; side: ReactNode }) {
+  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">{main}<aside className="xl:sticky xl:top-4">{side}</aside></div>;
+}
+
+function FundingReadinessHero({ readinessScore, eligibleRange, mainBlocker, nextAction, onAskAi, onTabChange }: { readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; onAskAi: () => void; onTabChange: (tab: FinanceSupportTab) => void }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/20 via-card to-card shadow-sm">
+      <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-6">
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2"><Badge className="rounded-full">Prime OS readiness score</Badge><Badge variant="outline" className="rounded-full">Bank-ready evidence package</Badge></div>
+          <div className="mt-5 flex flex-wrap items-end gap-4"><div className="text-6xl font-semibold tracking-tight">{readinessGrade(readinessScore)}</div><div className="pb-2 text-2xl font-semibold">{readinessScore}%</div></div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <MiniFact label="Indicative range" value={eligibleRange} />
+            <MiniFact label="Blocking issue" value={mainBlocker} />
+          </div>
+          <div className="mt-4 rounded-xl border bg-background/70 p-4"><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next best action</div><p className="mt-1 text-sm leading-6 text-muted-foreground">{nextAction}</p></div>
+          <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => onTabChange('documents')}>Fix blockers</Button><Button type="button" variant="secondary" onClick={() => onTabChange('documents')}>Prepare bank-ready package</Button><Button type="button" variant="outline" onClick={onAskAi}><Bot className="size-4" />Ask Prime AI</Button></div>
+        </div>
+        <div className="rounded-2xl border bg-background/70 p-4">
+          <div className="text-sm font-semibold">First-screen answer</div>
+          <div className="mt-4 space-y-3 text-sm"><DecisionAnswer label="Am I ready?" value={`${readinessGrade(readinessScore)} / ${readinessScore}% — reviewable after blocker cleanup.`} /><DecisionAnswer label="What blocks me?" value={mainBlocker} /><DecisionAnswer label="What next?" value={nextAction} /></div>
+          <Progress value={readinessScore} className="mt-5 h-2" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DecisionAnswer({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border bg-card p-3"><div className="text-xs font-medium text-muted-foreground">{label}</div><div className="mt-1 font-medium">{value}</div></div>; }
+
+function OverviewCockpit({ readinessScore, eligibleRange, mainBlocker, nextAction, signals, summary, evidencePack, blockers, lenders, onTabChange, onAskAi }: { readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; signals: EligibilitySignal[]; summary: BankReviewSummary; evidencePack: CommerceEvidencePack; blockers: RiskBlocker[]; lenders: LenderMatch[]; onTabChange: (tab: FinanceSupportTab) => void; onAskAi: () => void }) {
+  return (
+    <div className="space-y-4">
+      <FundingReadinessHero readinessScore={readinessScore} eligibleRange={eligibleRange} mainBlocker={mainBlocker} nextAction={nextAction} onTabChange={onTabChange} onAskAi={onAskAi} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <ReadinessBreakdownGrid signals={signals} />
+        <BankReviewSummaryPreview summary={summary} />
+      </section>
+      <EvidencePackageSnapshot evidencePack={evidencePack} onOpenEvidence={() => onTabChange('evidence')} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <RiskBlockerPanel blockers={blockers.slice(0, 3)} onTabChange={onTabChange} />
+        <RecommendedRoutesPreview lenders={lenders.slice(0, 4)} onTabChange={onTabChange} />
+      </section>
+    </div>
+  );
+}
+
+function readinessStatus(score: number) { return score >= 85 ? 'Strong' : score >= 72 ? 'Stable' : score >= 55 ? 'Watch' : 'Blocked'; }
+
+function ReadinessBreakdownGrid({ signals }: { signals: EligibilitySignal[] }) {
+  return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Readiness Breakdown</CardTitle><p className="text-sm text-muted-foreground">Compact diagnostics from verified operating sources.</p></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{signals.map((signal) => <ReadinessMetricCard key={signal.label} signal={signal} />)}</CardContent></Card>;
+}
+function ReadinessMetricCard({ signal }: { signal: EligibilitySignal }) { const Icon=signal.icon; const status=readinessStatus(signal.score); return <div className="rounded-xl border bg-background p-3"><div className="flex items-start justify-between gap-2"><div><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{signal.label}</div><div className="mt-1 font-semibold">{signal.value}</div></div><Icon className="size-4 text-primary" /></div><p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{signal.detail}</p><div className="mt-3 flex items-center justify-between gap-2"><Badge variant="outline" className={status === 'Blocked' ? 'border-destructive/30 bg-destructive/10 text-destructive' : status === 'Watch' ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'}>{status}</Badge><span className="text-sm font-semibold">{Math.round(signal.score)}%</span></div></div>; }
+
+function EvidencePackageSnapshot({ evidencePack, onOpenEvidence }: { evidencePack: CommerceEvidencePack; onOpenEvidence: () => void }) { return <Card className="rounded-2xl"><CardHeader className="border-b"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="text-base">Evidence Package Snapshot</CardTitle><p className="mt-1 text-sm text-muted-foreground">Summary only. Full source details live in Evidence.</p></div><Button type="button" variant="outline" size="sm" onClick={onOpenEvidence}>Open Evidence tab</Button></div></CardHeader><CardContent className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-5">{evidencePack.items.slice(0,5).map((item) => <div key={item.id} className="rounded-xl border bg-background p-3"><div className="flex items-center justify-between gap-2"><div className="font-medium line-clamp-1">{item.label}</div><Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge></div><div className="mt-3 text-sm text-muted-foreground">{item.records} records</div><div className="mt-1 text-xs text-muted-foreground">Owner: {item.sourceOfTruthOwner}</div></div>)}</CardContent></Card>; }
+
+function RiskBlockerPanel({ blockers, onTabChange }: { blockers: RiskBlocker[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Risk Blockers</CardTitle><p className="text-sm text-muted-foreground">Most important issues before partner review.</p></CardHeader><CardContent className="space-y-3">{blockers.map((blocker) => <div key={blocker.blocker} className="rounded-xl border bg-background p-3"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={blocker.severity === 'high' ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'bg-muted/30'}>{humanize(blocker.severity)}</Badge><span className="font-semibold">{blocker.blocker}</span></div><p className="mt-2 text-sm text-muted-foreground">Impact: {blocker.impact}</p><p className="mt-1 text-sm text-muted-foreground">Recommendation: {blocker.recommendation}</p><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Owner: Finance / Ops</span><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('documents')}>Resolve</Button></div></div>)}</CardContent></Card>; }
+
+function RecommendedRoutesPreview({ lenders, onTabChange }: { lenders: LenderMatch[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-2xl"><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle className="text-base">Recommended Review Routes</CardTitle><p className="text-sm text-muted-foreground">Preview only. No approval promise.</p></div><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('routes')}>Compare routes</Button></div></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{lenders.map((lender) => <ReviewRouteCard key={lender.id} lender={lender} compact />)}</CardContent></Card>; }
+
+function EvidenceTab({ evidencePack, signals, onTabChange }: { evidencePack: CommerceEvidencePack; signals: EligibilitySignal[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <div className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Evidence mapped to verified operating sources</CardTitle><p className="text-sm text-muted-foreground">Coverage: {evidencePack.summary}</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><MiniFact label="Evidence quality score" value={`${Math.round(signals.reduce((sum, item) => sum + item.score, 0) / Math.max(1, signals.length))}%`} /><MiniFact label="Reusable evidence" value={`${evidencePack.reusableDocumentCount} document(s)`} /><MiniFact label="Open issues" value={`${evidencePack.openIssueCount} issue(s)`} /></CardContent></Card><EvidenceSourceTable evidencePack={evidencePack} onTabChange={onTabChange} /></div>; }
+function EvidenceSourceTable({ evidencePack, onTabChange }: { evidencePack: CommerceEvidencePack; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Evidence source lines</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[860px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Evidence group</th><th className="p-3">Source owner</th><th className="p-3">Records</th><th className="p-3">Status</th><th className="p-3">Readiness dimension</th><th className="p-3">Action</th></tr></thead><tbody className="divide-y">{evidencePack.items.map((item) => <tr key={item.id}><td className="p-3 font-medium">{item.label}<div className="mt-1 text-xs text-muted-foreground">{item.summary}</div></td><td className="p-3">{item.sourceOfTruthOwner}</td><td className="p-3">{item.records}</td><td className="p-3"><Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge></td><td className="p-3">{humanize(item.category)}</td><td className="p-3"><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('audit')}>Open source records</Button></td></tr>)}</tbody></table></CardContent></Card>; }
+
+function DocumentsTab({ documents, verifiedDocs, missingDocs, lenders, onDrop, onFiles }: { documents: FinancingDocument[]; verifiedDocs: number; missingDocs: number; lenders: LenderMatch[]; onDrop: (event: DragEvent<HTMLDivElement>) => void; onFiles: (files: FileList | null) => void }) { return <div className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Document completeness</CardTitle><p className="text-sm text-muted-foreground">{verifiedDocs}/{documents.length} verified or reusable. {missingDocs} missing/rejected blocker(s).</p></CardHeader><CardContent><Progress value={(verifiedDocs / Math.max(1, documents.length)) * 100} className="h-2" /></CardContent></Card><DocumentSubmissionCenter documents={documents} verifiedDocs={verifiedDocs} onDrop={onDrop} onFiles={onFiles} /><DocumentRequirementList documents={documents} lenders={lenders} /></div>; }
+function DocumentRequirementList({ documents, lenders }: { documents: FinancingDocument[]; lenders: LenderMatch[] }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Document mapping to review routes</CardTitle></CardHeader><CardContent className="divide-y p-0">{documents.map((doc) => <div key={doc.id} className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_180px]"><div><div className="flex flex-wrap items-center gap-2"><span className="font-medium">{doc.label}</span><Badge variant="outline" className={statusClass(doc.status)}>{humanize(doc.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">Required by: {(doc.banks.length ? doc.banks : lenders.slice(0, 2).map((lender) => lender.bankName)).join(', ')}</p>{doc.issue ? <p className="mt-1 text-sm text-destructive">Issue: {doc.issue}</p> : null}<p className="mt-1 text-xs text-muted-foreground">Last updated: {doc.fileName ? 'May 13, 2026' : 'Pending upload'}</p></div><Button type="button" variant="outline" size="sm">{doc.status === 'missing' ? 'Upload' : doc.status === 'rejected' ? 'Replace' : doc.status === 'verifying' ? 'Verify' : 'View'}</Button></div>)}</CardContent></Card>; }
+
+function ReviewRoutesTab({ lenders, documents, blockers }: { lenders: LenderMatch[]; documents: FinancingDocument[]; blockers: RiskBlocker[] }) { return <div className="space-y-4"><div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">Preview only. No approval promise. Eligibility and underwriting depend on partner review.</div><div className="grid gap-3 md:grid-cols-2">{lenders.map((lender) => <ReviewRouteCard key={lender.id} lender={lender} blockers={blockers} />)}</div><ReviewRouteComparisonTable lenders={lenders} documents={documents} /></div>; }
+function ReviewRouteCard({ lender, blockers, compact }: { lender: LenderMatch; blockers?: RiskBlocker[]; compact?: boolean }) { return <Card className="rounded-2xl"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{lender.bankName}</CardTitle><p className="text-sm text-muted-foreground">{lender.financingType}</p></div><Badge variant="outline">{Math.round(lender.matchPercent)}%</Badge></div></CardHeader><CardContent className="space-y-3 text-sm"><MiniFact label="Indicative range" value={lender.estimatedRange} /><MiniFact label="Review window" value={lender.reviewWindow} />{!compact ? <><div><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Main requirements</div><ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">{lender.requirements.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="text-muted-foreground">Missing requirements: {blockers?.[0]?.blocker || 'No critical missing requirement'}</div><Button type="button" className="w-full" variant="outline">View route</Button></> : <Button type="button" size="sm" variant="outline">View route</Button>}</CardContent></Card>; }
+function ReviewRouteComparisonTable({ lenders, documents }: { lenders: LenderMatch[]; documents: FinancingDocument[] }) { const missing=documents.filter((doc)=>doc.status==='missing'||doc.status==='rejected').length; return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Route comparison</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[900px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Route</th><th className="p-3">Funding type</th><th className="p-3">Indicative range</th><th className="p-3">Review window</th><th className="p-3">Evidence required</th><th className="p-3">Missing docs</th><th className="p-3">Match</th><th className="p-3">Status</th></tr></thead><tbody className="divide-y">{lenders.map((lender)=><tr key={lender.id}><td className="p-3 font-medium">{lender.bankName}</td><td className="p-3">{lender.financingType}</td><td className="p-3">{lender.estimatedRange}</td><td className="p-3">{lender.reviewWindow}</td><td className="p-3">{lender.requirements.join(', ')}</td><td className="p-3">{missing}</td><td className="p-3">{Math.round(lender.matchPercent)}%</td><td className="p-3"><Badge variant="outline">Preview</Badge></td></tr>)}</tbody></table></CardContent></Card>; }
+
+function ApplicationsTab({ applications, documents }: { applications: ApplicationItem[]; documents: FinancingDocument[] }) { return <div className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Funding application tracker</CardTitle><p className="text-sm text-muted-foreground">Drafts, partner milestones, pending requirements, and internal notes.</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><MiniFact label="Applications" value={String(applications.length)} /><MiniFact label="Pending requirements" value={String(documents.filter((doc)=>doc.status==='missing'||doc.status==='rejected').length)} /><MiniFact label="Next action" value={applications[0]?.nextAction || 'No active application'} /></CardContent></Card><ApplicationStatusTracker applications={applications} /><ApplicationTimeline applications={applications} /></div>; }
+function ApplicationTimeline({ applications }: { applications: ApplicationItem[] }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Partner milestones</CardTitle></CardHeader><CardContent className="space-y-3">{applications.map((app, index)=><div key={app.lender} className="flex gap-3 rounded-xl border bg-background p-3"><div className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted/30 text-sm font-semibold">{index+1}</div><div><div className="font-medium">{app.lender} — {app.status}</div><p className="mt-1 text-sm text-muted-foreground">{app.timeline}. Next: {app.nextAction}. Owner: Finance lead.</p></div></div>)}</CardContent></Card>; }
+
+function AuditTab({ auditEvents, readinessScore }: { auditEvents: Array<{ timestamp: string; eventType: string; source: string; description: string; actor: string }>; readinessScore: number }) { return <div className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Traceability and confidence history</CardTitle><p className="text-sm text-muted-foreground">Current readiness score: {readinessScore}%. Audit supports enterprise trust, not lender approval.</p></CardHeader></Card><AuditTrailTable auditEvents={auditEvents} /></div>; }
+function AuditTrailTable({ auditEvents }: { auditEvents: Array<{ timestamp: string; eventType: string; source: string; description: string; actor: string }> }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Audit trail</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[820px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Timestamp</th><th className="p-3">Event</th><th className="p-3">Source</th><th className="p-3">Description</th><th className="p-3">Actor</th></tr></thead><tbody className="divide-y">{auditEvents.map((event, index)=><tr key={`${event.eventType}-${index}`}><td className="p-3">{formatShortDate(event.timestamp)}</td><td className="p-3 font-medium">{event.eventType}</td><td className="p-3">{event.source}</td><td className="p-3 text-muted-foreground">{event.description}</td><td className="p-3">{event.actor}</td></tr>)}</tbody></table></CardContent></Card>; }
+
+function PrimeAiPanel({ title, actions, prompt, onPromptChange, onAskAi }: { title: string; actions: string[]; prompt: string; onPromptChange: (value: string) => void; onAskAi: () => void }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bot className="size-4" />{title}</CardTitle><p className="text-sm text-muted-foreground">Contextual assistant. It explains evidence and drafts summaries; it does not make credit decisions.</p></CardHeader><CardContent className="space-y-3"><div className="space-y-2">{actions.map((action)=><button key={action} type="button" onClick={() => onPromptChange(action)} className="flex w-full items-center gap-2 rounded-lg border bg-background p-2 text-left text-sm hover:bg-muted/40"><Sparkles className="size-4 text-primary" />{action}</button>)}</div><Textarea value={prompt} onChange={(event)=>onPromptChange(event.target.value)} className="min-h-[96px]" /><Button type="button" className="w-full justify-between" onClick={onAskAi}>Ask Prime AI<Send className="size-4" /></Button></CardContent></Card>; }
 
 function FinSupportHero({
   readinessScore,
@@ -1412,7 +1562,7 @@ function WizardField({
 }) {
   return (
     <label className={cn('block space-y-1.5', className)}>
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <Input value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
@@ -1421,7 +1571,7 @@ function WizardField({
 function WizardCallout({ label, detail }: { label: string; detail: string }) {
   return (
     <div className="rounded-lg border bg-muted/20 p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
     </div>
   );
@@ -1831,7 +1981,7 @@ function TrackerLine({ icon, label, value }: { icon: ReactNode; label: string; v
     <div className="flex items-start gap-2 rounded-lg bg-muted/20 p-2">
       <span className="mt-0.5 text-muted-foreground">{icon}</span>
       <div>
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-xs font-medium text-muted-foreground">{label}</div>
         <div className="mt-0.5">{value}</div>
       </div>
     </div>

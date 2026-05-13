@@ -91,6 +91,7 @@ import { CustomerProfileFloor } from '@/components/prime/customer-profile/Custom
 import {
   PRIME_TOWER_CONFIGS,
   getPrimeSnapshot,
+  getProductMasterHref,
   getSkuCodeValue,
   getSkuLabel,
   getSkuProductName,
@@ -4696,6 +4697,29 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     nextLabel: 'Open Campaigns',
   };
 
+  const phaseContractCards = {
+    'campaign-ops': [
+      { label: 'Readiness', value: `${routeCampaign?.status || 'pending'} · ${roas}`, detail: 'Objective, audience, offer, channel, owner, and budget are reviewed before launch.' },
+      { label: 'Content readiness', value: queryView === 'creator-proof' ? 'Creator proof attached' : 'CTA + proof check', detail: 'Campaigns must reuse approved content/social proof instead of inventing new source truth.' },
+      { label: 'COS guardrail', value: stockGuardrail, detail: 'Demand can preview stock risk, but COS/Ecom owns order, quote, inventory, and ATS truth.' },
+    ],
+    'content-creator-ops': [
+      { label: 'Creator proof lane', value: `${snapshot.socialStreams.length} streams`, detail: 'Creator proof is one reusable lane inside Content & Social, not a separate creator CRM.' },
+      { label: 'Asset binding', value: 'Asset · CTA · landing', detail: 'Each proof asset needs destination and capture intent before campaigns reuse it.' },
+      { label: 'Forward path', value: 'Campaign + Lead/RFQ', detail: 'Content links back to Campaign readiness and forward to response capture.' },
+    ],
+    'lead-response-capture': [
+      { label: 'Queue routing', value: `${openRfqs.length} open RFQs`, detail: 'Demand owns intake, priority, owner, SLA, and handoff status.' },
+      { label: 'CRM handoff', value: topLead?.company || 'Buyer context', detail: 'Customer/CRM owns customer master; Demand only sends source and response context.' },
+      { label: 'COS preview', value: topRfq ? `${topRfq.quantity} units` : 'RFQ pending', detail: 'COS/Ecom owns quote/order truth; Demand previews RFQ/order linkage only.' },
+    ],
+    'retargeting-outreach': [
+      { label: 'Program trigger', value: topPlay?.trigger || 'Warm intent', detail: 'Re-engage starts from prior intent, not cold blast automation.' },
+      { label: 'Controls', value: 'Suppression + cooldown', detail: 'Converted buyers, open service cases, live RFQs, and fatigue controls stay visible.' },
+      { label: 'Result readback', value: `+${projectedLift}% lift`, detail: 'Outcomes include recovered RFQs, repeat orders, and suppressed-by-control counts.' },
+    ],
+  }[towerId] ?? [];
+
   const demandRouteTabs = [
     { id: 'campaign-ops', label: 'Campaigns', href: DEMAND_CAMPAIGNS_HREF, detail: 'Message, ad, SEO, stock handoff' },
     { id: 'content-creator-ops', label: 'Content & Social', href: DEMAND_CONTENT_SOCIAL_HREF, detail: 'Creator proof, briefs, assets' },
@@ -4794,7 +4818,9 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         </div>
         <div className="min-w-0">
           <Badge variant="secondary" className="rounded-full bg-background/80">Route product</Badge>
-          <div className="mt-1 line-clamp-1 text-xs font-semibold">{launchProductName}</div>
+          <Button asChild variant="link" size="sm" className="mt-1 h-auto max-w-full p-0 text-left text-xs font-semibold">
+            <Link to={getProductMasterHref(routeCampaign?.skuId, routeCampaign?.productId)} className="line-clamp-1">{launchProductName}</Link>
+          </Button>
           <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{launchRoute}</div>
         </div>
       </div>
@@ -5024,11 +5050,26 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     </div>
   );
 
+  const renderPhaseContract = () => phaseContractCards.length ? (
+    <Card className="rounded-lg border" data-testid="demand-phase-contracts">
+      <CardHeader className="pb-3">
+        <CardTitle>Phase contract</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">What this Demand workspace owns, what must stay in downstream source-of-truth systems.</p>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-3">
+        {phaseContractCards.map((card) => (
+          <RuntimeContextCard key={card.label} label={card.label} value={card.value} detail={card.detail} />
+        ))}
+      </CardContent>
+    </Card>
+  ) : null;
+
   return (
     <div className="space-y-4">
       {renderDemandRouteTabs()}
       {renderFocusedContext()}
       {renderHero()}
+      {renderPhaseContract()}
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         {renderRecommendedAction()}
         {renderActionList()}
@@ -8848,7 +8889,9 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
             {snapshot.forecasts.map((forecast) => (
               <div key={forecast.id} className="grid gap-3 rounded-lg border bg-muted/20 p-3 md:grid-cols-[1fr_1fr_2fr] md:items-center">
                 <div>
-                  <p className="font-medium">{getSkuProductName(forecast.skuCode)}</p>
+                  <Button asChild variant="link" size="sm" className="h-auto p-0 text-left font-medium">
+                    <Link to={getProductMasterHref(forecast.skuId)}>{getSkuProductName(forecast.skuCode)}</Link>
+                  </Button>
                   <p className="text-xs text-muted-foreground">{getSkuLabel(forecast.skuId)}</p>
                 </div>
                 <div className="space-y-1">
@@ -9013,7 +9056,11 @@ function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
               {snapshot.campaigns.map((campaign) => (
                 <TableRow key={campaign.id}>
                   <TableCell className="font-medium">{campaign.name}</TableCell>
-                  <TableCell>{getSkuLabel(campaign.skuCode)}</TableCell>
+                  <TableCell>
+                    <Button asChild variant="link" size="sm" className="h-auto p-0 text-left font-medium">
+                      <Link to={getProductMasterHref(campaign.skuId, campaign.productId)}>{getSkuLabel(campaign.skuCode)}</Link>
+                    </Button>
+                  </TableCell>
                   <TableCell className="text-right">{campaign.leads}</TableCell>
                   <TableCell className="text-right">{campaign.rfqs}</TableCell>
                   <TableCell className="text-right">{campaign.orders}</TableCell>
@@ -9229,8 +9276,8 @@ export function PrimeDemandHubPage() {
       title: `Pause scale until ${topForecast.skuCode} stock is safe`,
       detail: `${topForecast.ats} ATS vs ${topForecast.demand7d} projected demand. ${topForecast.suggestedAction}`,
       owner: 'Demand + Ecom',
-      href: '/ecom/cos/inventory-brain',
-      cta: 'Check stock',
+      href: getProductMasterHref(topForecast.skuId),
+      cta: 'Open product',
       evidence: 'COS guardrail',
     } : null,
     primaryCampaign ? {
@@ -9320,7 +9367,7 @@ export function PrimeDemandHubPage() {
     {
       label: 'Stock',
       value: topForecast ? `${topForecast.ats}/${topForecast.demand7d}` : 'Clear',
-      detail: topForecast ? `${topForecast.skuCode} is ${topForecast.risk} risk.` : 'No inventory guardrail detected.',
+      detail: topForecast ? `${getSkuLabel(topForecast.skuId)} is ${topForecast.risk} risk.` : 'No inventory guardrail detected.',
       tone: topForecast?.risk === 'high' ? 'destructive' : topForecast?.risk === 'medium' ? 'secondary' : 'outline',
     },
     {
@@ -9621,6 +9668,17 @@ export function PrimeDemandSourcesPage() {
     { label: 'Lead rate', value: `${leadRate}%`, detail: 'Preview conversion from campaign traffic to leads.', tone: 'success' },
     { label: 'RFQ rate', value: `${rfqRate}%`, detail: 'Commercial readiness from leads into RFQs.', tone: 'purple' },
   ];
+  const weakSources = snapshot.socialStreams.filter((stream) => stream.status !== 'healthy');
+
+  const getSourceAction = (stream: PrimeSocialStream) => {
+    if (stream.status === 'lagging') {
+      return { label: 'Fix', href: '/demand/content-social', detail: 'Refresh creative, CTA, or landing proof before scaling.' };
+    }
+    if (stream.status === 'watch') {
+      return { label: 'Test', href: '/demand/campaigns', detail: 'Run a controlled campaign test before adding budget.' };
+    }
+    return { label: 'Scale', href: '/demand/campaigns', detail: 'Source is healthy enough to scale into campaign planning.' };
+  };
 
   return (
     <div className="min-h-full bg-background">
@@ -9667,6 +9725,36 @@ export function PrimeDemandSourcesPage() {
           <SummaryMetricCard label="RFQ readiness" value={`${rfqRate}%`} meta={`${totalRfqs} RFQs attached.`} icon={<ClipboardList className="size-5" />} tone="warning" />
         </div>
 
+        {weakSources.length ? (
+          <Card className="rounded-lg border border-warning/30 bg-warning/5" data-testid="demand-source-warning-lane">
+            <CardHeader>
+              <CardTitle>Weak-source control lane</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {weakSources.map((stream) => {
+                const action = getSourceAction(stream);
+                return (
+                  <div key={stream.id} className="rounded-lg border bg-background p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-semibold">{stream.source}</div>
+                        <p className="mt-1 text-xs text-muted-foreground">{stream.audienceSignal}</p>
+                      </div>
+                      <Badge variant={stream.status === 'lagging' ? 'warning' : 'secondary'}>{stream.status}</Badge>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">{action.detail}</p>
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={action.href}>{action.label}</Link>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        ) : null}
+
         <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <Card className="rounded-lg border">
             <CardHeader>
@@ -9684,19 +9772,29 @@ export function PrimeDemandSourcesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {snapshot.socialStreams.map((stream) => (
-                    <TableRow key={stream.id}>
-                      <TableCell className="font-medium">{stream.source}</TableCell>
-                      <TableCell>{stream.ingestionMode}</TableCell>
-                      <TableCell className="text-right">{formatCompactCount(stream.eventVolume)}</TableCell>
-                      <TableCell>
-                        <Badge variant={stream.status === 'healthy' ? 'default' : stream.status === 'watch' ? 'secondary' : 'outline'}>
-                          {stream.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[320px] text-muted-foreground">{stream.audienceSignal}</TableCell>
-                    </TableRow>
-                  ))}
+                  {snapshot.socialStreams.map((stream) => {
+                    const action = getSourceAction(stream);
+                    return (
+                      <TableRow key={stream.id}>
+                        <TableCell className="font-medium">{stream.source}</TableCell>
+                        <TableCell>{stream.ingestionMode}</TableCell>
+                        <TableCell className="text-right">{formatCompactCount(stream.eventVolume)}</TableCell>
+                        <TableCell>
+                          <Badge variant={stream.status === 'healthy' ? 'default' : stream.status === 'watch' ? 'secondary' : 'warning'}>
+                            {stream.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[360px]">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button asChild size="sm" variant={stream.status === 'healthy' ? 'default' : 'outline'}>
+                              <Link to={action.href}>{action.label}</Link>
+                            </Button>
+                            <span className="text-xs text-muted-foreground">{stream.audienceSignal}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -9708,7 +9806,7 @@ export function PrimeDemandSourcesPage() {
             </CardHeader>
             <CardContent className="grid gap-3">
               {snapshot.campaigns.slice(0, 4).map((campaign) => (
-                <Link key={campaign.id} to="/demand/campaigns" className="block rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                <Link key={campaign.id} to={`/demand/campaigns?campaign=${encodeURIComponent(campaign.id)}`} className="block rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold">{campaign.name}</div>

@@ -138,13 +138,13 @@ function ProductSettingsFlyout({
         </div>
       </div>
 
-      <div className="relative min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
+      <div className="relative min-h-0 overflow-hidden p-4">
         <div className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="relative mb-3 flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Product functions</div>
-            <h3 className="mt-1 font-display text-xl font-semibold text-foreground">{activeProduct?.label || 'Select product'}</h3>
-            <p className="mt-1 max-w-md text-xs text-muted-foreground">Hover a product to preview its functions. Click any product or function to open the mapped Prime OS route.</p>
+            <h3 className="mt-1 truncate font-display text-lg font-semibold text-foreground">{activeProduct?.label || 'Select product'}</h3>
+            <p className="mt-0.5 max-w-md text-xs leading-5 text-muted-foreground">Hover to preview. Click product or function to open its Prime OS route.</p>
           </div>
           {activeProduct ? (
             <button
@@ -158,22 +158,25 @@ function ProductSettingsFlyout({
         </div>
 
         {productFunctions.length ? (
-          <div className="relative grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-2.5">
+          <div className="relative grid grid-cols-3 gap-2.5">
               {productFunctions.map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    className="group min-h-24 rounded-xl border border-border/80 bg-background/70 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    className="group min-h-[92px] rounded-xl border border-border/80 bg-background/70 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                     onClick={() => onNavigate(item)}
                   >
-                    <span className="mb-2.5 grid size-9 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-transform group-hover:scale-105">
-                      {Icon ? <Icon className="size-5" /> : null}
+                    <span className="mb-2 flex items-start gap-2.5">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary transition-transform group-hover:scale-105">
+                        {Icon ? <Icon className="size-4" /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block line-clamp-2 font-display text-sm font-semibold leading-tight text-foreground">{item.label}</span>
+                      </span>
                     </span>
-                    <span className="block line-clamp-2 font-display text-sm font-semibold leading-tight text-foreground">{item.label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">Complete product function</span>
-                    <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary">Open <ChevronRight className="size-3" /></span>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">Open <ChevronRight className="size-3" /></span>
                   </button>
                 );
               })}

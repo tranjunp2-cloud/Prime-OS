@@ -14,9 +14,21 @@ describe('prime navigation utility routes', () => {
     expect(getPrimeNavPath('/customer/crm-compact?customer=cust_1&floor=tags').map((item) => item.label)).toEqual(['Customer', 'Customer Profile', 'Account Profile']);
   });
 
+  it('resolves Consulting Agent and legacy Intelligence routes', () => {
+    expect(getPrimeNavPath('/intelligence/consulting-agent').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
+    expect(getPrimeNavPath('/intelligence/consulting-agent?tab=kpi').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'KPI Dashboard']);
+    expect(getPrimeNavPath('/intelligence/consulting-agent?tab=signals').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'Signals Board']);
+    expect(getPrimeNavPath('/intelligence/consulting-agent?tab=launch').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'Launch Decisions']);
+    expect(getPrimeNavPath('/intelligence/decision-hub').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
+    expect(getPrimeNavPath('/intelligence/signals').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
+    expect(getPrimeNavPath('/intelligence/launch-decisions').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
+  });
+
   it('resolves Demand V1 hub, sources, and legacy route labels', () => {
     expect(getPrimeNavPath('/demand').map((item) => item.label)).toEqual(['Demand', 'Demand Hub']);
     expect(getPrimeNavPath('/demand/hub').map((item) => item.label)).toEqual(['Demand', 'Demand Hub']);
+    expect(getPrimeNavPath('/demand/mdec').map((item) => item.label)).toEqual(['Demand', 'MDEC']);
+    expect(getPrimeNavPath('/demand/mdec?view=escalations').map((item) => item.label)).toEqual(['Demand', 'MDEC', 'Workflow', 'Escalations']);
     expect(getPrimeNavPath('/demand/sources').map((item) => item.label)).toEqual(['Demand', 'Sources']);
     expect(getPrimeNavPath('/demand/acquisition').map((item) => item.label)).toEqual(['Demand', 'Sources']);
     expect(getPrimeNavPath('/demand/campaign-ops').map((item) => item.label)).toEqual(['Demand', 'Campaigns']);

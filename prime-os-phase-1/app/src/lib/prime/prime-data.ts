@@ -1064,3 +1064,19 @@ export function getSkuLabel(skuCodeOrId: string) {
   const resolved = resolvePrimeSku(skuCodeOrId);
   return resolved ? `${resolved.product.name} · ${resolved.sku.sku_code}` : skuCodeOrId;
 }
+
+export function getProductMasterHref(skuCodeOrId?: string | null, productId?: string | null) {
+  if (skuCodeOrId) {
+    const resolved = resolvePrimeSku(skuCodeOrId);
+    if (resolved) {
+      return `/ecom/cos/product-master/${resolved.product.id}?variant=${encodeURIComponent(resolved.sku.id)}`;
+    }
+  }
+
+  if (productId) {
+    const product = getProducts().find((candidate) => candidate.id === productId);
+    if (product) return `/ecom/cos/product-master/${product.id}`;
+  }
+
+  return '/ecom/cos/product-master';
+}

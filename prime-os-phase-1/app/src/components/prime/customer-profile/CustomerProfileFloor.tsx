@@ -319,6 +319,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
   const [accountDialogMode, setAccountDialogMode] = useState<'create' | 'edit' | null>(null);
   const [accountForm, setAccountForm] = useState<AccountFormState>(() => makeBlankAccountForm(seed.owners[0]?.id ?? ''));
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileAccountId, setProfileAccountId] = useState<string | null>(null);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [contactForm, setContactForm] = useState<ContactFormState>(() => makeBlankContactForm());
@@ -340,6 +341,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
   const filteredAccounts = useMemo(() => filterCustomerAccounts(accounts, tags, filters), [accounts, filters, tags]);
   const selectedAccount = filteredAccounts.find((account) => account.id === selectedAccountId) ?? filteredAccounts[0] ?? null;
   const selectedAccountRecord = accounts.find((account) => account.id === selectedAccountId) ?? accounts[0] ?? null;
+  const profileAccountRecord = accounts.find((account) => account.id === profileAccountId) ?? selectedAccountRecord;
   const selectedRecordContacts = selectedAccountRecord ? contacts.filter((contact) => contact.accountId === selectedAccountRecord.id) : [];
   const selectedRecordMatches = selectedAccountRecord ? getAccountMatches(matches, selectedAccountRecord, contacts) : [];
   const atRiskCount = accounts.filter((account) => account.lifecycle === 'at_risk' || account.status === 'watch').length;
@@ -372,6 +374,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
 
   function openAccountProfile(account: CustomerAccount) {
     setSelectedAccountId(account.id);
+    setProfileAccountId(account.id);
     setProfileDialogOpen(true);
   }
 
@@ -708,23 +711,30 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
 
       <AccountProfileDialog
         open={profileDialogOpen}
-        account={selectedAccountRecord}
-        contacts={selectedRecordContacts}
+        account={profileAccountRecord}
+        contacts={profileAccountRecord ? contacts.filter((contact) => contact.accountId === profileAccountRecord.id) : []}
         owners={seed.owners}
         tags={tags}
         futureModules={seed.futureModules}
-        onOpenChange={setProfileDialogOpen}
+        onOpenChange={(open) => {
+          setProfileDialogOpen(open);
+          if (!open) setProfileAccountId(null);
+        }}
         onEditAccount={() => {
-          if (!selectedAccountRecord) return;
+          if (!profileAccountRecord) return;
           setProfileDialogOpen(false);
-          openEditAccount(selectedAccountRecord);
+          setProfileAccountId(null);
+          openEditAccount(profileAccountRecord);
         }}
         onAddContact={() => {
+          if (profileAccountRecord) setSelectedAccountId(profileAccountRecord.id);
           setProfileDialogOpen(false);
+          setProfileAccountId(null);
           openCreateContact();
         }}
         onEditContact={(contact) => {
           setProfileDialogOpen(false);
+          setProfileAccountId(null);
           openEditContact(contact);
         }}
         onMakePrimaryContact={makePrimaryContact}
@@ -1048,35 +1058,36 @@ function AccountProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-7xl flex-col overflow-hidden p-0" data-testid="account-profile-dialog">
-        <DialogHeader className="border-b bg-background px-5 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 gap-3">
+      <DialogContent className="!top-[calc(50%+2.5rem)] flex h-[min(760px,calc(100dvh-8rem))] w-[calc(100vw-2rem)] max-w-6xl flex-col overflow-hidden rounded-2xl p-0" data-testid="account-profile-dialog">
+        <DialogHeader className="border-b bg-background/95 px-5 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <CustomerAvatar account={account} size="lg" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">Customer Profile Floor</Badge>
                   <Badge variant={accountStatusVariant(account.status)} className="capitalize">{account.status}</Badge>
                   <Badge variant="secondary">{humanize(account.lifecycle)}</Badge>
+                  <Badge variant="outline">{account.identityCompleteness}% identity</Badge>
                 </div>
-                <DialogTitle className="mt-3 text-2xl leading-tight">{account.displayName}</DialogTitle>
+                <DialogTitle className="mt-2 text-2xl leading-tight">{account.displayName}</DialogTitle>
                 <DialogDescription className="mt-1">
                   {account.accountCode} · {account.industry} · {account.country}
                 </DialogDescription>
               </div>
             </div>
-            <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:min-w-[26rem]">
-              <SmallMetric label="Owner" value={ownerName(owners, account.ownerId)} />
-              <SmallMetric label="Revenue read" value={currency.format(account.revenue)} />
-              <SmallMetric label="Open cases" value={String(openServiceCases)} />
-              <SmallMetric label="Priority follow-ups" value={String(highPriorityFollowUps)} />
+            <div className="grid gap-2 text-sm sm:grid-cols-4 lg:min-w-[34rem]">
+              <CompactStatus label="Owner" value={ownerName(owners, account.ownerId)} />
+              <CompactStatus label="Revenue" value={currency.format(account.revenue)} />
+              <CompactStatus label="Open cases" value={String(openServiceCases)} />
+              <CompactStatus label="Priority" value={String(highPriorityFollowUps)} />
             </div>
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
+        <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="border-b px-5">
-            <TabsList className="h-12 w-full justify-start overflow-x-auto rounded-none bg-transparent p-0">
+            <TabsList className="h-12 w-full justify-start overflow-x-auto rounded-none bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {[
                 ['overview', 'Overview'],
                 ['contacts', `Contacts (${contacts.length})`],
@@ -1093,8 +1104,24 @@ function AccountProfileDialog({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <TabsContent value="overview" className="m-0 space-y-4">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="space-y-4">
+                  <section className="rounded-xl border bg-primary/5 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="text-xs font-medium uppercase tracking-[0.18em] text-primary">Next customer move</div>
+                        <h3 className="mt-2 text-lg font-semibold">{account.followUps[0]?.nextAction ?? 'Keep customer memory current'}</h3>
+                        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{account.followUps[0]?.allowedAction ?? 'Review account context, confirm owner, and keep CRM evidence synchronized.'}</p>
+                      </div>
+                      <Button variant="default" onClick={onEditAccount}>Edit account</Button>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <SmallMetric label="Customer type" value={customerTypeLabels[account.customerType]} />
+                      <SmallMetric label="Orders" value={String(account.orderCount)} />
+                      <SmallMetric label="Lifecycle" value={humanize(account.lifecycle)} />
+                    </div>
+                  </section>
+
                   <div className="grid gap-3 sm:grid-cols-2">
                     <IdentityFact icon={<Building2 className="size-4" />} label="Company" value={account.companyName} detail={account.website} />
                     <IdentityFact icon={<UserRoundCheck className="size-4" />} label="Owner" value={ownerName(owners, account.ownerId)} detail="Relationship owner" />
@@ -1102,18 +1129,12 @@ function AccountProfileDialog({
                     <IdentityFact icon={<Mail className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.email ?? 'Add a primary contact'} />
                   </div>
 
-                  <section className="rounded-lg border p-4">
+                  <section className="rounded-xl border p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <h3 className="text-base font-semibold">What matters now</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">High-signal account context without opening the full portrait.</p>
+                        <h3 className="text-base font-semibold">Account memory</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">High-signal context for Demand, Service, Finance, and COS handoffs.</p>
                       </div>
-                      <Button variant="outline" onClick={onEditAccount}>Edit account</Button>
-                    </div>
-                    <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                      <SmallMetric label="Customer type" value={customerTypeLabels[account.customerType]} />
-                      <SmallMetric label="Orders" value={String(account.orderCount)} />
-                      <SmallMetric label="Lifecycle" value={humanize(account.lifecycle)} />
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {account.tags.map((tagId) => {
@@ -1126,8 +1147,7 @@ function AccountProfileDialog({
                 </div>
 
                 <aside className="space-y-3 xl:sticky xl:top-0 xl:self-start">
-                  <FollowUpQueue followUps={account.followUps.slice(0, 3)} owners={owners} />
-                  <CustomerTimelineEventList events={recentTimelineEvents} owners={owners} compact />
+                  <ActionContextRail account={account} owners={owners} recentTimelineEvents={recentTimelineEvents} />
                 </aside>
               </div>
             </TabsContent>
@@ -1185,6 +1205,50 @@ function AccountProfileDialog({
     </Dialog>
   );
 }
+
+function CompactStatus({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-muted/20 px-3 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function ActionContextRail({ account, owners, recentTimelineEvents }: { account: CustomerAccount; owners: CustomerOwner[]; recentTimelineEvents: CustomerTimelineEvent[] }) {
+  const nextFollowUp = account.followUps[0];
+
+  return (
+    <div className="rounded-xl border bg-card/80 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Action context</div>
+          <p className="mt-1 text-xs text-muted-foreground">Operator rail for the next customer decision.</p>
+        </div>
+        <Badge variant="outline">{account.followUps.length} actions</Badge>
+      </div>
+      <div className="mt-3 rounded-lg border bg-background p-3">
+        <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Next action</div>
+        <div className="mt-2 text-sm font-semibold">{nextFollowUp?.nextAction ?? 'No queued action'}</div>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{nextFollowUp?.allowedAction ?? 'Customer profile is ready for the next linked workflow.'}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline">Owner: {ownerName(owners, account.ownerId)}</Badge>
+          {nextFollowUp ? <Badge variant="outline">Due {formatProfileDate(nextFollowUp.dueAt)}</Badge> : null}
+        </div>
+      </div>
+      <div className="mt-3 space-y-2">
+        <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Recent memory</div>
+        {recentTimelineEvents.map((event) => (
+          <div key={event.id} className="rounded-lg border bg-background p-3 text-xs">
+            <div className="flex items-center justify-between gap-2"><Badge variant="outline">{event.sourceModule}</Badge><span className="text-muted-foreground">{formatProfileDate(event.occurredAt)}</span></div>
+            <div className="mt-2 font-medium leading-5">{event.summary}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CustomerAvatar({ account, size }: { account: CustomerAccount; size: 'sm' | 'lg' }) {
   const profile = account.profile;
   const name = profile?.customerName ?? account.displayName;
