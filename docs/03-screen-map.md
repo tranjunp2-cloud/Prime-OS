@@ -33,6 +33,10 @@
 | Attribution Tower | `/intelligence/attribution` | New for Prime OS |
 | Forecasting & Optimization Tower | `/intelligence/forecasting` | New for Prime OS |
 | AI Operator Tower | `/intelligence/ai-operator` | New for Prime OS, uses existing copilot shell context |
+| Operation Agent | `/intelligence/product-operation-agent?view=command` | New for Prime OS, governed session-local operating chat |
+| Operation Agent Kanban | `/intelligence/product-operation-agent?view=kanban` | New for Prime OS, policy-backed operating cards |
+| Operation Agent Queue | `/intelligence/product-operation-agent?view=queue` | New for Prime OS, explicit operator approval surface |
+| Operation Agent Audit | `/intelligence/product-operation-agent?view=audit` | New for Prime OS, traceable recommendations and moves |
 | Social Listening & VOC Tower | `/intelligence/voc` | New for Prime OS |
 | Automation & Alerts Tower | `/intelligence/alerts` | New for Prime OS |
 | UI regression | `/__ui-regression` | Reused internal COS QA route |

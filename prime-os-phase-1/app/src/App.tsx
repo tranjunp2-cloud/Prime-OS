@@ -28,6 +28,7 @@ import { PrimeOverview } from "./pages/prime/PrimeOverview";
 import { PrimeFinSupportPage } from "./pages/prime/PrimeFinSupportPage";
 import { PrimeMdecPage } from "./pages/prime/PrimeMdecPage";
 import { PrimeConsultingAgentPage } from "./pages/prime/PrimeConsultingAgentPage";
+import { PrimeProductOperationAgentPage } from "./pages/prime/PrimeProductOperationAgentPage";
 import { PrimeDemandHubPage, PrimeDemandSourcesPage, PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "./pages/prime/CommerceSurfacePage";
 import { CosPolicyRulePage } from "./pages/prime/CosPolicyRulePage";
@@ -151,6 +152,7 @@ const App = () => {
 
                     <Route path="/intelligence" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
                     <Route path="/intelligence/consulting-agent" element={<PrimeConsultingAgentPage />} />
+                    <Route path="/intelligence/product-operation-agent" element={<PrimeProductOperationAgentPage />} />
                     <Route path="/intelligence/decision-hub" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
                     <Route path="/intelligence/signals" element={<Navigate to="/intelligence/consulting-agent?tab=signals" replace />} />
                     <Route path="/intelligence/analytics" element={<Navigate to="/intelligence/consulting-agent?tab=kpi&capability=analytics" replace />} />

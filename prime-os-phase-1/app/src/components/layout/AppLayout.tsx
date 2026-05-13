@@ -467,11 +467,11 @@ export function AppLayout() {
   }, [globalSearchResults, searchQuery]);
 
   const breadcrumbItems = useMemo(() => (
-    getPrimeNavPath(location.pathname === '/account' ? `${location.pathname}${location.hash}` : location.pathname).map((node) => ({
+    getPrimeNavPath(location.pathname === '/account' ? `${location.pathname}${location.hash}` : `${location.pathname}${location.search}`).map((node) => ({
       id: node.id,
       label: getShellNavLabel(locale, node.id, node.label),
     }))
-  ), [locale, location.hash, location.pathname]);
+  ), [locale, location.hash, location.pathname, location.search]);
   const accountInitials = getAccountInitials(user?.fullName, user?.email);
   const accountRoleLabel = getAccountRoleLabel(user?.role);
 

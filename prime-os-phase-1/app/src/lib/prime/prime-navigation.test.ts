@@ -15,6 +15,11 @@ describe('prime navigation utility routes', () => {
   });
 
   it('resolves Consulting Agent and legacy Intelligence routes', () => {
+    expect(getPrimeNavPath('/intelligence/product-operation-agent').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent']);
+    expect(getPrimeNavPath('/intelligence/product-operation-agent?view=command').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Command Center']);
+    expect(getPrimeNavPath('/intelligence/product-operation-agent?view=kanban').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Operating Kanban']);
+    expect(getPrimeNavPath('/intelligence/product-operation-agent?view=queue').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Agent Queue']);
+    expect(getPrimeNavPath('/intelligence/product-operation-agent?view=audit').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Audit']);
     expect(getPrimeNavPath('/intelligence/consulting-agent').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
     expect(getPrimeNavPath('/intelligence/consulting-agent?tab=kpi').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'KPI Dashboard']);
     expect(getPrimeNavPath('/intelligence/consulting-agent?tab=signals').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'Signals Board']);

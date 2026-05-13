@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PrimeOS Product Operation Agent Plan</title>
+    <style>
+      :root {
+        --ink: #111113;
+        --muted: #636166;
+        --line: #e5e2ef;
+        --panel: #ffffff;
+        --soft: #f7f5ff;
+        --soft-2: #f4f7fb;
+        --primary: #5746f4;
+        --primary-2: #7c6dff;
+        --green: #11845b;
+        --amber: #a86400;
+        --red: #c93a35;
+        --blue: #1f66d1;
+        --shadow: 0 18px 50px rgba(32, 24, 77, 0.12);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 86% 4%, rgba(87, 70, 244, 0.16), transparent 28rem),
+          linear-gradient(180deg, #fbfbfd 0%, #f6f4fb 100%);
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      a { color: var(--primary); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .page { max-width: 1240px; margin: 0 auto; padding: 48px 28px 72px; }
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) 380px;
+        gap: 28px;
+        align-items: stretch;
+      }
+      .hero-main, .card, .lane, .phase, .source-card {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.86);
+        box-shadow: var(--shadow);
+      }
+      .hero-main { border-radius: 28px; padding: 34px; }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 18px;
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0;
+        max-width: 860px;
+        font-size: clamp(42px, 6vw, 78px);
+        line-height: 0.92;
+        letter-spacing: 0;
+      }
+      .lead {
+        max-width: 820px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 19px;
+        line-height: 1.55;
+      }
+      .hero-side {
+        border-radius: 28px;
+        padding: 24px;
+        background: #151321;
+        color: #fff;
+        box-shadow: var(--shadow);
+      }
+      .score {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        gap: 16px;
+        align-items: center;
+        margin: 22px 0;
+      }
+      .score strong {
+        display: grid;
+        place-items: center;
+        width: 96px;
+        height: 96px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-2));
+        font-size: 38px;
+      }
+      .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+      .pill {
+        border: 1px solid rgba(87, 70, 244, 0.22);
+        border-radius: 999px;
+        background: rgba(87, 70, 244, 0.08);
+        color: var(--primary);
+        padding: 7px 11px;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .hero-side .pill { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: #fff; }
+      .section { margin-top: 34px; }
+      .section-title {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 14px;
+      }
+      h2 { margin: 0; font-size: 26px; line-height: 1.1; letter-spacing: 0; }
+      .section-title p { max-width: 680px; margin: 0; color: var(--muted); line-height: 1.55; }
+      .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+      .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .card { border-radius: 22px; padding: 20px; }
+      .card h3, .lane h3, .phase h3 { margin: 0 0 10px; font-size: 17px; line-height: 1.25; }
+      .card p, .lane p, .phase p, li { color: var(--muted); line-height: 1.5; }
+      .card p, .lane p, .phase p { margin: 0; }
+      .metric {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-top: 1px solid var(--line);
+        margin-top: 16px;
+        padding-top: 14px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .tag {
+        border-radius: 9px;
+        padding: 5px 8px;
+        background: var(--soft);
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .decision {
+        border-left: 5px solid var(--primary);
+        border-radius: 22px;
+        background: #fff;
+        padding: 22px;
+        box-shadow: var(--shadow);
+      }
+      .decision strong { color: var(--primary); }
+      .board {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(180px, 1fr));
+        gap: 12px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+      }
+      .lane { min-height: 260px; border-radius: 20px; padding: 14px; box-shadow: none; }
+      .lane:nth-child(1) { background: #f3f7ff; }
+      .lane:nth-child(2) { background: #f8f7fb; }
+      .lane:nth-child(3) { background: #fff8ec; }
+      .lane:nth-child(4) { background: #f6f3ff; }
+      .lane:nth-child(5) { background: #fff6f5; }
+      .lane:nth-child(6) { background: #effaf4; }
+      .lane:nth-child(7) { background: #f4f7fb; }
+      .mini-card {
+        margin-top: 12px;
+        border: 1px solid rgba(17, 17, 19, 0.08);
+        border-radius: 14px;
+        background: rgba(255,255,255,0.88);
+        padding: 12px;
+        font-size: 13px;
+      }
+      .mini-card b { display: block; margin-bottom: 6px; }
+      .table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+      .table th, .table td {
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .table th {
+        background: var(--soft);
+        color: #3d3856;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .table tr:last-child td { border-bottom: 0; }
+      .phase {
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: none;
+      }
+      .phase small {
+        display: inline-flex;
+        margin-bottom: 10px;
+        color: var(--primary);
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .source-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+      .source-card { border-radius: 18px; padding: 16px; box-shadow: none; }
+      .source-card span { display: block; margin-bottom: 8px; color: var(--primary); font-weight: 800; font-size: 12px; }
+      .code {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: #151321;
+        color: #f5f2ff;
+        overflow-x: auto;
+        padding: 18px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .callout {
+        border: 1px solid rgba(17,132,91,0.18);
+        border-radius: 22px;
+        background: rgba(17,132,91,0.08);
+        padding: 20px;
+      }
+      .risk { color: var(--red); font-weight: 750; }
+      .ok { color: var(--green); font-weight: 750; }
+      .warn { color: var(--amber); font-weight: 750; }
+      footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+
+      @media (max-width: 980px) {
+        .hero, .grid-3, .grid-2, .source-grid { grid-template-columns: 1fr; }
+        h1 { font-size: 42px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero-main">
+          <p class="eyebrow">PrimeOS Plan · 2026-05-13</p>
+          <h1>Product Operation Agent cho hệ thống vận hành bằng Kanban dashboard</h1>
+          <p class="lead">
+            Hướng phù hợp là xây một lớp <strong>AI-assisted operating execution layer</strong>: Kanban không chỉ là task board, mà là cockpit để PrimeOS phát hiện tín hiệu, gom bằng chứng, mở quyết định, điều phối owner, xin duyệt, thi hành hành động đã được approve và ghi audit xuyên Demand, Ecom/COS, Finance, Customer và Intelligence.
+          </p>
+          <div class="pill-row">
+            <span class="pill">Kanban control surface</span>
+            <span class="pill">Policy-backed cards</span>
+            <span class="pill">Human approval gates</span>
+            <span class="pill">Cross-suite execution</span>
+            <span class="pill">Audit + evidence trail</span>
+          </div>
+        </div>
+        <aside class="hero-side">
+          <p class="eyebrow" style="color:#bdb6ff">Recommendation</p>
+          <div class="score">
+            <strong>A</strong>
+            <div>
+              <h2>Build as a new Intelligence product</h2>
+              <p style="color:#cfcbe6">Không replace Consulting Agent ngay. Tạo Product Operation Agent như control-plane product, reuse board primitives hiện có rồi mở rộng persistence/guardrails.</p>
+            </div>
+          </div>
+          <div class="pill-row">
+            <span class="pill">MVP wedge: weekly operating review</span>
+            <span class="pill">Owner: Intelligence suite</span>
+            <span class="pill">Execution: approved actions only</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section decision">
+        <h2>Decision</h2>
+        <p>
+          <strong>Chọn hướng “Operator, not boss”.</strong> Agent được quyền đọc tín hiệu, chuẩn bị work card, đề xuất next action, kéo evidence và route approval. Agent không tự thay đổi source-of-truth quan trọng nếu chưa có human confirmation. Đây là hướng khớp với PrimeOS hiện tại vì board Intelligence đã nói rõ “source truth remains owned by Demand, Customer, Ecom/COS, and Finance”.
+        </p>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Research Synthesis</h2>
+          <p>Những pattern nên mượn từ Product Ops, Kanban, agent orchestration và workflow execution.</p>
+        </div>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Product Ops = operating leverage</h3>
+            <p>Product Ops nên chuẩn hoá cadence, metrics, documentation, process, tool hygiene và cross-functional alignment. Vì vậy sản phẩm phải giảm friction vận hành, không chỉ thêm một task list.</p>
+            <div class="metric"><span>Borrow</span><span class="tag">Cadence + metrics</span></div>
+          </article>
+          <article class="card">
+            <h3>Kanban = visible flow + policies</h3>
+            <p>Kanban mạnh khi visualise workflow, giới hạn WIP, làm rõ policies, quản flow và cải tiến qua feedback loops. Board của Product Operation Agent phải show bottleneck, aging, owner overload, missing evidence.</p>
+            <div class="metric"><span>Borrow</span><span class="tag">WIP + blockers</span></div>
+          </article>
+          <article class="card">
+            <h3>Agent = tools, handoffs, guardrails</h3>
+            <p>Agent orchestration nên kết hợp manager agent, specialist agents, tool calls, handoff, tracing và guardrails. Với PrimeOS, manager giữ final control; specialist agents xử lý Demand, COS, Finance, CRM, Analytics.</p>
+            <div class="metric"><span>Borrow</span><span class="tag">Manager + specialists</span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Repo Fit</h2>
+          <p>Những phần đã có trong PrimeOS nên reuse trước khi tạo abstraction mới.</p>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Existing asset</th>
+              <th>Current role</th>
+              <th>Use for Product Operation Agent</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>prime-navigation.ts</code></td>
+              <td>Defines suite/tower/floor tree; Product Settings derives from this navigation registry.</td>
+              <td>Add new Intelligence product: <strong>Product Operation Agent</strong> with floors: Command Center, Operating Kanban, Agent Queue, Audit.</td>
+            </tr>
+            <tr>
+              <td><code>AppLayout.tsx</code></td>
+              <td>Renders Product Settings flyout, global search, breadcrumbs, and command shell.</td>
+              <td>Expose Product Operation Agent in Product Settings and search so it becomes a first-class operating product.</td>
+            </tr>
+            <tr>
+              <td><code>PrimeConsultingAgentPage.tsx</code></td>
+              <td>Already has KPI Dashboard, Signals Board, Launch Decisions tabs.</td>
+              <td>Use as implementation reference, not final product identity. Product Operation Agent should execute cross-suite work, while Consulting Agent remains analysis/decision support.</td>
+            </tr>
+            <tr>
+              <td><code>IntelligenceDragBoard.tsx</code></td>
+              <td>Reusable drag board with lanes, card moves, card detail, local audit events.</td>
+              <td>Fork or generalize into <code>OperatingKanbanBoard</code> with WIP limits, stale age, policy gates, approval state, and persistence boundary.</td>
+            </tr>
+            <tr>
+              <td><code>getPrimeSnapshot()</code></td>
+              <td>Composes read-model data from products, orders, inventory, demand, customer, intelligence, finance.</td>
+              <td>Use as MVP evidence source for auto-generated operating cards before backend workflow persistence is introduced.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Product Shape</h2>
+          <p>Recommended IA for Product Operation Agent in PrimeOS.</p>
+        </div>
+        <div class="grid-2">
+          <article class="card">
+            <h3>Positioning</h3>
+            <p><strong>PrimeOS Product Operation Agent</strong> is the operating cockpit that converts system signals into governed execution cards across all suites.</p>
+            <ul>
+              <li>Not a passive dashboard.</li>
+              <li>Not autonomous business decision maker.</li>
+              <li>Not another Trello/Jira clone.</li>
+              <li>It is the layer that prepares, routes, and executes approved operating work.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Core promise</h3>
+            <p>“Every system signal becomes a clear operating card with owner, evidence, policy, next action, approval state, and audit trail.”</p>
+            <ul>
+              <li>Detect drift and blockers.</li>
+              <li>Make work visible.</li>
+              <li>Limit WIP by owner and lane.</li>
+              <li>Escalate stale or blocked work.</li>
+              <li>Execute only after approval.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Operating Kanban Model</h2>
+          <p>Board này là heart của product. Card không phải task thường; card là operating commitment.</p>
+        </div>
+        <div class="board" aria-label="Recommended Product Operation Agent Kanban board">
+          <div class="lane">
+            <h3>Signal</h3>
+            <p>Metric drift, SLA breach, stock risk, campaign anomaly, lender blocker, customer identity alert.</p>
+            <div class="mini-card"><b>Auto card</b> Evidence source + severity + source owner</div>
+          </div>
+          <div class="lane">
+            <h3>Triage</h3>
+            <p>Agent groups duplicates, checks freshness, assigns likely owner and recommended route.</p>
+            <div class="mini-card"><b>Policy</b> Must have owner + source link</div>
+          </div>
+          <div class="lane">
+            <h3>Decision Needed</h3>
+            <p>Human must choose go/review/hold/no-go or approve a suggested action.</p>
+            <div class="mini-card"><b>Approval</b> No mutation before confirm</div>
+          </div>
+          <div class="lane">
+            <h3>In Progress</h3>
+            <p>Approved workflow is running or owner is actively doing the work.</p>
+            <div class="mini-card"><b>WIP</b> Limit per owner and suite</div>
+          </div>
+          <div class="lane">
+            <h3>Waiting</h3>
+            <p>Blocked by external response, missing document, delayed stock, customer reply, lender feedback.</p>
+            <div class="mini-card"><b>SLA</b> Aging threshold triggers escalation</div>
+          </div>
+          <div class="lane">
+            <h3>Done</h3>
+            <p>Action completed and written back to the owning route or read-model.</p>
+            <div class="mini-card"><b>Audit</b> Completion proof required</div>
+          </div>
+          <div class="lane">
+            <h3>Learning</h3>
+            <p>Outcome captured for next operating review, playbook, forecast, or agent eval.</p>
+            <div class="mini-card"><b>Memory</b> Close loop into PrimeOS context</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Card Schema</h2>
+          <p>Minimum object model needed before this becomes useful.</p>
+        </div>
+        <div class="code">type OperatingCard = {
+  id: string;
+  title: string;
+  lane: 'signal' | 'triage' | 'decision' | 'in_progress' | 'waiting' | 'done' | 'learning';
+  sourceSuite: 'Demand' | 'Ecom' | 'Finance' | 'Customer' | 'Intelligence';
+  sourceRoute: string;
+  sourceEntityId: string;
+  ownerId: string;
+  sourceOfTruthOwner: string;
+  severity: 'low' | 'medium' | 'high';
+  evidence: EvidenceLink[];
+  policyChecklist: PolicyCheck[];
+  recommendedAction: AgentAction;
+  approvalRequired: boolean;
+  approvalState: 'not_required' | 'pending' | 'approved' | 'rejected';
+  wipClass: 'standard' | 'expedite' | 'blocked' | 'compliance';
+  dueAt: string;
+  auditEvents: AuditEvent[];
+}</div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Agent Architecture</h2>
+          <p>Manager agent owns orchestration; specialists execute bounded work. This keeps prompts focused and guardrails central.</p>
+        </div>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Manager: Product Operation Agent</h3>
+            <p>Owns board state, card routing, final response, policy checks, approval gates, and audit record.</p>
+            <div class="metric"><span>Pattern</span><span class="tag">Agents as tools</span></div>
+          </article>
+          <article class="card">
+            <h3>Specialists</h3>
+            <p>Demand Operator, COS Operator, Finance Operator, Customer Operator, Analytics Operator, Escalation Operator.</p>
+            <div class="metric"><span>Pattern</span><span class="tag">Bounded handoffs</span></div>
+          </article>
+          <article class="card">
+            <h3>Guardrails</h3>
+            <p>Input checks, output checks, tool permissions, mutation gates, idempotency keys, and policy tripwires before write actions.</p>
+            <div class="metric"><span>Pattern</span><span class="tag">Human-in-loop</span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>MVP Scope</h2>
+          <p>Start narrow: weekly operating review. It creates repeat usage and can reuse existing snapshot data.</p>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Must have</th>
+              <th>Should have</th>
+              <th>Later</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <ul>
+                  <li>New route: <code>/intelligence/product-operation-agent</code></li>
+                  <li>Product Settings entry under Intelligence</li>
+                  <li>Operating Kanban board with 7 lanes</li>
+                  <li>Cards generated from <code>getPrimeSnapshot()</code></li>
+                  <li>Card detail drawer with evidence, owner, policy, next action</li>
+                  <li>Local move audit, modeled after <code>moveIntelligenceBoardCard</code></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>WIP limit display and stale card warnings</li>
+                  <li>Approve/reject suggested actions</li>
+                  <li>Operating review memo generator</li>
+                  <li>Filters by suite, severity, owner, due date</li>
+                  <li>Cross-route open buttons to owning page</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>Backend persistence for cards and audit events</li>
+                  <li>Real tool execution against backend APIs</li>
+                  <li>Notifications and scheduled monitors</li>
+                  <li>Temporal/LangGraph-style durable workflow engine</li>
+                  <li>Org-level policies, RBAC, and custom automations</li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Implementation Roadmap</h2>
+          <p>Phased plan sized for PrimeOS current codebase.</p>
+        </div>
+        <div class="grid-3">
+          <article class="phase">
+            <small>Phase 1</small>
+            <h3>Product registration</h3>
+            <p>Add Product Operation Agent to <code>primeNavigation</code>, route it in <code>App.tsx</code>, and expose floors in Product Settings.</p>
+          </article>
+          <article class="phase">
+            <small>Phase 2</small>
+            <h3>Operating card model</h3>
+            <p>Create seed/read-model builder from <code>getPrimeSnapshot()</code>. Generate cards from KPI drift, blockers, escalations, finance readiness and CRM identity alerts.</p>
+          </article>
+          <article class="phase">
+            <small>Phase 3</small>
+            <h3>Kanban cockpit</h3>
+            <p>Build <code>OperatingKanbanBoard</code> from existing drag board patterns. Add WIP badges, aging, severity, owner, source route and card drawer.</p>
+          </article>
+          <article class="phase">
+            <small>Phase 4</small>
+            <h3>Agent queue</h3>
+            <p>Add action proposals: draft memo, open owner route, request approval, send follow-up, mark blocked, mark complete. Keep all write actions behind explicit confirm.</p>
+          </article>
+          <article class="phase">
+            <small>Phase 5</small>
+            <h3>Audit and persistence boundary</h3>
+            <p>Start local audit like Consulting Agent. Then define backend resource for cards/events when the UX is validated.</p>
+          </article>
+          <article class="phase">
+            <small>Phase 6</small>
+            <h3>Validation</h3>
+            <p>Smoke all floors, test route matching, test card generation, test move audit, test approval gates, and run screenshot QA for desktop/mobile.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Subagent Staffing Plan</h2>
+          <p>Recommended subagent lanes when implementation starts.</p>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>Agent</th>
+              <th>Ownership</th>
+              <th>Success evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Repository map</td>
+              <td><code>code-mapper</code> / <code>explore</code></td>
+              <td>Route, nav, data contracts, existing boards</td>
+              <td>Line-referenced map before edits</td>
+            </tr>
+            <tr>
+              <td>Architecture</td>
+              <td><code>architect-reviewer</code></td>
+              <td>Agent boundaries, source-of-truth ownership, persistence strategy</td>
+              <td>ADR and risk checklist</td>
+            </tr>
+            <tr>
+              <td>Frontend execution</td>
+              <td><code>frontend-developer</code> / <code>react-specialist</code></td>
+              <td>Route, page, board, drawer, filters</td>
+              <td>Local UI works on desktop/mobile</td>
+            </tr>
+            <tr>
+              <td>Data model</td>
+              <td><code>typescript-pro</code></td>
+              <td>OperatingCard types, seed builder, tests</td>
+              <td>Unit tests for generated cards and move audit</td>
+            </tr>
+            <tr>
+              <td>QA</td>
+              <td><code>test-automator</code> / <code>qa-expert</code></td>
+              <td>Route smoke, Playwright interactions, screenshots, accessibility scan</td>
+              <td>Pass/fail report with screenshots</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Acceptance Criteria</h2>
+          <p>Concrete checks for the first implementation pass.</p>
+        </div>
+        <div class="grid-2">
+          <div class="callout">
+            <h3>Product behavior</h3>
+            <ul>
+              <li><span class="ok">Pass</span> Product Settings shows Product Operation Agent under Intelligence.</li>
+              <li><span class="ok">Pass</span> Route opens from Product Settings, global search, and sidebar.</li>
+              <li><span class="ok">Pass</span> Board shows cards from at least four suites: Demand, Ecom/COS, Finance, Customer.</li>
+              <li><span class="ok">Pass</span> Dragging a card updates lane and appends audit event.</li>
+              <li><span class="ok">Pass</span> Risky action requires approval before state mutation.</li>
+            </ul>
+          </div>
+          <div class="callout">
+            <h3>Engineering checks</h3>
+            <ul>
+              <li><code>npm run build:dev</code> passes.</li>
+              <li>Navigation tests cover the new route and floors.</li>
+              <li>Seed data tests cover card generation from snapshot.</li>
+              <li>Playwright smoke covers board drag, drawer, filters, and mobile overflow.</li>
+              <li>No new dependency unless a durable workflow engine is explicitly chosen.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Risks</h2>
+          <p>Risks that should shape implementation decisions.</p>
+        </div>
+        <div class="grid-3">
+          <article class="card">
+            <h3><span class="risk">Generic board trap</span></h3>
+            <p>If cards are just todos, product loses differentiation. Mitigation: every card must carry metric, evidence, policy, source route and audit trail.</p>
+          </article>
+          <article class="card">
+            <h3><span class="risk">Autonomy trust gap</span></h3>
+            <p>Users will reject silent mutation. Mitigation: agent proposes and prepares; humans approve material actions.</p>
+          </article>
+          <article class="card">
+            <h3><span class="warn">Persistence gap</span></h3>
+            <p>Current Consulting Agent board is local state only. Mitigation: MVP can prove UX locally, but phase 2 needs backend card/event resource.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Implementation Handoff</h2>
+          <p>Suggested OMX path after this plan.</p>
+        </div>
+        <div class="code">$team \"Implement Product Operation Agent MVP from docs/plans/2026-05-13-product-operation-agent/product-operation-agent-plan.html\"
+
+Recommended lanes:
+1. code-mapper: confirm final route/data ownership
+2. architect-reviewer: approve source-of-truth and persistence boundary
+3. frontend-developer: build page and board UI
+4. typescript-pro: build OperatingCard model and seed tests
+5. test-automator: Playwright and route smoke</div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Sources</h2>
+          <p>Research references used for this plan.</p>
+        </div>
+        <div class="source-grid">
+          <article class="source-card">
+            <span>Product Ops</span>
+            <a href="https://www.productplan.com/learn/product-operations/">ProductPlan: Product Operations</a>
+          </article>
+          <article class="source-card">
+            <span>Product Ops</span>
+            <a href="https://www.airtable.com/articles/product-operations-guide">Airtable: Product Operations Guide</a>
+          </article>
+          <article class="source-card">
+            <span>Kanban</span>
+            <a href="https://resources.kanban.university/wp-content/uploads/2021/06/The-Official-Kanban-Guide_US.pdf">Kanban University: Official Kanban Guide</a>
+          </article>
+          <article class="source-card">
+            <span>Agents</span>
+            <a href="https://openai.github.io/openai-agents-python/multi_agent/">OpenAI Agents SDK: Orchestration</a>
+          </article>
+          <article class="source-card">
+            <span>Guardrails</span>
+            <a href="https://openai.github.io/openai-agents-python/guardrails/">OpenAI Agents SDK: Guardrails</a>
+          </article>
+          <article class="source-card">
+            <span>Workflow</span>
+            <a href="https://docs.camunda.io/docs/components/concepts/processes/">Camunda: Process orchestration concepts</a>
+          </article>
+          <article class="source-card">
+            <span>Durability</span>
+            <a href="https://docs.temporal.io/">Temporal documentation</a>
+          </article>
+          <article class="source-card">
+            <span>Durability</span>
+            <a href="https://docs.langchain.com/oss/python/langgraph/durable-execution">LangGraph durable execution</a>
+          </article>
+        </div>
+      </section>
+
+      <footer>
+        Created for PrimeOS local workspace. Skills used: ck:plan, senior-architect, frontend-design. Subagents used: code-mapper and research-analyst. Stop condition: planning artifact created; no implementation code changed by this plan.
+      </footer>
+    </main>
+  </body>
+</html>

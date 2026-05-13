@@ -38,9 +38,9 @@ Prime OS Phase 1 is not a new backend. It is a board-ready product visualization
    - Message: Intelligence reads COS context before optimizing.
    - Proof: Demand forecast compares campaign demand with Inventory Brain ATS.
 
-9. Open `/intelligence/ai-operator`
-   - Message: AI Operator works on live system context, not detached chat.
-   - Proof: Recommendations target SKU, ticket, and campaign entities.
+9. Open `/intelligence/product-operation-agent?view=command`
+   - Message: Operation Agent is a governed execution chat, not detached AI prose.
+   - Proof: The session-local chat keeps a transcript, blocks direct mutation prompts, prepares approval packets, routes them to Agent Queue, and records audit context without silently changing source suites.
 
 10. Open `/ecom/cos/event-audit`
     - Message: Prime OS can produce an audit trail across execution and decisions.

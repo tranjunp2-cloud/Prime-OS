@@ -39,5 +39,5 @@
 
 - Start screen: `/intelligence/voc`
 - Key state change: VOC, forecast, ticket, and campaign data produce AI recommendation and alert.
-- Continue to: `/intelligence/analytics`, `/intelligence/forecasting`, `/intelligence/ai-operator`, `/intelligence/alerts`
-- End proof point: Intelligence learns and optimizes around COS system context.
+- Continue to: `/intelligence/analytics`, `/intelligence/forecasting`, `/intelligence/product-operation-agent?view=command`, `/intelligence/product-operation-agent?view=queue`, `/intelligence/product-operation-agent?view=audit`
+- End proof point: Intelligence learns and optimizes around COS system context while Operation Agent prepares, routes, and audits work without silently mutating source suites.

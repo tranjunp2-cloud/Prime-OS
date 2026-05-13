@@ -22,6 +22,11 @@ describe('primeProductSettingsGroups', () => {
     expect(ids).toContain('fulfillment');
     expect(ids).toContain('policy-rule');
     expect(ids).toContain('event-audit');
+    expect(ids).toContain('product-operation-agent');
+    expect(ids).toContain('product-operation-command');
+    expect(ids).toContain('product-operation-kanban');
+    expect(ids).toContain('product-operation-agent-queue');
+    expect(ids).toContain('product-operation-audit');
     expect(ids).toContain('consulting-agent');
     expect(ids).toContain('consulting-agent-kpi');
     expect(ids).toContain('consulting-agent-signals');

@@ -1,10 +1,11 @@
-import { useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Clock, ExternalLink, GripVertical, ShieldAlert } from 'lucide-react';
+import { useMemo, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, Bot, Clock, ExternalLink, GripVertical, Info, ShieldAlert } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { IntelligenceBoardAuditEvent, IntelligenceBoardCard, IntelligenceBoardLaneId, IntelligenceBoardSnapshot } from '@/lib/prime/intelligence-workspace';
 
@@ -35,6 +36,26 @@ function formatStatus(status: string) {
 
 function cardCountLabel(count: number) {
   return count === 1 ? '1 card' : `${count} cards`;
+}
+
+function InfoHint({ children, label = 'More information' }: { children: ReactNode; label?: string }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            aria-label={label}
+          >
+            <Info className="size-3" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-72 text-xs leading-relaxed">
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, className }: IntelligenceDragBoardProps) {
@@ -120,10 +141,10 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Intelligence projection</div>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight">Signal → decision board</h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Drag cards across Intelligence lanes to update triage state only. Source truth remains owned by Demand, Customer, Ecom / COS, and Finance.
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <h2 className="text-2xl font-semibold tracking-tight">Signal → decision board</h2>
+            <InfoHint label="Signal decision board info">Drag cards across Intelligence lanes to update triage state only. Source truth remains owned by Demand, Customer, Ecom / COS, and Finance.</InfoHint>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">{board.cards.length} cards</Badge>
@@ -162,21 +183,23 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
                 <div className="sticky top-0 z-10 rounded-xl border bg-background/90 p-3 backdrop-blur">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <button
-                        type="button"
-                        draggable
-                        onDragStart={(event) => handleLaneDragStart(event, lane.id)}
-                        onDragEnd={() => {
-                          setDraggedLaneId(null);
-                          setActiveLaneId(null);
-                        }}
-                        className="inline-flex items-center gap-2 rounded-md text-left font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        aria-label={`Drag ${lane.label} tab`}
-                      >
-                        <GripVertical className="size-3.5 text-muted-foreground" />
-                        {lane.label}
-                      </button>
-                      <p className="mt-1 text-xs text-muted-foreground">{lane.purpose}</p>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          draggable
+                          onDragStart={(event) => handleLaneDragStart(event, lane.id)}
+                          onDragEnd={() => {
+                            setDraggedLaneId(null);
+                            setActiveLaneId(null);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-md text-left font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          aria-label={`Drag ${lane.label} tab`}
+                        >
+                          <GripVertical className="size-3.5 text-muted-foreground" />
+                          {lane.label}
+                        </button>
+                        <InfoHint label={`${lane.label} info`}>{lane.purpose}</InfoHint>
+                      </div>
                     </div>
                     <Badge variant={exceptionCount > 0 ? 'destructive' : 'outline'}>{laneCards.length}</Badge>
                   </div>
@@ -282,9 +305,11 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
 function BoardSummaryMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="rounded-2xl border bg-muted/20 p-4">
-      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-1.5">
+        <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+        <InfoHint label={`${label} info`}>{detail}</InfoHint>
+      </div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     </div>
   );
 }

@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Product Operation Agent Command Center Chat Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --text: #101828;
+      --muted: #667085;
+      --line: #e4e7ec;
+      --primary: #5145f5;
+      --primary-soft: #eef2ff;
+      --green: #079455;
+      --amber: #dc6803;
+      --red: #d92d20;
+      --shadow: 0 18px 45px rgb(16 24 40 / 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 44px 24px 72px;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.1; letter-spacing: 0; }
+    h1 { max-width: 900px; font-size: clamp(40px, 6vw, 72px); }
+    h2 { margin-bottom: 18px; font-size: 30px; }
+    h3 { margin: 22px 0 10px; font-size: 20px; }
+    p { margin: 0; color: var(--muted); }
+    a { color: var(--primary); }
+    code {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f9fafb;
+      padding: 2px 6px;
+      font-size: 0.9em;
+    }
+    .hero {
+      display: grid;
+      gap: 24px;
+      margin-bottom: 28px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(135deg, #ffffff 0%, #f2f4ff 100%);
+      box-shadow: var(--shadow);
+    }
+    .eyebrow {
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .hero p { max-width: 820px; font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      border: 1px solid #c7d2fe;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      padding: 7px 12px;
+      color: #3730a3;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .section {
+      margin-top: 22px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 10px 30px rgb(16 24 40 / 0.05);
+    }
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 840px) {
+      .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      padding: 18px;
+    }
+    .card strong { display: block; margin-bottom: 6px; }
+    .metric {
+      color: var(--primary);
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    ul, ol { margin: 12px 0 0; padding-left: 22px; }
+    li { margin: 8px 0; color: var(--muted); }
+    li strong { color: var(--text); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 13px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f9fafb;
+      color: #344054;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    td { color: var(--muted); }
+    .wireframe {
+      overflow-x: auto;
+      margin-top: 16px;
+      border-radius: 16px;
+      background: #111827;
+      color: #e5e7eb;
+      padding: 18px;
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .status {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .ok { background: #ecfdf3; color: var(--green); }
+    .warn { background: #fff7ed; color: var(--amber); }
+    .risk { background: #fef3f2; color: var(--red); }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Approval Plan · Product Operation Agent</div>
+      <h1>Command Center thành AI Agent Chat Command Interface</h1>
+      <p>
+        Chuyển Command Center từ dashboard-first sang chat-first: operator ra lệnh bằng ngôn ngữ tự nhiên,
+        agent trả lời bằng evidence/action preview, rồi handoff sang Kanban, Agent Queue hoặc Audit. Phase này
+        vẫn giữ boundary an toàn: chat chỉ prepare, route, summarize, queue approval; chưa mutate source-of-record.
+      </p>
+      <div class="chips">
+        <span class="chip">Route: /intelligence/product-operation-agent?view=command</span>
+        <span class="chip">No live LLM in MVP</span>
+        <span class="chip">No destructive action from chat</span>
+        <span class="chip">Research: Lazyweb + web references</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Research Decision</h2>
+      <div class="grid three">
+        <div class="card">
+          <div class="metric">1</div>
+          <strong>Chat là command surface chính</strong>
+          <p>Composer + transcript phải nằm above the fold. Metrics chuyển thành context rail để không lấn luồng ra lệnh.</p>
+        </div>
+        <div class="card">
+          <div class="metric">2</div>
+          <strong>Agent output phải có governance</strong>
+          <p>Mỗi câu trả lời cần owner, source route, evidence, policy state, approval requirement, và next safe action.</p>
+        </div>
+        <div class="card">
+          <div class="metric">3</div>
+          <strong>Execution đi qua Queue/Audit</strong>
+          <p>Chat không đóng vai source of truth. Action quan trọng phải queue approval hoặc mở route nguồn.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px">
+        Full research report: <a href="../../../.lazyweb/design-research/ai-command-center-chat-2026-05-13/report.html">.lazyweb/design-research/ai-command-center-chat-2026-05-13/report.html</a>
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Target UX Shape</h2>
+      <div class="wireframe">+--------------------------------------------------------------------------------+
+| Product Operation Agent                                                        |
+| [What needs approval?] [Prepare risk packet] [Blocked work] [Audit summary]    |
++---------------------+----------------------------------+-----------------------+
+| Operating Context   | Agent Transcript                  | Action Preview        |
+| - 6 cards           | Operator: what needs action?      | ATS pressure packet   |
+| - 4 approvals       | Agent: top risk is ATS pressure   | Evidence: 3 items     |
+| - 2 high risk       | Source: Inventory Brain           | Policy: 2/3 passed    |
+| - 5 suites          | [Prepare approval packet]         | Approval: required    |
+|                     | [Open in Kanban] [Queue approval] | [Open source route]   |
++---------------------+----------------------------------+-----------------------+
+| Command composer: Ask the Product Operation Agent... [Send]                    |
++--------------------------------------------------------------------------------+</div>
+    </section>
+
+    <section class="section">
+      <h2>Success Criteria</h2>
+      <ul>
+        <li>Command Center opens as a chat-led operator interface, not a metrics dashboard.</li>
+        <li>Agent responses are grounded in existing Product Operation Agent cards, proposals, source routes, evidence, and policy checks.</li>
+        <li>Every suggested action has visible command status, source context, approval requirement, and audit implication.</li>
+        <li>Operators can move from chat output to Kanban card, Agent Queue proposal, or source suite route without losing context.</li>
+        <li>No destructive or source-of-record mutation is introduced from chat in this phase.</li>
+        <li>Existing Kanban, Queue, Audit, navigation, and seed-data tests continue to pass.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Scope</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>In Scope</h3>
+          <ul>
+            <li>Redesign only Product Operation Agent <code>Command Center</code> view.</li>
+            <li>Add chat transcript, command composer, suggested prompts, command status rows, context cards, and action preview panel.</li>
+            <li>Use existing <code>OperatingCard</code>, <code>OperatingAgentProposal</code>, audit seed structures.</li>
+            <li>Provide deterministic mock chat behavior for approval and QA.</li>
+            <li>Preserve Product Operation Agent route, tabs, Kanban, Queue, Audit, source links.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Out Of Scope</h3>
+          <ul>
+            <li>Live LLM integration.</li>
+            <li>Backend persistence for chat sessions.</li>
+            <li>Executing destructive actions from chat.</li>
+            <li>Replacing Operating Kanban, Agent Queue, or Audit surfaces.</li>
+            <li>New navigation route beyond existing <code>?view=command</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Phased Implementation Plan</h2>
+      <div class="grid two">
+        <div class="card">
+          <span class="status ok">Phase 0</span>
+          <h3>Approval Gate</h3>
+          <p>Confirm chat-first direction, non-destructive operator boundary, and no IA changes.</p>
+          <ul>
+            <li>Approve research direction.</li>
+            <li>Approve deterministic MVP behavior.</li>
+            <li>Approve safe CTA language: prepare, queue approval, open source, summarize.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="status ok">Phase 1</span>
+          <h3>Data Contract</h3>
+          <p>Map chat model to existing Product Operation Agent data.</p>
+          <ul>
+            <li>Define message types: operator prompt, agent answer, command status, evidence reference, action preview.</li>
+            <li>Map prompt outputs to cards, proposals, routes, policy checks.</li>
+            <li>Add minimal seed data only if needed for realistic transcript examples.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="status ok">Phase 2</span>
+          <h3>Command Center UI Build</h3>
+          <p>Replace dashboard-first layout with a split command surface.</p>
+          <ul>
+            <li>Transcript and composer as center panel.</li>
+            <li>Operating context as left rail or top compact rail.</li>
+            <li>Action preview as right rail on desktop, collapsible section on mobile.</li>
+            <li>Prompt chips: approvals, blocked work, inventory risk packet, audit summary.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="status warn">Phase 3</span>
+          <h3>Governance And Accessibility</h3>
+          <p>Make trust boundaries and states clear.</p>
+          <ul>
+            <li>States: ready, needs approval, blocked, executed/mock, audit-only.</li>
+            <li>No irreversible CTA wording.</li>
+            <li>Keyboard flow, focus states, contrast, responsive layout.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="status ok">Phase 4</span>
+          <h3>Test And Approval Package</h3>
+          <p>Ship evidence for review before deeper agent integration.</p>
+          <ul>
+            <li>Unit/component coverage for prompts and response rendering.</li>
+            <li>Existing Product Operation Agent tests continue passing.</li>
+            <li>Lint/build pass.</li>
+            <li>Browser smoke desktop and mobile for <code>?view=command</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Dependency And Ownership Map</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Workstream</th>
+            <th>Owner</th>
+            <th>Depends On</th>
+            <th>Done Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>UX direction</td>
+            <td>Design / parent agent</td>
+            <td>Lazyweb research + current Product Operation Agent plan</td>
+            <td>Approved chat command surface pattern</td>
+          </tr>
+          <tr>
+            <td>Command Center redesign</td>
+            <td>Frontend engineer</td>
+            <td>Approved UX direction and existing page structure</td>
+            <td><code>?view=command</code> renders chat-led interface</td>
+          </tr>
+          <tr>
+            <td>Mock command model</td>
+            <td>Frontend engineer / product owner</td>
+            <td>Existing seed data contract</td>
+            <td>Deterministic prompts produce grounded responses</td>
+          </tr>
+          <tr>
+            <td>Governance boundary</td>
+            <td>Product owner</td>
+            <td>Operator boundary from Product Operation Agent plan</td>
+            <td>Chat labels prepare, route, approval-needed, or audit-only</td>
+          </tr>
+          <tr>
+            <td>QA regression</td>
+            <td>QA / frontend engineer</td>
+            <td>Completed UI implementation</td>
+            <td>Unit, lint, build, browser smoke pass</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Risks And Mitigations</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Impact</th>
+            <th>Mitigation</th>
+            <th>Escalation Trigger</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Chat implies real autonomous execution</td>
+            <td>Trust and boundary confusion</td>
+            <td>Use prepare/route/approval language; avoid destructive CTA labels</td>
+            <td>Any stakeholder reads a command as live mutation</td>
+          </tr>
+          <tr>
+            <td>Scope expands into live LLM or persistence</td>
+            <td>Timeline and QA confidence drop</td>
+            <td>Keep MVP deterministic; capture live-agent work as later phase</td>
+            <td>Request requires backend, auth, streaming, saved history</td>
+          </tr>
+          <tr>
+            <td>Chat disconnects from Kanban/Queue/Audit</td>
+            <td>Breaks governed operating model</td>
+            <td>Every answer links to card, proposal, route, or audit state</td>
+            <td>Response appears without evidence/source/owner/action status</td>
+          </tr>
+          <tr>
+            <td>Mobile layout becomes unusable</td>
+            <td>Approval failure in responsive QA</td>
+            <td>Stack transcript first, sticky composer, collapsible context/action panels</td>
+            <td>Composer, buttons, or evidence cards overlap below tablet width</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Test Plan</h2>
+      <ul>
+        <li><strong>Unit/component:</strong> Command Center renders transcript, suggested prompts, source-linked responses, and action previews.</li>
+        <li><strong>Regression:</strong> View switching, Product Settings navigation, Kanban movement, Queue, Audit remain intact.</li>
+        <li><strong>Build:</strong> Run frontend lint/build commands used by the repo.</li>
+        <li><strong>Browser smoke:</strong> Verify <code>?view=command</code> on desktop and mobile; check no overlap, broken links, or inaccessible controls.</li>
+        <li><strong>Governance QA:</strong> Every command response has owner, evidence, source route, approval state, and non-destructive CTA language.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Approval Checklist</h2>
+      <ol>
+        <li>Approve chat-first Command Center direction.</li>
+        <li>Approve deterministic MVP, no live LLM.</li>
+        <li>Approve non-destructive operator boundary.</li>
+        <li>Approve implementation limited to Product Operation Agent Command view.</li>
+        <li>Approve test plan before code starts.</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>
