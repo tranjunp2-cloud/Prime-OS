@@ -51,7 +51,7 @@ export interface PrimeNavNode {
 export const primeNavigation: PrimeNavNode[] = [
   {
     id: 'overview',
-    label: 'Overview',
+    label: 'General Dashboard',
     kind: 'overview',
     href: '/overview',
     icon: LayoutDashboard,

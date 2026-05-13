@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Clock3,
   FileText,
+  Info,
   Megaphone,
   PackageCheck,
   Radar,
@@ -20,12 +21,15 @@ import {
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PartnerWorkspacePanel } from '@/components/prime/PartnerWorkspacePanel';
 import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
 import { getPrimeSnapshot, getSkuProductName } from '@/lib/prime/prime-data';
@@ -40,6 +44,13 @@ const compactNumber = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
 });
+
+const suiteReadinessChartConfig = {
+  readiness: {
+    label: 'Readiness',
+    color: 'hsl(var(--primary))',
+  },
+} satisfies ChartConfig;
 
 type OperatingStatus = 'Ready' | 'Watch' | 'Critical';
 type OperatingMode = 'command' | 'investigate' | 'audit';
@@ -96,6 +107,20 @@ type AreaStatusItem = {
   action: string;
   icon: LucideIcon;
   risks: number;
+};
+
+type QuickLinkItem = {
+  label: string;
+  href: string;
+  count?: string;
+  status?: OperatingStatus;
+};
+
+type QuickLinkGroup = {
+  suite: string;
+  summary: string;
+  icon: LucideIcon;
+  links: QuickLinkItem[];
 };
 
 type EvidenceItem = {
@@ -172,6 +197,26 @@ function openPrimeAi(context?: Record<string, string>) {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('prime-ai:open', { detail: context }));
   }
+}
+
+function InfoHint({ children, label = 'More information' }: { children: ReactNode; label?: string }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            aria-label={label}
+          >
+            <Info className="size-3" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-72 text-xs leading-relaxed">
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export function PrimeOverview() {
@@ -477,6 +522,63 @@ export function PrimeOverview() {
     },
   ];
 
+  const quickLinkGroups: QuickLinkGroup[] = [
+    {
+      suite: 'Intelligence',
+      summary: `${snapshot.insightModels.length + snapshot.vocInsights.length} active signals`,
+      icon: Sparkles,
+      links: [
+        { label: 'Operation Agent', href: '/intelligence/product-operation-agent?view=command', status: scoreStatus(intelligenceScore) },
+        { label: 'KPI Dashboard', href: '/intelligence/consulting-agent?tab=kpi' },
+        { label: 'Signals Board', href: '/intelligence/consulting-agent?tab=signals', count: `${snapshot.vocInsights.length}` },
+        { label: 'Launch Decisions', href: '/intelligence/consulting-agent?tab=launch', count: topRecommendation ? '1' : '0' },
+      ],
+    },
+    {
+      suite: 'Ecom/COS',
+      summary: `${ordersAtRisk.length} orders need watch`,
+      icon: Store,
+      links: [
+        { label: 'Products', href: '/ecom/cos/product-master', count: `${snapshot.products.length}` },
+        { label: 'Inventory Brain', href: '/ecom/cos/inventory-brain', count: `${watchForecasts.length}`, status: highRiskForecasts.length ? 'Critical' : watchForecasts.length ? 'Watch' : 'Ready' },
+        { label: 'Orders', href: '/ecom/cos/oms', count: `${ordersAtRisk.length}` },
+        { label: 'Fulfillment', href: '/ecom/cos/fulfillment' },
+      ],
+    },
+    {
+      suite: 'Demand',
+      summary: `${totalLeads} leads, ${totalRfqs} RFQs`,
+      icon: Megaphone,
+      links: [
+        { label: 'Campaigns', href: '/demand/campaigns', count: `${snapshot.campaigns.length}`, status: scoreStatus(demandScore) },
+        { label: 'Composer', href: '/demand/mdec?view=composer' },
+        { label: 'Calendar', href: '/demand/mdec?view=calendar' },
+        { label: 'Activation Plays', href: '/demand/campaigns', count: `${snapshot.activationPlays.length}` },
+      ],
+    },
+    {
+      suite: 'Finance',
+      summary: `${financeScore}% readiness`,
+      icon: CircleDollarSign,
+      links: [
+        { label: 'Fin Support', href: '/finance/fin-support', status: scoreStatus(financeScore) },
+        { label: 'Evidence', href: '/finance/fin-support?tab=evidence' },
+        { label: 'Review Routes', href: '/finance/fin-support?tab=routes' },
+        { label: 'Blockers', href: '/finance/fin-support#blockers', count: financeScore < 80 ? '1' : '0' },
+      ],
+    },
+    {
+      suite: 'Customer',
+      summary: `${openTickets.length} open tickets`,
+      icon: UsersRound,
+      links: [
+        { label: 'CRM Compact', href: '/customer/crm-compact', count: `${snapshot.customers.length}` },
+        { label: 'Service', href: '/customer/service', count: `${openTickets.length}`, status: highPriorityTickets.length ? 'Critical' : openTickets.length ? 'Watch' : 'Ready' },
+        { label: 'Customer Profile', href: '/customer/crm-compact?floor=overview' },
+      ],
+    },
+  ];
+
   const evidenceItems: EvidenceItem[] = [
     {
       label: 'Inventory evidence',
@@ -583,9 +685,9 @@ export function PrimeOverview() {
     dependency: missionSignal?.dependency ?? 'No active dependency',
     signal: missionSignal?.signal ?? 'No active signal',
   } : {
-    action: 'Monitor Operating Home',
+    action: 'Monitor General Dashboard',
     owner: 'Prime OS',
-    object: 'Operating Home',
+    object: 'General Dashboard',
     risk: systemStatus,
     impact: currency.format(revenueAtRisk),
     blocker: 'No active blocker',
@@ -609,7 +711,12 @@ export function PrimeOverview() {
 
         {partnerWorkspace ? <PartnerWorkspacePanel summary={partnerWorkspace} /> : null}
 
-        <OperatorModeSwitch mode={operatingMode} onModeChange={setOperatingMode} />
+        <GeneralDashboardSurface
+          suites={areaStatus}
+          metrics={healthMetrics}
+          dependencyFlow={riskRadar}
+          quickLinks={quickLinkGroups}
+        />
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <PriorityMissionList
@@ -623,7 +730,7 @@ export function PrimeOverview() {
           <DependencyRiskFlow items={riskRadar} mode={operatingMode} />
         </section>
 
-        <SystemHealthStrip metrics={healthMetrics} />
+        <OperatorModeSwitch mode={operatingMode} onModeChange={setOperatingMode} />
 
         <SecondarySignalsPanel
           mode={operatingMode}
@@ -657,9 +764,8 @@ function MissionBrief({
   systemStatus: OperatingStatus;
   onAskAi: () => void;
 }) {
-  const headline = primaryAction?.title ?? 'Monitor Prime OS readiness';
-  const missionCopy = primaryAction
-    ? `${primaryAction.owner} owns ${primaryAction.object}. ${primaryAction.reason}`
+  const topActionCopy = primaryAction
+    ? `${primaryAction.owner} owns ${primaryAction.object}: ${primaryAction.reason}`
     : 'All operating areas are ready for monitor mode.';
 
   return (
@@ -667,24 +773,23 @@ function MissionBrief({
       <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.72fr)] xl:items-stretch">
         <div className="flex min-w-0 flex-col justify-between gap-3">
           <div className="min-w-0">
-            <Badge variant="outline" className="mb-3 rounded-full bg-background/80">Operating Home</Badge>
+            <Badge variant="outline" className="mb-3 rounded-full bg-background/80">Cross-suite snapshot</Badge>
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <span className={`size-2 rounded-full ${statusDotClass(primaryAction?.risk ?? systemStatus, 'quiet')}`} />
-              <span>Today's Mission</span>
+              <span>General Dashboard</span>
               {primaryAction ? <StatusBadge status={primaryAction.risk} /> : <StatusBadge status={systemStatus} tone="quiet" />}
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">{headline}</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{missionCopy}</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">General Dashboard</h1>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
               <Link to={primaryAction?.href ?? '/intelligence/launch-decisions'}>
-                {primaryAction?.cta ?? 'Review decisions'}
+                {primaryAction?.cta ?? 'Review dashboard'}
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <Button size="sm" variant="outline" onClick={onAskAi} aria-label="Ask Prime AI about today's mission">
+            <Button size="sm" variant="outline" onClick={onAskAi} aria-label="Ask Prime AI about General Dashboard">
               <Bot className="size-4" />
               Ask Prime AI
             </Button>
@@ -695,12 +800,14 @@ function MissionBrief({
           <div className="rounded-lg border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <span>Primary signal</span>
+              <InfoHint label="Primary signal info">The most urgent cross-suite signal currently affecting PrimeOS readiness.</InfoHint>
               {missionSignal ? <StatusBadge status={missionSignal.status} tone="quiet" /> : null}
             </div>
             <div className="mt-2 text-sm font-semibold">{missionSignal?.stage ?? 'Operating system'}</div>
             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
               {missionSignal ? `${missionSignal.signal}. ${missionSignal.dependency}` : 'No active dependency pressure.'}
             </p>
+            <p className="mt-3 line-clamp-2 text-xs text-muted-foreground">{topActionCopy}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
@@ -737,6 +844,224 @@ function MissionStat({
   );
 }
 
+function GeneralDashboardSurface({
+  suites,
+  metrics,
+  dependencyFlow,
+  quickLinks,
+}: {
+  suites: AreaStatusItem[];
+  metrics: HealthMetric[];
+  dependencyFlow: RiskFlowItem[];
+  quickLinks: QuickLinkGroup[];
+}) {
+  return (
+    <section data-testid="general-dashboard-summary" className="space-y-4" aria-label="General Dashboard cross-suite summary">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <SuiteReadinessPanel suites={suites} />
+        <CrossSuiteFlowSummary items={dependencyFlow} />
+      </div>
+
+      <SystemHealthStrip metrics={metrics} />
+
+      <QuickAccessHub groups={quickLinks} />
+    </section>
+  );
+}
+
+function SuiteReadinessPanel({ suites }: { suites: AreaStatusItem[] }) {
+  const chartData = suites.map((suite) => ({
+    suite: suite.area.replace(' / ', '/'),
+    readiness: suite.readiness,
+    status: suite.status,
+    blocker: suite.blocker,
+  }));
+  const counts = suites.reduce(
+    (acc, suite) => {
+      acc[suite.status] += 1;
+      return acc;
+    },
+    { Ready: 0, Watch: 0, Critical: 0 } satisfies Record<OperatingStatus, number>,
+  );
+
+  return (
+    <Card className="rounded-lg border shadow-sm">
+      <CardHeader className="border-b pb-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="size-5" />
+              Suite health
+              <InfoHint label="Suite health info">Readiness comparison across PrimeOS suites. Each row links to the owner module.</InfoHint>
+            </CardTitle>
+          </div>
+          <StatusDistribution counts={counts} />
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div>
+          <ChartContainer
+            config={suiteReadinessChartConfig}
+            className="h-64 w-full"
+            aria-label={`Suite readiness: ${chartData.map((row) => `${row.suite} ${row.readiness} percent ${row.status}`).join(', ')}`}
+          >
+            <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 44, top: 8, bottom: 8 }}>
+              <CartesianGrid horizontal={false} />
+              <XAxis type="number" domain={[0, 100]} hide />
+              <YAxis type="category" dataKey="suite" width={96} tickLine={false} axisLine={false} tickMargin={8} />
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <Bar dataKey="readiness" fill="var(--color-readiness)" radius={[0, 6, 6, 0]} barSize={18}>
+                <LabelList dataKey="readiness" position="right" formatter={(value: number) => `${value}%`} className="fill-foreground font-medium" />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+          <ul className="sr-only">
+            {chartData.map((row) => (
+              <li key={row.suite}>{row.suite}: {row.readiness} percent, {row.status}. {row.blocker}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="grid content-start gap-2">
+          {suites.map((suite) => {
+            const Icon = suite.icon;
+
+            return (
+              <Link key={suite.area} to={suite.href} className="group rounded-lg border bg-muted/10 p-2.5 transition-colors hover:border-primary/40 hover:bg-muted/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Icon className="size-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+                      <span className="truncate text-sm font-semibold">{suite.area}</span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{suite.metric}</p>
+                  </div>
+                  <StatusBadge status={suite.status} tone="quiet" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatusDistribution({ counts }: { counts: Record<OperatingStatus, number> }) {
+  const total = Math.max(1, counts.Ready + counts.Watch + counts.Critical);
+  const rows: Array<{ status: OperatingStatus; count: number }> = [
+    { status: 'Critical', count: counts.Critical },
+    { status: 'Watch', count: counts.Watch },
+    { status: 'Ready', count: counts.Ready },
+  ];
+
+  return (
+    <div className="min-w-[220px]" aria-label={`${counts.Critical} critical, ${counts.Watch} watch, ${counts.Ready} ready suites`}>
+      <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+        {rows.map((row) => (
+          <span
+            key={row.status}
+            className={statusDotClass(row.status)}
+            style={{ width: `${(row.count / total) * 100}%` }}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+        {rows.map((row) => (
+          <span key={row.status}>{row.count} {row.status}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CrossSuiteFlowSummary({ items }: { items: RiskFlowItem[] }) {
+  return (
+    <Card className="rounded-lg border shadow-sm">
+      <CardHeader className="border-b pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Radar className="size-5" />
+              Cross-suite flow
+              <InfoHint label="Cross-suite flow info">Risk path from inventory through demand, order fulfillment, customer trust, and finance exposure.</InfoHint>
+            </CardTitle>
+          </div>
+          <Badge variant="outline" className="rounded-full">{items.filter((item) => item.status !== 'Ready').length} active</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4">
+        <div className="grid gap-2">
+          {items.map((item, index) => (
+            <Link key={item.stage} to={item.href} className="group grid gap-2 rounded-lg border bg-muted/10 p-3 transition-colors hover:border-primary/40 hover:bg-muted/20 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`size-2 rounded-full ${statusDotClass(item.status, 'quiet')}`} />
+                  <span className="text-sm font-semibold">{index + 1}. {item.stage}</span>
+                  <StatusBadge status={item.status} tone="quiet" />
+                </div>
+                <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{item.signal}</p>
+              </div>
+              <ArrowRight className="size-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuickAccessHub({ groups }: { groups: QuickLinkGroup[] }) {
+  return (
+    <Card className="rounded-lg border shadow-sm">
+      <CardHeader className="border-b pb-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <PackageCheck className="size-5" />
+              Quick access
+              <InfoHint label="Quick access info">Jump into the suite, product, or function that owns the current signal without reopening the sidebar.</InfoHint>
+            </CardTitle>
+          </div>
+          <Badge variant="outline" className="w-fit">{groups.length} suites</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-5">
+        {groups.map((group) => {
+          const Icon = group.icon;
+
+          return (
+            <div key={group.suite} className="rounded-lg border bg-background p-3">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg border bg-muted/30 p-2 text-muted-foreground">
+                  <Icon className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{group.suite}</div>
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{group.summary}</p>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-1.5">
+                {group.links.map((link) => (
+                  <Link key={`${group.suite}-${link.label}`} to={link.href} className="group flex min-h-9 items-center justify-between gap-2 rounded-md border bg-muted/10 px-2.5 py-1.5 text-sm transition-colors hover:border-primary/40 hover:bg-muted/20">
+                    <span className="truncate">{link.label}</span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {link.status ? <span className={`size-2 rounded-full ${statusDotClass(link.status, 'quiet')}`} aria-label={link.status} /> : null}
+                      {link.count ? <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">{link.count}</Badge> : null}
+                      <ArrowRight className="size-3 text-muted-foreground transition-colors group-hover:text-foreground" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 function OperatorModeSwitch({
   mode,
   onModeChange,
@@ -752,10 +1077,12 @@ function OperatorModeSwitch({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <div className="text-sm font-semibold">Operator mode</div>
-        <p className="text-xs text-muted-foreground">{modeCopy[mode]}</p>
-      </div>
+        <div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
+            Operator mode
+            <InfoHint label="Operator mode info">{modeCopy[mode]}</InfoHint>
+          </div>
+        </div>
       <div className="grid w-full grid-cols-3 gap-1 rounded-lg border bg-muted p-1 sm:w-auto" role="group" aria-label="Operator mode">
         {(['command', 'investigate', 'audit'] as OperatingMode[]).map((option) => (
           <Button
@@ -780,8 +1107,10 @@ function SystemHealthStrip({ metrics }: { metrics: HealthMetric[] }) {
     <section className="rounded-lg border bg-card shadow-sm">
       <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold">System Health</h2>
-          <p className="text-xs text-muted-foreground">Compact readiness signals; details stay in owner modules.</p>
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+            Cross-suite KPIs
+            <InfoHint label="Cross-suite KPIs info">Compact operating signals with links back to owner modules.</InfoHint>
+          </h2>
         </div>
         <Badge variant="outline" className="w-fit">{metrics.length} indicators</Badge>
       </div>
@@ -836,8 +1165,8 @@ function PriorityMissionList({
             <CardTitle className="flex items-center gap-2 text-lg">
               <ClipboardList className="size-5" />
               Top 3 Priorities
+              <InfoHint label="Top 3 Priorities info">Owner route, reason, and impact. Details expand only when needed.</InfoHint>
             </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Owner route, reason, impact. Details expand only when needed.</p>
           </div>
           <Badge variant="outline" className="w-fit">{actions.length} visible</Badge>
         </div>
@@ -977,8 +1306,8 @@ function DependencyRiskFlow({
             <CardTitle className="flex items-center gap-2 text-base">
               <Radar className="size-4" />
               Dependency Risk Flow
+              <InfoHint label="Dependency Risk Flow info">Business consequence order; severity stays as metadata.</InfoHint>
             </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Business consequence order; severity stays as metadata.</p>
           </div>
           <Badge variant="outline" className="w-fit">{items.filter((item) => item.status !== 'Ready').length} active</Badge>
         </div>
@@ -1070,6 +1399,7 @@ function SecondarySignalsPanel({
             <CardTitle className="flex items-center gap-2 text-base">
               <Activity className="size-4" />
               Area Status Map
+              <InfoHint label="Area Status Map info">Suite readiness, blocker, and owner-module route for investigation mode.</InfoHint>
             </CardTitle>
           </CardHeader>
           <CardContent className="divide-y p-0">
@@ -1088,8 +1418,8 @@ function SecondarySignalsPanel({
                 <CardTitle className="flex items-center gap-2 text-base">
                   <FileText className="size-4" />
                   Operating Proof Timeline
+                  <InfoHint label="Operating Proof Timeline info">Evidence, events, decisions, and owner actions in one audit-ready lane.</InfoHint>
                 </CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Evidence, events, decisions, and owner actions in one audit-ready lane.</p>
               </div>
               <Badge variant="outline" className="w-fit">{proofTimelineItems.length} proof points</Badge>
             </div>

@@ -40,7 +40,7 @@ const shellEnUS = {
     Alert: 'Alert',
   },
   navLabels: {
-    overview: 'Overview',
+    overview: 'General Dashboard',
     intelligence: 'Intelligence',
     'product-operation-agent': 'Operation Agent',
     'product-operation-command': 'Command Center',
@@ -145,7 +145,7 @@ const shellJaJP: ShellDictionary = {
     Alert: 'アラート',
   },
   navLabels: {
-    overview: '概要',
+    overview: 'General Dashboard',
     intelligence: 'インテリジェンス',
     'product-operation-agent': 'プロダクト運用エージェント',
     'product-operation-command': 'コマンドセンター',
@@ -248,7 +248,7 @@ const shellViVN: ShellDictionary = {
     Alert: 'Cảnh báo',
   },
   navLabels: {
-    overview: 'Tổng quan',
+    overview: 'General Dashboard',
     intelligence: 'Trí tuệ vận hành',
     'product-operation-agent': 'Agent vận hành sản phẩm',
     'product-operation-command': 'Trung tâm điều phối',

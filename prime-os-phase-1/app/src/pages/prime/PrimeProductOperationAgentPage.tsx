@@ -754,71 +754,209 @@ function OperatingKanban({
 }
 
 function AgentQueue({
+  cards,
   proposals,
   onResolve,
 }: {
+  cards: OperatingCard[]
   proposals: OperatingAgentProposal[]
   onResolve: (proposalId: string, status: Extract<OperatingProposalStatus, 'approved' | 'rejected' | 'executed'>) => void
 }) {
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const selectedProposal = proposals.find((proposal) => proposal.id === selectedProposalId) ?? null;
+  const selectedCard = selectedProposal ? cards.find((card) => card.id === selectedProposal.cardId) ?? null : null;
+
+  const renderProposalActions = (proposal: OperatingAgentProposal) => {
+    if (terminalProposalStatuses.has(proposal.status)) {
+      return <Badge variant={proposal.status === 'rejected' ? 'destructive' : 'secondary'}>{proposalLabel[proposal.status]}</Badge>;
+    }
+
+    if (proposal.requiresApproval) {
+      return (
+        <>
+          <Button
+            size="sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onResolve(proposal.id, 'approved');
+            }}
+          >
+            <CheckCircle2 className="size-4" /> Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(event) => {
+              event.stopPropagation();
+              onResolve(proposal.id, 'rejected');
+            }}
+          >
+            <XCircle className="size-4" /> Reject
+          </Button>
+        </>
+      );
+    }
+
+    return (
+      <Button
+        size="sm"
+        onClick={(event) => {
+          event.stopPropagation();
+          onResolve(proposal.id, 'executed');
+        }}
+      >
+        <ClipboardCheck className="size-4" /> Mark executed
+      </Button>
+    );
+  };
+
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {proposals.map((proposal) => (
-        <Card key={proposal.id} className="rounded-2xl">
-          <CardHeader>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <CardTitle className="text-lg">{proposal.title}</CardTitle>
-                  <InfoHint label={`${proposal.title} info`}>{proposal.summary}</InfoHint>
+    <>
+      <Card className="overflow-hidden rounded-2xl">
+        <CardHeader className="border-b">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-1.5 text-lg">
+                Agent Queue
+                <InfoHint label="Agent Queue list info">Click a row to inspect evidence, policy checks, and audit context.</InfoHint>
+              </CardTitle>
+            </div>
+            <Badge variant="outline">{proposals.length} packets</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="hidden border-b bg-muted/30 px-4 py-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground md:grid md:grid-cols-[minmax(260px,1.35fr)_170px_120px_minmax(150px,0.8fr)_230px] md:gap-4">
+            <div>Packet</div>
+            <div>Agent</div>
+            <div>Action</div>
+            <div>Status</div>
+            <div>Controls</div>
+          </div>
+          <div className="divide-y">
+            {proposals.map((proposal) => (
+              <div
+                key={proposal.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedProposalId(proposal.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedProposalId(proposal.id);
+                  }
+                }}
+                className="grid cursor-pointer gap-3 px-4 py-4 transition-colors hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/30 md:grid-cols-[minmax(260px,1.35fr)_170px_120px_minmax(150px,0.8fr)_230px] md:items-center md:gap-4"
+              >
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <div className="truncate font-semibold">{proposal.title}</div>
+                    <InfoHint label={`${proposal.title} info`}>{proposal.summary}</InfoHint>
+                  </div>
+                  <div className="mt-1 truncate text-xs text-muted-foreground">{proposal.route}</div>
+                </div>
+                <div className="text-sm">
+                  <div className="md:hidden text-xs text-muted-foreground">Agent</div>
+                  <div className="font-medium">{proposal.agentName}</div>
+                </div>
+                <div className="text-sm capitalize">
+                  <div className="md:hidden text-xs text-muted-foreground">Action</div>
+                  {proposal.actionType}
+                </div>
+                <div>
+                  <Badge variant={proposal.status === 'rejected' ? 'destructive' : proposal.requiresApproval ? 'outline' : 'secondary'}>
+                    {proposalLabel[proposal.status]}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+                  {renderProposalActions(proposal)}
+                  <Button asChild size="sm" variant="ghost">
+                    <Link to={proposal.route}>
+                      Open route <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
                 </div>
               </div>
-              <Badge variant={proposal.status === 'rejected' ? 'destructive' : proposal.requiresApproval ? 'outline' : 'secondary'}>
-                {proposalLabel[proposal.status]}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 text-sm sm:grid-cols-3">
-              <div className="rounded-xl border bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Agent</div>
-                <div className="mt-1 font-medium">{proposal.agentName}</div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(selectedProposal)} onOpenChange={(open) => !open && setSelectedProposalId(null)}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-2xl">
+          {selectedProposal ? (
+            <div className="space-y-5">
+              <DialogHeader>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={selectedProposal.status === 'rejected' ? 'destructive' : selectedProposal.requiresApproval ? 'outline' : 'secondary'}>
+                    {proposalLabel[selectedProposal.status]}
+                  </Badge>
+                  <Badge variant="secondary" className="capitalize">{selectedProposal.actionType}</Badge>
+                  {selectedCard ? <Badge variant="outline">{selectedCard.sourceSuite}</Badge> : null}
+                </div>
+                <DialogTitle className="text-2xl">{selectedProposal.title}</DialogTitle>
+                <DialogDescription>{selectedProposal.summary}</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
+                <div className="rounded-xl border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground">Agent</div>
+                  <div className="mt-1 font-medium">{selectedProposal.agentName}</div>
+                </div>
+                <div className="rounded-xl border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground">Route</div>
+                  <div className="mt-1 truncate font-medium">{selectedProposal.route}</div>
+                </div>
+                <div className="rounded-xl border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground">Approval</div>
+                  <div className="mt-1 font-medium">{selectedProposal.requiresApproval ? 'Operator required' : 'Not required'}</div>
+                </div>
               </div>
-              <div className="rounded-xl border bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Action</div>
-                <div className="mt-1 font-medium capitalize">{proposal.actionType}</div>
-              </div>
-              <div className="rounded-xl border bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Route</div>
-                <div className="mt-1 truncate font-medium">{proposal.route}</div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {terminalProposalStatuses.has(proposal.status) ? (
-                <Badge variant={proposal.status === 'rejected' ? 'destructive' : 'secondary'}>{proposalLabel[proposal.status]}</Badge>
-              ) : proposal.requiresApproval ? (
-                <>
-                  <Button size="sm" onClick={() => onResolve(proposal.id, 'approved')}>
-                    <CheckCircle2 className="size-4" /> Approve
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => onResolve(proposal.id, 'rejected')}>
-                    <XCircle className="size-4" /> Reject
-                  </Button>
-                </>
-              ) : (
-                <Button size="sm" onClick={() => onResolve(proposal.id, 'executed')}>
-                  <ClipboardCheck className="size-4" /> Mark executed
+
+              {selectedCard ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <section className="rounded-xl border p-4">
+                    <h3 className="font-semibold">Evidence</h3>
+                    <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                      {selectedCard.evidence.map((item) => (
+                        <div key={item} className="rounded-lg border bg-muted/20 px-3 py-2">{item}</div>
+                      ))}
+                    </div>
+                  </section>
+                  <section className="rounded-xl border p-4">
+                    <h3 className="font-semibold">Policy checks</h3>
+                    <div className="mt-3 space-y-2 text-sm">
+                      {selectedCard.policyChecklist.map((check) => (
+                        <div key={check.label} className="flex items-center gap-2 rounded-lg border bg-muted/20 px-3 py-2">
+                          {check.passed ? <CheckCircle2 className="size-4 text-emerald-600" /> : <Clock3 className="size-4 text-amber-600" />}
+                          <span>{check.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                  <section className="rounded-xl border p-4 md:col-span-2">
+                    <h3 className="font-semibold">Audit context</h3>
+                    <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+                      {selectedCard.auditTrail.map((item) => (
+                        <div key={item} className="rounded-lg border bg-muted/20 px-3 py-2">{item}</div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2 border-t pt-4">
+                {renderProposalActions(selectedProposal)}
+                <Button asChild variant="outline">
+                  <Link to={selectedProposal.route}>
+                    Open source route <ArrowRight className="size-4" />
+                  </Link>
                 </Button>
-              )}
-              <Button asChild size="sm" variant="ghost">
-                <Link to={proposal.route}>
-                  Open route <ArrowRight className="size-4" />
-                </Link>
-              </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -987,7 +1125,7 @@ export function PrimeProductOperationAgentPage() {
           <CommandCenter cards={cards} proposals={proposals} onQueueApproval={handleQueueApprovalFromChat} />
         </div>
         {activeView === 'kanban' ? <OperatingKanban cards={cards} lanes={seed.lanes} onMoveCard={handleMoveCard} onOpenCard={setSelectedCardId} /> : null}
-        {activeView === 'queue' ? <AgentQueue proposals={proposals} onResolve={handleResolveProposal} /> : null}
+        {activeView === 'queue' ? <AgentQueue cards={cards} proposals={proposals} onResolve={handleResolveProposal} /> : null}
         {activeView === 'audit' ? <AuditView cards={cards} proposals={proposals} /> : null}
       </main>
       <CardDetailDialog card={selectedCard} onClose={() => setSelectedCardId(null)} />
