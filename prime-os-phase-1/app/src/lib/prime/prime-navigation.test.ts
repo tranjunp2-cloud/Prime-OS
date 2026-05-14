@@ -30,8 +30,8 @@ describe('prime navigation utility routes', () => {
   });
 
   it('resolves Demand V1 hub, sources, and legacy route labels', () => {
-    expect(getPrimeNavPath('/demand').map((item) => item.label)).toEqual(['Demand', 'Demand Hub']);
-    expect(getPrimeNavPath('/demand/hub').map((item) => item.label)).toEqual(['Demand', 'Demand Hub']);
+    expect(getPrimeNavPath('/demand').map((item) => item.label)).toEqual(['Demand', 'Demand Dashboard']);
+    expect(getPrimeNavPath('/demand/hub').map((item) => item.label)).toEqual(['Demand', 'Demand Dashboard']);
     expect(getPrimeNavPath('/demand/mdec').map((item) => item.label)).toEqual(['Demand', 'MDEC']);
     expect(getPrimeNavPath('/demand/mdec?view=escalations').map((item) => item.label)).toEqual(['Demand', 'MDEC', 'Workflow', 'Escalations']);
     expect(getPrimeNavPath('/demand/sources').map((item) => item.label)).toEqual(['Demand', 'Sources']);

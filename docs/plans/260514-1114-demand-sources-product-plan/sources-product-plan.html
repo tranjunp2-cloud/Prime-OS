@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PrimeOS Demand Center - Sources Product Plan</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --panel-soft: #fbfcff;
+      --text: #111827;
+      --muted: #5f6675;
+      --faint: #8b93a3;
+      --line: #dde2eb;
+      --line-soft: #edf0f5;
+      --brand: #5646e8;
+      --brand-soft: #eef0ff;
+      --blue: #0f82d4;
+      --blue-soft: #e9f5ff;
+      --green: #0f9f73;
+      --green-soft: #eaf8f1;
+      --amber: #b56b08;
+      --amber-soft: #fff6df;
+      --red: #d13b4c;
+      --red-soft: #fff0f2;
+      --purple: #6c3ce9;
+      --purple-soft: #f2ecff;
+      --shadow: 0 18px 50px rgba(16, 24, 40, 0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.58;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      border-right: 1px solid var(--line);
+      background: #fff;
+      padding: 28px 20px;
+    }
+
+    main {
+      min-width: 0;
+      padding: 34px;
+    }
+
+    .brand {
+      margin-bottom: 28px;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav-title {
+      margin: 24px 0 8px;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .toc a {
+      display: block;
+      border-radius: 10px;
+      padding: 9px 10px;
+      color: #3d4452;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      background: var(--brand-soft);
+      color: var(--brand);
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 92% 0%, rgba(86, 70, 232, 0.14), transparent 30%),
+        linear-gradient(135deg, #fff 0%, #f9fbff 100%);
+      box-shadow: var(--shadow);
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-size: clamp(36px, 5vw, 68px);
+      line-height: 0.98;
+      letter-spacing: -0.055em;
+    }
+
+    .lead {
+      max-width: 920px;
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .metric {
+      min-height: 112px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.78);
+      padding: 16px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 26px;
+      letter-spacing: -0.04em;
+    }
+
+    .metric p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    section {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      overflow: hidden;
+    }
+
+    .section-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 24px 26px 18px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.035em;
+    }
+
+    .section-head p {
+      max-width: 880px;
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .content {
+      padding: 24px 26px 28px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid.four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      padding: 18px;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .card p {
+      margin: 0;
+    }
+
+    ul,
+    ol {
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 4px 10px;
+      color: #2f3745;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .pill.brand {
+      margin: 0;
+      border-color: rgba(86, 70, 232, 0.25);
+      background: var(--brand-soft);
+      color: var(--brand);
+    }
+
+    .pill.green {
+      border-color: rgba(15, 159, 115, 0.26);
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .pill.amber {
+      border-color: rgba(181, 107, 8, 0.28);
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .pill.red {
+      border-color: rgba(209, 59, 76, 0.25);
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      vertical-align: top;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: #f8f9fc;
+      color: #4a5262;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td {
+      color: var(--muted);
+    }
+
+    td strong {
+      color: var(--text);
+    }
+
+    code,
+    pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      border-radius: 5px;
+      background: #eef1f6;
+      padding: 2px 5px;
+      color: #253044;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0f172a;
+      padding: 18px;
+      color: #d7e1f5;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .callout {
+      border: 1px solid rgba(86, 70, 232, 0.24);
+      border-radius: var(--radius);
+      background: var(--brand-soft);
+      padding: 16px 18px;
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--brand);
+    }
+
+    .callout p {
+      margin: 0;
+      color: #3f4363;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .flow-step {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 16px;
+    }
+
+    .flow-step:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 50%;
+      right: -11px;
+      z-index: 2;
+      width: 20px;
+      height: 20px;
+      transform: translateY(-50%);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 18px;
+      text-align: center;
+    }
+
+    .flow-step span {
+      display: block;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 16px;
+    }
+
+    .flow-step p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 14px;
+    }
+
+    .bars {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr) 52px;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .bar-track {
+      height: 10px;
+      border-radius: 999px;
+      background: #edf0f5;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--brand), #2f8ce8);
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: 1.1fr repeat(5, 1fr);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .matrix div {
+      min-height: 44px;
+      border-right: 1px solid var(--line-soft);
+      border-bottom: 1px solid var(--line-soft);
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .matrix div:nth-child(6n) {
+      border-right: 0;
+    }
+
+    .matrix .head {
+      background: #f8f9fc;
+      color: #4a5262;
+      font-weight: 800;
+    }
+
+    .heat-high {
+      background: var(--green-soft);
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .heat-mid {
+      background: var(--amber-soft);
+      color: var(--amber);
+      font-weight: 800;
+    }
+
+    .heat-low {
+      background: var(--red-soft);
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .phase {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr);
+      gap: 16px;
+      border-top: 1px solid var(--line-soft);
+      padding: 20px 0;
+    }
+
+    .phase:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .phase-marker {
+      align-self: start;
+      border: 1px solid rgba(86, 70, 232, 0.25);
+      border-radius: var(--radius);
+      background: var(--brand-soft);
+      padding: 12px;
+      color: var(--brand);
+      font-weight: 800;
+    }
+
+    .phase h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .phase p {
+      margin: 0 0 10px;
+      color: var(--muted);
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .check {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .check::before {
+      content: "";
+      width: 15px;
+      height: 15px;
+      margin-top: 2px;
+      border: 1px solid var(--brand);
+      border-radius: 5px;
+      background: var(--brand-soft);
+    }
+
+    .file-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .file {
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .file strong {
+      color: var(--text);
+    }
+
+    .footer-note {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 1100px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        position: static;
+        height: auto;
+      }
+
+      main {
+        padding: 22px;
+      }
+
+      .hero-grid,
+      .grid.four,
+      .grid.three,
+      .grid.two,
+      .flow,
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-step::after {
+        display: none;
+      }
+
+      .phase {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">
+        <strong>PrimeOS Plan</strong>
+        <span>Demand Center / Sources</span>
+      </div>
+      <div class="nav-title">Plan Index</div>
+      <ul class="toc">
+        <li><a href="#summary">Executive summary</a></li>
+        <li><a href="#challenge">Scope challenge</a></li>
+        <li><a href="#codebase">Codebase context</a></li>
+        <li><a href="#users">Users and jobs</a></li>
+        <li><a href="#domain">Domain model</a></li>
+        <li><a href="#rules">Rules and boundaries</a></li>
+        <li><a href="#ui">UI / UX plan</a></li>
+        <li><a href="#charts">Charts and infographics</a></li>
+        <li><a href="#workflows">Operating workflows</a></li>
+        <li><a href="#data">Data contracts</a></li>
+        <li><a href="#phases">Implementation phases</a></li>
+        <li><a href="#acceptance">Acceptance criteria</a></li>
+        <li><a href="#handoff">Cook handoff</a></li>
+      </ul>
+      <div class="nav-title">Metadata</div>
+      <div class="card">
+        <p><strong>Status:</strong> implemented</p>
+        <p><strong>Created:</strong> 2026-05-14</p>
+        <p><strong>Plan dir:</strong><br /><code>docs/plans/260514-1114-demand-sources-product-plan</code></p>
+      </div>
+    </aside>
+
+    <main>
+      <article class="hero" id="summary">
+        <div class="eyebrow">
+          <span>Demand Center</span>
+          <span>/</span>
+          <span>Sources</span>
+          <span>/</span>
+          <span>Product + BA Plan</span>
+        </div>
+        <h1>Sources as the Demand Source Registry and Source Quality Engine</h1>
+        <p class="lead">
+          Sources gom, chuẩn hóa và đánh giá toàn bộ nguồn tạo demand cho seller/factory. Module này giúp operator biết demand đến từ đâu, nguồn nào tạo lead/RFQ thật, SKU nào có tín hiệu tốt, campaign nào đang kéo demand thật, và nguồn nào đáng tiếp tục đầu tư.
+        </p>
+        <div class="hero-grid">
+          <div class="metric">
+            <span>Product position</span>
+            <strong>Registry + engine</strong>
+            <p>Không chỉ là channel list hay traffic dashboard.</p>
+          </div>
+          <div class="metric">
+            <span>Primary route</span>
+            <strong>/demand/sources</strong>
+            <p>Existing route is already wired in PrimeOS.</p>
+          </div>
+          <div class="metric">
+            <span>MVP data</span>
+            <strong>Derived first</strong>
+            <p>Use socialStreams, campaigns, leads, RFQs before backend contracts.</p>
+          </div>
+          <div class="metric">
+            <span>Operating output</span>
+            <strong>Scale / fix / pause</strong>
+            <p>Every source needs an owner, reason, and next move.</p>
+          </div>
+        </div>
+      </article>
+
+      <section id="challenge">
+        <div class="section-head">
+          <div>
+            <h2>1. Scope Challenge</h2>
+            <p>YAGNI/KISS check: build the decision workspace first; avoid turning Sources into a full ad manager, CRM, BI attribution suite, or ingestion admin console.</p>
+          </div>
+          <div class="pill-row">
+            <span class="pill brand">Scope locked</span>
+            <span class="pill amber">Hard plan</span>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>What Sources must own</h3>
+            <ul>
+              <li>Ghi nhận nguồn demand: marketplace, social, ads, partner, manual import.</li>
+              <li>Chuẩn hóa source data thành registry có owner, market, SKU/category, campaign links.</li>
+              <li>Đo chất lượng nguồn bằng lead/RFQ quality, conversion, duplicate, freshness, buyer fit.</li>
+              <li>Đưa ra next action: scale, test, fix, pause, review, route leads/RFQs.</li>
+              <li>Giữ source lineage khi handoff qua Campaigns, Leads/RFQs, Customer/CRM, Finance, Intelligence.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>What Sources must not own</h3>
+            <ul>
+              <li>Không xử lý toàn bộ CRM hoặc account/customer lifecycle.</li>
+              <li>Không quyết định giá bán, fulfillment, finance ledger, funding approval, hay campaign budget approval.</li>
+              <li>Không mutate product master, order truth, quote truth, customer truth từ Sources page.</li>
+              <li>Không claim final attribution/ROI nếu chưa có Intelligence readback model rõ ràng.</li>
+              <li>Không hiển thị vanity metrics nếu metric đó không hỗ trợ decision hoặc handoff.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="codebase">
+        <div class="section-head">
+          <div>
+            <h2>2. Codebase Context</h2>
+            <p>Current app already has a working route and a lightweight derived Sources view. Plan should extend this path instead of introducing a parallel module.</p>
+          </div>
+          <span class="pill green">No blocking plan found</span>
+        </div>
+        <div class="content">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Current state</th>
+                <th>Implication for plan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Route</strong></td>
+                <td><code>prime-os-phase-1/app/src/App.tsx</code> maps <code>/demand/sources</code> to <code>PrimeDemandSourcesPage</code>. Legacy <code>/demand/acquisition</code> redirects to Sources.</td>
+                <td>Keep route stable. Treat Sources as the official Demand source workspace.</td>
+              </tr>
+              <tr>
+                <td><strong>Navigation</strong></td>
+                <td><code>prime-navigation.ts</code> has Demand child tower <code>sources</code>, label <code>Sources</code>, icon <code>Globe</code>, href <code>/demand/sources</code>.</td>
+                <td>Optional subnav can be added later: Overview, Registry, Signals, Imports, Attribution, Rules.</td>
+              </tr>
+              <tr>
+                <td><strong>Existing UI</strong></td>
+                <td><code>PrimeDemandSourcesPage</code> lives inside <code>PrimeTowerPage.tsx</code> and currently shows DecisionHeader, KPI cards, weak-source lane, source registry table, source-to-action cards.</td>
+                <td>Use as MVP foundation. Consider extracting to <code>PrimeDemandSourcesPage.tsx</code> if the feature grows.</td>
+              </tr>
+              <tr>
+                <td><strong>Current data</strong></td>
+                <td><code>getPrimeSnapshot()</code> exposes <code>campaigns</code>, <code>leads</code>, <code>rfqs</code>, <code>customers</code>, <code>products</code>, <code>forecasts</code>, <code>socialStreams</code>, <code>orders</code>.</td>
+                <td>Build derived <code>DemandSource</code> read model from existing snapshot first.</td>
+              </tr>
+              <tr>
+                <td><strong>Closest source model</strong></td>
+                <td><code>PrimeSocialStream</code>: source, ingestionMode, eventVolume, freshnessMinutes, audienceSignal, status.</td>
+                <td>Extend into canonical source registry rather than replacing immediately.</td>
+              </tr>
+              <tr>
+                <td><strong>Flow registry</strong></td>
+                <td><code>campaign-to-lead</code> includes routes <code>/demand/campaigns</code>, <code>/demand/sources</code>, <code>/demand/leads-rfqs</code>, <code>/customer/crm-compact</code>.</td>
+                <td>Sources should preserve lineage into lead/RFQ/customer handoff.</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout">
+            <strong>Cross-plan dependency scan</strong>
+            <p>Relevant references: <code>docs/plans/2026-05-05-demand-ui-overview-style-refresh</code>, <code>docs/plans/2026-05-08-primeos-v1-alignment-roadmap</code>, and <code>docs/plans/260514-0155-general-dashboard-overview-restructure</code>. No active blocker detected. This plan should align with those outputs but does not need to modify them.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="users">
+        <div class="section-head">
+          <div>
+            <h2>3. Users, Jobs, and First-Screen Questions</h2>
+            <p>Sources should answer operating questions within the first screen, then let details expand only when needed.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>Core questions</h3>
+            <table>
+              <tbody>
+                <tr><td><strong>Demand đến từ đâu?</strong></td><td>Marketplace, social, ads, partner, manual import.</td></tr>
+                <tr><td><strong>Nguồn nào tạo lead tốt?</strong></td><td>Lead/RFQ quality, not just traffic.</td></tr>
+                <tr><td><strong>SKU nào có tín hiệu tốt?</strong></td><td>Source to SKU/category signal heatmap.</td></tr>
+                <tr><td><strong>Campaign nào kéo demand thật?</strong></td><td>Source-to-campaign linkage and output.</td></tr>
+                <tr><td><strong>Có nên tiếp tục đầu tư?</strong></td><td>Scale/test/fix/pause recommendation with guardrails.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>User roles</h3>
+            <ul>
+              <li><strong>Demand operator:</strong> compare active demand origins and choose next move.</li>
+              <li><strong>Growth/campaign manager:</strong> know which source should feed campaign or content work.</li>
+              <li><strong>Sales/RFQ responder:</strong> trace lead/RFQ source and urgency.</li>
+              <li><strong>Seller/factory owner:</strong> understand where real demand is forming.</li>
+              <li><strong>Finance/COS stakeholder:</strong> see guardrails before demand is scaled.</li>
+              <li><strong>Data/admin:</strong> maintain mappings, owners, import batches, duplicate rules.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="domain">
+        <div class="section-head">
+          <div>
+            <h2>4. Domain Model</h2>
+            <p>The core chain is Source -> Signal -> Lead/RFQ -> Opportunity. Sources owns upstream origin quality and lineage, not downstream source-of-truth records.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="flow">
+            <div class="flow-step">
+              <span>Layer 1</span>
+              <strong>Source</strong>
+              <p>Where demand originates: marketplace, social, ads, partner, manual import.</p>
+            </div>
+            <div class="flow-step">
+              <span>Layer 2</span>
+              <strong>Signal</strong>
+              <p>Click, message, form, comment, inquiry, trend, import row, referral event.</p>
+            </div>
+            <div class="flow-step">
+              <span>Layer 3</span>
+              <strong>Lead / RFQ</strong>
+              <p>Qualified buyer intent with SKU, customer, market, SLA, value context.</p>
+            </div>
+            <div class="flow-step">
+              <span>Layer 4</span>
+              <strong>Opportunity</strong>
+              <p>Commercial opportunity ready for CRM, campaign, finance, or COS handoff.</p>
+            </div>
+          </div>
+
+          <div class="grid two" style="margin-top: 16px;">
+            <div class="card">
+              <h3>Module taxonomy</h3>
+              <ul>
+                <li><strong>Marketplace Source:</strong> Amazon, Rakuten, Shopee, TikTok Shop, other marketplaces.</li>
+                <li><strong>Social Source:</strong> Facebook, Instagram, TikTok, YouTube, LINE/community.</li>
+                <li><strong>Ads Source:</strong> Google Ads, Meta Ads, TikTok Ads, marketplace ads, sponsored campaign.</li>
+                <li><strong>Partner Source:</strong> distributor, agency, affiliate, KOL/creator, business partner.</li>
+                <li><strong>Manual Import:</strong> CSV, sales team input, event list, offline contact, legacy lead data.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Entity set</h3>
+              <div class="pill-row">
+                <span class="pill">DemandSource</span>
+                <span class="pill">SourceType</span>
+                <span class="pill">SourceConnection</span>
+                <span class="pill">DemandSignal</span>
+                <span class="pill">SourceAttribution</span>
+                <span class="pill">SourceQualityScore</span>
+                <span class="pill">SourceOwner</span>
+                <span class="pill">SourceImportBatch</span>
+                <span class="pill">SourceMappingRule</span>
+                <span class="pill">SourceSkuSignal</span>
+                <span class="pill">SourceCampaignLink</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="rules">
+        <div class="section-head">
+          <div>
+            <h2>5. Business Rules and Boundaries</h2>
+            <p>These are the rules that make Sources operational instead of becoming another passive dashboard.</p>
+          </div>
+        </div>
+        <div class="content">
+          <table>
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th>Why it matters</th>
+                <th>MVP enforcement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Một lead phải có source gốc.</strong></td>
+                <td>Without origin, attribution and quality learning break.</td>
+                <td>Show missing-source warning and mapping rule prompt.</td>
+              </tr>
+              <tr>
+                <td><strong>Một source phải có owner.</strong></td>
+                <td>Source insights need accountable action.</td>
+                <td>Owner column required; ownerless sources go to needs review.</td>
+              </tr>
+              <tr>
+                <td><strong>Duplicate rate cao phải bị flag.</strong></td>
+                <td>Protect lead/RFQ quality from noisy imports or spam.</td>
+                <td>Add duplicate risk as score penalty and review reason.</td>
+              </tr>
+              <tr>
+                <td><strong>RFQ quality cao nên recommend tăng đầu tư.</strong></td>
+                <td>Operators need investment decision support.</td>
+                <td>Scale recommendation requires RFQ rate, buyer fit, SKU readiness, finance guardrail.</td>
+              </tr>
+              <tr>
+                <td><strong>SKU hết hàng phải cảnh báo.</strong></td>
+                <td>A strong source can become harmful if fulfillment cannot support demand.</td>
+                <td>Block scale CTA and route to COS/Product.</td>
+              </tr>
+              <tr>
+                <td><strong>Manual import phải có batch log.</strong></td>
+                <td>Hand-entered demand needs traceability.</td>
+                <td>Every manual row points to SourceImportBatch and import owner.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ui">
+        <div class="section-head">
+          <div>
+            <h2>6. UI / UX Plan</h2>
+            <p>Enterprise SaaS direction: fewer explanatory paragraphs, more ranked operating views, visual source quality, and fast links into product functions.</p>
+          </div>
+        </div>
+        <div class="content grid three">
+          <div class="card">
+            <h3>Sources Overview</h3>
+            <ul>
+              <li>Top answer card: best source, worst source, and next operating action.</li>
+              <li>KPI strip: active sources, top performing source, leads, RFQs, avg quality, sources needing review.</li>
+              <li>Quality matrix and source funnel above the fold.</li>
+              <li>Quick links to Campaigns, Leads/RFQs, MDEC, Product/SKU, Finance.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Source List</h3>
+            <ul>
+              <li>List-first layout with expandable rows or detail drawer.</li>
+              <li>Columns: source, type, owner, market, leads, RFQs, quality, duplicate rate, status, next action.</li>
+              <li>Row actions: view detail, route leads, create campaign, fix content, suppress source.</li>
+              <li>Filters: type, status, owner, market, SKU/category, campaign, review needed.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Source Detail</h3>
+            <ul>
+              <li>Basic info, owner, market, connected channel, mapping rules.</li>
+              <li>Performance: signal, lead/RFQ, conversion, score, duplicate, cost per qualified lead.</li>
+              <li>Linked campaigns and SKU/category signals.</li>
+              <li>Recent signals, attribution timeline, import batch log, recommended actions.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="charts">
+        <div class="section-head">
+          <div>
+            <h2>7. Charts and Infographics to Prioritize</h2>
+            <p>User asked to prioritize charts/infographics where useful. Sources should show quality and movement, not decorative visuals.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="chart-grid">
+            <div class="card">
+              <h3>Source Quality Ranking</h3>
+              <div class="bars">
+                <div class="bar-row">
+                  <span>Rakuten Search</span>
+                  <div class="bar-track"><div class="bar-fill" style="width: 91%;"></div></div>
+                  <strong>91</strong>
+                </div>
+                <div class="bar-row">
+                  <span>Distributor Referral</span>
+                  <div class="bar-track"><div class="bar-fill" style="width: 88%;"></div></div>
+                  <strong>88</strong>
+                </div>
+                <div class="bar-row">
+                  <span>TikTok Organic VN</span>
+                  <div class="bar-track"><div class="bar-fill" style="width: 82%;"></div></div>
+                  <strong>82</strong>
+                </div>
+                <div class="bar-row">
+                  <span>Meta Ads Matcha</span>
+                  <div class="bar-track"><div class="bar-fill" style="width: 54%;"></div></div>
+                  <strong>54</strong>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Source x SKU Heatmap</h3>
+              <div class="matrix">
+                <div class="head">Source</div>
+                <div class="head">Matcha</div>
+                <div class="head">Tea</div>
+                <div class="head">Bundle</div>
+                <div class="head">Refill</div>
+                <div class="head">B2B</div>
+                <div>TikTok Organic</div>
+                <div class="heat-high">High</div>
+                <div class="heat-mid">Med</div>
+                <div class="heat-high">High</div>
+                <div class="heat-low">Low</div>
+                <div class="heat-mid">Med</div>
+                <div>Rakuten Search</div>
+                <div class="heat-high">High</div>
+                <div class="heat-high">High</div>
+                <div class="heat-mid">Med</div>
+                <div class="heat-mid">Med</div>
+                <div class="heat-low">Low</div>
+                <div>Partner Referral</div>
+                <div class="heat-mid">Med</div>
+                <div class="heat-low">Low</div>
+                <div class="heat-mid">Med</div>
+                <div class="heat-high">High</div>
+                <div class="heat-high">High</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid three" style="margin-top: 14px;">
+            <div class="card">
+              <h3>Funnel</h3>
+              <p>Source volume -> qualified signals -> leads -> RFQs -> opportunities. Best for first-screen conversion truth.</p>
+            </div>
+            <div class="card">
+              <h3>Quality Quadrant</h3>
+              <p>X-axis source volume, Y-axis quality score. Quadrants: scale, nurture, fix, suppress.</p>
+            </div>
+            <div class="card">
+              <h3>Attribution Timeline</h3>
+              <p>First touch, last touch, campaign touch, manual override, RFQ conversion. Use confidence labels, not overclaimed ROI.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflows">
+        <div class="section-head">
+          <div>
+            <h2>8. Operating Workflows</h2>
+            <p>Each workflow should end with an explicit owner, target workspace, audit note, and reversible handoff.</p>
+          </div>
+        </div>
+        <div class="content">
+          <table>
+            <thead>
+              <tr>
+                <th>Workflow</th>
+                <th>Trigger</th>
+                <th>Steps</th>
+                <th>Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Connect source</strong></td>
+                <td>New source or channel discovered.</td>
+                <td>Select type, owner, market, connection mode, linked SKU/category, mapping rule.</td>
+                <td>DemandSource active or needs_review.</td>
+              </tr>
+              <tr>
+                <td><strong>Manual CSV import</strong></td>
+                <td>Sales/event/offline lead list.</td>
+                <td>Upload batch, map fields, dedupe, assign source owner, preview errors, commit import.</td>
+                <td>SourceImportBatch with traceable rows.</td>
+              </tr>
+              <tr>
+                <td><strong>Qualify signal to lead/RFQ</strong></td>
+                <td>Signal has buyer fit and SKU intent.</td>
+                <td>Open signal detail, confirm lead/RFQ candidate, attach source attribution, route to Leads/RFQs.</td>
+                <td>Lead/RFQ handoff package.</td>
+              </tr>
+              <tr>
+                <td><strong>Attribution override</strong></td>
+                <td>First/last-touch is wrong or missing.</td>
+                <td>Review timeline, choose source, add reason, save manual override.</td>
+                <td>Auditable SourceAttribution update.</td>
+              </tr>
+              <tr>
+                <td><strong>Suppress weak source</strong></td>
+                <td>Duplicate, stale, low quality, blocked SKU, poor buyer fit.</td>
+                <td>Open source, inspect reasons, choose pause/suppress, notify owner, set review date.</td>
+                <td>Status paused with recovery rule.</td>
+              </tr>
+              <tr>
+                <td><strong>Scale source</strong></td>
+                <td>Quality score and RFQ quality are strong.</td>
+                <td>Check inventory, finance, customer suppression; then create campaign or resource recommendation.</td>
+                <td>Campaign/Finance/Product handoff, not direct budget mutation.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="data">
+        <div class="section-head">
+          <div>
+            <h2>9. Data Contracts</h2>
+            <p>MVP should implement a derived read model first, then evolve toward persisted source registry and API contracts.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div>
+            <pre><code>type SourceType =
+  | 'marketplace'
+  | 'social'
+  | 'ads'
+  | 'partner'
+  | 'manual';
+
+type SourceStatus =
+  | 'active'
+  | 'inactive'
+  | 'needs_review'
+  | 'suppressed';
+
+interface DemandSource {
+  id: string;
+  name: string;
+  type: SourceType;
+  status: SourceStatus;
+  ownerId: string;
+  ownerLabel: string;
+  market: string;
+  connectedChannel?: string;
+  linkedCampaignIds: string[];
+  linkedSkuIds: string[];
+  linkedCategoryIds: string[];
+  qualityScore: number;
+  leadCount: number;
+  rfqCount: number;
+  conversionRate: number;
+  duplicateRate: number;
+  costPerQualifiedLead?: number;
+  lastSyncAt: string;
+  nextAction: SourceNextAction;
+}</code></pre>
+          </div>
+          <div>
+            <pre><code>interface SourceAttribution {
+  id: string;
+  leadId?: string;
+  rfqId?: string;
+  opportunityId?: string;
+  firstSourceId?: string;
+  lastSourceId?: string;
+  touchpoints: Array<{
+    sourceId: string;
+    campaignId?: string;
+    occurredAt: string;
+    confidence: number;
+    eventType: 'click' | 'message' | 'form' | 'comment' | 'inquiry' | 'import';
+  }>;
+  manualOverrideSourceId?: string;
+  overrideReason?: string;
+}
+
+interface SourceQualityScore {
+  sourceId: string;
+  score: number;
+  label: 'scale' | 'test' | 'fix' | 'pause' | 'review';
+  factors: {
+    leadVolume: number;
+    rfqVolume: number;
+    responseQuality: number;
+    buyerFit: number;
+    skuRelevance: number;
+    duplicatePenalty: number;
+    freshnessPenalty: number;
+  };
+  reasons: string[];
+  blockers: string[];
+}</code></pre>
+          </div>
+        </div>
+        <div class="content" style="padding-top: 0;">
+          <div class="callout">
+            <strong>MVP read model recommendation</strong>
+            <p>Create helper functions such as <code>buildDemandSources(snapshot)</code>, <code>scoreDemandSource(source)</code>, and <code>getSourceRecommendedAction(source)</code>. Derive initial rows from <code>socialStreams</code>, <code>campaigns</code>, <code>leads</code>, and <code>rfqs</code>; only persist canonical entities after taxonomy and thresholds are approved.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="phases">
+        <div class="section-head">
+          <div>
+            <h2>10. Implementation Phases</h2>
+            <p>Phases are intentionally buildable. Each phase can be cooked separately after product approval.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="phase">
+            <div class="phase-marker">Phase 0</div>
+            <div>
+              <h3>Confirm taxonomy, thresholds, and boundaries</h3>
+              <p>Lock source types, score factors, next-action labels, owner model, and non-goals before UI work.</p>
+              <div class="checklist">
+                <div class="check">Confirm source taxonomy: marketplace, social, ads, partner, manual.</div>
+                <div class="check">Confirm quality formula and thresholds for scale/test/fix/pause/review.</div>
+                <div class="check">Confirm boundaries with MDEC, Campaigns, Leads/RFQs, Customer/CRM, Finance, COS.</div>
+                <div class="check">Confirm whether MVP remains derived or needs persisted mock fixtures.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 1</div>
+            <div>
+              <h3>Build derived DemandSource model</h3>
+              <p>Create a typed data helper that transforms current snapshot data into a canonical Sources read model.</p>
+              <div class="file-list">
+                <div class="file"><strong>Add:</strong> <code>prime-os-phase-1/app/src/lib/prime/demand-sources.ts</code></div>
+                <div class="file"><strong>Add:</strong> <code>prime-os-phase-1/app/src/lib/prime/demand-sources.test.ts</code> if test harness supports local lib tests.</div>
+                <div class="file"><strong>Read:</strong> <code>prime-os-phase-1/app/src/lib/prime/prime-data.ts</code></div>
+              </div>
+              <div class="checklist">
+                <div class="check">Map <code>PrimeSocialStream</code> and <code>PrimeCampaign</code> into <code>DemandSource</code>.</div>
+                <div class="check">Join campaign source with lead/RFQ output where possible.</div>
+                <div class="check">Compute lead rate, RFQ rate, freshness, duplicate placeholder, quality score, next action.</div>
+                <div class="check">Return empty state-safe output; no fabricated metrics when inputs are missing.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 2</div>
+            <div>
+              <h3>Redesign Sources Overview</h3>
+              <p>Replace generic dashboard feel with a visual operating overview: source answer, charts, heatmap, and quick links.</p>
+              <div class="file-list">
+                <div class="file"><strong>Modify:</strong> <code>prime-os-phase-1/app/src/pages/prime/PrimeTowerPage.tsx</code></div>
+                <div class="file"><strong>Optional extract:</strong> <code>prime-os-phase-1/app/src/pages/prime/PrimeDemandSourcesPage.tsx</code></div>
+              </div>
+              <div class="checklist">
+                <div class="check">Hero answer: best source, worst source, quality average, primary CTA.</div>
+                <div class="check">KPI strip: active sources, top source, leads generated, RFQs generated, avg quality, needs review.</div>
+                <div class="check">Add source quality ranking chart, source type mix, funnel, and Source x SKU heatmap.</div>
+                <div class="check">Keep text short and move explanations into hover info icons where the app pattern supports it.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 3</div>
+            <div>
+              <h3>Upgrade Source Registry list and detail drawer</h3>
+              <p>Make registry the primary working surface with expandable rows and a detail drawer/popup for deeper information.</p>
+              <div class="checklist">
+                <div class="check">Table/list columns: Source, Type, Owner, Market, Leads, RFQs, Quality, Duplicate, Status, Next action.</div>
+                <div class="check">Filters: type, owner, market, status, linked SKU/category, campaign, needs review.</div>
+                <div class="check">Click row opens detail drawer with basic info, performance, linked campaigns, SKU signals, recent signals, recommended actions.</div>
+                <div class="check">Actions route to existing pages: Campaigns, Content & Social, Leads/RFQs, MDEC, Product/SKU, Finance.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 4</div>
+            <div>
+              <h3>Add attribution, import, and rule affordances</h3>
+              <p>Introduce deeper product capabilities without building full backend workflows yet.</p>
+              <div class="checklist">
+                <div class="check">Add attribution timeline preview: first touch, last touch, campaign, manual override placeholder.</div>
+                <div class="check">Add import batch snapshot for manual imports: batch id, owner, rows, duplicate rate, errors.</div>
+                <div class="check">Add rule cards: owner required, duplicate flag, SKU stock warning, manual import batch log.</div>
+                <div class="check">Do not perform external writes; keep actions as local handoff links or in-app prepared action states.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 5</div>
+            <div>
+              <h3>QA, accessibility, responsive validation</h3>
+              <p>Validate that the page works as enterprise SaaS on desktop and mobile without text crowding or confusing ownership.</p>
+              <div class="checklist">
+                <div class="check">Run project lint/build/tests using repo scripts.</div>
+                <div class="check">Open <code>http://localhost:5177/demand/sources</code> and inspect responsive layout.</div>
+                <div class="check">Check empty, high-quality, weak-source, and no-owner states.</div>
+                <div class="check">Confirm CTAs are not destructive and do not imply real budget/customer/finance mutation.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="acceptance">
+        <div class="section-head">
+          <div>
+            <h2>11. Acceptance Criteria</h2>
+            <p>Definition of done for the eventual implementation.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>Product acceptance</h3>
+            <ul>
+              <li>Page clearly communicates Sources as demand origin quality and action routing.</li>
+              <li>Operator can identify top source, weak source, and next action in under 30 seconds.</li>
+              <li>Every source has status, reason, owner or owner placeholder, and target action.</li>
+              <li>Lead/RFQ lineage preserves source and campaign context.</li>
+              <li>Weak/risky sources are visible before scale recommendations.</li>
+              <li>Charts support decisions: quality, funnel, type mix, SKU signal, attribution.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Engineering acceptance</h3>
+            <ul>
+              <li>Derived model is typed and isolated from page presentation.</li>
+              <li>No CRM, order, product, finance, or external platform mutation occurs from Sources MVP.</li>
+              <li>Empty/missing data states render without fabricated numbers.</li>
+              <li>Routes and navigation remain stable: <code>/demand/sources</code> remains canonical.</li>
+              <li>Responsive layout avoids cramped card grids on narrow screens.</li>
+              <li>Build/lint/test pass, or known failures are documented with exact cause.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="handoff">
+        <div class="section-head">
+          <div>
+            <h2>12. Cook Handoff</h2>
+            <p>Use this after you approve the plan and want implementation to start.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="callout">
+            <strong>Recommended cook command</strong>
+            <p><code>/ck:cook /Users/admin/Desktop/PrimeOS_LarkVer/docs/plans/260514-1114-demand-sources-product-plan/sources-product-plan.html</code></p>
+          </div>
+          <div class="grid two" style="margin-top: 14px;">
+            <div class="card">
+              <h3>First implementation target</h3>
+              <p>Start with Phase 1 and Phase 2. The highest-leverage move is a typed derived read model plus a clearer Sources Overview; do not start by building import or attribution admin screens.</p>
+            </div>
+            <div class="card">
+              <h3>Red-team note</h3>
+              <p>The biggest risk is overbuilding. Keep the first implementation as a read-only operating cockpit with prepared handoffs. Add mutation workflows only after the source taxonomy and score formula prove useful.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="implementation-result">
+        <div class="section-head">
+          <div>
+            <h2>13. Implementation Result</h2>
+            <p>Cooked on 2026-05-14 against the local PrimeOS_LarkVer workspace.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>Completed scope</h3>
+            <ul>
+              <li>Added a typed Demand Sources read model derived from the current PrimeOS snapshot.</li>
+              <li>Rebuilt <code>/demand/sources</code> as a source quality workspace with first-screen answer, KPI info icons, visual ranking, type mix, SKU signal cards, needs-review lane, source registry list, and detail popup.</li>
+              <li>Added source quality scoring, guardrail labels, next-action routing, attribution preview, and manual import batch affordance.</li>
+              <li>Added unit coverage for the derived registry and overview metrics.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Verification</h3>
+            <ul>
+              <li><code>npm run test -- demand-sources</code> passed.</li>
+              <li><code>npm run lint</code> passed with existing repo warnings only.</li>
+              <li><code>npm run build</code> is blocked by required production env <code>VITE_SUPABASE_URL</code>.</li>
+              <li><code>npm run build:dev</code> passed.</li>
+              <li>Playwright smoke verified desktop and mobile render for <code>/demand/sources</code>, plus detail popup.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <p class="footer-note">Generated and cooked for PrimeOS_LarkVer. Implementation result is recorded above.</p>
+    </main>
+  </div>
+
+  <script type="application/json" id="plan-metadata">
+    {
+      "planDir": "docs/plans/260514-1114-demand-sources-product-plan",
+      "status": "implemented",
+      "title": "Demand Sources Product Plan",
+      "route": "/demand/sources",
+      "createdAt": "2026-05-14",
+      "mode": "hard",
+      "relatedPlans": [
+        "docs/plans/2026-05-05-demand-ui-overview-style-refresh",
+        "docs/plans/2026-05-08-primeos-v1-alignment-roadmap",
+        "docs/plans/260514-0155-general-dashboard-overview-restructure"
+      ],
+      "blockedBy": [],
+      "blocks": []
+    }
+  </script>
+</body>
+</html>

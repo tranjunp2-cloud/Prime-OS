@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PrimeOS Demand Dashboard Redesign Plan</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --soft: #fbfcff;
+      --text: #111827;
+      --muted: #5f6675;
+      --faint: #8b93a3;
+      --line: #dfe4ee;
+      --line-soft: #edf0f5;
+      --brand: #5646e8;
+      --brand-soft: #eef0ff;
+      --blue: #0f82d4;
+      --blue-soft: #e9f5ff;
+      --green: #0f9f73;
+      --green-soft: #eaf8f1;
+      --amber: #b56b08;
+      --amber-soft: #fff6df;
+      --red: #d13b4c;
+      --red-soft: #fff0f2;
+      --purple: #6c3ce9;
+      --purple-soft: #f2ecff;
+      --shadow: 0 18px 50px rgba(16, 24, 40, 0.08);
+      --radius: 14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.58;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 292px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      border-right: 1px solid var(--line);
+      background: #fff;
+      padding: 28px 20px;
+    }
+
+    main {
+      min-width: 0;
+      padding: 34px;
+    }
+
+    .brand { margin-bottom: 26px; }
+    .brand strong {
+      display: block;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+    .brand span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav-title {
+      margin: 22px 0 8px;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .toc a {
+      display: block;
+      border-radius: 10px;
+      padding: 9px 10px;
+      color: #3d4452;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      background: var(--brand-soft);
+      color: var(--brand);
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 92% 0%, rgba(86, 70, 232, 0.15), transparent 31%),
+        linear-gradient(135deg, #fff 0%, #f9fbff 100%);
+      box-shadow: var(--shadow);
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 1040px;
+      margin: 0;
+      font-size: clamp(38px, 5vw, 72px);
+      line-height: 0.98;
+      letter-spacing: -0.055em;
+    }
+
+    .lead {
+      max-width: 960px;
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .metric {
+      min-height: 112px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.82);
+      padding: 16px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 26px;
+      letter-spacing: -0.04em;
+    }
+
+    .metric p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    section {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      overflow: hidden;
+    }
+
+    .section-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 24px 26px 18px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.035em;
+    }
+
+    .section-head p {
+      max-width: 940px;
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .content { padding: 24px 26px 28px; }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .grid.main { grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.85fr); }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+      padding: 18px;
+    }
+
+    .card.white { background: #fff; }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .card p { margin: 0; }
+
+    ul, ol {
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    li + li { margin-top: 6px; }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 4px 10px;
+      color: #2f3745;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .pill.brand { border-color: rgba(86, 70, 232, 0.25); background: var(--brand-soft); color: var(--brand); }
+    .pill.green { border-color: rgba(15, 159, 115, 0.26); background: var(--green-soft); color: var(--green); }
+    .pill.amber { border-color: rgba(181, 107, 8, 0.28); background: var(--amber-soft); color: var(--amber); }
+    .pill.red { border-color: rgba(209, 59, 76, 0.25); background: var(--red-soft); color: var(--red); }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      vertical-align: top;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: #f8f9fc;
+      color: #4a5262;
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+    td { color: var(--muted); }
+    td strong { color: var(--text); }
+
+    code, pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      border-radius: 5px;
+      background: #eef1f6;
+      padding: 2px 5px;
+      color: #253044;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0f172a;
+      padding: 18px;
+      color: #d7e1f5;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .callout {
+      border: 1px solid rgba(86, 70, 232, 0.24);
+      border-radius: var(--radius);
+      background: var(--brand-soft);
+      padding: 16px 18px;
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--brand);
+    }
+
+    .callout p {
+      margin: 0;
+      color: #3f4363;
+    }
+
+    .wireframe {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #f9fbff;
+      padding: 14px;
+    }
+
+    .wf-block {
+      border: 1px dashed #b9c2d2;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.8);
+      padding: 14px;
+      color: #4a5262;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .wf-row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .wf-row.functions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .wf-row.main { grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.8fr); }
+    .wf-row.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .bar-list { display: grid; gap: 12px; }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) 52px;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .bar-track {
+      height: 10px;
+      border-radius: 999px;
+      background: #edf0f5;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--brand), #2f8ce8);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .flow-step {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 14px;
+      min-height: 132px;
+    }
+
+    .flow-step:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 50%;
+      right: -10px;
+      z-index: 2;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 16px;
+      text-align: center;
+    }
+
+    .flow-step span {
+      display: block;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 15px;
+    }
+
+    .flow-step p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .phase {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 16px;
+      border-top: 1px solid var(--line-soft);
+      padding: 20px 0;
+    }
+
+    .phase:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .phase-marker {
+      align-self: start;
+      border: 1px solid rgba(86, 70, 232, 0.25);
+      border-radius: var(--radius);
+      background: var(--brand-soft);
+      padding: 12px;
+      color: var(--brand);
+      font-weight: 850;
+    }
+
+    .phase h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .phase p {
+      margin: 0 0 10px;
+      color: var(--muted);
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .check {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .check::before {
+      content: "";
+      width: 15px;
+      height: 15px;
+      margin-top: 2px;
+      border: 1px solid var(--brand);
+      border-radius: 5px;
+      background: var(--brand-soft);
+    }
+
+    .footer-note {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 1120px) {
+      .shell { grid-template-columns: 1fr; }
+      aside { position: static; height: auto; }
+      main { padding: 22px; }
+      .hero-grid,
+      .grid.two,
+      .grid.three,
+      .grid.four,
+      .grid.five,
+      .grid.main,
+      .wf-row.functions,
+      .wf-row.main,
+      .wf-row.charts,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+      .flow-step::after { display: none; }
+      .phase { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">
+        <strong>PrimeOS Plan</strong>
+        <span>Demand Hub -> Demand Dashboard</span>
+      </div>
+      <div class="nav-title">Plan Index</div>
+      <ul class="toc">
+        <li><a href="#summary">Executive summary</a></li>
+        <li><a href="#scope">Scope challenge</a></li>
+        <li><a href="#code">Codebase context</a></li>
+        <li><a href="#positioning">Product positioning</a></li>
+        <li><a href="#taxonomy">Function taxonomy</a></li>
+        <li><a href="#ia">Information architecture</a></li>
+        <li><a href="#visuals">Charts and visuals</a></li>
+        <li><a href="#model">Data model</a></li>
+        <li><a href="#rules">Business rules</a></li>
+        <li><a href="#workflows">Workflows</a></li>
+        <li><a href="#phases">Implementation phases</a></li>
+        <li><a href="#acceptance">Acceptance criteria</a></li>
+        <li><a href="#handoff">Cook handoff</a></li>
+      </ul>
+      <div class="nav-title">Metadata</div>
+      <div class="card">
+        <p><strong>Status:</strong> draft for approval</p>
+        <p><strong>Created:</strong> 2026-05-14</p>
+        <p><strong>Mode:</strong> ck:plan hard</p>
+        <p><strong>Plan dir:</strong><br /><code>docs/plans/260514-1156-demand-dashboard-redesign</code></p>
+      </div>
+    </aside>
+
+    <main>
+      <article class="hero" id="summary">
+        <div class="eyebrow">
+          <span>Demand Center</span>
+          <span>/</span>
+          <span>Dashboard Redesign</span>
+          <span>/</span>
+          <span>Plan Only</span>
+        </div>
+        <h1>Rebuild Demand Hub into Demand Dashboard</h1>
+        <p class="lead">
+          Demand Dashboard phải trở thành màn hình đầu tiên của Demand: nắm toàn bộ tình trạng Sources, MDEC, Campaigns, Content & Social, Leads/RFQs, Re-engage bằng chart, diagram, infographic, quick links và priority actions. Mục tiêu là người dùng nhìn 10-30 giây là biết Demand đang khỏe hay bị nghẽn, nên mở function nào tiếp theo.
+        </p>
+        <div class="hero-grid">
+          <div class="metric">
+            <span>Rename</span>
+            <strong>Demand Dashboard</strong>
+            <p>Visible labels đổi từ Demand Hub sang Dashboard.</p>
+          </div>
+          <div class="metric">
+            <span>Priority</span>
+            <strong>Top function</strong>
+            <p>Đặt Dashboard đầu tiên dưới Demand.</p>
+          </div>
+          <div class="metric">
+            <span>Visuals</span>
+            <strong>Chart-led</strong>
+            <p>Readiness, funnel, flow, outcome readback.</p>
+          </div>
+          <div class="metric">
+            <span>Boundary</span>
+            <strong>Not BI</strong>
+            <p>Overview + action accelerator, không phải report builder.</p>
+          </div>
+        </div>
+      </article>
+
+      <section id="scope">
+        <div class="section-head">
+          <div>
+            <h2>1. Scope Challenge</h2>
+            <p>Hard-mode scope: rebuild the entry point and visual information architecture, not a configurable analytics product.</p>
+          </div>
+          <div class="pill-row">
+            <span class="pill brand">Plan only</span>
+            <span class="pill amber">No code changes in this step</span>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>Ship now</h3>
+            <ul>
+              <li>Rename visible product copy from <strong>Demand Hub</strong> to <strong>Demand Dashboard</strong>.</li>
+              <li>Move Dashboard to the first/top Demand function in navigation.</li>
+              <li>Show function cards before generic KPIs: MDEC, Sources, Campaigns, Content & Social, Leads/RFQs, Re-engage.</li>
+              <li>Add chart/infographic layout: function readiness, demand funnel, source mix, outcome readback, guardrail rail.</li>
+              <li>Keep all quick links to existing Demand routes and Sources child function routes.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Defer</h3>
+            <ul>
+              <li>Custom dashboard builder or draggable widgets.</li>
+              <li>Real-time streaming metrics.</li>
+              <li>New chart library for funnel visualization.</li>
+              <li>Deep attribution modeling or final ROI claims.</li>
+              <li>New backend analytics contracts unless implementation hits a hard limit.</li>
+              <li>MDEC execution details that belong inside MDEC itself.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="code">
+        <div class="section-head">
+          <div>
+            <h2>2. Codebase Context</h2>
+            <p>The plan should extend current PrimeOS patterns rather than introducing a separate dashboard framework.</p>
+          </div>
+          <span class="pill green">No blocking plan detected</span>
+        </div>
+        <div class="content">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Current state</th>
+                <th>Plan impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Route</strong></td>
+                <td><code>/demand</code> and <code>/demand/hub</code> render <code>PrimeDemandHubPage</code> in <code>PrimeTowerPage.tsx</code>.</td>
+                <td>Keep routes compatible; only visible label and information architecture change.</td>
+              </tr>
+              <tr>
+                <td><strong>Navigation</strong></td>
+                <td><code>prime-navigation.ts</code> currently labels the tower <code>Demand Hub</code>.</td>
+                <td>Rename to <code>Demand Dashboard</code> and ensure it stays first under Demand.</td>
+              </tr>
+              <tr>
+                <td><strong>Data</strong></td>
+                <td><code>getPrimeSnapshot()</code> provides campaigns, leads, RFQs, orders, socialStreams, forecasts, tickets, activationPlays.</td>
+                <td>Create a derived <code>DemandDashboardSnapshot</code> helper instead of embedding formulas in the component.</td>
+              </tr>
+              <tr>
+                <td><strong>Sources</strong></td>
+                <td>New <code>demand-sources.ts</code> has <code>SOURCE_FUNCTION_CATALOG</code> and derived source quality.</td>
+                <td>Reuse source function catalog and source quality summary inside Dashboard.</td>
+              </tr>
+              <tr>
+                <td><strong>Charts</strong></td>
+                <td>Recharts exists; <code>ChartContainer</code> is used in <code>PrimeOverview</code> and <code>PrimeFinSupportPage</code>.</td>
+                <td>Use existing chart wrapper for readiness and outcome charts. No new dependency.</td>
+              </tr>
+              <tr>
+                <td><strong>Related plans</strong></td>
+                <td>Demand UI overview refresh completed; Sources product plan exists and is implemented.</td>
+                <td>This plan builds on both, no plan frontmatter update needed.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="positioning">
+        <div class="section-head">
+          <div>
+            <h2>3. Product Positioning</h2>
+            <p>Demand Dashboard is the command surface for the full Demand suite, not a sub-module page.</p>
+          </div>
+        </div>
+        <div class="content grid three">
+          <div class="card">
+            <h3>Primary promise</h3>
+            <p>What is happening across Demand, what needs attention, and where should I go next?</p>
+          </div>
+          <div class="card">
+            <h3>First-screen answers</h3>
+            <ul>
+              <li>Are we generating enough demand?</li>
+              <li>Which channels or sources are working?</li>
+              <li>What is blocked or needs action?</li>
+              <li>Where should I click next?</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Target users</h3>
+            <ul>
+              <li>Demand owner: pipeline health and weak spots.</li>
+              <li>Operator: today’s tasks and quick entries.</li>
+              <li>Executive: fast read on contribution, trend, and risk.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="taxonomy">
+        <div class="section-head">
+          <div>
+            <h2>4. Demand Function Taxonomy</h2>
+            <p>Dashboard should treat every Demand function as a first-class summary card with status, metric, and route.</p>
+          </div>
+        </div>
+        <div class="content">
+          <table>
+            <thead>
+              <tr>
+                <th>Function</th>
+                <th>Role</th>
+                <th>Primary metric</th>
+                <th>Quick route</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Demand Dashboard</strong></td>
+                <td>Cross-function operating summary and action priority.</td>
+                <td>Demand readiness, blockers, next moves.</td>
+                <td><code>/demand/hub</code></td>
+              </tr>
+              <tr>
+                <td><strong>MDEC</strong></td>
+                <td>Message/social engagement execution surface.</td>
+                <td>Pending approvals, escalations, engagement-derived leads.</td>
+                <td><code>/demand/mdec</code></td>
+              </tr>
+              <tr>
+                <td><strong>Sources</strong></td>
+                <td>Acquisition origin and quality registry.</td>
+                <td>Source quality, top source, needs review.</td>
+                <td><code>/demand/sources</code> plus child functions.</td>
+              </tr>
+              <tr>
+                <td><strong>Campaigns</strong></td>
+                <td>Planned demand push with objective/readiness/guardrails.</td>
+                <td>Active campaigns, campaign readiness, at-risk campaigns.</td>
+                <td><code>/demand/campaigns</code></td>
+              </tr>
+              <tr>
+                <td><strong>Content & Social</strong></td>
+                <td>Proof assets, social signals, CTA readiness.</td>
+                <td>Streams, content gaps, CTA/proof readiness.</td>
+                <td><code>/demand/content-social</code></td>
+              </tr>
+              <tr>
+                <td><strong>Leads/RFQs</strong></td>
+                <td>Commercial intent queue and CRM/COS handoff.</td>
+                <td>Open leads, open RFQs, SLA risk, qualified response volume.</td>
+                <td><code>/demand/leads-rfqs</code></td>
+              </tr>
+              <tr>
+                <td><strong>Re-engage</strong></td>
+                <td>Controlled warm-buyer re-entry.</td>
+                <td>Eligible audience, suppression, recovery opportunities.</td>
+                <td><code>/demand/re-engage</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ia">
+        <div class="section-head">
+          <div>
+            <h2>5. Information Architecture</h2>
+            <p>Function cards must come before generic KPIs; charts must explain the function health and flow.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="wireframe">
+            <div class="wf-block">Demand Dashboard Command Bar: title, operating answer, readiness progress, primary/secondary CTAs</div>
+            <div class="wf-row functions">
+              <div class="wf-block">MDEC</div>
+              <div class="wf-block">Sources</div>
+              <div class="wf-block">Campaigns</div>
+              <div class="wf-block">Content & Social</div>
+              <div class="wf-block">Leads/RFQs + Re-engage</div>
+            </div>
+            <div class="wf-row charts">
+              <div class="wf-block">Demand readiness chart</div>
+              <div class="wf-block">Demand funnel infographic</div>
+            </div>
+            <div class="wf-row main">
+              <div class="wf-block">Priority Demand Queue</div>
+              <div class="wf-block">Demand Flow Map + Guardrail Rail</div>
+            </div>
+            <div class="wf-row charts">
+              <div class="wf-block">Outcome readback stacked bar</div>
+              <div class="wf-block">Source/channel contribution chart</div>
+            </div>
+            <div class="wf-block">Outcome table + evidence stack + quick links</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="visuals">
+        <div class="section-head">
+          <div>
+            <h2>6. Charts, Diagrams, and Infographics</h2>
+            <p>Use visual aids to answer a decision question. Avoid decorative charts.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card white">
+            <h3>Demand function readiness</h3>
+            <div class="bar-list">
+              <div class="bar-row"><span>Sources</span><div class="bar-track"><div class="bar-fill" style="width: 82%"></div></div><strong>82</strong></div>
+              <div class="bar-row"><span>Campaigns</span><div class="bar-track"><div class="bar-fill" style="width: 74%"></div></div><strong>74</strong></div>
+              <div class="bar-row"><span>Content</span><div class="bar-track"><div class="bar-fill" style="width: 68%"></div></div><strong>68</strong></div>
+              <div class="bar-row"><span>Leads/RFQs</span><div class="bar-track"><div class="bar-fill" style="width: 71%"></div></div><strong>71</strong></div>
+              <div class="bar-row"><span>Re-engage</span><div class="bar-track"><div class="bar-fill" style="width: 61%"></div></div><strong>61</strong></div>
+            </div>
+          </div>
+          <div class="card white">
+            <h3>Demand funnel infographic</h3>
+            <div class="flow">
+              <div class="flow-step"><span>01</span><strong>Source</strong><p>Origin quality before spend.</p></div>
+              <div class="flow-step"><span>02</span><strong>Campaign</strong><p>Objective, audience, offer.</p></div>
+              <div class="flow-step"><span>03</span><strong>Content</strong><p>Proof, CTA, MDEC signal.</p></div>
+              <div class="flow-step"><span>04</span><strong>Lead/RFQ</strong><p>Owner, SLA, handoff.</p></div>
+              <div class="flow-step"><span>05</span><strong>Outcome</strong><p>Orders, learning, re-entry.</p></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Chart inventory</h3>
+            <table>
+              <thead><tr><th>Visual</th><th>Purpose</th><th>Implementation</th></tr></thead>
+              <tbody>
+                <tr><td>Readiness bar chart</td><td>Compare function health quickly.</td><td>Recharts <code>BarChart</code> + <code>ChartContainer</code>.</td></tr>
+                <tr><td>Funnel substitute</td><td>Explain Source -> Campaign -> Content -> Lead/RFQ -> Outcome.</td><td>CSS cards, no new chart library.</td></tr>
+                <tr><td>Outcome stacked bar</td><td>Show campaign readback: leads, RFQs, orders.</td><td>Recharts stacked <code>Bar</code>.</td></tr>
+                <tr><td>Source contribution</td><td>Show source/channel share.</td><td>Horizontal bar list or Recharts bar.</td></tr>
+                <tr><td>Guardrail rail</td><td>Show blockers before scale.</td><td>Compact cards with severity badges.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Responsive rules</h3>
+            <ul>
+              <li>Desktop: 5 function cards, 2-column dashboard grid, charts height around <code>h-64</code>.</li>
+              <li>Tablet: function cards 2 columns, charts stack under queue.</li>
+              <li>Mobile: cards become compact rows, charts degrade to readable bar lists if labels crowd.</li>
+              <li>No horizontal scroll at 375px.</li>
+              <li>Each chart needs an <code>sr-only</code> or visible text summary.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="model">
+        <div class="section-head">
+          <div>
+            <h2>7. Demand Dashboard Data Model</h2>
+            <p>Keep calculations in a derived read model so the page remains a presentation layer.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <pre><code>interface DemandDashboardSnapshot {
+  generatedAt: string;
+  kpis: {
+    activeCampaigns: number;
+    sourceQualityScore: number;
+    openLeads: number;
+    openRfqs: number;
+    responseBacklog: number;
+    reengageEligible: number;
+    blockedGuardrails: number;
+    outcomeOrders: number;
+    outcomeRevenue: number;
+    leadToOrderRate: number;
+  };
+  functions: DemandFunctionSummary[];
+  blockers: DemandBlocker[];
+  nextMoves: DemandNextMove[];
+  outcomeReadback: DemandOutcomeReadback[];
+}</code></pre>
+          <pre><code>interface DemandFunctionSummary {
+  id: 'mdec' | 'sources' | 'campaigns'
+    | 'content-social' | 'leads-rfqs' | 're-engage';
+  label: string;
+  href: string;
+  readiness: number;
+  status: 'ready' | 'watch' | 'blocked';
+  primaryMetric: string;
+  nextAction: string;
+  blockers: string[];
+}
+
+interface DemandNextMove {
+  id: string;
+  priority: number;
+  functionId: DemandFunctionSummary['id'];
+  title: string;
+  evidence: string;
+  href: string;
+  owner: string;
+  blockedBy: string[];
+}</code></pre>
+        </div>
+        <div class="content" style="padding-top: 0;">
+          <div class="callout">
+            <strong>Recommended file boundary</strong>
+            <p>Add <code>prime-os-phase-1/app/src/lib/prime/demand-dashboard.ts</code> with helpers like <code>buildDemandDashboardSnapshot(snapshot)</code>. Let <code>PrimeDemandHubPage</code> consume the derived dashboard snapshot instead of re-deriving KPIs inline.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="rules">
+        <div class="section-head">
+          <div>
+            <h2>8. Business Rules and Boundaries</h2>
+            <p>Rules prevent the Dashboard from making unsafe scale recommendations or claiming ownership of other suites.</p>
+          </div>
+        </div>
+        <div class="content">
+          <table>
+            <thead><tr><th>Rule</th><th>Dashboard behavior</th><th>Boundary</th></tr></thead>
+            <tbody>
+              <tr><td>Source scale rule</td><td>Recommend scale only when source quality and RFQ signal are strong and no major blocker exists.</td><td>Sources owns source details; Dashboard summarizes.</td></tr>
+              <tr><td>Campaign launch rule</td><td>Campaign cannot be “Ready” unless source, CTA, owner, and guardrail are present.</td><td>Campaigns owns campaign execution.</td></tr>
+              <tr><td>Inventory guardrail</td><td>High-risk SKU blocks scale CTA and routes to COS/Product.</td><td>COS owns inventory truth.</td></tr>
+              <tr><td>Lead/RFQ SLA rule</td><td>Missing owner or stale last touch becomes priority queue blocker.</td><td>Leads/RFQs owns response workflow.</td></tr>
+              <tr><td>Re-engage suppression</td><td>Re-engage card must show suppression before recovery recommendation.</td><td>Customer/Service owns lifecycle and service truth.</td></tr>
+              <tr><td>Outcome readback</td><td>Orders/revenue must be labeled as derived from campaign/order readback.</td><td>Intelligence owns final attribution model.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="workflows">
+        <div class="section-head">
+          <div>
+            <h2>9. Cross-Function Workflows</h2>
+            <p>Dashboard links the suite together without absorbing each product’s operational depth.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>Operator flow</h3>
+            <ol>
+              <li>Open Demand Dashboard from first Demand nav item.</li>
+              <li>Read command bar: readiness, guardrails, open moves.</li>
+              <li>Scan function cards to identify blocked or ready function.</li>
+              <li>Use readiness chart and funnel infographic to understand where the flow is stuck.</li>
+              <li>Open priority queue item or function quick link.</li>
+              <li>Return to Dashboard for outcome readback.</li>
+            </ol>
+          </div>
+          <div class="card">
+            <h3>System flow</h3>
+            <ol>
+              <li>Build dashboard snapshot from <code>getPrimeSnapshot()</code> and <code>buildDemandSources()</code>.</li>
+              <li>Compute function readiness and blockers.</li>
+              <li>Rank next moves: guardrail, source, campaign, RFQ, re-engage.</li>
+              <li>Render charts and text fallbacks from one read model.</li>
+              <li>Preserve routes to existing Demand pages.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="phases">
+        <div class="section-head">
+          <div>
+            <h2>10. Implementation Phases</h2>
+            <p>Phased so cook can stop after a useful MVP if needed.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="phase">
+            <div class="phase-marker">Phase 1</div>
+            <div>
+              <h3>Rename and promote Demand Dashboard</h3>
+              <p>Change visible label from Demand Hub to Demand Dashboard and ensure it is the first Demand function.</p>
+              <div class="checklist">
+                <div class="check">Update <code>prime-navigation.ts</code> label to <code>Demand Dashboard</code>.</div>
+                <div class="check">Keep <code>/demand</code> and <code>/demand/hub</code> routes compatible.</div>
+                <div class="check">Replace visible copy in <code>PrimeDemandHubPage</code>.</div>
+                <div class="check">Verify breadcrumbs/search/sidebar do not show stale Demand Hub label.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 2</div>
+            <div>
+              <h3>Create DemandDashboardSnapshot read model</h3>
+              <p>Move dashboard calculations out of the component and reuse Sources read model.</p>
+              <div class="checklist">
+                <div class="check">Add <code>prime-os-phase-1/app/src/lib/prime/demand-dashboard.ts</code>.</div>
+                <div class="check">Derive function summaries, KPIs, blockers, next moves, readiness chart data, funnel data, and outcome readback.</div>
+                <div class="check">Add tests for readiness, blocker ranking, route coverage, and empty snapshot handling.</div>
+                <div class="check">Do not mutate snapshot or source-of-truth stores.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 3</div>
+            <div>
+              <h3>Rebuild first viewport IA</h3>
+              <p>Put the command bar and Demand function cards at the top, before the priority queue.</p>
+              <div class="checklist">
+                <div class="check">Add command bar with operating answer, readiness progress, guardrails, and CTAs.</div>
+                <div class="check">Add six function cards: MDEC, Sources, Campaigns, Content & Social, Leads/RFQs, Re-engage.</div>
+                <div class="check">Each function card is a native link with icon, status, metric, next action, and route.</div>
+                <div class="check">Keep card copy short; move explanatory detail into tooltip/info patterns if needed.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 4</div>
+            <div>
+              <h3>Add charts and infographics</h3>
+              <p>Use visual aids to make the dashboard understandable without overbuilding analytics.</p>
+              <div class="checklist">
+                <div class="check">Add function readiness bar chart using <code>ChartContainer</code> and Recharts.</div>
+                <div class="check">Add CSS funnel infographic for Source -> Campaign -> Content -> Lead/RFQ -> Outcome.</div>
+                <div class="check">Add outcome readback stacked bar chart by campaign.</div>
+                <div class="check">Add text fallback summaries for chart accessibility.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 5</div>
+            <div>
+              <h3>Restructure priority queue, guardrails, and quick links</h3>
+              <p>Make action obvious, while preserving all current Demand destinations.</p>
+              <div class="checklist">
+                <div class="check">Rank priority queue by severity, owner, evidence, and blocker state.</div>
+                <div class="check">Add guardrail rail beside queue on desktop and below queue on mobile.</div>
+                <div class="check">Add quick links for Sources child functions and major Demand routes.</div>
+                <div class="check">Prevent chart/card overload by making outcome table supporting evidence below charts.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-marker">Phase 6</div>
+            <div>
+              <h3>QA, responsive, and route validation</h3>
+              <p>Validate the new Dashboard as the Demand entry point.</p>
+              <div class="checklist">
+                <div class="check">Run <code>npm run test -- demand-dashboard demand-sources</code> or targeted vitest files.</div>
+                <div class="check">Run <code>npm run lint</code> and <code>npm run build:dev</code>.</div>
+                <div class="check">Playwright smoke <code>/demand</code>, <code>/demand/hub</code>, and key Demand links.</div>
+                <div class="check">Check 1440px, tablet, and 390px mobile for no horizontal overflow and readable charts.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="acceptance">
+        <div class="section-head">
+          <div>
+            <h2>11. Acceptance Criteria</h2>
+            <p>Definition of done for implementation.</p>
+          </div>
+        </div>
+        <div class="content grid two">
+          <div class="card">
+            <h3>Product acceptance</h3>
+            <ul>
+              <li>Demand nav shows <strong>Demand Dashboard</strong> first.</li>
+              <li>Page H1 and visible copy use <strong>Demand Dashboard</strong>, not Demand Hub.</li>
+              <li>First viewport answers: health, working sources/channels, blockers, where to click next.</li>
+              <li>Every major Demand function has visible summary and quick link.</li>
+              <li>At least three visual aids exist: readiness chart, funnel/flow infographic, outcome readback chart.</li>
+              <li>Priority queue remains action-oriented with owner, evidence, route, and severity.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Engineering acceptance</h3>
+            <ul>
+              <li>Dashboard uses a derived read model, not scattered formulas in JSX.</li>
+              <li>No new chart library introduced.</li>
+              <li>Existing routes remain compatible.</li>
+              <li>Empty data states do not look broken.</li>
+              <li>Charts have labels and text fallback; color is not the only status signal.</li>
+              <li>Desktop/mobile smoke tests pass or any blocker is documented.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="handoff">
+        <div class="section-head">
+          <div>
+            <h2>12. Cook Handoff</h2>
+            <p>Use this when you approve the plan and want implementation to begin.</p>
+          </div>
+        </div>
+        <div class="content">
+          <div class="callout">
+            <strong>Recommended cook command</strong>
+            <p><code>/ck:cook /Users/admin/Desktop/PrimeOS_LarkVer/docs/plans/260514-1156-demand-dashboard-redesign/demand-dashboard-redesign-plan.html</code></p>
+          </div>
+          <div class="grid two" style="margin-top: 14px;">
+            <div class="card">
+              <h3>Best first implementation slice</h3>
+              <p>Phase 1-3 first: rename, create read model, and put function cards first. Then add charts in Phase 4 once the data contract is clean.</p>
+            </div>
+            <div class="card">
+              <h3>Red-team warning</h3>
+              <p>The highest risk is building a visual wall. Every chart must answer a decision question and route the user to a Demand function.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="footer-note">Generated for PrimeOS_LarkVer. Implemented on 2026-05-14 with a Demand Dashboard read model, rebuilt entry screen, chart visuals, and route validation.</p>
+    </main>
+  </div>
+
+  <script type="application/json" id="plan-metadata">
+    {
+      "planDir": "docs/plans/260514-1156-demand-dashboard-redesign",
+      "status": "implemented",
+      "title": "Demand Dashboard Redesign",
+      "route": "/demand/hub",
+      "createdAt": "2026-05-14",
+      "completedAt": "2026-05-14",
+      "mode": "hard",
+      "journal": "docs/journals/260514-1221-demand-dashboard-redesign.md",
+      "relatedPlans": [
+        "docs/plans/2026-05-05-demand-ui-overview-style-refresh",
+        "docs/plans/2026-05-08-primeos-v1-alignment-roadmap",
+        "docs/plans/260514-1114-demand-sources-product-plan"
+      ],
+      "blockedBy": [],
+      "blocks": []
+    }
+  </script>
+</body>
+</html>

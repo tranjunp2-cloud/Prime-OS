@@ -707,7 +707,7 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
   ] as const;
   const history = [
     ['TODAY', 'Current session', 'Active'],
-    ['YESTERDAY', 'Demand Hub launch plan', 'Drafted 3, scheduled 2'],
+    ['YESTERDAY', 'Demand Dashboard launch plan', 'Drafted 3, scheduled 2'],
     ['YESTERDAY', 'Inbox triage — Tue PM', '12 replies sent w/ approval'],
     ['LAST 7 DAYS', 'Listening: B2B chatter', 'Escalated 1, watch added'],
     ['LAST 7 DAYS', 'Q1 weekly report', 'Generated, delivered to leads'],

@@ -561,3 +561,177 @@ Known caveats:
 - Operation Agent state is still local demo state.
 - Tooltip helper is duplicated locally in a few files; it can later be extracted into a shared component.
 - Build still warns about large chunks >500kB; not addressed in this session.
+
+## Session Update - 2026-05-14 Fin Support / General Dashboard / Commit Push
+
+### User Intent
+
+User continued PrimeOS UI/product-operation work and wanted:
+
+- Fin Support overview restructured away from many peer tabs/cards.
+- Global `/overview` reframed as **General Dashboard**, a high-level cross-suite dashboard for all suites.
+- General Dashboard to prioritize charts, infographics, and quick links into suites/products/functions.
+- Visible explanatory subtitles moved behind `(i)` info icons to reduce dashboard clutter.
+- All developed work from the session committed and pushed to `main`.
+
+### Fin Support Overview Work
+
+Route:
+- `/finance/fin-support?tab=overview`
+
+Plan created and completed:
+- `docs/plans/260514-0110-fin-support-overview-restructure/`
+
+Journal:
+- `docs/journals/260514-0148-fin-support-overview-restructure.md`
+
+Key file:
+- `prime-os-phase-1/app/src/pages/prime/PrimeFinSupportPage.tsx`
+
+Implemented direction:
+- Grouped finance support into clearer workflow regions instead of many equal tabs/cards.
+- Added overview surfaces for:
+  - readiness answer
+  - evidence health
+  - work queue
+  - funding path
+  - bank-review summary preview
+- Converted dense overview items into lists/detail dialog patterns where useful.
+- Added/kept `(i)` tooltip pattern for finance overview headings and compact metrics.
+
+Validation captured in plan:
+- `npm run build:dev` passed.
+- Focused lint/test/smoke checks passed during that work.
+
+### General Dashboard Work
+
+Route:
+- `/overview`
+
+Visible product/page name:
+- **General Dashboard**
+
+Plan created and completed:
+- `docs/plans/260514-0155-general-dashboard-overview-restructure/`
+
+Journal:
+- `docs/journals/260514-0210-general-dashboard-overview-restructure.md`
+
+Key files:
+- `prime-os-phase-1/app/src/pages/prime/PrimeOverview.tsx`
+- `prime-os-phase-1/app/src/lib/prime/prime-navigation.ts`
+- `prime-os-phase-1/app/src/lib/i18n/shell-dictionaries.ts`
+
+Implemented direction:
+- Kept route `/overview` stable.
+- Changed visible sidebar/top label from `Overview` to `General Dashboard`.
+- Reframed hero as cross-suite snapshot, not daily task queue.
+- Added chart-backed and infographic summary regions:
+  - suite health bar chart using existing `ChartContainer` + Recharts
+  - Ready/Watch/Critical status distribution strip
+  - cross-suite dependency flow summary
+  - cross-suite KPI strip
+  - quick access hub grouped by suite
+- Kept top priorities and detailed/audit views, but moved them below the dashboard scan areas.
+- Added `(i)` tooltip pattern for explanatory copy:
+  - Primary signal
+  - Suite health
+  - Cross-suite flow
+  - Quick access
+  - Operator mode
+  - Cross-suite KPIs
+  - Top 3 Priorities
+  - Dependency Risk Flow
+  - Area Status Map
+  - Operating Proof Timeline
+
+Validation:
+- `npm run build:dev` passed.
+- `npx eslint src/pages/prime/PrimeOverview.tsx src/lib/prime/prime-navigation.ts src/lib/i18n/shell-dictionaries.ts` passed.
+- `npm run test -- src/lib/prime/prime-navigation.test.ts src/App.legacy-routes.test.tsx` passed.
+- `npx tsc --noEmit --pretty false | rg "PrimeOverview|prime-navigation"` returned no scoped type errors.
+- Full-project `tsc --noEmit` still fails due pre-existing unrelated type errors outside this work.
+- Playwright smoke for `/overview` passed at:
+  - 375
+  - 768
+  - 1024
+  - 1440
+- Smoke confirmed:
+  - General Dashboard title visible
+  - chart SVG rendered
+  - quick access visible
+  - no horizontal overflow
+  - `/dashboard` redirects to `/overview`
+
+### Commit / Push
+
+User requested `git-workflow-manager` and push to `main`.
+
+Git workflow agent advised:
+- Current branch: `main`
+- Tracking: `origin/main`
+- Ahead/behind before commit: `0 0`
+- Stage path-specific session files to avoid unrelated artifacts.
+
+Commit pushed:
+
+```text
+49faf82 Improve Prime OS operating dashboards
+```
+
+Remote:
+- `origin https://github.com/thanhnguyen4649/PrimeOS.git`
+
+Push result:
+- `main -> origin/main`
+
+Commit included:
+- Operation Agent work from this session.
+- Fin Support overview work and plan/journal.
+- General Dashboard overview work and plan/journal.
+- Navigation/dictionary label updates.
+
+Commit intentionally excluded:
+- `.lazyweb/design-research/ai-command-center-chat-2026-05-13/`
+
+Reason:
+- Secret scan found many signed image URLs containing `token=` in Lazyweb raw cache/report files.
+- These were not the private Lazyweb bearer token, but still should not be pushed to public git history.
+
+Current post-push git state at time of memory write:
+
+```text
+## main...origin/main
+?? .lazyweb/design-research/ai-command-center-chat-2026-05-13/
+```
+
+After this memory update, this memory file itself is modified locally and has not yet been committed unless user asks for another commit/push.
+
+### Commit Protocol Reminder
+
+Repo hook expects Lore-style commit message:
+
+```text
+<intent line>
+
+<body>
+
+Constraint: ...
+Rejected: ... | ...
+Confidence: high
+Scope-risk: narrow|moderate|broad
+Directive: ...
+Tested: ...
+Not-tested: ...
+Co-authored-by: OmX <omx@oh-my-codex.dev>
+```
+
+Simple conventional commits like `feat(...)` are blocked.
+
+### Environment Notes
+
+- `AGENTS.md` referenced `@RTK.md`, but a git workflow agent could not find `RTK.md` under the workspace/parent tree.
+- Do not use `git add -A` in this repo while Lazyweb cache is present.
+- If user asks to commit memory later, stage only:
+  - `memory/session-2026-05-13-primeos-larkver.md`
+- Keep `.lazyweb/design-research/ai-command-center-chat-2026-05-13/` untracked or sanitize signed URLs before committing.

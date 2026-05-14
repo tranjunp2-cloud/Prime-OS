@@ -1,5 +1,6 @@
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 import {
   ArrowRight,
   BellRing,
@@ -41,6 +42,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import {
   Dialog,
   DialogContent,
@@ -136,6 +138,33 @@ import {
   uploadIntelligenceAsset,
 } from '@/lib/prime/intelligence-assets';
 import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
+import {
+  SOURCE_FUNCTION_CATALOG,
+  buildDemandSources,
+  buildDemandSourcesOverview,
+  getDemandSourceTypeLabel,
+  type DemandSource,
+  type DemandSourceFunction,
+  type DemandSourceType,
+} from '@/lib/prime/demand-sources';
+import {
+  buildDemandDashboardSnapshot,
+  type DemandDashboardSeverity,
+} from '@/lib/prime/demand-dashboard';
+import {
+  MARKETPLACE_SOURCE_PAGES,
+  buildMarketplaceSourceSnapshot,
+  getMarketplaceSourcePage,
+  getMarketplaceSourcePageHref,
+  getMarketplaceSourcePageMeta,
+  type MarketplaceCampaignAttribution,
+  type MarketplaceDataHealthItem,
+  type MarketplaceDemandSignal,
+  type MarketplaceInquiry,
+  type MarketplaceSkuSignal,
+  type MarketplaceSourcePage,
+  type MarketplaceSourceSnapshot,
+} from '@/lib/prime/marketplace-source';
 
 interface PrimeTowerPageProps {
   towerId: PrimeTowerId;
@@ -9207,266 +9236,55 @@ function getLocalizedTowerJob(towerId: PrimeTowerId, locale: Locale): TowerJob |
 
 export function PrimeDemandHubPage() {
   const snapshot = getPrimeSnapshot();
-  const activeCampaigns = snapshot.campaigns.filter((campaign) => campaign.status === 'active').length;
-  const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
-  const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
-  const totalOrders = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.orders, 0);
-  const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
-  const totalRevenue = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.revenue, 0);
-  const openRfqs = snapshot.rfqs.filter((rfq) => rfq.status !== 'converted').length;
-  const openLeads = snapshot.leads.filter((lead) => lead.status !== 'converted').length;
-  const reengageEligible = snapshot.activationPlays.length;
-  const sourceVolume = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
-  const highRiskForecasts = snapshot.forecasts.filter((forecast) => forecast.risk === 'high');
-  const openTickets = snapshot.tickets.filter((ticket) => ticket.status !== 'resolved');
-  const blockedGuardrails = highRiskForecasts.length + openTickets.length;
-  const primaryCampaign = snapshot.campaigns[0];
-  const primaryPlay = snapshot.activationPlays[0];
-  const topForecast = highRiskForecasts[0] ?? snapshot.forecasts.find((forecast) => forecast.risk === 'medium') ?? snapshot.forecasts[0];
-  const topLead = [...snapshot.leads].sort((left, right) => right.score - left.score)[0];
-  const topRfq = snapshot.rfqs.find((rfq) => rfq.status !== 'converted') ?? snapshot.rfqs[0];
-  const responseBacklog = openLeads + openRfqs;
-  const leadToOrderRate = snapshot.metrics.leadToOrderRate;
-  const hubReadiness = Math.max(42, Math.min(94, 60 + activeCampaigns * 6 + Math.min(16, leadToOrderRate) - blockedGuardrails * 7));
-  const hubStatus = blockedGuardrails ? 'Watch guardrails' : 'Ready to scale';
+  const dashboard = useMemo(() => buildDemandDashboardSnapshot(snapshot), [snapshot]);
 
-  const healthCards = [
-    {
-      label: 'Source quality',
-      value: formatCompactCount(sourceVolume),
-      meta: `${snapshot.socialStreams.length} tracked origins`,
-      icon: <Globe className="size-5" />,
-      tone: 'info',
-    },
-    {
-      label: 'Campaign readiness',
-      value: `${activeCampaigns}/${snapshot.campaigns.length}`,
-      meta: primaryCampaign ? primaryCampaign.name : 'No campaign route',
-      icon: <Megaphone className="size-5" />,
-      tone: 'purple',
-    },
-    {
-      label: 'Response queue',
-      value: responseBacklog,
-      meta: `${openLeads} leads, ${openRfqs} RFQs open`,
-      icon: <UserRoundCheck className="size-5" />,
-      tone: 'success',
-    },
-    {
-      label: 'Re-engage safety',
-      value: reengageEligible,
-      meta: 'Warm-buyer plays with suppression',
-      icon: <Target className="size-5" />,
-      tone: 'warning',
-    },
-    {
-      label: 'Outcome readback',
-      value: `${totalOrders} orders`,
-      meta: currency.format(totalRevenue),
-      icon: <ClipboardList className="size-5" />,
-      tone: blockedGuardrails ? 'warning' : 'success',
-    },
-  ] as const;
-
-  const priorityMoves = [
-    topForecast && topForecast.risk === 'high' ? {
-      id: `guardrail-${topForecast.id}`,
-      severity: 'Critical',
-      label: 'Guardrail',
-      title: `Pause scale until ${topForecast.skuCode} stock is safe`,
-      detail: `${topForecast.ats} ATS vs ${topForecast.demand7d} projected demand. ${topForecast.suggestedAction}`,
-      owner: 'Demand + Ecom',
-      href: getProductMasterHref(topForecast.skuId),
-      cta: 'Open product',
-      evidence: 'COS guardrail',
-    } : null,
-    primaryCampaign ? {
-      id: `campaign-${primaryCampaign.id}`,
-      severity: blockedGuardrails ? 'Watch' : 'Ready',
-      label: 'Campaign',
-      title: `Review ${primaryCampaign.name}`,
-      detail: `${primaryCampaign.targetSegment} through ${primaryCampaign.channel}; ${primaryCampaign.leads} leads, ${primaryCampaign.rfqs} RFQs, ${primaryCampaign.orders} orders.`,
-      owner: 'Campaigns',
-      href: DEMAND_CAMPAIGNS_HREF,
-      cta: 'Open campaigns',
-      evidence: `${formatCompactCount(primaryCampaign.traffic)} traffic`,
-    } : null,
-    topRfq ? {
-      id: `rfq-${topRfq.id}`,
-      severity: topRfq.status === 'draft' ? 'Watch' : 'Ready',
-      label: 'Response',
-      title: `Read ${topRfq.requestedBy} RFQ`,
-      detail: `${topRfq.quantity} units, ${currency.format(topRfq.value)}, status ${topRfq.status}.`,
-      owner: 'Leads & RFQs',
-      href: `${DEMAND_LEADS_RFQS_HREF}?rfq=${encodeURIComponent(topRfq.id)}`,
-      cta: 'Open RFQ',
-      evidence: 'Buyer intent',
-    } : null,
-    primaryPlay ? {
-      id: `play-${primaryPlay.id}`,
-      severity: 'Ready',
-      label: 'Re-entry',
-      title: primaryPlay.audience,
-      detail: `${primaryPlay.nextBestAction} Projected lift ${primaryPlay.projectedLift}%.`,
-      owner: 'Re-engage',
-      href: DEMAND_REENGAGE_HREF,
-      cta: 'Open play',
-      evidence: primaryPlay.trigger,
-    } : null,
-  ].filter(Boolean) as Array<{
-    id: string;
-    severity: 'Critical' | 'Watch' | 'Ready';
-    label: string;
-    title: string;
-    detail: string;
-    owner: string;
-    href: string;
-    cta: string;
-    evidence: string;
-  }>;
-
-  const pipelineSteps = [
-    {
-      label: 'Sources',
-      value: formatCompactCount(sourceVolume),
-      detail: 'Find origin quality before adding spend.',
-      href: '/demand/sources',
-      icon: <Globe className="size-4" />,
-    },
-    {
-      label: 'Campaigns',
-      value: String(activeCampaigns),
-      detail: 'Package objective, audience, offer, guardrail.',
-      href: DEMAND_CAMPAIGNS_HREF,
-      icon: <Megaphone className="size-4" />,
-    },
-    {
-      label: 'Content',
-      value: `${snapshot.socialStreams.length} streams`,
-      detail: 'Turn proof into assets and CTAs.',
-      href: DEMAND_CONTENT_SOCIAL_HREF,
-      icon: <PenLine className="size-4" />,
-    },
-    {
-      label: 'Leads/RFQs',
-      value: String(responseBacklog),
-      detail: 'Assign owner, SLA, CRM handoff.',
-      href: DEMAND_LEADS_RFQS_HREF,
-      icon: <UserRoundCheck className="size-4" />,
-    },
-    {
-      label: 'Re-engage',
-      value: String(reengageEligible),
-      detail: 'Recover warm buyers with suppression.',
-      href: DEMAND_REENGAGE_HREF,
-      icon: <Target className="size-4" />,
-    },
-  ];
-
-  const guardrails = [
-    {
-      label: 'Stock',
-      value: topForecast ? `${topForecast.ats}/${topForecast.demand7d}` : 'Clear',
-      detail: topForecast ? `${getSkuLabel(topForecast.skuId)} is ${topForecast.risk} risk.` : 'No inventory guardrail detected.',
-      tone: topForecast?.risk === 'high' ? 'destructive' : topForecast?.risk === 'medium' ? 'secondary' : 'outline',
-    },
-    {
-      label: 'Service',
-      value: openTickets.length ? `${openTickets.length} open` : 'Clear',
-      detail: openTickets[0]?.subject || 'No service issue blocks outreach.',
-      tone: openTickets.length ? 'secondary' : 'outline',
-    },
-    {
-      label: 'Suppression',
-      value: reengageEligible ? 'On' : 'Pending',
-      detail: 'Converted buyers, open cases, and assigned RFQs stay excluded.',
-      tone: 'outline',
-    },
-  ] as const;
-
-  const evidence = [
-    {
-      label: 'Source proof',
-      value: `${formatCompactCount(totalTraffic)} campaign traffic`,
-      meta: `${formatCompactCount(sourceVolume)} source signals feeding Demand.`,
-    },
-    {
-      label: 'Response proof',
-      value: `${totalLeads} leads / ${totalRfqs} RFQs`,
-      meta: topLead ? `${topLead.company} is top scored at ${topLead.score}.` : 'No lead scored yet.',
-    },
-    {
-      label: 'Outcome proof',
-      value: `${totalOrders} orders`,
-      meta: `${currency.format(totalRevenue)} read back to Intelligence.`,
-    },
-    {
-      label: 'Next handoff',
-      value: blockedGuardrails ? 'Fix guardrail' : 'Scale campaign',
-      meta: blockedGuardrails ? 'Keep COS/customer context visible before scale.' : 'Demand can push the current route safely.',
-    },
-  ];
-
-  const severityClass = (severity: 'Critical' | 'Watch' | 'Ready') => {
-    if (severity === 'Critical') return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300';
-    if (severity === 'Watch') return 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
-    return 'border-emerald-500/30 bg-background text-emerald-700 dark:text-emerald-300';
+  const kpiIcons: Record<string, ReactNode> = {
+    readiness: <Gauge className="size-5" />,
+    'source-quality': <Globe className="size-5" />,
+    response: <UserRoundCheck className="size-5" />,
+    outcome: <ClipboardList className="size-5" />,
   };
-
-  const loop: OperatingLoopStep[] = [
-    {
-      label: 'Source',
-      title: 'Find the strongest demand origin',
-      detail: 'Use source quality, social streams, and campaign origin before adding spend.',
-      href: '/demand/sources',
-      tone: 'info',
+  const readinessConfig = {
+    readiness: {
+      label: 'Readiness',
+      color: 'hsl(var(--primary))',
     },
-    {
-      label: 'Campaign',
-      title: 'Package the market move',
-      detail: 'Objective, audience, offer, channel, owner, and guardrail belong together.',
-      href: '/demand/campaigns',
-      tone: 'purple',
+  } satisfies ChartConfig;
+  const outcomeConfig = {
+    leads: {
+      label: 'Leads',
+      color: 'hsl(var(--chart-1))',
     },
-    {
-      label: 'Response',
-      title: 'Turn intent into lead/RFQ work',
-      detail: 'Every response needs qualification, owner, SLA, and CRM/COS handoff.',
-      href: '/demand/leads-rfqs',
-      tone: 'success',
+    rfqs: {
+      label: 'RFQs',
+      color: 'hsl(var(--chart-2))',
     },
-    {
-      label: 'Re-entry',
-      title: 'Recover warm buyers safely',
-      detail: 'Re-engage only with suppression, cooldown, and outcome readback.',
-      href: '/demand/re-engage',
-      tone: 'warning',
+    orders: {
+      label: 'Orders',
+      color: 'hsl(var(--chart-3))',
     },
-  ];
+  } satisfies ChartConfig;
 
   return (
     <div className="min-h-full bg-background">
       <div className="space-y-4 p-4 md:p-6">
         <section data-testid="demand-command-bar" className="rounded-lg border bg-card shadow-sm">
-          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.68fr)_auto] lg:items-center">
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)_auto] lg:items-center">
             <div className="min-w-0">
-              <Badge variant="outline" className="mb-3 rounded-full">Demand Command Bar</Badge>
-              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Demand Hub</h1>
-              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                Decide which source, campaign, content, lead/RFQ, or re-entry move should run next, with guardrails visible before scale.
-              </p>
+              <Badge variant="outline" className="mb-3 rounded-full">Demand Dashboard</Badge>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{dashboard.title}</h1>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{dashboard.operatingDetail}</p>
             </div>
             <div className="rounded-lg border bg-muted/20 p-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                <span>{hubReadiness}% readiness</span>
+              <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                <span>{dashboard.readiness}% readiness</span>
                 <span className="text-muted-foreground">/</span>
-                <span>{priorityMoves.length} moves</span>
+                <span>{dashboard.nextMoves.length} moves</span>
                 <span className="text-muted-foreground">/</span>
-                <span>{blockedGuardrails} guardrails</span>
+                <span>{dashboard.guardrailCount} guardrails</span>
               </div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                {hubStatus}: {totalLeads} leads, {totalRfqs} RFQs, {totalOrders} orders read back from Demand.
-              </div>
+              <Progress value={dashboard.readiness} className="mt-3 h-2" />
+              <div className="mt-2 text-xs text-muted-foreground">{dashboard.operatingAnswer}</div>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
               <Button asChild size="sm">
@@ -9488,19 +9306,112 @@ export function PrimeDemandHubPage() {
         <LinkedEntityStrip
           entities={[
             { label: 'Area', value: 'Demand Area', tone: 'purple' },
-            { label: 'Hub', value: 'Growth input', tone: 'info' },
-            { label: 'Campaign', value: primaryCampaign?.id || 'pending', href: '/demand/campaigns', tone: 'purple' },
-            { label: 'Orders', value: String(totalOrders), href: '/ecom/cos/oms', tone: 'success' },
+            { label: 'Dashboard', value: 'Suite overview', tone: 'info' },
+            { label: 'Functions', value: String(dashboard.functions.length), href: '/demand/sources', tone: 'purple' },
+            { label: 'Orders', value: String(dashboard.totalOrders), href: '/ecom/cos/oms', tone: 'success' },
           ]}
         />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {healthCards.map((card) => (
-            <SummaryMetricCard key={card.label} label={card.label} value={card.value} meta={card.meta} icon={card.icon} tone={card.tone} />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {dashboard.kpis.map((card) => (
+            <SummaryMetricCard
+              key={card.id}
+              label={card.label}
+              value={card.value}
+              meta={card.detail}
+              icon={kpiIcons[card.id]}
+              tone={card.tone}
+              metaTooltip={card.detail}
+            />
           ))}
         </div>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+        <section className="grid gap-3 xl:grid-cols-6">
+          {dashboard.functions.map((item) => {
+            const Icon = demandFunctionIcon(item.id);
+            return (
+              <Link key={item.id} to={item.href} className="group rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30 text-primary">
+                    <Icon className="size-4" />
+                  </div>
+                  <DemandSeverityBadge severity={item.status} />
+                </div>
+                <div className="mt-3">
+                  <div className="truncate text-sm font-semibold">{item.label}</div>
+                  <div className="mt-1 text-xl font-semibold">{item.metric}</div>
+                  <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                  <span className="font-medium text-primary">{item.nextAction}</span>
+                  <span className="text-muted-foreground">{item.readiness}%</span>
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+          <Card className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="size-4" />
+                Function Readiness
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+              <div>
+                <ChartContainer
+                  config={readinessConfig}
+                  className="h-64 w-full"
+                  aria-label={`Demand function readiness: ${dashboard.chartData.map((row) => `${row.function} ${row.readiness}%`).join(', ')}`}
+                >
+                  <BarChart data={dashboard.chartData} layout="vertical" margin={{ left: 8, right: 44, top: 8, bottom: 8 }}>
+                    <CartesianGrid horizontal={false} />
+                    <XAxis type="number" domain={[0, 100]} hide />
+                    <YAxis type="category" dataKey="function" width={116} tickLine={false} axisLine={false} tickMargin={8} />
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <Bar dataKey="readiness" fill="var(--color-readiness)" radius={[0, 6, 6, 0]} barSize={18}>
+                      <LabelList dataKey="readiness" position="right" formatter={(value: number) => `${value}%`} className="fill-foreground font-medium" />
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+                <ul className="sr-only">
+                  {dashboard.chartData.map((row) => (
+                    <li key={row.function}>{row.function}: {row.readiness}% readiness, {row.status}.</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="grid content-start gap-2">
+                {dashboard.guardrails.map((item) => (
+                  <Link key={item.id} to={item.href} className="rounded-lg border bg-muted/15 p-3 transition-colors hover:border-primary/40 hover:bg-muted/25">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold">{item.label}</div>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                      </div>
+                      <DemandSeverityBadge severity={item.severity} label={item.value} />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border shadow-sm">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ScanSearch className="size-4" />
+                Demand Funnel
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <DemandFunnel stages={dashboard.funnel} />
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <Card id="priority-demand-queue" className="rounded-lg border shadow-sm">
             <CardHeader className="border-b pb-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -9513,20 +9424,19 @@ export function PrimeDemandHubPage() {
                     Ranked by guardrail risk, buyer intent, and next owner clarity.
                   </p>
                 </div>
-                <Badge variant="outline" className="w-fit">{priorityMoves.length} moves</Badge>
+                <Badge variant="outline" className="w-fit">{dashboard.nextMoves.length} moves</Badge>
               </div>
             </CardHeader>
             <CardContent className="divide-y p-0">
-              {priorityMoves.map((move, index) => (
+              {dashboard.nextMoves.map((move) => (
                 <Link key={move.id} to={move.href} className="grid gap-3 p-4 transition-colors hover:bg-muted/20 lg:grid-cols-[44px_minmax(0,1fr)_auto] lg:items-center">
                   <div className="flex size-9 items-center justify-center rounded-lg border bg-background text-sm font-semibold">
-                    {index + 1}
+                    {move.rank}
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className={severityClass(move.severity)}>{move.severity}</Badge>
+                      <DemandSeverityBadge severity={move.severity} />
                       <Badge variant="outline">{move.owner}</Badge>
-                      <span className="text-xs text-muted-foreground">{move.label}</span>
                     </div>
                     <h2 className="mt-2 text-base font-semibold leading-tight">{move.title}</h2>
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{move.detail}</p>
@@ -9541,78 +9451,34 @@ export function PrimeDemandHubPage() {
             </CardContent>
           </Card>
 
-          <aside className="space-y-4">
-            <Card className="rounded-lg border shadow-sm">
-              <CardHeader className="border-b pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <ScanSearch className="size-4" />
-                  Guardrail Rail
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="divide-y p-0">
-                {guardrails.map((item) => (
-                  <div key={item.label} className="p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold">{item.label}</div>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.detail}</p>
-                      </div>
-                      <Badge variant={item.tone} className="shrink-0">{item.value}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-lg border shadow-sm">
-              <CardHeader className="border-b pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <PanelsTopLeft className="size-4" />
-                  Demand Pipeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2 p-3">
-                {pipelineSteps.map((step) => (
-                  <Link key={step.label} to={step.href} className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">{step.icon}</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold">{step.label}</div>
-                        <div className="shrink-0 text-xs text-muted-foreground">{step.value}</div>
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{step.detail}</p>
-                    </div>
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
-          </aside>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
           <Card className="rounded-lg border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <RadioTower className="size-4" />
-                Growth Input Loop
+                <TrendingUp className="size-4" />
+                Outcome Readback
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <OperatingLoop steps={loop} />
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg border shadow-sm">
-            <CardHeader className="border-b pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ClipboardList className="size-4" />
-                Evidence Stack
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
-              {evidence.map((item) => (
-                <EvidenceCard key={item.label} label={item.label} value={item.value} meta={item.meta} />
-              ))}
+              <ChartContainer
+                config={outcomeConfig}
+                className="h-64 w-full"
+                aria-label={`Demand outcomes: ${dashboard.outcomes.map((row) => `${row.label}: ${row.leads} leads, ${row.rfqs} RFQs, ${row.orders} orders`).join(', ')}`}
+              >
+                <BarChart data={dashboard.outcomes} margin={{ left: 8, right: 8, top: 12, bottom: 8 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} interval={0} tickFormatter={(value: string) => value.split(' ').slice(0, 2).join(' ')} />
+                  <YAxis hide />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="leads" stackId="a" fill="var(--color-leads)" radius={[0, 0, 4, 4]} />
+                  <Bar dataKey="rfqs" stackId="a" fill="var(--color-rfqs)" />
+                  <Bar dataKey="orders" stackId="a" fill="var(--color-orders)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+              <ul className="sr-only">
+                {dashboard.outcomes.map((row) => (
+                  <li key={row.id}>{row.label}: {row.leads} leads, {row.rfqs} RFQs, {row.orders} orders, {currency.format(row.revenue)}.</li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
         </section>
@@ -9636,9 +9502,11 @@ export function PrimeDemandHubPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {snapshot.campaigns.slice(0, 5).map((campaign) => (
+                  {dashboard.outcomes.map((campaign) => (
                     <TableRow key={campaign.id}>
-                      <TableCell className="font-medium">{campaign.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link to={campaign.href} className="hover:text-primary">{campaign.label}</Link>
+                      </TableCell>
                       <TableCell className="text-right">{campaign.leads}</TableCell>
                       <TableCell className="text-right">{campaign.rfqs}</TableCell>
                       <TableCell className="text-right">{campaign.orders}</TableCell>
@@ -9654,52 +9522,432 @@ export function PrimeDemandHubPage() {
   );
 }
 
-export function PrimeDemandSourcesPage() {
-  const snapshot = getPrimeSnapshot();
-  const totalTraffic = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.traffic, 0);
-  const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
-  const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
-  const sourceVolume = snapshot.socialStreams.reduce((sum, stream) => sum + stream.eventVolume, 0);
-  const leadRate = totalTraffic ? Math.round((totalLeads / totalTraffic) * 100) : 0;
-  const rfqRate = totalLeads ? Math.round((totalRfqs / totalLeads) * 100) : 0;
+function demandFunctionIcon(id: string) {
+  const icons = {
+    mdec: RadioTower,
+    sources: Globe,
+    campaigns: Megaphone,
+    'content-social': PenLine,
+    'leads-rfqs': UserRoundCheck,
+    're-engage': Target,
+  } as const;
 
-  const sourceEvidence: EvidenceItem[] = [
-    { label: 'Traffic intent', value: formatCompactCount(totalTraffic), detail: 'Campaign traffic connected to SKU routes.', tone: 'info' },
-    { label: 'Lead rate', value: `${leadRate}%`, detail: 'Preview conversion from campaign traffic to leads.', tone: 'success' },
-    { label: 'RFQ rate', value: `${rfqRate}%`, detail: 'Commercial readiness from leads into RFQs.', tone: 'purple' },
+  return icons[id as keyof typeof icons] || PanelsTopLeft;
+}
+
+function demandSeverityClassName(severity: DemandDashboardSeverity) {
+  if (severity === 'critical') return 'border-rose-500/35 bg-rose-500/10 text-rose-700 dark:text-rose-300';
+  if (severity === 'watch') return 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+  return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+}
+
+function demandSeverityLabel(severity: DemandDashboardSeverity) {
+  if (severity === 'critical') return 'Critical';
+  if (severity === 'watch') return 'Watch';
+  return 'Ready';
+}
+
+function DemandSeverityBadge({ severity, label }: { severity: DemandDashboardSeverity; label?: string }) {
+  return (
+    <Badge variant="outline" className={demandSeverityClassName(severity)}>
+      {label || demandSeverityLabel(severity)}
+    </Badge>
+  );
+}
+
+function DemandFunnel({ stages }: { stages: Array<{ id: string; label: string; displayValue: string; href: string; detail: string }> }) {
+  return (
+    <div className="grid gap-3">
+      {stages.map((stage, index) => (
+        <Link
+          key={stage.id}
+          to={stage.href}
+          className="group grid gap-3 rounded-lg border bg-muted/10 p-3 transition-colors hover:border-primary/40 hover:bg-primary/5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-md border bg-background text-[11px] font-semibold">{index + 1}</span>
+              <div className="truncate text-sm font-semibold">{stage.label}</div>
+            </div>
+            <p className="mt-1 line-clamp-2 pl-8 text-xs leading-5 text-muted-foreground">{stage.detail}</p>
+          </div>
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <div className="text-xl font-semibold tabular-nums">{stage.displayValue}</div>
+            <ArrowRight className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function sourceStatusVariant(source: DemandSource): 'default' | 'secondary' | 'warning' | 'outline' {
+  if (source.status === 'active' && source.blockers.length === 0) return 'default';
+  if (source.status === 'needs_review' || source.blockers.length > 0) return 'warning';
+  if (source.status === 'suppressed') return 'secondary';
+  return 'outline';
+}
+
+function sourceActionVariant(action: DemandSource['nextAction']): 'default' | 'secondary' | 'outline' {
+  if (action === 'Scale' || action === 'Route leads') return 'default';
+  if (action === 'Fix' || action === 'Review') return 'outline';
+  return 'secondary';
+}
+
+function sourceRiskBadgeVariant(risk: DemandSource['inventoryRisk'] | DemandSource['financeRisk']): 'default' | 'secondary' | 'warning' | 'outline' {
+  if (risk === 'high') return 'warning';
+  if (risk === 'medium') return 'secondary';
+  if (risk === 'low') return 'default';
+  return 'outline';
+}
+
+function SourceQualityBar({ value }: { value: number }) {
+  const toneClassName = value >= 78 ? 'bg-emerald-500' : value >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className={`h-full rounded-full ${toneClassName}`} style={{ width: `${Math.max(8, value)}%` }} />
+      </div>
+      <span className="min-w-8 text-right text-xs font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; onClose: () => void }) {
+  if (!source) return null;
+
+  return (
+    <Dialog open={Boolean(source)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto rounded-2xl">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={sourceStatusVariant(source)}>{source.status.replace('_', ' ')}</Badge>
+            <Badge variant="outline">{getDemandSourceTypeLabel(source.type)}</Badge>
+            <Badge variant="outline">{source.market}</Badge>
+          </div>
+          <DialogTitle className="text-2xl">{source.name}</DialogTitle>
+          <DialogDescription>{source.sourceSignal}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle className="text-base">Source identity</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs text-muted-foreground">Owner</div>
+                  <div className="mt-1 font-semibold">{source.ownerLabel}</div>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs text-muted-foreground">Mode</div>
+                  <div className="mt-1 font-semibold">{source.ingestionMode}</div>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs text-muted-foreground">Channel</div>
+                  <div className="mt-1 font-semibold">{source.connectedChannel}</div>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs text-muted-foreground">Last sync</div>
+                  <div className="mt-1 font-semibold">{source.lastSyncAt}</div>
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="text-xs text-muted-foreground">Product route</div>
+                <div className="mt-1 font-semibold">{source.productName}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{source.skuCode}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle className="text-base">Quality engine</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">Source quality score</span>
+                  <span className="text-sm font-semibold">{source.qualityScore}/100</span>
+                </div>
+                <Progress value={source.qualityScore} className="h-2" />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Signals</div>
+                  <div className="text-lg font-semibold">{formatCompactCount(source.signalVolume)}</div>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Leads</div>
+                  <div className="text-lg font-semibold">{source.leadCount}</div>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">RFQs</div>
+                  <div className="text-lg font-semibold">{source.rfqCount}</div>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Badge variant={sourceRiskBadgeVariant(source.inventoryRisk)}>Inventory: {source.inventoryRisk}</Badge>
+                <Badge variant={sourceRiskBadgeVariant(source.financeRisk)}>Finance: {source.financeRisk}</Badge>
+              </div>
+              <div className="space-y-2">
+                {source.scoreReasons.map((reason) => (
+                  <div key={reason} className="rounded-lg bg-muted/35 px-3 py-2 text-xs text-muted-foreground">{reason}</div>
+                ))}
+                {source.blockers.map((blocker) => (
+                  <div key={blocker} className="rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning">{blocker}</div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle className="text-base">Attribution preview</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {source.attribution.map((touchpoint) => (
+                <div key={`${touchpoint.label}-${touchpoint.sourceId}`} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                  <div>
+                    <div className="font-medium">{touchpoint.label}</div>
+                    <div className="text-xs text-muted-foreground">{touchpoint.campaignId || touchpoint.sourceId}</div>
+                  </div>
+                  <Badge variant="outline">{touchpoint.confidence}%</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle className="text-base">Recommended action</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-xl border bg-primary/5 p-4">
+                <div className="text-lg font-semibold">{source.nextAction}</div>
+                <p className="mt-2 text-sm text-muted-foreground">{source.actionReason}</p>
+                {source.importBatch ? (
+                  <div className="mt-3 rounded-lg border bg-background p-3 text-xs text-muted-foreground">
+                    Batch {source.importBatch.id}: {source.importBatch.rows} rows, {source.importBatch.duplicateRate}% duplicate risk, owner {source.importBatch.owner}.
+                  </div>
+                ) : null}
+                <Button asChild className="mt-4" size="sm">
+                  <Link to={source.nextActionRoute}>
+                    Open target workspace
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function marketplacePageIcon(page: MarketplaceSourcePage) {
+  const icons = {
+    overview: Globe,
+    accounts: CircleUserRound,
+    'demand-signals': RadioTower,
+    'product-sku-signals': PackagePlus,
+    'inquiry-lead-intake': MessageCircle,
+    'campaign-attribution': Megaphone,
+    'source-quality': Gauge,
+    'data-health': SlidersHorizontal,
+    detail: ScanSearch,
+  } as const;
+
+  return icons[page] || Globe;
+}
+
+function marketplaceStatusVariant(status: string): 'default' | 'secondary' | 'warning' | 'outline' | 'destructive' {
+  if (status === 'active' || status === 'healthy' || status === 'routed' || status === 'converted_to_rfq') return 'default';
+  if (status === 'needs_review' || status === 'stale' || status === 'needs_qualification' || status === 'mapping_issue' || status === 'duplicate_risk') return 'warning';
+  if (status === 'failed' || status === 'duplicate' || status === 'suppressed') return 'destructive';
+  if (status === 'inactive') return 'secondary';
+  return 'outline';
+}
+
+function prettyMarketplaceLabel(value: string) {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function sourceGraphicToneClassName(index: number) {
+  const tones = [
+    'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300',
+    'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300',
+    'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300',
+    'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300',
+    'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300',
   ];
-  const weakSources = snapshot.socialStreams.filter((stream) => stream.status !== 'healthy');
+  return tones[index % tones.length];
+}
 
-  const getSourceAction = (stream: PrimeSocialStream) => {
-    if (stream.status === 'lagging') {
-      return { label: 'Fix', href: '/demand/content-social', detail: 'Refresh creative, CTA, or landing proof before scaling.' };
-    }
-    if (stream.status === 'watch') {
-      return { label: 'Test', href: '/demand/campaigns', detail: 'Run a controlled campaign test before adding budget.' };
-    }
-    return { label: 'Scale', href: '/demand/campaigns', detail: 'Source is healthy enough to scale into campaign planning.' };
-  };
+function sourceChildIcon(type: DemandSourceType, child: string) {
+  const normalized = child.toLowerCase();
+  if (type === 'marketplace') {
+    if (normalized.includes('shop') || normalized.includes('market')) return Globe;
+    return PackagePlus;
+  }
+  if (type === 'social') {
+    if (normalized.includes('instagram')) return Instagram;
+    if (normalized.includes('youtube')) return Youtube;
+    if (normalized.includes('line') || normalized.includes('community')) return MessageCircle;
+    if (normalized.includes('facebook')) return MessageCircle;
+    return RadioTower;
+  }
+  if (type === 'ads') {
+    if (normalized.includes('google')) return Search;
+    if (normalized.includes('meta')) return Target;
+    if (normalized.includes('marketplace')) return Globe;
+    return Megaphone;
+  }
+  if (type === 'partner') {
+    if (normalized.includes('creator') || normalized.includes('kol')) return Sparkles;
+    if (normalized.includes('affiliate')) return Heart;
+    if (normalized.includes('agency')) return PanelsTopLeft;
+    return HeartHandshake;
+  }
+  if (normalized.includes('csv') || normalized.includes('upload')) return Upload;
+  if (normalized.includes('sales')) return Phone;
+  if (normalized.includes('event')) return CalendarCheck;
+  if (normalized.includes('offline')) return Mail;
+  return ClipboardList;
+}
+
+function SourceOperatingLoopGraphic({
+  type,
+  hrefForPage,
+}: {
+  type: DemandSourceType;
+  hrefForPage: (page: SourceWorkspacePage) => string;
+}) {
+  const stages = [
+    { label: 'Source', detail: 'Origin registry', icon: sourceFunctionIcon(type), href: hrefForPage('accounts') },
+    { label: 'Signal', detail: 'Intent evidence', icon: RadioTower, href: hrefForPage('demand-signals') },
+    { label: 'Lead / RFQ', detail: 'Qualified demand', icon: UserRoundCheck, href: hrefForPage('inquiry-lead-intake') },
+    { label: 'Readback', detail: 'Campaign outcome', icon: TrendingUp, href: hrefForPage('campaign-attribution') },
+  ];
+
+  return (
+    <Card className="rounded-2xl border bg-muted/10">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="size-5 text-primary" />
+          Operating source loop
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">Icon path from origin to commercial readback; each step opens its operating page.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-4">
+          {stages.map((stage, index) => {
+            const Icon = stage.icon;
+            return (
+              <Link
+                key={stage.label}
+                to={stage.href}
+                className="group relative rounded-2xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5"
+              >
+                <div className={`flex size-11 items-center justify-center rounded-xl border ${sourceGraphicToneClassName(index)}`}>
+                  <Icon className="size-5" />
+                </div>
+                <div className="mt-4 font-semibold">{stage.label}</div>
+                <p className="mt-1 text-sm text-muted-foreground">{stage.detail}</p>
+                <div className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary">
+                  Open
+                  <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MarketplaceVisualRouteMap({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <Card className="rounded-2xl border">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="size-5 text-primary" />
+              Marketplace route map
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">A visual registry of marketplace accounts, quality, and lead/RFQ contribution.</p>
+          </div>
+          <Badge variant="outline">{marketplace.accounts.length} account classes</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {marketplace.accounts.map((account, index) => {
+          const Icon = sourceChildIcon('marketplace', account.marketplace);
+          const quality = account.sourceIds.length
+            ? Math.round(marketplace.sources.filter((source) => account.sourceIds.includes(source.id)).reduce((sum, source) => sum + source.qualityScore, 0) / account.sourceIds.length)
+            : 0;
+          return (
+            <Link
+              key={account.id}
+              to={account.sourceIds[0] ? getMarketplaceSourcePageHref('detail', account.sourceIds[0]) : getMarketplaceSourcePageHref('accounts')}
+              className="rounded-2xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className={`flex size-11 items-center justify-center rounded-xl border ${sourceGraphicToneClassName(index)}`}>
+                  <Icon className="size-5" />
+                </div>
+                <Badge variant={marketplaceStatusVariant(account.status)}>{prettyMarketplaceLabel(account.status)}</Badge>
+              </div>
+              <div className="mt-4 font-semibold">{account.marketplace}</div>
+              <p className="mt-1 line-clamp-2 min-h-10 text-xs text-muted-foreground">{account.storefrontName}</p>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <div><div className="text-muted-foreground">Q</div><div className="font-semibold">{quality}</div></div>
+                <div><div className="text-muted-foreground">Lead</div><div className="font-semibold">{account.leadCount}</div></div>
+                <div><div className="text-muted-foreground">RFQ</div><div className="font-semibold">{account.rfqCount}</div></div>
+              </div>
+            </Link>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MarketplaceSourceWorkspace({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const pageMeta = getMarketplaceSourcePageMeta(marketplace.page);
+  const PageIcon = marketplacePageIcon(marketplace.page);
+  const sourceEvidence: EvidenceItem[] = [
+    { label: 'Marketplace sources', value: String(marketplace.overview.totalMarketplaceSources), detail: 'Filtered to DemandSource rows classified as marketplace.', tone: 'info' },
+    { label: 'Quality score', value: `${marketplace.overview.marketplaceSourceQualityScore}/100`, detail: 'Lead, RFQ, freshness, duplicate, inventory, and finance factors.', tone: 'purple' },
+    { label: 'Needs review', value: String(marketplace.overview.sourcesNeedingReview), detail: 'Sources with stale, duplicate, mapping, inventory, or finance blockers.', tone: marketplace.overview.sourcesNeedingReview ? 'warning' : 'success' },
+  ];
 
   return (
     <div className="min-h-full bg-background">
-      <div className="space-y-6 p-4 md:p-6">
+      <div className="space-y-5 p-4 md:p-6">
         <DecisionHeader
-          eyebrow="Demand Area source workspace"
-          title="Sources"
-          description="Read acquisition and content origins as source quality, then decide whether to scale, test, fix, or pause."
-          confidence={82}
-          status="Ready"
+          eyebrow="Demand Center / Sources / Marketplace Source"
+          title="Marketplace Source"
+          description="Track marketplace-originated demand across accounts, signals, SKUs, inquiries, attribution, source quality, and data health."
+          confidence={marketplace.overview.marketplaceSourceQualityScore}
+          status={marketplace.overview.sourcesNeedingReview ? 'Review needed' : 'Ready'}
           actions={(
             <>
               <Button asChild>
-                <Link to="/demand/campaigns">
-                  Build campaign
+                <Link to={getMarketplaceSourcePageHref('source-quality')}>
+                  Review source quality
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to="/demand/content-social">
-                  Fix content/CTA
+                <Link to={getMarketplaceSourcePageHref('inquiry-lead-intake')}>
+                  Open intake
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -9711,117 +9959,1891 @@ export function PrimeDemandSourcesPage() {
 
         <LinkedEntityStrip
           entities={[
-            { label: 'Area', value: 'Demand Area', tone: 'purple' },
-            { label: 'Workspace', value: 'Sources', tone: 'info' },
-            { label: 'Signals', value: formatCompactCount(sourceVolume), href: '/intelligence/signals', tone: 'muted' },
-            { label: 'Leads', value: String(totalLeads), href: '/demand/leads-rfqs', tone: 'success' },
+            { label: 'Function', value: 'Marketplace Source', tone: 'purple' },
+            { label: 'Page', value: pageMeta.label, tone: 'info' },
+            { label: 'Signals', value: formatCompactCount(marketplace.overview.totalSignalVolume), href: getMarketplaceSourcePageHref('demand-signals'), tone: 'info' },
+            { label: 'Leads', value: String(marketplace.overview.totalMarketplaceLeads), href: getMarketplaceSourcePageHref('inquiry-lead-intake'), tone: 'success' },
+            { label: 'RFQs', value: String(marketplace.overview.totalRfqs), href: getMarketplaceSourcePageHref('inquiry-lead-intake'), tone: 'warning' },
+            { label: 'Top marketplace', value: marketplace.overview.topDemandMarketplace, tone: 'muted' },
           ]}
         />
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Source signal volume" value={formatCompactCount(sourceVolume)} meta="Social, creator, chat, and review streams." icon={<RadioTower className="size-5" />} tone="info" />
-          <SummaryMetricCard label="Campaign traffic" value={formatCompactCount(totalTraffic)} meta="Traffic linked to active campaign routes." icon={<Megaphone className="size-5" />} tone="purple" />
-          <SummaryMetricCard label="Lead conversion" value={`${leadRate}%`} meta={`${totalLeads} leads from tracked demand.`} icon={<UserRoundCheck className="size-5" />} tone="success" />
-          <SummaryMetricCard label="RFQ readiness" value={`${rfqRate}%`} meta={`${totalRfqs} RFQs attached.`} icon={<ClipboardList className="size-5" />} tone="warning" />
-        </div>
-
-        {weakSources.length ? (
-          <Card className="rounded-lg border border-warning/30 bg-warning/5" data-testid="demand-source-warning-lane">
-            <CardHeader>
-              <CardTitle>Weak-source control lane</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              {weakSources.map((stream) => {
-                const action = getSourceAction(stream);
+        <Card className="rounded-2xl border">
+          <CardContent className="p-2">
+            <div className="flex gap-2 overflow-x-auto">
+              {MARKETPLACE_SOURCE_PAGES.filter((item) => item.id !== 'detail').map((item) => {
+                const Icon = marketplacePageIcon(item.id);
+                const isActive = marketplace.page === item.id;
                 return (
-                  <div key={stream.id} className="rounded-lg border bg-background p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-semibold">{stream.source}</div>
-                        <p className="mt-1 text-xs text-muted-foreground">{stream.audienceSignal}</p>
-                      </div>
-                      <Badge variant={stream.status === 'lagging' ? 'warning' : 'secondary'}>{stream.status}</Badge>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground">{action.detail}</p>
-                      <Button asChild size="sm" variant="outline">
-                        <Link to={action.href}>{action.label}</Link>
-                      </Button>
-                    </div>
-                  </div>
+                  <Link
+                    key={item.id}
+                    to={getMarketplaceSourcePageHref(item.id)}
+                    className={`inline-flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                  >
+                    <Icon className="size-4" />
+                    {item.label}
+                  </Link>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-muted/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <PageIcon className="size-5" />
+              {pageMeta.label}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">{pageMeta.description}</p>
+          </CardHeader>
+        </Card>
+
+        {marketplace.page === 'overview' ? <MarketplaceOverviewView marketplace={marketplace} /> : null}
+        {marketplace.page === 'accounts' ? <MarketplaceAccountsView marketplace={marketplace} /> : null}
+        {marketplace.page === 'demand-signals' ? <MarketplaceDemandSignalsView marketplace={marketplace} /> : null}
+        {marketplace.page === 'product-sku-signals' ? <MarketplaceSkuSignalsView marketplace={marketplace} /> : null}
+        {marketplace.page === 'inquiry-lead-intake' ? <MarketplaceInquiryLeadIntakeView marketplace={marketplace} /> : null}
+        {marketplace.page === 'campaign-attribution' ? <MarketplaceCampaignAttributionView marketplace={marketplace} /> : null}
+        {marketplace.page === 'source-quality' ? <MarketplaceSourceQualityView marketplace={marketplace} /> : null}
+        {marketplace.page === 'data-health' ? <MarketplaceDataHealthView marketplace={marketplace} /> : null}
+        {marketplace.page === 'detail' ? <MarketplaceDetailView marketplace={marketplace} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function MarketplaceKpiStrip({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <SummaryMetricCard label="Marketplace sources" value={marketplace.overview.totalMarketplaceSources} metaTooltip="Total DemandSource rows classified as Marketplace Source." icon={<Globe className="size-5" />} tone="info" />
+      <SummaryMetricCard label="Active marketplaces" value={marketplace.overview.activeMarketplaces} metaTooltip="Marketplace accounts with live or reviewable signal sources." icon={<CircleUserRound className="size-5" />} tone="success" />
+      <SummaryMetricCard label="Marketplace leads" value={marketplace.overview.totalMarketplaceLeads} metaTooltip="Lead count traced to marketplace source lineage." icon={<UserRoundCheck className="size-5" />} tone="teal" />
+      <SummaryMetricCard label="RFQs" value={marketplace.overview.totalRfqs} metaTooltip="RFQs linked back through marketplace sources and campaigns." icon={<ClipboardList className="size-5" />} tone="warning" />
+      <SummaryMetricCard label="Top marketplace" value={marketplace.overview.topDemandMarketplace} metaTooltip="Marketplace with the strongest blend of signals, leads, and RFQs." icon={<Target className="size-5" />} tone="purple" />
+      <SummaryMetricCard label="Quality score" value={`${marketplace.overview.marketplaceSourceQualityScore}`} metaTooltip="Average quality score for marketplace sources." icon={<Gauge className="size-5" />} tone={marketplace.overview.sourcesNeedingReview ? 'warning' : 'success'} />
+    </div>
+  );
+}
+
+function MarketplaceQualityChart({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const chartData = marketplace.accounts.map((account) => ({
+    marketplace: account.marketplace,
+    quality: account.sourceIds.length
+      ? Math.round(marketplace.sources.filter((source) => account.sourceIds.includes(source.id)).reduce((sum, source) => sum + source.qualityScore, 0) / account.sourceIds.length)
+      : 0,
+  }));
+  const config = {
+    quality: {
+      label: 'Quality',
+      color: 'hsl(var(--primary))',
+    },
+  } satisfies ChartConfig;
+
+  return (
+    <ChartContainer config={config} className="h-64 w-full" aria-label={`Marketplace source quality: ${chartData.map((row) => `${row.marketplace} ${row.quality}`).join(', ')}`}>
+      <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 42, top: 8, bottom: 8 }}>
+        <CartesianGrid horizontal={false} />
+        <XAxis type="number" domain={[0, 100]} hide />
+        <YAxis type="category" dataKey="marketplace" width={112} tickLine={false} axisLine={false} tickMargin={8} />
+        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+        <Bar dataKey="quality" fill="var(--color-quality)" radius={[0, 6, 6, 0]} barSize={18}>
+          <LabelList dataKey="quality" position="right" formatter={(value: number) => `${value}`} className="fill-foreground font-medium" />
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+function MarketplaceFunnel({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const stages = [
+    { label: 'Signals', value: marketplace.overview.totalSignalVolume, href: getMarketplaceSourcePageHref('demand-signals') },
+    { label: 'Inquiries', value: marketplace.inquiries.length, href: getMarketplaceSourcePageHref('inquiry-lead-intake') },
+    { label: 'Leads', value: marketplace.overview.totalMarketplaceLeads, href: getMarketplaceSourcePageHref('inquiry-lead-intake') },
+    { label: 'RFQs', value: marketplace.overview.totalRfqs, href: getMarketplaceSourcePageHref('inquiry-lead-intake') },
+    { label: 'Readback', value: marketplace.attribution.reduce((sum, item) => sum + item.orders, 0), href: getMarketplaceSourcePageHref('campaign-attribution') },
+  ];
+  const max = Math.max(...stages.map((stage) => stage.value), 1);
+
+  return (
+    <div className="space-y-3">
+      {stages.map((stage, index) => (
+        <Link key={stage.label} to={stage.href} className="block rounded-xl border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-md border bg-muted text-xs font-semibold">{index + 1}</span>
+              <span className="text-sm font-semibold">{stage.label}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums">{formatCompactCount(stage.value)}</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(8, Math.round(stage.value / max * 100))}%` }} />
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function MarketplaceOverviewView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const topSource = marketplace.sources[0];
+  const reviewItems = [
+    ...marketplace.sources.filter((source) => source.status === 'needs_review' || source.blockers.length > 0).slice(0, 2).map((source) => ({
+      id: source.id,
+      title: source.name,
+      detail: source.blockers[0] || source.actionReason,
+      href: getMarketplaceSourcePageHref('detail', source.id),
+    })),
+    ...marketplace.dataHealth.filter((item) => item.status !== 'healthy').slice(0, 2).map((item) => ({
+      id: item.id,
+      title: `${item.marketplace} data health`,
+      detail: `${prettyMarketplaceLabel(item.status)} / ${item.actionLabel}`,
+      href: getMarketplaceSourcePageHref('data-health'),
+    })),
+  ];
+
+  return (
+    <div className="space-y-4">
+      <MarketplaceKpiStrip marketplace={marketplace} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+        <MarketplaceVisualRouteMap marketplace={marketplace} />
+        <SourceOperatingLoopGraphic
+          type="marketplace"
+          hrefForPage={(page) => getMarketplaceSourcePageHref(page)}
+        />
+      </section>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>First-screen answer</CardTitle>
+            <p className="text-sm text-muted-foreground">Which marketplace source deserves action now?</p>
+          </CardHeader>
+          <CardContent>
+            {topSource ? (
+              <div className="rounded-2xl border bg-primary/5 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-2xl font-semibold tracking-tight">{topSource.name}</div>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{topSource.actionReason}</p>
+                  </div>
+                  <div className="min-w-24 rounded-xl bg-background p-3 text-center shadow-sm">
+                    <div className="text-xs text-muted-foreground">Quality</div>
+                    <div className="text-2xl font-semibold">{topSource.qualityScore}</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                  <RuntimeContextCard label="Marketplace" value={marketplace.accounts.find((account) => account.sourceIds.includes(topSource.id))?.marketplace || 'Marketplace'} detail={topSource.market} />
+                  <RuntimeContextCard label="Leads / RFQs" value={`${topSource.leadCount} / ${topSource.rfqCount}`} detail="Marketplace source lineage." />
+                  <RuntimeContextCard label="Freshness" value={topSource.lastSyncAt} detail={`${topSource.freshnessMinutes} minutes.`} />
+                  <RuntimeContextCard label="SKU" value={topSource.skuCode} detail={topSource.productName} />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button asChild>
+                    <Link to={topSource.nextActionRoute}>
+                      {topSource.nextAction}
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link to={getMarketplaceSourcePageHref('detail', topSource.id)}>View detail</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+                No marketplace sources connected yet. Review Sources setup before scaling marketplace demand.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>Marketplace quality</CardTitle>
+            <p className="text-sm text-muted-foreground">Quality score by marketplace account class.</p>
+          </CardHeader>
+          <CardContent>
+            <MarketplaceQualityChart marketplace={marketplace} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(340px,0.75fr)_minmax(0,1.25fr)]">
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>Signal to outcome funnel</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MarketplaceFunnel marketplace={marketplace} />
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-warning/30 bg-warning/5">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>Needs-review lane</CardTitle>
+              <Badge variant="warning">{reviewItems.length} visible</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {reviewItems.length ? reviewItems.map((item) => (
+              <Link key={item.id} to={item.href} className="rounded-xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                <div className="font-semibold">{item.title}</div>
+                <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>
+              </Link>
+            )) : (
+              <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">No marketplace review blockers are visible.</div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function MarketplaceAccountsView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Connected accounts" value={marketplace.accounts.filter((account) => account.status !== 'inactive').length} metaTooltip="Accounts with at least one active or reviewable marketplace source." icon={<CircleUserRound className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Healthy feeds" value={marketplace.dataHealth.filter((item) => item.status === 'healthy').length} metaTooltip="Marketplace feeds without stale, duplicate, or mapping blockers." icon={<Gauge className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Pending review" value={marketplace.accounts.filter((account) => account.status === 'needs_review').length} metaTooltip="Accounts blocked by owner, mapping, quality, or sync concerns." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Stale syncs" value={marketplace.accounts.filter((account) => account.status === 'stale' || account.freshnessMinutes > 60).length} metaTooltip="Accounts whose latest source data is stale." icon={<SlidersHorizontal className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>Marketplace account registry</CardTitle>
+          <p className="text-sm text-muted-foreground">Account/storefront status, owner, ingestion mode, sync, linked SKUs, and action blockers.</p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table variant="embedded">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Marketplace</TableHead>
+                <TableHead>Account / storefront</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last sync</TableHead>
+                <TableHead className="text-right">Signals</TableHead>
+                <TableHead className="text-right">Leads / RFQs</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {marketplace.accounts.map((account) => (
+                <TableRow key={account.id}>
+                  <TableCell className="font-medium">{account.marketplace}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{account.accountName}</div>
+                    <div className="text-xs text-muted-foreground">{account.storefrontName} / {account.market}</div>
+                  </TableCell>
+                  <TableCell>{account.ownerLabel}</TableCell>
+                  <TableCell><Badge variant={marketplaceStatusVariant(account.status)}>{prettyMarketplaceLabel(account.status)}</Badge></TableCell>
+                  <TableCell>{account.lastSyncAt}</TableCell>
+                  <TableCell className="text-right">{formatCompactCount(account.signalVolume)}</TableCell>
+                  <TableCell className="text-right">{account.leadCount} / {account.rfqCount}</TableCell>
+                  <TableCell>
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={account.sourceIds[0] ? getMarketplaceSourcePageHref('detail', account.sourceIds[0]) : getMarketplaceSourcePageHref('data-health')}>
+                        {account.status === 'inactive' ? 'Reconnect' : 'Open detail'}
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MarketplaceDemandSignalsView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const signalTypes = Array.from(new Set(marketplace.demandSignals.map((signal) => signal.signalType)));
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Signal volume" value={formatCompactCount(marketplace.overview.totalSignalVolume)} metaTooltip="Normalized marketplace signal volume." icon={<RadioTower className="size-5" />} tone="info" />
+        <SummaryMetricCard label="High intent" value={marketplace.demandSignals.filter((signal) => signal.confidence >= 78).length} metaTooltip="Signals with confidence at or above 78." icon={<Target className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Fresh signals" value={marketplace.demandSignals.filter((signal) => signal.freshnessMinutes <= 30).length} metaTooltip="Signals refreshed in 30 minutes or less." icon={<Gauge className="size-5" />} tone="teal" />
+        <SummaryMetricCard label="Signal types" value={signalTypes.length} metaTooltip={signalTypes.map(prettyMarketplaceLabel).join(', ')} icon={<SlidersHorizontal className="size-5" />} tone="purple" />
+      </div>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>Marketplace demand signals</CardTitle>
+            <p className="text-sm text-muted-foreground">Normalized intent events with source, SKU, confidence, freshness, and next action.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {marketplace.demandSignals.map((signal) => (
+              <MarketplaceSignalRow key={signal.id} signal={signal} />
+            ))}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>Marketplace x signal type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MarketplaceSignalHeatmap marketplace={marketplace} />
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function MarketplaceSignalRow({ signal }: { signal: MarketplaceDemandSignal }) {
+  return (
+    <Link to={getMarketplaceSourcePageHref('detail', signal.sourceId)} className="grid gap-3 rounded-xl border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_120px_120px_auto] md:items-center">
+      <div className="min-w-0">
+        <div className="font-semibold">{prettyMarketplaceLabel(signal.signalType)}</div>
+        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{signal.marketplace} / {signal.productName} / {signal.skuCode}</p>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">Volume</div>
+        <div className="font-semibold">{formatCompactCount(signal.volume)}</div>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">Confidence</div>
+        <div className="font-semibold">{signal.confidence}%</div>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">Freshness</div>
+        <div className="font-semibold">{signal.freshnessMinutes}m</div>
+      </div>
+      <Badge variant="outline">{signal.recommendedAction}</Badge>
+    </Link>
+  );
+}
+
+function MarketplaceSignalHeatmap({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const types: MarketplaceDemandSignal['signalType'][] = ['search_trend', 'product_view', 'add_to_cart', 'wishlist', 'inquiry', 'buyer_behavior', 'campaign_click', 'order_readback'];
+  return (
+    <div className="space-y-2">
+      {marketplace.accounts.map((account) => (
+        <div key={account.id} className="grid grid-cols-[92px_repeat(4,minmax(0,1fr))] gap-2 xl:grid-cols-[102px_repeat(8,minmax(0,1fr))]">
+          <div className="truncate text-xs font-semibold">{account.marketplace}</div>
+          {types.map((type) => {
+            const value = marketplace.demandSignals
+              .filter((signal) => signal.marketplace === account.marketplace && signal.signalType === type)
+              .reduce((sum, signal) => sum + signal.volume, 0);
+            return (
+              <div key={`${account.id}-${type}`} className={`rounded-md border px-2 py-1 text-center text-[11px] ${value ? 'border-primary/25 bg-primary/10 text-primary' : 'bg-muted/25 text-muted-foreground'}`} title={`${account.marketplace} ${type}: ${value}`}>
+                {value ? formatCompactCount(value) : '-'}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">Cells show normalized signal volume by marketplace and signal type.</p>
+    </div>
+  );
+}
+
+function MarketplaceSkuSignalsView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const mapped = marketplace.skuSignals.filter((signal) => signal.isMapped);
+  const unmapped = marketplace.skuSignals.filter((signal) => !signal.isMapped);
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Active SKU demand" value={mapped.length} metaTooltip="Marketplace SKU/listing signals mapped to internal SKUs." icon={<PackagePlus className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Top SKU quality" value={mapped[0]?.listingPerformance || 0} metaTooltip={mapped[0]?.productName || 'No mapped SKU.'} icon={<Sparkles className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Inventory blocked" value={marketplace.skuSignals.filter((signal) => signal.inventoryRisk === 'high').length} metaTooltip="Marketplace SKU signals blocked by high inventory risk." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Unmapped" value={unmapped.length} metaTooltip="Marketplace listing/SKU rows without internal mapping." icon={<SlidersHorizontal className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>SKU signal matrix</CardTitle>
+          <p className="text-sm text-muted-foreground">Mapped SKU demand by marketplace with listing performance, price fit, and guardrails.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {marketplace.skuSignals.map((signal) => (
+            <Link key={signal.id} to={getMarketplaceSourcePageHref('detail', signal.linkedSourceIds[0])} className="grid gap-3 rounded-xl border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_110px_110px_110px_110px_auto] md:items-center">
+              <div className="min-w-0">
+                <div className="font-semibold">{signal.skuCode}</div>
+                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{signal.productName} / {signal.category}</p>
+              </div>
+              <div><div className="text-xs text-muted-foreground">Marketplace</div><div className="font-semibold">{signal.marketplace}</div></div>
+              <div><div className="text-xs text-muted-foreground">Demand</div><div className="font-semibold">{formatCompactCount(signal.demandSignal)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Listing</div><div className="font-semibold">{signal.listingPerformance}%</div></div>
+              <div><div className="text-xs text-muted-foreground">Price fit</div><div className="font-semibold">{signal.priceCompetitiveness}%</div></div>
+              <Badge variant={sourceRiskBadgeVariant(signal.inventoryRisk)}>Stock {signal.inventoryRisk}</Badge>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MarketplaceInquiryLeadIntakeView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <SummaryMetricCard label="New inquiries" value={marketplace.inquiries.filter((item) => item.status === 'new').length} metaTooltip="Marketplace messages or questions awaiting qualification." icon={<MessageCircle className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Qualified leads" value={marketplace.inquiries.filter((item) => item.status === 'routed').length} metaTooltip="Inquiries already routed as lead work." icon={<UserRoundCheck className="size-5" />} tone="success" />
+        <SummaryMetricCard label="RFQ ready" value={marketplace.inquiries.filter((item) => item.status === 'converted_to_rfq').length} metaTooltip="Inquiry rows with RFQ readiness/readback." icon={<ClipboardList className="size-5" />} tone="teal" />
+        <SummaryMetricCard label="SLA risk" value={marketplace.inquiries.filter((item) => item.slaAgeHours >= 12).length} metaTooltip="Marketplace inquiries aging past the safe response window." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Duplicate risk" value={marketplace.inquiries.filter((item) => item.status === 'duplicate').length} metaTooltip="Inquiries that should not auto-route." icon={<Trash2 className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>Inquiry and lead intake queue</CardTitle>
+          <p className="text-sm text-muted-foreground">Explicit qualification, owner/SLA, duplicate state, and handoff lineage.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {marketplace.inquiries.map((inquiry) => (
+            <MarketplaceInquiryRow key={inquiry.id} inquiry={inquiry} />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MarketplaceInquiryRow({ inquiry }: { inquiry: MarketplaceInquiry }) {
+  const canRoute = inquiry.status !== 'duplicate' && inquiry.status !== 'suppressed';
+  return (
+    <div className="grid gap-3 rounded-xl border bg-background p-4 md:grid-cols-[1fr_110px_110px_110px_auto] md:items-center">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="font-semibold">{inquiry.buyerLabel}</div>
+          <Badge variant={marketplaceStatusVariant(inquiry.status)}>{prettyMarketplaceLabel(inquiry.status)}</Badge>
+        </div>
+        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{inquiry.summary}</p>
+      </div>
+      <div><div className="text-xs text-muted-foreground">Intent</div><div className="font-semibold">{prettyMarketplaceLabel(inquiry.intent)}</div></div>
+      <div><div className="text-xs text-muted-foreground">Score</div><div className="font-semibold">{inquiry.leadScore}</div></div>
+      <div><div className="text-xs text-muted-foreground">SLA age</div><div className="font-semibold">{inquiry.slaAgeHours}h</div></div>
+      <div className="flex flex-wrap gap-2 md:justify-end">
+        <Button size="sm" disabled={!canRoute}>{inquiry.rfqReadiness >= 50 ? 'Create RFQ' : 'Qualify'}</Button>
+        <Button asChild size="sm" variant="outline">
+          <Link to={getMarketplaceSourcePageHref('detail', inquiry.sourceId)}>Detail</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function MarketplaceCampaignAttributionView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Attributed leads" value={marketplace.attribution.reduce((sum, item) => sum + item.leads, 0)} metaTooltip="Marketplace leads with campaign/source readback." icon={<UserRoundCheck className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Campaign RFQs" value={marketplace.attribution.reduce((sum, item) => sum + item.rfqs, 0)} metaTooltip="RFQs connected to marketplace campaign touchpoints." icon={<ClipboardList className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Orders readback" value={marketplace.attribution.reduce((sum, item) => sum + item.orders, 0)} metaTooltip="Order readback preview; not final attribution truth." icon={<TrendingUp className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Low confidence" value={marketplace.attribution.filter((item) => item.attributionConfidence < 70).length} metaTooltip="Rows needing review before attribution decisions." icon={<BellRing className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>Campaign attribution preview</CardTitle>
+          <p className="text-sm text-muted-foreground">Marketplace campaign source, promotion, lead/RFQ mapping, and confidence readback.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {marketplace.attribution.map((item) => (
+            <MarketplaceAttributionRow key={item.id} item={item} />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MarketplaceAttributionRow({ item }: { item: MarketplaceCampaignAttribution }) {
+  return (
+    <Link to={getMarketplaceSourcePageHref('detail', item.sourceId)} className="block rounded-xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+      <div className="grid gap-3 md:grid-cols-[1fr_220px_120px_120px_auto] md:items-center">
+        <div className="min-w-0">
+          <div className="font-semibold">{item.campaignName}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{item.marketplace} / preview readback, not final attribution truth</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {item.touchpoints.map((touchpoint) => (
+            <Badge key={`${item.id}-${touchpoint.label}`} variant="outline">{touchpoint.label} {touchpoint.confidence}%</Badge>
+          ))}
+        </div>
+        <div><div className="text-xs text-muted-foreground">Leads / RFQs</div><div className="font-semibold">{item.leads} / {item.rfqs}</div></div>
+        <div><div className="text-xs text-muted-foreground">Orders</div><div className="font-semibold">{item.orders}</div></div>
+        <Badge variant={item.attributionConfidence < 70 ? 'warning' : 'default'}>{item.attributionConfidence}% confidence</Badge>
+      </div>
+    </Link>
+  );
+}
+
+function MarketplaceSourceQualityView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Average quality" value={marketplace.overview.marketplaceSourceQualityScore} metaTooltip="Average marketplace source quality." icon={<Gauge className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Top source" value={marketplace.sources[0]?.qualityScore || 0} metaTooltip={marketplace.sources[0]?.name || 'No marketplace source.'} icon={<Target className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Scale candidates" value={marketplace.sources.filter((source) => source.nextAction === 'Scale').length} metaTooltip="High-quality RFQ-ready sources without hard blockers." icon={<TrendingUp className="size-5" />} tone="teal" />
+        <SummaryMetricCard label="Review sources" value={marketplace.overview.sourcesNeedingReview} metaTooltip="Stale, duplicate, inventory, finance, or mapping blockers." icon={<BellRing className="size-5" />} tone="warning" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>Marketplace source quality ranking</CardTitle>
+          <p className="text-sm text-muted-foreground">Every score shows reasons, blockers, and recommended action.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {marketplace.sources.map((source) => (
+            <Link key={source.id} to={getMarketplaceSourcePageHref('detail', source.id)} className="block rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+              <div className="grid gap-3 md:grid-cols-[1fr_240px_140px_auto] md:items-center">
+                <div className="min-w-0">
+                  <div className="font-semibold">{source.name}</div>
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{source.scoreReasons.join(' / ')}</p>
+                </div>
+                <SourceQualityBar value={source.qualityScore} />
+                <Badge variant={sourceStatusVariant(source)}>{source.nextAction}</Badge>
+                <div className="text-xs text-muted-foreground md:text-right">{source.blockers[0] || source.actionReason}</div>
+              </div>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MarketplaceDataHealthView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <SummaryMetricCard label="Healthy feeds" value={marketplace.dataHealth.filter((item) => item.status === 'healthy').length} metaTooltip="Marketplace feeds without current blockers." icon={<Gauge className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Stale feeds" value={marketplace.dataHealth.filter((item) => item.status === 'stale').length} metaTooltip="Feeds past freshness threshold." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Duplicate risk" value={marketplace.dataHealth.filter((item) => item.status === 'duplicate_risk').length} metaTooltip="Feeds with duplicate risk requiring review." icon={<Trash2 className="size-5" />} tone="purple" />
+        <SummaryMetricCard label="Unmapped rows" value={marketplace.dataHealth.reduce((sum, item) => sum + item.unmappedSkuCount + item.unmappedListingCount, 0)} metaTooltip="Listings or SKUs not mapped to internal objects." icon={<SlidersHorizontal className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Failed syncs" value={marketplace.dataHealth.filter((item) => item.status === 'failed').length} metaTooltip="Disconnected or failed marketplace feeds." icon={<ScanSearch className="size-5" />} tone="warning" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>Marketplace feed health</CardTitle>
+          <p className="text-sm text-muted-foreground">Sync freshness, missing mappings, duplicate rate, and reconciliation actions.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {marketplace.dataHealth.map((item) => (
+            <MarketplaceFeedHealthRow key={item.id} item={item} />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MarketplaceFeedHealthRow({ item }: { item: MarketplaceDataHealthItem }) {
+  return (
+    <div className="grid gap-3 rounded-xl border bg-background p-4 md:grid-cols-[1fr_120px_120px_120px_120px_auto] md:items-center">
+      <div className="min-w-0">
+        <div className="font-semibold">{item.marketplace}</div>
+        <p className="mt-1 text-xs text-muted-foreground">{item.ingestionMode} / owner {item.ownerLabel}</p>
+      </div>
+      <Badge variant={marketplaceStatusVariant(item.status)}>{prettyMarketplaceLabel(item.status)}</Badge>
+      <div><div className="text-xs text-muted-foreground">Last sync</div><div className="font-semibold">{item.lastSyncAt}</div></div>
+      <div><div className="text-xs text-muted-foreground">Errors</div><div className="font-semibold">{item.errorCount}</div></div>
+      <div><div className="text-xs text-muted-foreground">Dupes</div><div className="font-semibold">{item.duplicateRate}%</div></div>
+      <Button asChild size="sm" variant="outline">
+        <Link to={getMarketplaceSourcePageHref(item.actionLabel === 'Open detail' ? 'accounts' : 'data-health')}>{item.actionLabel}</Link>
+      </Button>
+    </div>
+  );
+}
+
+function MarketplaceDetailView({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+  const source = marketplace.selectedSource;
+  if (!source) {
+    return (
+      <Card className="rounded-2xl border border-dashed">
+        <CardContent className="p-6 text-sm text-muted-foreground">No marketplace source is selected for detail.</CardContent>
+      </Card>
+    );
+  }
+  const account = marketplace.accounts.find((item) => item.sourceIds.includes(source.id));
+  const signals = marketplace.demandSignals.filter((signal) => signal.sourceId === source.id);
+  const inquiries = marketplace.inquiries.filter((inquiry) => inquiry.sourceId === source.id);
+  const attribution = marketplace.attribution.filter((item) => item.sourceId === source.id);
+  const health = account ? marketplace.dataHealth.find((item) => item.accountId === account.id) : null;
+
+  return (
+    <div className="space-y-4">
+      <Card className="rounded-2xl border">
+        <CardContent className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={sourceStatusVariant(source)}>{source.status.replace('_', ' ')}</Badge>
+                <Badge variant="outline">{account?.marketplace || 'Marketplace'}</Badge>
+                <Badge variant="outline">{source.market}</Badge>
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight">{source.name}</h2>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{source.sourceSignal}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-4 text-center">
+              <div className="text-xs text-muted-foreground">Quality</div>
+              <div className="text-3xl font-semibold">{source.qualityScore}</div>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <RuntimeContextCard label="Owner" value={source.ownerLabel} detail={account?.accountName || 'Marketplace account'} />
+            <RuntimeContextCard label="SKU" value={source.skuCode} detail={source.productName} />
+            <RuntimeContextCard label="Leads / RFQs" value={`${source.leadCount} / ${source.rfqCount}`} detail="Marketplace lineage." />
+            <RuntimeContextCard label="Freshness" value={source.lastSyncAt} detail={health ? prettyMarketplaceLabel(health.status) : 'No feed row'} />
+          </div>
+        </CardContent>
+      </Card>
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>Quality engine</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <SourceQualityBar value={source.qualityScore} />
+            {source.scoreReasons.map((reason) => (
+              <div key={reason} className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">{reason}</div>
+            ))}
+            {source.blockers.map((blocker) => (
+              <div key={blocker} className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{blocker}</div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>Lineage and readback</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <EvidenceCard label="Signals" value={signals.length} meta={signals.slice(0, 2).map((signal) => prettyMarketplaceLabel(signal.signalType)).join(', ') || 'No signal row'} />
+            <EvidenceCard label="Inquiries" value={inquiries.length} meta={inquiries[0]?.summary || 'No inquiry row'} />
+            <EvidenceCard label="Attribution" value={`${attribution[0]?.attributionConfidence || 0}%`} meta={attribution[0]?.campaignName || 'No campaign readback'} />
+            <EvidenceCard label="Data health" value={health ? prettyMarketplaceLabel(health.status) : 'Missing'} meta={health ? `${health.errorCount} errors / ${health.unmappedSkuCount} unmapped SKUs` : 'No health row'} />
+          </CardContent>
+        </Card>
+      </section>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild><Link to={source.nextActionRoute}>{source.nextAction}<ArrowRight className="size-4" /></Link></Button>
+        <Button asChild variant="outline"><Link to="/demand/campaigns">Open campaigns</Link></Button>
+        <Button asChild variant="outline"><Link to="/demand/leads-rfqs">Open leads/RFQs</Link></Button>
+        <Button asChild variant="outline"><Link to={getMarketplaceSourcePageHref('data-health')}>Review data health</Link></Button>
+      </div>
+    </div>
+  );
+}
+
+type SourceWorkspacePage = MarketplaceSourcePage;
+
+function getSourceFunctionPage(value: string | null): SourceWorkspacePage {
+  return getMarketplaceSourcePage(value);
+}
+
+function getSourceFunctionPageHref(type: DemandSourceType, page: SourceWorkspacePage, sourceId?: string) {
+  const params = new URLSearchParams({ function: type, page });
+  if (sourceId) params.set('sourceId', sourceId);
+  return `/demand/sources?${params.toString()}`;
+}
+
+function sourceFunctionIcon(type: DemandSourceType) {
+  if (type === 'social') return MessageCircle;
+  if (type === 'ads') return Megaphone;
+  if (type === 'partner') return HeartHandshake;
+  if (type === 'manual') return Upload;
+  return Globe;
+}
+
+function sourceFunctionUnitLabel(type: DemandSourceType) {
+  if (type === 'social') return 'channel';
+  if (type === 'ads') return 'ad source';
+  if (type === 'partner') return 'partner';
+  if (type === 'manual') return 'import source';
+  return 'source';
+}
+
+function sourceFunctionPageLabel(page: SourceWorkspacePage, type: DemandSourceType) {
+  if (page === 'overview') return 'Overview';
+  if (page === 'accounts') {
+    if (type === 'social') return 'Social Channels';
+    if (type === 'ads') return 'Ad Accounts';
+    if (type === 'partner') return 'Partner Network';
+    if (type === 'manual') return 'Import Batches';
+    return 'Connections';
+  }
+  if (page === 'demand-signals') return 'Demand Signals';
+  if (page === 'product-sku-signals') return 'Product / SKU Signals';
+  if (page === 'inquiry-lead-intake') return 'Lead Intake';
+  if (page === 'campaign-attribution') return 'Campaign Attribution';
+  if (page === 'source-quality') return 'Source Quality';
+  if (page === 'data-health') return 'Data Health';
+  return 'Source Detail';
+}
+
+function sourceFunctionPageDescription(page: SourceWorkspacePage, meta: DemandSourceFunction) {
+  const unit = sourceFunctionUnitLabel(meta.id);
+  if (page === 'overview') return `${meta.label} health, top action, and source quality.`;
+  if (page === 'accounts') return `Connection, owner, status, freshness, and blocker view for every ${unit}.`;
+  if (page === 'demand-signals') return `Normalized ${meta.label.toLowerCase()} signals before they become lead or RFQ work.`;
+  if (page === 'product-sku-signals') return 'SKU/category demand, stock risk, listing or content fit, and recommended route.';
+  if (page === 'inquiry-lead-intake') return 'Source-linked leads and RFQs with owner, intent, duplicate, and SLA context.';
+  if (page === 'campaign-attribution') return 'Campaign/source readback preview with first-touch and last-touch confidence.';
+  if (page === 'source-quality') return 'Quality score, reason trail, blockers, and next operating action.';
+  if (page === 'data-health') return 'Freshness, ingestion mode, duplicate risk, missing mappings, and reconciliation actions.';
+  return 'Full drill-down for one selected source, including lineage, quality, blockers, and handoff routes.';
+}
+
+function childForSource(source: DemandSource, meta: DemandSourceFunction, index = 0) {
+  const normalized = `${source.name} ${source.connectedChannel} ${source.sourceSignal}`.toLowerCase();
+  const matched = meta.children.find((child) => normalized.includes(child.toLowerCase().split(' ')[0]));
+  return matched || meta.children[index % meta.children.length] || meta.label;
+}
+
+function buildSourceConnectionRows(sources: DemandSource[], meta: DemandSourceFunction) {
+  return meta.children.map((child, index) => {
+    const matches = sources.filter((source, sourceIndex) => childForSource(source, meta, sourceIndex) === child);
+    const primary = matches[0];
+    const blockers = matches.flatMap((source) => source.blockers);
+    const signalVolume = matches.reduce((sum, source) => sum + source.signalVolume, 0);
+    const leadCount = matches.reduce((sum, source) => sum + source.leadCount, 0);
+    const rfqCount = matches.reduce((sum, source) => sum + source.rfqCount, 0);
+    const quality = matches.length ? Math.round(matches.reduce((sum, source) => sum + source.qualityScore, 0) / matches.length) : 0;
+    return {
+      id: `${meta.id}-${child.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      child,
+      primary,
+      status: primary ? (blockers.length || primary.status === 'needs_review' ? 'needs_review' : primary.status) : 'inactive',
+      owner: primary?.ownerLabel || `Unassigned ${sourceFunctionUnitLabel(meta.id)} owner`,
+      market: primary?.market || 'Regional',
+      ingestionMode: primary?.ingestionMode || 'manual',
+      lastSyncAt: primary?.lastSyncAt || 'Not connected',
+      signalVolume,
+      leadCount,
+      rfqCount,
+      quality,
+      blockers: primary ? blockers : [`No ${sourceFunctionUnitLabel(meta.id)} connected yet`],
+    };
+  });
+}
+
+function buildSourceDataHealthRows(sources: DemandSource[], meta: DemandSourceFunction) {
+  return buildSourceConnectionRows(sources, meta).map((row) => {
+    const duplicateRate = row.primary?.duplicateRate || 0;
+    const status = !row.primary
+      ? 'failed'
+      : row.primary.freshnessMinutes > 60
+        ? 'stale'
+        : duplicateRate >= 14
+          ? 'duplicate_risk'
+          : row.blockers.length
+            ? 'mapping_issue'
+            : 'healthy';
+    return {
+      ...row,
+      status,
+      duplicateRate,
+      freshnessMinutes: row.primary?.freshnessMinutes || 0,
+      errorCount: status === 'healthy' ? 0 : Math.max(1, row.blockers.length),
+      unmappedCount: row.primary?.linkedSkuIds.length ? 0 : 1,
+      actionLabel: status === 'healthy' ? 'Open detail' : status === 'duplicate_risk' ? 'Dedupe' : status === 'failed' ? 'Reconnect' : 'Review',
+    };
+  });
+}
+
+function SourceFunctionVisualRouteMap({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  const rows = buildSourceConnectionRows(sources, meta);
+  const HeaderIcon = sourceFunctionIcon(meta.id);
+  return (
+    <Card className="rounded-2xl border">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <HeaderIcon className="size-5 text-primary" />
+              {meta.label} route map
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">A visual registry of source classes, quality, contribution, and setup gaps.</p>
+          </div>
+          <Badge variant="outline">{rows.length} source classes</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {rows.map((row, index) => {
+          const Icon = sourceChildIcon(meta.id, row.child);
+          return (
+            <Link
+              key={row.id}
+              to={row.primary ? getSourceFunctionPageHref(meta.id, 'detail', row.primary.id) : getSourceFunctionPageHref(meta.id, 'accounts')}
+              className="rounded-2xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className={`flex size-11 items-center justify-center rounded-xl border ${sourceGraphicToneClassName(index)}`}>
+                  <Icon className="size-5" />
+                </div>
+                <Badge variant={marketplaceStatusVariant(row.status)}>{prettyMarketplaceLabel(row.status)}</Badge>
+              </div>
+              <div className="mt-4 font-semibold">{row.child}</div>
+              <p className="mt-1 line-clamp-2 min-h-10 text-xs text-muted-foreground">{row.primary?.sourceSignal || row.blockers[0]}</p>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <div><div className="text-muted-foreground">Q</div><div className="font-semibold">{row.quality}</div></div>
+                <div><div className="text-muted-foreground">Lead</div><div className="font-semibold">{row.leadCount}</div></div>
+                <div><div className="text-muted-foreground">RFQ</div><div className="font-semibold">{row.rfqCount}</div></div>
+              </div>
+            </Link>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SourceFunctionWorkspace({
+  meta,
+  page,
+  sources,
+  selectedSourceId,
+}: {
+  meta: DemandSourceFunction;
+  page: SourceWorkspacePage;
+  sources: DemandSource[];
+  selectedSourceId: string | null;
+}) {
+  const overview = buildDemandSourcesOverview(sources);
+  const Icon = sourceFunctionIcon(meta.id);
+  const PageIcon = marketplacePageIcon(page);
+  const pageLabel = sourceFunctionPageLabel(page, meta.id);
+  const evidence: EvidenceItem[] = [
+    { label: 'Sources', value: String(sources.length), detail: `${meta.label} rows from the Demand Source Registry.`, tone: 'info' },
+    { label: 'Quality', value: `${overview.averageQualityScore}/100`, detail: 'Lead, RFQ, freshness, duplicate, inventory, and finance factors.', tone: 'purple' },
+    { label: 'Needs review', value: String(overview.sourcesNeedingReview), detail: 'Rows with stale, duplicate, owner, mapping, inventory, or finance blockers.', tone: overview.sourcesNeedingReview ? 'warning' : 'success' },
+  ];
+
+  return (
+    <div className="min-h-full bg-background">
+      <div className="space-y-5 p-4 md:p-6">
+        <DecisionHeader
+          eyebrow={`Demand Center / Sources / ${meta.label}`}
+          title={meta.label}
+          description={meta.description}
+          confidence={overview.averageQualityScore}
+          status={overview.sourcesNeedingReview ? 'Review needed' : 'Ready'}
+          actions={(
+            <>
+              <Button asChild>
+                <Link to={getSourceFunctionPageHref(meta.id, 'source-quality')}>
+                  Review quality
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to={getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake')}>
+                  Open intake
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          evidence={evidence}
+          variant="compact"
+        />
+
+        <LinkedEntityStrip
+          entities={[
+            { label: 'Function', value: meta.label, tone: 'purple' },
+            { label: 'Page', value: pageLabel, tone: 'info' },
+            { label: 'Signals', value: formatCompactCount(overview.typeMix.reduce((sum, item) => sum + item.count, 0) || sources.reduce((sum, source) => sum + source.signalVolume, 0)), href: getSourceFunctionPageHref(meta.id, 'demand-signals'), tone: 'info' },
+            { label: 'Leads', value: String(overview.totalLeads), href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake'), tone: 'success' },
+            { label: 'RFQs', value: String(overview.totalRfqs), href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake'), tone: 'warning' },
+            { label: 'Top source', value: overview.topSource?.name || 'None', href: overview.topSource ? getSourceFunctionPageHref(meta.id, 'detail', overview.topSource.id) : undefined, tone: 'muted' },
+          ]}
+        />
+
+        <Card className="rounded-2xl border">
+          <CardContent className="p-2">
+            <div className="flex gap-2 overflow-x-auto">
+              {MARKETPLACE_SOURCE_PAGES.filter((item) => item.id !== 'detail').map((item) => {
+                const ItemIcon = marketplacePageIcon(item.id);
+                const isActive = page === item.id;
+                return (
+                  <Link
+                    key={item.id}
+                    to={getSourceFunctionPageHref(meta.id, item.id)}
+                    className={`inline-flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                  >
+                    <ItemIcon className="size-4" />
+                    {sourceFunctionPageLabel(item.id, meta.id)}
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-muted/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <PageIcon className="size-5" />
+              {pageLabel}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">{sourceFunctionPageDescription(page, meta)}</p>
+          </CardHeader>
+        </Card>
+
+        {page === 'overview' ? <SourceFunctionOverviewView meta={meta} sources={sources} overview={overview} /> : null}
+        {page === 'accounts' ? <SourceFunctionConnectionsView meta={meta} sources={sources} /> : null}
+        {page === 'demand-signals' ? <SourceFunctionSignalsView meta={meta} sources={sources} /> : null}
+        {page === 'product-sku-signals' ? <SourceFunctionSkuView meta={meta} sources={sources} overview={overview} /> : null}
+        {page === 'inquiry-lead-intake' ? <SourceFunctionIntakeView meta={meta} sources={sources} /> : null}
+        {page === 'campaign-attribution' ? <SourceFunctionAttributionView meta={meta} sources={sources} /> : null}
+        {page === 'source-quality' ? <SourceFunctionQualityView meta={meta} sources={sources} overview={overview} /> : null}
+        {page === 'data-health' ? <SourceFunctionDataHealthView meta={meta} sources={sources} /> : null}
+        {page === 'detail' ? <SourceFunctionDetailView meta={meta} sources={sources} selectedSourceId={selectedSourceId} /> : null}
+        {!sources.length ? (
+          <Card className="rounded-2xl border border-dashed">
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+              <div>
+                <div className="font-semibold">No {meta.label.toLowerCase()} records yet</div>
+                <p className="mt-1 text-sm text-muted-foreground">Connect or import a {sourceFunctionUnitLabel(meta.id)} before scaling this function.</p>
+              </div>
+              <Button asChild variant="outline">
+                <Link to="/demand/sources">Back to all Sources</Link>
+              </Button>
             </CardContent>
           </Card>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SourceFunctionKpiStrip({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+  const connections = buildSourceConnectionRows(sources, meta);
+  const Icon = sourceFunctionIcon(meta.id);
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <SummaryMetricCard label="Source rows" value={sources.length} metaTooltip={`Total ${meta.label} DemandSource rows.`} icon={<Icon className="size-5" />} tone="info" />
+      <SummaryMetricCard label="Active routes" value={connections.filter((row) => row.status !== 'inactive').length} metaTooltip={`Connected ${sourceFunctionUnitLabel(meta.id)} routes.`} icon={<CircleUserRound className="size-5" />} tone="success" />
+      <SummaryMetricCard label="Leads" value={overview.totalLeads} metaTooltip="Leads traced to this source function." icon={<UserRoundCheck className="size-5" />} tone="teal" />
+      <SummaryMetricCard label="RFQs" value={overview.totalRfqs} metaTooltip="RFQs traced to this source function." icon={<ClipboardList className="size-5" />} tone="warning" />
+      <SummaryMetricCard label="Top quality" value={overview.topSource?.qualityScore || 0} metaTooltip={overview.topSource?.name || 'No source data.'} icon={<Target className="size-5" />} tone="purple" />
+      <SummaryMetricCard label="Needs review" value={overview.sourcesNeedingReview} metaTooltip="Sources blocked by data quality or operating guardrails." icon={<BellRing className="size-5" />} tone={overview.sourcesNeedingReview ? 'warning' : 'success'} />
+    </div>
+  );
+}
+
+function SourceFunctionQualityChart({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  const rows = buildSourceConnectionRows(sources, meta);
+  const config = {
+    quality: {
+      label: 'Quality',
+      color: 'hsl(var(--primary))',
+    },
+  } satisfies ChartConfig;
+
+  return (
+    <ChartContainer config={config} className="h-64 w-full" aria-label={`${meta.label} quality: ${rows.map((row) => `${row.child} ${row.quality}`).join(', ')}`}>
+      <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 42, top: 8, bottom: 8 }}>
+        <CartesianGrid horizontal={false} />
+        <XAxis type="number" domain={[0, 100]} hide />
+        <YAxis type="category" dataKey="child" width={128} tickLine={false} axisLine={false} tickMargin={8} />
+        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+        <Bar dataKey="quality" fill="var(--color-quality)" radius={[0, 6, 6, 0]} barSize={18}>
+          <LabelList dataKey="quality" position="right" formatter={(value: number) => `${value}`} className="fill-foreground font-medium" />
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+function SourceFunctionFunnel({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  const signalVolume = sources.reduce((sum, source) => sum + source.signalVolume, 0);
+  const leads = sources.reduce((sum, source) => sum + source.leadCount, 0);
+  const rfqs = sources.reduce((sum, source) => sum + source.rfqCount, 0);
+  const traffic = sources.reduce((sum, source) => sum + source.campaignTraffic, 0);
+  const stages = [
+    { label: 'Signals', value: signalVolume, href: getSourceFunctionPageHref(meta.id, 'demand-signals') },
+    { label: 'Traffic', value: traffic, href: getSourceFunctionPageHref(meta.id, 'campaign-attribution') },
+    { label: 'Leads', value: leads, href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake') },
+    { label: 'RFQs', value: rfqs, href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake') },
+  ];
+  const max = Math.max(...stages.map((stage) => stage.value), 1);
+  return (
+    <div className="space-y-3">
+      {stages.map((stage, index) => (
+        <Link key={stage.label} to={stage.href} className="block rounded-xl border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-md border bg-muted text-xs font-semibold">{index + 1}</span>
+              <span className="text-sm font-semibold">{stage.label}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums">{formatCompactCount(stage.value)}</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(8, Math.round(stage.value / max * 100))}%` }} />
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+  const topSource = overview.topSource;
+  const reviewSources = sources.filter((source) => source.status === 'needs_review' || source.blockers.length > 0).slice(0, 4);
+  return (
+    <div className="space-y-4">
+      <SourceFunctionKpiStrip meta={meta} sources={sources} overview={overview} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+        <SourceFunctionVisualRouteMap meta={meta} sources={sources} />
+        <SourceOperatingLoopGraphic
+          type={meta.id}
+          hrefForPage={(page) => getSourceFunctionPageHref(meta.id, page)}
+        />
+      </section>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>First-screen answer</CardTitle>
+            <p className="text-sm text-muted-foreground">Which {meta.label.toLowerCase()} route deserves action now?</p>
+          </CardHeader>
+          <CardContent>
+            {topSource ? (
+              <div className="rounded-2xl border bg-primary/5 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-2xl font-semibold tracking-tight">{topSource.name}</div>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{topSource.actionReason}</p>
+                  </div>
+                  <div className="min-w-24 rounded-xl bg-background p-3 text-center shadow-sm">
+                    <div className="text-xs text-muted-foreground">Quality</div>
+                    <div className="text-2xl font-semibold">{topSource.qualityScore}</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                  <RuntimeContextCard label="Route" value={childForSource(topSource, meta)} detail={topSource.market} />
+                  <RuntimeContextCard label="Leads / RFQs" value={`${topSource.leadCount} / ${topSource.rfqCount}`} detail="Source-linked conversion." />
+                  <RuntimeContextCard label="Freshness" value={topSource.lastSyncAt} detail={`${topSource.freshnessMinutes} minutes.`} />
+                  <RuntimeContextCard label="SKU" value={topSource.skuCode} detail={topSource.productName} />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button asChild><Link to={topSource.nextActionRoute}>{topSource.nextAction}<ArrowRight className="size-4" /></Link></Button>
+                  <Button asChild variant="outline"><Link to={getSourceFunctionPageHref(meta.id, 'detail', topSource.id)}>View detail</Link></Button>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">No {meta.label.toLowerCase()} records yet.</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <CardTitle>{meta.label} quality</CardTitle>
+            <p className="text-sm text-muted-foreground">Quality score by {sourceFunctionUnitLabel(meta.id)} class.</p>
+          </CardHeader>
+          <CardContent>
+            <SourceFunctionQualityChart meta={meta} sources={sources} />
+          </CardContent>
+        </Card>
+      </section>
+      <section className="grid gap-4 xl:grid-cols-[minmax(340px,0.75fr)_minmax(0,1.25fr)]">
+        <Card className="rounded-2xl border">
+          <CardHeader><CardTitle>Signal to RFQ funnel</CardTitle></CardHeader>
+          <CardContent><SourceFunctionFunnel meta={meta} sources={sources} /></CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-warning/30 bg-warning/5">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>Needs-review lane</CardTitle>
+              <Badge variant="warning">{reviewSources.length} visible</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {reviewSources.length ? reviewSources.map((source) => (
+              <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="rounded-xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                <div className="font-semibold">{source.name}</div>
+                <p className="mt-2 text-sm text-muted-foreground">{source.blockers[0] || source.actionReason}</p>
+              </Link>
+            )) : (
+              <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">No review blockers are visible.</div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function SourceFunctionConnectionsView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  const rows = buildSourceConnectionRows(sources, meta);
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Connected" value={rows.filter((row) => row.status !== 'inactive').length} metaTooltip={`Connected ${sourceFunctionUnitLabel(meta.id)} routes.`} icon={<CircleUserRound className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Healthy" value={rows.filter((row) => row.status === 'active').length} metaTooltip="Routes without current source blockers." icon={<Gauge className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Pending review" value={rows.filter((row) => row.status === 'needs_review').length} metaTooltip="Routes blocked by quality or data issues." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Not connected" value={rows.filter((row) => row.status === 'inactive').length} metaTooltip="Expected function children without a connected row." icon={<SlidersHorizontal className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader>
+          <CardTitle>{sourceFunctionPageLabel('accounts', meta.id)} registry</CardTitle>
+          <p className="text-sm text-muted-foreground">Owner, status, ingestion, freshness, leads, RFQs, and blocker state.</p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table variant="embedded">
+            <TableHeader>
+              <TableRow>
+                <TableHead>{sourceFunctionUnitLabel(meta.id)}</TableHead>
+                <TableHead>Owner / market</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Ingestion</TableHead>
+                <TableHead>Last sync</TableHead>
+                <TableHead className="text-right">Signals</TableHead>
+                <TableHead className="text-right">Leads / RFQs</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-medium">{row.child}</TableCell>
+                  <TableCell><div>{row.owner}</div><div className="text-xs text-muted-foreground">{row.market}</div></TableCell>
+                  <TableCell><Badge variant={marketplaceStatusVariant(row.status)}>{prettyMarketplaceLabel(row.status)}</Badge></TableCell>
+                  <TableCell>{row.ingestionMode}</TableCell>
+                  <TableCell>{row.lastSyncAt}</TableCell>
+                  <TableCell className="text-right">{formatCompactCount(row.signalVolume)}</TableCell>
+                  <TableCell className="text-right">{row.leadCount} / {row.rfqCount}</TableCell>
+                  <TableCell><Button asChild size="sm" variant="outline"><Link to={row.primary ? getSourceFunctionPageHref(meta.id, 'detail', row.primary.id) : getSourceFunctionPageHref(meta.id, 'data-health')}>{row.primary ? 'Open detail' : 'Review setup'}</Link></Button></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionSignalsView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Signal volume" value={formatCompactCount(sources.reduce((sum, source) => sum + source.signalVolume, 0))} metaTooltip="Normalized signal volume for this source function." icon={<RadioTower className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Fresh signals" value={sources.filter((source) => source.freshnessMinutes <= 30).length} metaTooltip="Sources updated inside the current freshness window." icon={<Gauge className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Watch signals" value={sources.filter((source) => source.status === 'needs_review').length} metaTooltip="Signals needing operator review." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Avg conversion" value={`${sources.length ? Math.round(sources.reduce((sum, source) => sum + source.conversionRate, 0) / sources.length) : 0}%`} metaTooltip="Average signal-to-lead conversion." icon={<TrendingUp className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader><CardTitle>Normalized signal queue</CardTitle><p className="text-sm text-muted-foreground">Every signal keeps source, owner, SKU, freshness, and action context.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {sources.map((source, index) => (
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="grid gap-3 rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_120px_120px_auto] md:items-center">
+              <div><div className="font-semibold">{source.sourceSignal}</div><p className="mt-1 text-sm text-muted-foreground">{childForSource(source, meta, index)} / {source.name}</p></div>
+              <div><div className="text-xs text-muted-foreground">Volume</div><div className="font-semibold">{formatCompactCount(source.signalVolume)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Freshness</div><div className="font-semibold">{source.freshnessMinutes}m</div></div>
+              <div><div className="text-xs text-muted-foreground">SKU</div><div className="font-semibold">{source.skuCode}</div></div>
+              <Badge variant={sourceStatusVariant(source)}>{source.nextAction}</Badge>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionSkuView({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="SKU rows" value={overview.skuSignals.length} metaTooltip="SKU/category rows with source contribution." icon={<PackagePlus className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Stock blocked" value={sources.filter((source) => source.inventoryRisk === 'high').length} metaTooltip="Sources blocked by high inventory risk." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Finance watch" value={sources.filter((source) => source.financeRisk === 'high').length} metaTooltip="Sources blocked by finance review." icon={<CircleDollarSign className="size-5" />} tone="purple" />
+        <SummaryMetricCard label="Mapped campaigns" value={sources.filter((source) => source.linkedCampaignIds.length > 0).length} metaTooltip="Sources linked to campaign work." icon={<Megaphone className="size-5" />} tone="success" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader><CardTitle>Product / SKU signal matrix</CardTitle><p className="text-sm text-muted-foreground">SKU demand and guardrails across {meta.label.toLowerCase()}.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {sources.map((source, index) => (
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="grid gap-3 rounded-xl border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_110px_110px_110px_auto] md:items-center">
+              <div><div className="font-semibold">{source.skuCode}</div><p className="mt-1 text-xs text-muted-foreground">{source.productName} / {childForSource(source, meta, index)}</p></div>
+              <div><div className="text-xs text-muted-foreground">Demand</div><div className="font-semibold">{formatCompactCount(source.signalVolume)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Leads</div><div className="font-semibold">{source.leadCount}</div></div>
+              <div><div className="text-xs text-muted-foreground">RFQs</div><div className="font-semibold">{source.rfqCount}</div></div>
+              <div><div className="text-xs text-muted-foreground">Quality</div><div className="font-semibold">{source.qualityScore}</div></div>
+              <Badge variant={sourceRiskBadgeVariant(source.inventoryRisk)}>Stock {source.inventoryRisk}</Badge>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionIntakeView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Leads" value={sources.reduce((sum, source) => sum + source.leadCount, 0)} metaTooltip="Lead volume from this source function." icon={<UserRoundCheck className="size-5" />} tone="info" />
+        <SummaryMetricCard label="RFQs" value={sources.reduce((sum, source) => sum + source.rfqCount, 0)} metaTooltip="RFQ volume from this source function." icon={<ClipboardList className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Route leads" value={sources.filter((source) => source.nextAction === 'Route leads').length} metaTooltip="Sources ready for lead routing." icon={<ArrowRight className="size-5" />} tone="teal" />
+        <SummaryMetricCard label="Duplicate watch" value={sources.filter((source) => source.duplicateRate >= 14).length} metaTooltip="Rows that should not auto-route." icon={<Trash2 className="size-5" />} tone="warning" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader><CardTitle>Lead and RFQ intake queue</CardTitle><p className="text-sm text-muted-foreground">Operator-owned handoff queue with source lineage preserved.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {sources.map((source) => (
+            <div key={source.id} className="grid gap-3 rounded-xl border bg-background p-4 md:grid-cols-[1fr_110px_110px_110px_auto] md:items-center">
+              <div><div className="font-semibold">{source.name}</div><p className="mt-1 text-sm text-muted-foreground">{source.sourceSignal}</p></div>
+              <div><div className="text-xs text-muted-foreground">Owner</div><div className="font-semibold">{source.ownerLabel}</div></div>
+              <div><div className="text-xs text-muted-foreground">Leads</div><div className="font-semibold">{source.leadCount}</div></div>
+              <div><div className="text-xs text-muted-foreground">RFQs</div><div className="font-semibold">{source.rfqCount}</div></div>
+              <div className="flex flex-wrap gap-2 md:justify-end">
+                <Button asChild size="sm"><Link to={source.nextActionRoute}>{source.nextAction}</Link></Button>
+                <Button asChild size="sm" variant="outline"><Link to={getSourceFunctionPageHref(meta.id, 'detail', source.id)}>Detail</Link></Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionAttributionView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetricCard label="Touchpoints" value={sources.reduce((sum, source) => sum + source.attribution.length, 0)} metaTooltip="Source attribution touchpoints." icon={<PanelsTopLeft className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Campaign traffic" value={formatCompactCount(sources.reduce((sum, source) => sum + source.campaignTraffic, 0))} metaTooltip="Campaign traffic linked to this source function." icon={<Megaphone className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Low confidence" value={sources.filter((source) => source.attribution.some((touchpoint) => touchpoint.confidence < 70)).length} metaTooltip="Attribution rows needing review." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Preview only" value="Readback" metaTooltip="Attribution here is a readback preview, not final truth." icon={<ScanSearch className="size-5" />} tone="purple" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader><CardTitle>Attribution readback preview</CardTitle><p className="text-sm text-muted-foreground">First-touch, last-touch, campaign, and RFQ readback context.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {sources.map((source) => (
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="block rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+              <div className="grid gap-3 md:grid-cols-[1fr_260px_120px_120px_auto] md:items-center">
+                <div><div className="font-semibold">{source.name}</div><p className="mt-1 text-xs text-muted-foreground">{source.sourceSignal}</p></div>
+                <div className="flex flex-wrap gap-1.5">{source.attribution.map((touchpoint) => <Badge key={`${source.id}-${touchpoint.label}`} variant="outline">{touchpoint.label} {touchpoint.confidence}%</Badge>)}</div>
+                <div><div className="text-xs text-muted-foreground">Leads / RFQs</div><div className="font-semibold">{source.leadCount} / {source.rfqCount}</div></div>
+                <div><div className="text-xs text-muted-foreground">Traffic</div><div className="font-semibold">{formatCompactCount(source.campaignTraffic)}</div></div>
+                <Badge variant={source.attribution.some((touchpoint) => touchpoint.confidence < 70) ? 'warning' : 'default'}>Preview</Badge>
+              </div>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionQualityView({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+  return (
+    <div className="space-y-4">
+      <SourceFunctionKpiStrip meta={meta} sources={sources} overview={overview} />
+      <Card className="rounded-2xl border">
+        <CardHeader><CardTitle>{meta.label} quality ranking</CardTitle><p className="text-sm text-muted-foreground">Numeric score is paired with reason trail, blocker, and action route.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {sources.map((source) => (
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="block rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+              <div className="grid gap-3 md:grid-cols-[1fr_240px_140px_auto] md:items-center">
+                <div><div className="font-semibold">{source.name}</div><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{source.scoreReasons.join(' / ')}</p></div>
+                <SourceQualityBar value={source.qualityScore} />
+                <Badge variant={sourceStatusVariant(source)}>{source.nextAction}</Badge>
+                <div className="text-xs text-muted-foreground md:text-right">{source.blockers[0] || source.actionReason}</div>
+              </div>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionDataHealthView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+  const rows = buildSourceDataHealthRows(sources, meta);
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <SummaryMetricCard label="Healthy" value={rows.filter((row) => row.status === 'healthy').length} metaTooltip="Feeds without source health blockers." icon={<Gauge className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Stale" value={rows.filter((row) => row.status === 'stale').length} metaTooltip="Feeds past freshness threshold." icon={<BellRing className="size-5" />} tone="warning" />
+        <SummaryMetricCard label="Duplicate risk" value={rows.filter((row) => row.status === 'duplicate_risk').length} metaTooltip="Duplicate rate over review threshold." icon={<Trash2 className="size-5" />} tone="purple" />
+        <SummaryMetricCard label="Unmapped" value={rows.reduce((sum, row) => sum + row.unmappedCount, 0)} metaTooltip="Rows without mapped SKU/campaign context." icon={<SlidersHorizontal className="size-5" />} tone="info" />
+        <SummaryMetricCard label="Errors" value={rows.reduce((sum, row) => sum + row.errorCount, 0)} metaTooltip="Data-health issues blocking scale recommendations." icon={<ScanSearch className="size-5" />} tone="warning" />
+      </div>
+      <Card className="rounded-2xl border">
+        <CardHeader><CardTitle>{meta.label} data health</CardTitle><p className="text-sm text-muted-foreground">Freshness, ingestion, duplicate rate, missing mapping, and reconciliation action.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {rows.map((row) => (
+            <div key={row.id} className="grid gap-3 rounded-xl border bg-background p-4 md:grid-cols-[1fr_120px_120px_120px_120px_auto] md:items-center">
+              <div><div className="font-semibold">{row.child}</div><p className="mt-1 text-xs text-muted-foreground">{row.ingestionMode} / owner {row.owner}</p></div>
+              <Badge variant={marketplaceStatusVariant(row.status)}>{prettyMarketplaceLabel(row.status)}</Badge>
+              <div><div className="text-xs text-muted-foreground">Last sync</div><div className="font-semibold">{row.lastSyncAt}</div></div>
+              <div><div className="text-xs text-muted-foreground">Errors</div><div className="font-semibold">{row.errorCount}</div></div>
+              <div><div className="text-xs text-muted-foreground">Dupes</div><div className="font-semibold">{row.duplicateRate}%</div></div>
+              <Button asChild size="sm" variant="outline"><Link to={row.primary ? getSourceFunctionPageHref(meta.id, 'detail', row.primary.id) : getSourceFunctionPageHref(meta.id, 'accounts')}>{row.actionLabel}</Link></Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SourceFunctionDetailView({ meta, sources, selectedSourceId }: { meta: DemandSourceFunction; sources: DemandSource[]; selectedSourceId: string | null }) {
+  const source = sources.find((item) => item.id === selectedSourceId) || sources[0] || null;
+  if (!source) {
+    return <Card className="rounded-2xl border border-dashed"><CardContent className="p-6 text-sm text-muted-foreground">No source is selected for detail.</CardContent></Card>;
+  }
+  return (
+    <div className="space-y-4">
+      <Card className="rounded-2xl border">
+        <CardContent className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={sourceStatusVariant(source)}>{source.status.replace('_', ' ')}</Badge>
+                <Badge variant="outline">{childForSource(source, meta)}</Badge>
+                <Badge variant="outline">{source.market}</Badge>
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight">{source.name}</h2>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{source.sourceSignal}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-4 text-center">
+              <div className="text-xs text-muted-foreground">Quality</div>
+              <div className="text-3xl font-semibold">{source.qualityScore}</div>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <RuntimeContextCard label="Owner" value={source.ownerLabel} detail={source.connectedChannel} />
+            <RuntimeContextCard label="SKU" value={source.skuCode} detail={source.productName} />
+            <RuntimeContextCard label="Leads / RFQs" value={`${source.leadCount} / ${source.rfqCount}`} detail="Source lineage." />
+            <RuntimeContextCard label="Freshness" value={source.lastSyncAt} detail={`${source.freshnessMinutes} minutes.`} />
+          </div>
+        </CardContent>
+      </Card>
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card className="rounded-2xl border">
+          <CardHeader><CardTitle>Quality engine</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <SourceQualityBar value={source.qualityScore} />
+            {source.scoreReasons.map((reason) => <div key={reason} className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">{reason}</div>)}
+            {source.blockers.map((blocker) => <div key={blocker} className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{blocker}</div>)}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border">
+          <CardHeader><CardTitle>Lineage and readback</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <EvidenceCard label="Signal volume" value={formatCompactCount(source.signalVolume)} meta={source.sourceSignal} />
+            <EvidenceCard label="Traffic" value={formatCompactCount(source.campaignTraffic)} meta={source.linkedCampaignIds.join(', ') || 'No campaign link'} />
+            <EvidenceCard label="Conversion" value={`${source.conversionRate}%`} meta={`${source.rfqRate}% RFQ rate`} />
+            <EvidenceCard label="Data health" value={`${source.duplicateRate}% duplicates`} meta={source.blockers[0] || 'No hard blocker'} />
+          </CardContent>
+        </Card>
+      </section>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild><Link to={source.nextActionRoute}>{source.nextAction}<ArrowRight className="size-4" /></Link></Button>
+        <Button asChild variant="outline"><Link to="/demand/campaigns">Open campaigns</Link></Button>
+        <Button asChild variant="outline"><Link to="/demand/leads-rfqs">Open leads/RFQs</Link></Button>
+        <Button asChild variant="outline"><Link to={getSourceFunctionPageHref(meta.id, 'data-health')}>Review data health</Link></Button>
+      </div>
+    </div>
+  );
+}
+
+export function PrimeDemandSourcesPage() {
+  const snapshot = getPrimeSnapshot();
+  const [searchParams] = useSearchParams();
+  const sources = useMemo(() => buildDemandSources(snapshot), [snapshot]);
+  const requestedFunction = searchParams.get('function');
+  const selectedFunction = SOURCE_FUNCTION_CATALOG.some((item) => item.id === requestedFunction)
+    ? requestedFunction as DemandSourceType
+    : 'all';
+  const visibleSources = useMemo(() => (
+    selectedFunction === 'all'
+      ? sources
+      : sources.filter((source) => source.type === selectedFunction)
+  ), [selectedFunction, sources]);
+  const overview = useMemo(() => buildDemandSourcesOverview(visibleSources), [visibleSources]);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const selectedSource = sources.find((source) => source.id === selectedSourceId) || null;
+  const selectedFunctionMeta = selectedFunction === 'all'
+    ? null
+    : SOURCE_FUNCTION_CATALOG.find((item) => item.id === selectedFunction) || null;
+  const totalSignals = visibleSources.reduce((sum, source) => sum + source.signalVolume, 0);
+  const topSources = visibleSources.slice(0, 5);
+  const reviewSources = visibleSources.filter((source) => source.status === 'needs_review' || source.blockers.length > 0).slice(0, 3);
+  const functionSummaries = SOURCE_FUNCTION_CATALOG.map((item) => {
+    const functionSources = sources.filter((source) => source.type === item.id);
+    const quality = functionSources.length
+      ? Math.round(functionSources.reduce((sum, source) => sum + source.qualityScore, 0) / functionSources.length)
+      : 0;
+    return {
+      ...item,
+      count: functionSources.length,
+      leads: functionSources.reduce((sum, source) => sum + source.leadCount, 0),
+      rfqs: functionSources.reduce((sum, source) => sum + source.rfqCount, 0),
+      quality,
+      needsReview: functionSources.filter((source) => source.status === 'needs_review' || source.blockers.length > 0).length,
+    };
+  });
+  const marketplacePage = getMarketplaceSourcePage(searchParams.get('page'));
+  const marketplaceSourceId = searchParams.get('sourceId');
+  const sourceWorkspacePage = getSourceFunctionPage(searchParams.get('page'));
+  const marketplaceSnapshot = useMemo(
+    () => buildMarketplaceSourceSnapshot(snapshot, marketplacePage, marketplaceSourceId),
+    [snapshot, marketplacePage, marketplaceSourceId],
+  );
+
+  const sourceEvidence: EvidenceItem[] = [
+    { label: 'Active sources', value: String(overview.totalActiveSources), detail: 'Registry rows with owner, status, market, and source quality.', tone: 'info' },
+    { label: 'Avg quality', value: `${overview.averageQualityScore}/100`, detail: 'Composite read model from lead, RFQ, freshness, duplicate, inventory, and finance factors.', tone: 'purple' },
+    { label: 'Needs review', value: String(overview.sourcesNeedingReview), detail: 'Sources blocked by stale signal, duplicate risk, inventory, finance, or manual import issues.', tone: overview.sourcesNeedingReview ? 'warning' : 'success' },
+  ];
+
+  if (selectedFunction === 'marketplace') {
+    return <MarketplaceSourceWorkspace marketplace={marketplaceSnapshot} />;
+  }
+
+  if (selectedFunctionMeta) {
+    return (
+      <SourceFunctionWorkspace
+        meta={selectedFunctionMeta}
+        page={sourceWorkspacePage}
+        sources={visibleSources}
+        selectedSourceId={marketplaceSourceId}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-full bg-background">
+      <div className="space-y-6 p-4 md:p-6">
+        <DecisionHeader
+          eyebrow="Demand Center / Source Quality Engine"
+          title={selectedFunctionMeta?.label || 'Sources'}
+          description={selectedFunctionMeta?.description || 'Track where demand comes from, measure source quality, and turn raw signals into leads, RFQs, and sales opportunities.'}
+          confidence={overview.averageQualityScore}
+          status={overview.sourcesNeedingReview ? 'Review needed' : 'Ready'}
+          actions={(
+            <>
+              <Button asChild>
+                <Link to={overview.topSource?.nextActionRoute || '/demand/campaigns'}>
+                  {overview.topSource ? overview.topSource.nextAction : 'Build campaign'}
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/demand/leads-rfqs">
+                  Open leads/RFQs
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          evidence={sourceEvidence}
+          variant="compact"
+        />
+
+        <LinkedEntityStrip
+          entities={[
+            { label: 'Workspace', value: 'Sources', tone: 'purple' },
+            { label: 'Function', value: selectedFunctionMeta?.label || 'All source functions', tone: 'info' },
+            { label: 'Signals', value: formatCompactCount(totalSignals), href: '/intelligence/signals', tone: 'info' },
+            { label: 'Leads', value: String(overview.totalLeads), href: '/demand/leads-rfqs', tone: 'success' },
+            { label: 'RFQs', value: String(overview.totalRfqs), href: '/demand/leads-rfqs', tone: 'warning' },
+            { label: 'Top source', value: overview.topSource?.name || 'None', href: overview.topSource?.nextActionRoute, tone: 'muted' },
+          ]}
+        />
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <SummaryMetricCard
+            label="Active sources"
+            value={overview.totalActiveSources}
+            metaTooltip={selectedFunctionMeta ? `${selectedFunctionMeta.label}: ${selectedFunctionMeta.children.join(', ')}` : 'Sources with owner, market, status, and a current quality score.'}
+            status={<Badge variant="outline">{visibleSources.length} registry rows</Badge>}
+            icon={<RadioTower className="size-5" />}
+            tone="info"
+          />
+          <SummaryMetricCard
+            label="Top source"
+            value={overview.topSource ? `${overview.topSource.qualityScore}` : '0'}
+            metaTooltip={overview.topSource ? `${overview.topSource.name}: ${overview.topSource.actionReason}` : 'No source data available.'}
+            status={<Badge variant="default">{overview.topSource?.nextAction || 'None'}</Badge>}
+            icon={<Target className="size-5" />}
+            tone="success"
+          />
+          <SummaryMetricCard
+            label="Leads"
+            value={overview.totalLeads}
+            metaTooltip="Total source-linked leads derived from current Demand campaign and lead records."
+            status={<Badge variant="outline">Source-linked</Badge>}
+            icon={<UserRoundCheck className="size-5" />}
+            tone="teal"
+          />
+          <SummaryMetricCard
+            label="RFQs"
+            value={overview.totalRfqs}
+            metaTooltip="RFQs that can be traced back through source and campaign lineage."
+            status={<Badge variant="outline">Commercial intent</Badge>}
+            icon={<ClipboardList className="size-5" />}
+            tone="warning"
+          />
+          <SummaryMetricCard
+            label="Needs review"
+            value={overview.sourcesNeedingReview}
+            metaTooltip="Sources that need owner review because of stale signal, duplicate risk, manual import, inventory risk, or finance risk."
+            status={<Badge variant={overview.sourcesNeedingReview ? 'warning' : 'default'}>{overview.sourcesNeedingReview ? 'Fix before scale' : 'Clean'}</Badge>}
+            icon={<BellRing className="size-5" />}
+            tone={overview.sourcesNeedingReview ? 'warning' : 'success'}
+          />
+        </div>
+
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl">Source functions</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Sources is split into operating functions so each channel class has its own quality, owner, and action route.
+                </p>
+              </div>
+              {selectedFunctionMeta ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/demand/sources">Show all functions</Link>
+                </Button>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 lg:grid-cols-5">
+            {functionSummaries.map((item) => {
+              const isSelected = selectedFunction === item.id;
+              return (
+                <Link
+                  key={item.id}
+                  to={`/demand/sources?function=${item.id}`}
+                  className={`rounded-2xl border p-4 transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/50 bg-primary/10 shadow-sm' : 'bg-background'}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold leading-5">{item.label}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{item.count} sources / {item.leads} leads / {item.rfqs} RFQs</div>
+                    </div>
+                    <Badge variant={item.needsReview ? 'warning' : item.count ? 'default' : 'outline'}>
+                      {item.quality || 'New'}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{item.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {item.children.map((child) => (
+                      <span key={`${item.id}-${child}`} className="rounded-full border bg-muted/35 px-2 py-1 text-[11px] text-muted-foreground">
+                        {child}
+                      </span>
+                    ))}
+                  </div>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
 
         <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <Card className="rounded-lg border">
-            <CardHeader>
-              <CardTitle>Source quality registry</CardTitle>
+          <Card className="rounded-2xl border">
+            <CardHeader className="space-y-2">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-xl">First-screen answer</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">Which demand source deserves action now?</p>
+                </div>
+                <Badge variant={overview.topSource?.blockers.length ? 'warning' : 'default'}>
+                  {overview.topSource?.nextAction || 'No action'}
+                </Badge>
+              </div>
             </CardHeader>
-            <CardContent>
-              <Table variant="embedded">
-                <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
-                  <TableRow>
-                    <TableHead className="h-8 text-[10px]">Source</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead className="text-right">Signals</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Next move</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {snapshot.socialStreams.map((stream) => {
-                    const action = getSourceAction(stream);
-                    return (
-                      <TableRow key={stream.id}>
-                        <TableCell className="font-medium">{stream.source}</TableCell>
-                        <TableCell>{stream.ingestionMode}</TableCell>
-                        <TableCell className="text-right">{formatCompactCount(stream.eventVolume)}</TableCell>
-                        <TableCell>
-                          <Badge variant={stream.status === 'healthy' ? 'default' : stream.status === 'watch' ? 'secondary' : 'warning'}>
-                            {stream.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[360px]">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button asChild size="sm" variant={stream.status === 'healthy' ? 'default' : 'outline'}>
-                              <Link to={action.href}>{action.label}</Link>
-                            </Button>
-                            <span className="text-xs text-muted-foreground">{stream.audienceSignal}</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <CardContent className="space-y-4">
+              {overview.topSource ? (
+                <div className="rounded-2xl border bg-primary/5 p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-2xl font-semibold tracking-tight">{overview.topSource.name}</div>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{overview.topSource.actionReason}</p>
+                    </div>
+                    <div className="min-w-24 rounded-xl bg-background p-3 text-center shadow-sm">
+                      <div className="text-xs text-muted-foreground">Quality</div>
+                      <div className="text-2xl font-semibold">{overview.topSource.qualityScore}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs text-muted-foreground">Type</div>
+                      <div className="mt-1 font-medium">{getDemandSourceTypeLabel(overview.topSource.type)}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs text-muted-foreground">Owner</div>
+                      <div className="mt-1 font-medium">{overview.topSource.ownerLabel}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs text-muted-foreground">Leads / RFQs</div>
+                      <div className="mt-1 font-medium">{overview.topSource.leadCount} / {overview.topSource.rfqCount}</div>
+                    </div>
+                    <div className="rounded-xl border bg-background p-3">
+                      <div className="text-xs text-muted-foreground">SKU signal</div>
+                      <div className="mt-1 truncate font-medium">{overview.topSource.skuCode}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button asChild>
+                      <Link to={overview.topSource.nextActionRoute}>
+                        {overview.topSource.nextAction}
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                    <Button variant="outline" onClick={() => setSelectedSourceId(overview.topSource?.id || null)}>
+                      View source detail
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">No source data available.</div>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border">
+          <Card className="rounded-2xl border">
             <CardHeader>
-              <CardTitle>Source to action</CardTitle>
+              <CardTitle className="text-xl">Source type mix</CardTitle>
+              <p className="text-sm text-muted-foreground">Quality by acquisition class.</p>
             </CardHeader>
-            <CardContent className="grid gap-3">
-              {snapshot.campaigns.slice(0, 4).map((campaign) => (
-                <Link key={campaign.id} to={`/demand/campaigns?campaign=${encodeURIComponent(campaign.id)}`} className="block rounded-lg border bg-muted/20 p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold">{campaign.name}</div>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        {campaign.channel} source feeds {campaign.leads} leads, {campaign.rfqs} RFQs, and {campaign.orders} orders.
-                      </p>
-                    </div>
-                    <Badge variant="outline">{campaign.status}</Badge>
+            <CardContent className="space-y-3">
+              {overview.typeMix.map((item) => (
+                <div key={item.type} className="rounded-xl border p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="font-medium">{getDemandSourceTypeLabel(item.type)}</div>
+                    <Badge variant="outline">{item.count} sources</Badge>
                   </div>
-                </Link>
+                  <SourceQualityBar value={item.quality} />
+                </div>
               ))}
             </CardContent>
           </Card>
         </section>
+
+        <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <Card className="rounded-2xl border">
+            <CardHeader>
+              <CardTitle className="text-xl">Source quality ranking</CardTitle>
+              <p className="text-sm text-muted-foreground">Ranked by lead/RFQ quality, freshness, duplicate risk, and guardrails.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {topSources.length ? topSources.map((source) => (
+                <button
+                  key={source.id}
+                  type="button"
+                  onClick={() => setSelectedSourceId(source.id)}
+                  className="w-full rounded-xl border bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{source.name}</div>
+                      <div className="text-xs text-muted-foreground">{getDemandSourceTypeLabel(source.type)} / {source.ownerLabel}</div>
+                    </div>
+                    <Badge variant={sourceStatusVariant(source)}>{source.nextAction}</Badge>
+                  </div>
+                  <SourceQualityBar value={source.qualityScore} />
+                </button>
+              )) : (
+                <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                  No source rows are mapped to this function yet.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border">
+            <CardHeader>
+              <CardTitle className="text-xl">Source to SKU signal</CardTitle>
+              <p className="text-sm text-muted-foreground">Which SKU routes are receiving source quality.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3">
+                {overview.skuSignals.length ? overview.skuSignals.map((sku) => (
+                  <div key={sku.skuCode} className="rounded-xl border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold">{sku.skuCode}</div>
+                        <div className="text-xs text-muted-foreground">{sku.productName}</div>
+                      </div>
+                      <Badge variant="outline">{sku.sourceScores.length} source signals</Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {sku.sourceScores.map((signal) => (
+                        <div key={`${sku.skuCode}-${signal.sourceName}`} className={`rounded-lg border px-3 py-2 text-xs ${signal.level === 'high' ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700' : signal.level === 'medium' ? 'border-amber-500/25 bg-amber-500/10 text-amber-800' : 'border-rose-500/25 bg-rose-500/10 text-rose-700'}`}>
+                          <div className="truncate font-semibold">{signal.sourceName}</div>
+                          <div className="mt-1">{signal.score}/100 quality</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )) : (
+                  <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                    No SKU signal is mapped to this function yet.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {reviewSources.length ? (
+          <Card className="rounded-2xl border border-warning/30 bg-warning/5" data-testid="demand-source-warning-lane">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Needs-review lane</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">Do not scale these sources until the owner resolves the blocker.</p>
+                </div>
+                <Badge variant="warning">{reviewSources.length} visible</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-3">
+              {reviewSources.map((source) => (
+                <div key={source.id} className="rounded-xl border bg-background p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{source.name}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{source.ownerLabel}</div>
+                    </div>
+                    <Badge variant="warning">{source.qualityScore}</Badge>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">{source.blockers[0] || source.actionReason}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={source.nextActionRoute}>{source.nextAction}</Link>
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedSourceId(source.id)}>Details</Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card className="rounded-2xl border">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl">Source registry</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">List-first workspace for origin, quality, owner, RFQ output, and action routing.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(selectedFunctionMeta?.children || SOURCE_FUNCTION_CATALOG.map((item) => item.label)).map((label) => (
+                  <Badge key={label} variant="outline">{label}</Badge>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {visibleSources.length ? visibleSources.map((source) => (
+              <div key={source.id} className="rounded-2xl border bg-background p-4 transition-colors hover:border-primary/30">
+                <div className="grid gap-4 xl:grid-cols-[1.4fr_0.8fr_0.8fr_0.9fr_auto]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-base font-semibold">{source.name}</h3>
+                      <Badge variant={sourceStatusVariant(source)}>{source.status.replace('_', ' ')}</Badge>
+                      <Badge variant="outline">{getDemandSourceTypeLabel(source.type)}</Badge>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{source.sourceSignal}</p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span className="rounded-full bg-muted px-2.5 py-1">Owner: {source.ownerLabel}</span>
+                      <span className="rounded-full bg-muted px-2.5 py-1">Market: {source.market}</span>
+                      <span className="rounded-full bg-muted px-2.5 py-1">SKU: {source.skuCode}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Quality</div>
+                    <div className="mt-2">
+                      <SourceQualityBar value={source.qualityScore} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 xl:grid-cols-1">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Signals</div>
+                      <div className="font-semibold">{formatCompactCount(source.signalVolume)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Leads</div>
+                      <div className="font-semibold">{source.leadCount}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">RFQs</div>
+                      <div className="font-semibold">{source.rfqCount}</div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Badge variant={sourceRiskBadgeVariant(source.inventoryRisk)}>Inventory {source.inventoryRisk}</Badge>
+                    <Badge variant={sourceRiskBadgeVariant(source.financeRisk)}>Finance {source.financeRisk}</Badge>
+                    <div className="text-xs text-muted-foreground">Duplicate risk {source.duplicateRate}%</div>
+                  </div>
+                  <div className="flex flex-row gap-2 xl:flex-col xl:items-end">
+                    <Button asChild size="sm" variant={sourceActionVariant(source.nextAction)}>
+                      <Link to={source.nextActionRoute}>
+                        {source.nextAction}
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setSelectedSourceId(source.id)}>Detail</Button>
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+                No source registry rows are currently mapped to {selectedFunctionMeta?.label || 'this function'}.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          <Card className="rounded-2xl border">
+            <CardHeader>
+              <CardTitle>Source to campaign</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {snapshot.campaigns
+                .filter((campaign) => selectedFunction === 'all' || visibleSources.some((source) => source.linkedCampaignIds.includes(campaign.id)))
+                .slice(0, 3)
+                .map((campaign) => (
+                <Link key={campaign.id} to={`/demand/campaigns?campaign=${encodeURIComponent(campaign.id)}`} className="block rounded-xl border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                  <div className="font-semibold">{campaign.name}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">{campaign.channel} / {campaign.leads} leads / {campaign.rfqs} RFQs</p>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border">
+            <CardHeader>
+              <CardTitle>Source to leads/RFQs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {visibleSources.filter((source) => source.leadCount > 0).slice(0, 3).map((source) => (
+                <button key={source.id} type="button" onClick={() => setSelectedSourceId(source.id)} className="block w-full rounded-xl border p-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/5">
+                  <div className="font-semibold">{source.name}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">{source.leadCount} leads with {source.rfqCount} RFQs ready for lineage review.</p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border">
+            <CardHeader>
+              <CardTitle>Import and rules</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-xl border p-3">
+                <div className="flex items-center gap-2 font-semibold"><Upload className="size-4" /> Manual import batch</div>
+                <p className="mt-1 text-xs text-muted-foreground">CSV/event rows must keep batch owner, duplicate risk, and source mapping.</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="flex items-center gap-2 font-semibold"><SlidersHorizontal className="size-4" /> Mapping rules</div>
+                <p className="mt-1 text-xs text-muted-foreground">Owner, source origin, SKU/category, campaign, and attribution override rules.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
       </div>
+
+      <SourceDetailDialog source={selectedSource} onClose={() => setSelectedSourceId(null)} />
     </div>
   );
 }

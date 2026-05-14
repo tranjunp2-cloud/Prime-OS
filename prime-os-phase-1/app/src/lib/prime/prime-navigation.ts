@@ -161,6 +161,14 @@ export const primeNavigation: PrimeNavNode[] = [
     icon: RadioTower,
     children: [
       {
+        id: 'demand-hub',
+        label: 'Demand Dashboard',
+        kind: 'tower',
+        href: '/demand/hub',
+        matchPaths: ['/demand'],
+        icon: LayoutDashboard,
+      },
+      {
         id: 'mdec',
         label: 'MDEC',
         kind: 'tower',
@@ -208,20 +216,19 @@ export const primeNavigation: PrimeNavNode[] = [
         ],
       },
       {
-        id: 'demand-hub',
-        label: 'Demand Hub',
-        kind: 'tower',
-        href: '/demand/hub',
-        matchPaths: ['/demand'],
-        icon: RadioTower,
-      },
-      {
         id: 'sources',
         label: 'Sources',
         kind: 'tower',
         href: '/demand/sources',
         matchPaths: ['/demand/acquisition'],
         icon: Globe,
+        children: [
+          { id: 'sources-marketplace', label: 'Marketplace Source', kind: 'floor', href: '/demand/sources?function=marketplace', icon: Store },
+          { id: 'sources-social', label: 'Social Source', kind: 'floor', href: '/demand/sources?function=social', icon: MessagesSquare },
+          { id: 'sources-ads', label: 'Ads Source', kind: 'floor', href: '/demand/sources?function=ads', icon: Megaphone },
+          { id: 'sources-partner', label: 'Partner Source', kind: 'floor', href: '/demand/sources?function=partner', icon: HeartHandshake },
+          { id: 'sources-manual', label: 'Manual Import', kind: 'floor', href: '/demand/sources?function=manual', icon: FileText },
+        ],
       },
       {
         id: 'campaign-ops',

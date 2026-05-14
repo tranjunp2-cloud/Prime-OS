@@ -92,6 +92,16 @@ vi.mock('./GlobalCopilotFAB', () => ({
   ),
 }));
 
+function renderWorkspace() {
+  return render(
+    <MemoryRouter initialEntries={['/orders']}>
+      <GlobalCopilotWorkspace>
+        <div>main content</div>
+      </GlobalCopilotWorkspace>
+    </MemoryRouter>,
+  );
+}
+
 describe('GlobalCopilotWorkspace', () => {
   afterEach(() => {
     cleanup();
