@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -87,7 +88,7 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/auth" element={<Navigate to="/overview" replace />} />
+                  <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route
