@@ -56,21 +56,20 @@ test('logout revokes bearer token server-side', async () => {
   assert.equal(session.status, 401);
 });
 
-test('demo local bypass token can read session in local mode', async () => {
+test('demo local bypass token is rejected in local mode', async () => {
   const session = await request('/api/session', {
     headers: { Authorization: 'Bearer prime-local-bypass-token' }
   });
-  assert.equal(session.status, 200);
-
-  const body = await session.json();
-  assert.equal(body.role, 'admin');
-  assert.equal(body.account.email, 'admin@primeos.local');
+  assert.equal(session.status, 401);
 });
 
 test('demo local CORS allows Vite preview origin', async () => {
+  const { response, body } = await login('admin@primeos.local', 'Admin@PrimeOS2026!');
+  assert.equal(response.status, 200);
+
   const session = await request('/api/session', {
     headers: {
-      Authorization: 'Bearer prime-local-bypass-token',
+      Authorization: `Bearer ${body.token}`,
       Origin: 'http://127.0.0.1:4173'
     }
   });

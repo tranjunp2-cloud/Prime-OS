@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalCopilotWorkspace } from './GlobalCopilotWorkspace';
 
@@ -25,6 +26,16 @@ const mockEngine = {
 };
 
 let desktopMode = true;
+
+function renderWorkspace() {
+  return render(
+    <MemoryRouter>
+      <GlobalCopilotWorkspace>
+        <div>main content</div>
+      </GlobalCopilotWorkspace>
+    </MemoryRouter>,
+  );
+}
 
 vi.mock('@/hooks/use-global-copilot-engine', () => ({
   useGlobalCopilotEngine: () => mockEngine,
@@ -116,11 +127,7 @@ describe('GlobalCopilotWorkspace', () => {
   });
 
   it('initializes the engine and opens the desktop assistant when toggled', () => {
-    render(
-      <GlobalCopilotWorkspace>
-        <div>main content</div>
-      </GlobalCopilotWorkspace>,
-    );
+    renderWorkspace();
 
     expect(screen.getByText('main content')).toBeInTheDocument();
     expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
@@ -130,11 +137,7 @@ describe('GlobalCopilotWorkspace', () => {
   });
 
   it('persists desktop assistant preference in local storage', () => {
-    render(
-      <GlobalCopilotWorkspace>
-        <div>main content</div>
-      </GlobalCopilotWorkspace>,
-    );
+    renderWorkspace();
 
     expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('closed');
 
@@ -145,11 +148,7 @@ describe('GlobalCopilotWorkspace', () => {
   it('falls back to FAB + drawer on mobile and opens the drawer on click', () => {
     desktopMode = false;
 
-    render(
-      <GlobalCopilotWorkspace>
-        <div>main content</div>
-      </GlobalCopilotWorkspace>,
-    );
+    renderWorkspace();
 
     expect(screen.getByTestId('assistant-drawer')).toHaveTextContent('closed');
     fireEvent.click(screen.getByTestId('assistant-fab'));

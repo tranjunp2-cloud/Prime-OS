@@ -5,7 +5,6 @@ const defaultAdminEmail = 'admin@primeos.local';
 const defaultUserEmail = 'user@primeos.local';
 const defaultAdminPassword = 'Admin@PrimeOS2026!';
 const defaultUserPassword = 'User@PrimeOS2026!';
-const localBypassToken = 'prime-local-bypass-token';
 const demoCredentialsEnabled = process.env.PRIME_ALLOW_DEMO_CREDENTIALS === 'true';
 const sessionSecret = process.env.PRIME_SESSION_SECRET || (demoCredentialsEnabled ? defaultSessionSecret : '');
 const sessionTtlMs = Number(process.env.PRIME_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
@@ -203,10 +202,6 @@ export function revokeSessionToken(token) {
 }
 
 export function verifySessionToken(token) {
-  if (demoCredentialsEnabled && token === localBypassToken) {
-    return identityAccounts.find((account) => account.role === 'admin') ?? null;
-  }
-
   const [encodedPayload, signature, extra] = String(token || '').split('.');
   if (!encodedPayload || !signature || extra !== undefined) {
     return null;

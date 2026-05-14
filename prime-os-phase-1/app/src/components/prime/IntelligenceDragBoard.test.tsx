@@ -21,7 +21,7 @@ describe('IntelligenceDragBoard', () => {
 
     expect(screen.getByTestId('intelligence-drag-board')).toBeTruthy();
     expect(screen.getByText('Signal → decision board')).toBeTruthy();
-    expect(screen.getByText(/Source truth remains owned by Demand, Customer, Ecom \/ COS, and Finance/i)).toBeTruthy();
+    expect(screen.getByLabelText('Signal decision board info')).toBeTruthy();
     expect(screen.getByText('Open intelligence work')).toBeTruthy();
     expect(screen.getByText('Boundary protected')).toBeTruthy();
     expect(screen.getByText('Move audit preview')).toBeTruthy();
