@@ -115,6 +115,16 @@ import {
   type SourceOwner,
 } from '@/lib/prime/intelligence-workspace';
 import {
+  CAMPAIGN_OBJECTIVES,
+  CAMPAIGN_WORKSPACE_TABS,
+  buildCampaignWorkspace,
+  getCampaignWorkspaceCompactNumber,
+  getCampaignWorkspaceMoney,
+  getCampaignWorkspaceStatusLabel,
+  normalizeCampaignWorkspaceTab,
+  type CampaignWorkspaceTab,
+} from '@/lib/prime/campaign-workspace';
+import {
   fetchFinanceControlPlane,
   type CapitalOffersRecord,
   type CapitalReadinessRecord,
@@ -4128,6 +4138,11 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const queryRfqId = searchParams.get('rfq');
   const queryView = searchParams.get('view');
   const queryHandoffId = searchParams.get('handoff');
+  const campaignWorkspaceTab = normalizeCampaignWorkspaceTab(searchParams.get('tab'));
+  const campaignWorkspace = useMemo(
+    () => buildCampaignWorkspace(snapshot, { selectedCampaignId: queryCampaignId }),
+    [queryCampaignId, snapshot]
+  );
   const intelligenceWorkspace = useMemo(() => buildIntelligenceWorkspace(snapshot), [snapshot]);
   const handoffPackage = queryHandoffId ? intelligenceWorkspace.packages.find((item) => item.id === queryHandoffId) : null;
   const primaryCampaign = snapshot.campaigns[0];
@@ -4833,6 +4848,487 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     </Card>
   ) : null;
 
+  const campaignTabHref = (tab: CampaignWorkspaceTab) => {
+    const params = new URLSearchParams();
+    params.set('tab', tab);
+    if (queryCampaignId) params.set('campaign', queryCampaignId);
+    if (queryHandoffId) params.set('handoff', queryHandoffId);
+    return `${DEMAND_CAMPAIGNS_HREF}?${params.toString()}`;
+  };
+
+  const readinessBadgeVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'warning' | 'outline' => {
+    if (status === 'blocked' || status === 'failed') return 'destructive';
+    if (status === 'warning' || status === 'needs-review' || status === 'reviewed') return 'warning';
+    if (status === 'ready' || status === 'done' || status === 'running' || status === 'executing') return 'default';
+    return 'outline';
+  };
+
+  const selectedCampaignWorkspaceItem = campaignWorkspace.campaigns.find((campaign) => campaign.id === campaignWorkspace.selectedCampaignId)
+    ?? campaignWorkspace.campaigns[0]
+    ?? null;
+  const selectedPlannerDraft = campaignWorkspace.plannerDrafts.find((draft) => draft.campaignId === selectedCampaignWorkspaceItem?.id)
+    ?? campaignWorkspace.plannerDrafts[0]
+    ?? null;
+  const selectedCampaignChecks = selectedCampaignWorkspaceItem
+    ? campaignWorkspace.readinessChecks.filter((check) => check.campaignId === selectedCampaignWorkspaceItem.id)
+    : campaignWorkspace.readinessChecks.slice(0, 4);
+  const recommendedExecutionRow = campaignWorkspace.executionActions.find((action) => action.status === 'recommended')
+    ?? campaignWorkspace.executionActions[0]
+    ?? null;
+
+  const renderCampaignWorkspaceTabs = () => (
+    <nav aria-label="Campaigns workspace tabs" className="rounded-lg border bg-muted/20 p-2">
+      <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+        {CAMPAIGN_WORKSPACE_TABS.map((tab) => {
+          const active = campaignWorkspaceTab === tab.id;
+          return (
+            <Link
+              key={tab.id}
+              to={campaignTabHref(tab.id)}
+              aria-current={active ? 'page' : undefined}
+              className={[
+                'rounded-lg border px-3 py-2 transition hover:border-primary/40 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                active ? 'border-primary/35 bg-background text-primary shadow-sm' : 'border-transparent text-muted-foreground',
+              ].join(' ')}
+            >
+              <div className="text-sm font-semibold">{tab.label}</div>
+              <div className="mt-0.5 line-clamp-1 text-[11px]">{tab.detail}</div>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+
+  const renderCampaignMetricCard = (
+    label: string,
+    value: string,
+    detail: string,
+    icon: ReactNode,
+    tone = 'text-primary'
+  ) => (
+    <div className="rounded-lg border bg-background p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+          <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+        </div>
+        <div className={`flex size-10 items-center justify-center rounded-lg border bg-muted/30 ${tone}`}>{icon}</div>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+
+  const renderCampaignOverview = () => (
+    <div className="space-y-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {renderCampaignMetricCard('Active campaigns', `${campaignWorkspace.summary.activeCampaigns}`, `${campaignWorkspace.campaigns.length} total campaign routes`, <Megaphone className="size-5" />)}
+        {renderCampaignMetricCard('Queued actions', `${campaignWorkspace.summary.queuedActions}`, 'Recommended, reviewed, queued, or executing', <ClipboardList className="size-5" />)}
+        {renderCampaignMetricCard('Decision readiness', `${campaignWorkspace.summary.readiness}%`, 'Average campaign launch safety', <Gauge className="size-5" />)}
+        {renderCampaignMetricCard('Guardrail alerts', `${campaignWorkspace.summary.guardrailAlerts}`, 'Blocked, warning, or needs-review checks', <BellRing className="size-5" />, 'text-warning')}
+        {renderCampaignMetricCard('Outcome preview', `${campaignWorkspace.summary.orders} orders`, `${campaignWorkspace.summary.leads} leads / ${campaignWorkspace.summary.rfqs} RFQs`, <TrendingUp className="size-5" />)}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="rounded-lg border">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <CardTitle>Recommended next action</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Start with one campaign action. Review the seed before queueing anything.</p>
+              </div>
+              <Badge variant="outline" className="w-fit">Local draft only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recommendedExecutionRow ? (
+              <>
+                <div className="rounded-lg border bg-primary/5 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <Badge variant={readinessBadgeVariant(recommendedExecutionRow.status)}>{getCampaignWorkspaceStatusLabel(recommendedExecutionRow.status)}</Badge>
+                      <h3 className="mt-3 text-xl font-semibold">{recommendedExecutionRow.title}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">{recommendedExecutionRow.channel} · {recommendedExecutionRow.owner} · {recommendedExecutionRow.guardrail}</p>
+                    </div>
+                    <Button type="button" onClick={() => setSelectedAction(recommendedAction)}>
+                      Review setup
+                      <ArrowRight className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <RuntimeContextCard label="Campaign" value={recommendedExecutionRow.campaignName} detail="Focused route for this action." />
+                  <RuntimeContextCard label="Action type" value={recommendedExecutionRow.actionType} detail="Local queue item, not an external send." />
+                  <RuntimeContextCard label="Outcome readback" value={`${campaignWorkspace.summary.roas}x ROAS`} detail={getCampaignWorkspaceMoney(campaignWorkspace.summary.revenue)} />
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No campaign action is available.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="pb-3">
+            <CardTitle>Decision readiness</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Which campaigns can move toward execution without hiding guardrails.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {campaignWorkspace.campaigns.map((campaign) => (
+              <div key={campaign.id} className="rounded-lg border bg-muted/20 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{campaign.name}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">{campaign.channel} · {campaign.skuCode}</p>
+                  </div>
+                  <Badge variant={readinessBadgeVariant(campaign.stage)}>{getCampaignWorkspaceStatusLabel(campaign.stage)}</Badge>
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <Progress value={campaign.readiness} className="h-2 flex-1" />
+                  <span className="w-10 text-right text-xs font-semibold">{campaign.readiness}%</span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <CardTitle>Campaign operating loop</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">A simple path from plan to result. External systems remain the source of truth.</p>
+        </CardHeader>
+        <CardContent className="grid gap-2 md:grid-cols-6">
+          {['Plan', 'Check', 'Queue', 'Execute', 'Read back', 'Recommend'].map((step, index) => (
+            <div key={step} className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{index + 1}</div>
+              <div className="mt-2 text-sm font-semibold">{step}</div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderCampaignPipeline = () => (
+    <Card className="rounded-lg border">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <CardTitle>Campaign pipeline</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Lifecycle, owner, readiness, and next action for every campaign route.</p>
+          </div>
+          <Badge variant="outline">{campaignWorkspace.campaigns.length} campaigns</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Campaign</TableHead>
+              <TableHead>Stage</TableHead>
+              <TableHead>Owner</TableHead>
+              <TableHead>SKU</TableHead>
+              <TableHead>Channel</TableHead>
+              <TableHead>Readiness</TableHead>
+              <TableHead>Next action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {campaignWorkspace.campaigns.map((campaign) => (
+              <TableRow key={campaign.id}>
+                <TableCell className="font-medium">
+                  <Link className="hover:text-primary" to={`${DEMAND_CAMPAIGNS_HREF}?tab=pipeline&campaign=${campaign.id}`}>{campaign.name}</Link>
+                </TableCell>
+                <TableCell><Badge variant={readinessBadgeVariant(campaign.stage)}>{getCampaignWorkspaceStatusLabel(campaign.stage)}</Badge></TableCell>
+                <TableCell>{campaign.owner}</TableCell>
+                <TableCell>{campaign.skuCode}</TableCell>
+                <TableCell>{campaign.channel}</TableCell>
+                <TableCell>
+                  <div className="flex min-w-32 items-center gap-2">
+                    <Progress value={campaign.readiness} className="h-2" />
+                    <span className="text-xs font-semibold">{campaign.readiness}%</span>
+                  </div>
+                </TableCell>
+                <TableCell>{campaign.nextAction}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
+  const renderCampaignPlanner = () => (
+    <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <CardTitle>Campaign objective</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Pick the operating reason before configuring channel and owner.</p>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {CAMPAIGN_OBJECTIVES.map((objective) => (
+            <div key={objective.id} className={[
+              'rounded-lg border p-3',
+              selectedPlannerDraft?.objective === objective.id ? 'border-primary/35 bg-primary/5' : 'bg-muted/20',
+            ].join(' ')}>
+              <div className="text-sm font-semibold">{objective.label}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{objective.detail}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle>Planner route</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Read-only MVP draft from current Demand signals. No source mutation is performed.</p>
+            </div>
+            <Badge variant="outline">Draft surface</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {selectedPlannerDraft ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {[
+                ['Campaign name', selectedPlannerDraft.campaignName],
+                ['Target SKU', selectedPlannerDraft.targetSku],
+                ['Audience', selectedPlannerDraft.targetAudience],
+                ['Message / offer', selectedPlannerDraft.messageOffer],
+                ['Channel', selectedPlannerDraft.channel],
+                ['Owner', selectedPlannerDraft.owner],
+                ['Timeline', selectedPlannerDraft.timeline],
+                ['Expected outcome', selectedPlannerDraft.expectedOutcome],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+                  <div className="mt-2 text-sm font-semibold">{value}</div>
+                </div>
+              ))}
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground md:col-span-2">
+                Planner defines the route. Publishing, ad spend, CRM sends, and inventory changes stay in their source systems.
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No campaign draft is available.</div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderCampaignReadiness = () => (
+    <Card className="rounded-lg border">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Readiness checks</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Launch safety before any campaign runs or scales.</p>
+          </div>
+          <Badge variant={campaignWorkspace.summary.readiness >= 84 ? 'default' : campaignWorkspace.summary.readiness >= 70 ? 'warning' : 'destructive'}>
+            {campaignWorkspace.summary.readiness}% ready
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          {selectedCampaignChecks.map((check) => (
+            <div key={check.id} className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-sm font-semibold">{check.area}</div>
+                <Badge variant={readinessBadgeVariant(check.status)}>{getCampaignWorkspaceStatusLabel(check.status)}</Badge>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{check.blocker}</p>
+            </div>
+          ))}
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Area</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Blocker</TableHead>
+              <TableHead>Owner</TableHead>
+              <TableHead>Recommended fix</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {campaignWorkspace.readinessChecks.map((check) => (
+              <TableRow key={check.id}>
+                <TableCell className="font-medium">{check.area}</TableCell>
+                <TableCell><Badge variant={readinessBadgeVariant(check.status)}>{getCampaignWorkspaceStatusLabel(check.status)}</Badge></TableCell>
+                <TableCell>{check.blocker}</TableCell>
+                <TableCell>{check.owner}</TableCell>
+                <TableCell>{check.fix}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
+  const renderCampaignExecutionQueue = () => (
+    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle>Execution queue</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Campaign decisions become local drafts, tasks, and assigned queue items.</p>
+            </div>
+            <Badge variant="outline">No external send</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Action</TableHead>
+                <TableHead>Campaign</TableHead>
+                <TableHead>Channel</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Guardrail</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {campaignWorkspace.executionActions.map((action) => (
+                <TableRow key={action.id}>
+                  <TableCell className="font-medium">{action.actionType}</TableCell>
+                  <TableCell>{action.campaignName}</TableCell>
+                  <TableCell>{action.channel}</TableCell>
+                  <TableCell>{action.owner}</TableCell>
+                  <TableCell><Badge variant={readinessBadgeVariant(action.status)}>{getCampaignWorkspaceStatusLabel(action.status)}</Badge></TableCell>
+                  <TableCell>{action.guardrail}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-lg border">
+        <CardHeader className="pb-3">
+          <CardTitle>Queue actions</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">Use the existing setup dialog to create local demo state.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {campaignActions.map((action) => {
+            const status = getActionStatus(action);
+            return (
+              <button
+                key={action.id}
+                type="button"
+                className="flex w-full items-start gap-3 rounded-lg border bg-muted/20 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                onClick={() => setSelectedAction(action)}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">{action.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{action.title}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{action.owner} · {action.channel}</span>
+                </span>
+                <Badge variant={status === 'ready' ? 'outline' : 'default'}>{statusLabel[status]}</Badge>
+              </button>
+            );
+          })}
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-muted-foreground">
+            Local queue only. PrimeOS creates drafts and tasks for review; it does not send messages, publish ads, or mutate inventory externally.
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderCampaignResults = () => {
+    const maxRevenue = Math.max(...campaignWorkspace.results.map((result) => result.revenue), 1);
+    return (
+      <div className="space-y-4">
+        <section className="grid gap-3 md:grid-cols-4">
+          {renderCampaignMetricCard('Reach', getCampaignWorkspaceCompactNumber(campaignWorkspace.summary.traffic), 'Campaign traffic and marketplace attention', <Globe className="size-5" />)}
+          {renderCampaignMetricCard('Leads / RFQs', `${campaignWorkspace.summary.leads} / ${campaignWorkspace.summary.rfqs}`, 'Qualified buyer response readback', <CircleUserRound className="size-5" />)}
+          {renderCampaignMetricCard('Revenue', getCampaignWorkspaceMoney(campaignWorkspace.summary.revenue), `${campaignWorkspace.summary.orders} related orders`, <CircleDollarSign className="size-5" />)}
+          {renderCampaignMetricCard('ROAS', `${campaignWorkspace.summary.roas}x`, `${getCampaignWorkspaceMoney(campaignWorkspace.summary.spend)} tracked spend`, <TrendingUp className="size-5" />)}
+        </section>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="pb-3">
+            <CardTitle>Outcome readback</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Campaign proof from reach to revenue. Final attribution remains in Intelligence.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {campaignWorkspace.results.map((result) => (
+              <div key={result.id} className="rounded-lg border bg-muted/20 p-3">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px_110px] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-semibold">{result.campaignName}</div>
+                      <Badge variant={readinessBadgeVariant(result.status === 'watch' ? 'warning' : 'ready')}>{getCampaignWorkspaceStatusLabel(result.status)}</Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{result.leads} leads · {result.rfqs} RFQs · {result.orders} orders · {result.skuSignal}</p>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Revenue</span>
+                      <span className="font-semibold">{getCampaignWorkspaceMoney(result.revenue)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted">
+                      <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(8, Math.round((result.revenue / maxRevenue) * 100))}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-right text-sm font-semibold">{result.roas}x ROAS</div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border">
+          <CardHeader className="pb-3">
+            <CardTitle>Readback flow</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 md:grid-cols-6">
+            {['Campaign', 'Action', 'Buyer response', 'Lead / RFQ', 'Order / revenue', 'Next recommendation'].map((step) => (
+              <div key={step} className="rounded-lg border bg-background p-3 text-sm font-medium">
+                {step}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  const renderCampaignWorkspace = () => (
+    <div className="space-y-4">
+      <section className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <Badge variant="outline" className="mb-3 rounded-full">Campaigns workspace</Badge>
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Campaigns</h1>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Plan campaign routes, check launch readiness, queue local actions, and read results back without mutating source systems.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 xl:w-[520px]">
+            <RuntimeContextCard label="Readiness" value={`${campaignWorkspace.summary.readiness}%`} detail="Average launch safety." />
+            <RuntimeContextCard label="Queued work" value={`${campaignWorkspace.summary.queuedActions}`} detail="Actions needing review." />
+            <RuntimeContextCard label="Readback" value={`${campaignWorkspace.summary.orders} orders`} detail={`${campaignWorkspace.summary.roas}x ROAS.`} />
+          </div>
+        </div>
+      </section>
+
+      {campaignWorkspaceTab === 'overview' ? renderCampaignOverview() : null}
+      {campaignWorkspaceTab === 'pipeline' ? renderCampaignPipeline() : null}
+      {campaignWorkspaceTab === 'planner' ? renderCampaignPlanner() : null}
+      {campaignWorkspaceTab === 'readiness' ? renderCampaignReadiness() : null}
+      {campaignWorkspaceTab === 'execution-queue' ? renderCampaignExecutionQueue() : null}
+      {campaignWorkspaceTab === 'results' ? renderCampaignResults() : null}
+    </div>
+  );
+
   const renderProductSignal = () => (
     <div className="rounded-lg border bg-muted/20 p-3">
       <div className="flex items-start gap-3">
@@ -5095,15 +5591,20 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
 
   return (
     <div className="space-y-4">
-      {renderDemandRouteTabs()}
       {renderFocusedContext()}
-      {renderHero()}
-      {renderPhaseContract()}
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        {renderRecommendedAction()}
-        {renderActionList()}
-      </div>
-      {renderQueueAndProof()}
+      {towerId === 'campaign-ops' ? (
+        renderCampaignWorkspace()
+      ) : (
+        <>
+          {renderHero()}
+          {renderPhaseContract()}
+          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+            {renderRecommendedAction()}
+            {renderActionList()}
+          </div>
+          {renderQueueAndProof()}
+        </>
+      )}
 
       <Dialog open={Boolean(selectedAction)} onOpenChange={(open) => !open && setSelectedAction(null)}>
         <DialogContent className="max-h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
@@ -9922,52 +10423,10 @@ function MarketplaceVisualRouteMap({ marketplace }: { marketplace: MarketplaceSo
 function MarketplaceSourceWorkspace({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
   const pageMeta = getMarketplaceSourcePageMeta(marketplace.page);
   const PageIcon = marketplacePageIcon(marketplace.page);
-  const sourceEvidence: EvidenceItem[] = [
-    { label: 'Marketplace sources', value: String(marketplace.overview.totalMarketplaceSources), detail: 'Filtered to DemandSource rows classified as marketplace.', tone: 'info' },
-    { label: 'Quality score', value: `${marketplace.overview.marketplaceSourceQualityScore}/100`, detail: 'Lead, RFQ, freshness, duplicate, inventory, and finance factors.', tone: 'purple' },
-    { label: 'Needs review', value: String(marketplace.overview.sourcesNeedingReview), detail: 'Sources with stale, duplicate, mapping, inventory, or finance blockers.', tone: marketplace.overview.sourcesNeedingReview ? 'warning' : 'success' },
-  ];
 
   return (
     <div className="min-h-full bg-background">
       <div className="space-y-5 p-4 md:p-6">
-        <DecisionHeader
-          eyebrow="Demand Center / Sources / Marketplace Source"
-          title="Marketplace Source"
-          description="Track marketplace-originated demand across accounts, signals, SKUs, inquiries, attribution, source quality, and data health."
-          confidence={marketplace.overview.marketplaceSourceQualityScore}
-          status={marketplace.overview.sourcesNeedingReview ? 'Review needed' : 'Ready'}
-          actions={(
-            <>
-              <Button asChild>
-                <Link to={getMarketplaceSourcePageHref('source-quality')}>
-                  Review source quality
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to={getMarketplaceSourcePageHref('inquiry-lead-intake')}>
-                  Open intake
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            </>
-          )}
-          evidence={sourceEvidence}
-          variant="compact"
-        />
-
-        <LinkedEntityStrip
-          entities={[
-            { label: 'Function', value: 'Marketplace Source', tone: 'purple' },
-            { label: 'Page', value: pageMeta.label, tone: 'info' },
-            { label: 'Signals', value: formatCompactCount(marketplace.overview.totalSignalVolume), href: getMarketplaceSourcePageHref('demand-signals'), tone: 'info' },
-            { label: 'Leads', value: String(marketplace.overview.totalMarketplaceLeads), href: getMarketplaceSourcePageHref('inquiry-lead-intake'), tone: 'success' },
-            { label: 'RFQs', value: String(marketplace.overview.totalRfqs), href: getMarketplaceSourcePageHref('inquiry-lead-intake'), tone: 'warning' },
-            { label: 'Top marketplace', value: marketplace.overview.topDemandMarketplace, tone: 'muted' },
-          ]}
-        />
-
         <Card className="rounded-2xl border">
           <CardContent className="p-2">
             <div className="flex gap-2 overflow-x-auto">
@@ -10801,55 +11260,12 @@ function SourceFunctionWorkspace({
   selectedSourceId: string | null;
 }) {
   const overview = buildDemandSourcesOverview(sources);
-  const Icon = sourceFunctionIcon(meta.id);
   const PageIcon = marketplacePageIcon(page);
   const pageLabel = sourceFunctionPageLabel(page, meta.id);
-  const evidence: EvidenceItem[] = [
-    { label: 'Sources', value: String(sources.length), detail: `${meta.label} rows from the Demand Source Registry.`, tone: 'info' },
-    { label: 'Quality', value: `${overview.averageQualityScore}/100`, detail: 'Lead, RFQ, freshness, duplicate, inventory, and finance factors.', tone: 'purple' },
-    { label: 'Needs review', value: String(overview.sourcesNeedingReview), detail: 'Rows with stale, duplicate, owner, mapping, inventory, or finance blockers.', tone: overview.sourcesNeedingReview ? 'warning' : 'success' },
-  ];
 
   return (
     <div className="min-h-full bg-background">
       <div className="space-y-5 p-4 md:p-6">
-        <DecisionHeader
-          eyebrow={`Demand Center / Sources / ${meta.label}`}
-          title={meta.label}
-          description={meta.description}
-          confidence={overview.averageQualityScore}
-          status={overview.sourcesNeedingReview ? 'Review needed' : 'Ready'}
-          actions={(
-            <>
-              <Button asChild>
-                <Link to={getSourceFunctionPageHref(meta.id, 'source-quality')}>
-                  Review quality
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to={getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake')}>
-                  Open intake
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            </>
-          )}
-          evidence={evidence}
-          variant="compact"
-        />
-
-        <LinkedEntityStrip
-          entities={[
-            { label: 'Function', value: meta.label, tone: 'purple' },
-            { label: 'Page', value: pageLabel, tone: 'info' },
-            { label: 'Signals', value: formatCompactCount(overview.typeMix.reduce((sum, item) => sum + item.count, 0) || sources.reduce((sum, source) => sum + source.signalVolume, 0)), href: getSourceFunctionPageHref(meta.id, 'demand-signals'), tone: 'info' },
-            { label: 'Leads', value: String(overview.totalLeads), href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake'), tone: 'success' },
-            { label: 'RFQs', value: String(overview.totalRfqs), href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake'), tone: 'warning' },
-            { label: 'Top source', value: overview.topSource?.name || 'None', href: overview.topSource ? getSourceFunctionPageHref(meta.id, 'detail', overview.topSource.id) : undefined, tone: 'muted' },
-          ]}
-        />
-
         <Card className="rounded-2xl border">
           <CardContent className="p-2">
             <div className="flex gap-2 overflow-x-auto">
@@ -11866,7 +12282,8 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
   const customerProfileFloor = searchParams.get('floor');
   const isCustomerProfileSubPage = towerId === 'crm-compact'
     && (customerProfileFloor === 'account' || customerProfileFloor === 'contact' || customerProfileFloor === 'identity' || customerProfileFloor === 'tags');
-  const showTowerChrome = !isCustomerProfileSubPage;
+  const isCampaignWorkspace = towerId === 'campaign-ops';
+  const showTowerChrome = !isCustomerProfileSubPage && !isCampaignWorkspace;
 
   return (
     <div className="min-h-full bg-background">

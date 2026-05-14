@@ -106,14 +106,19 @@ test.describe('authenticated route shell', () => {
     await expect(page.getByText('Evidence Stack')).toBeVisible();
   });
 
-  test('shows the compact Demand child command bar and readback', async ({ page }) => {
+  test('shows the Campaigns workspace tabs and readback', async ({ page }) => {
     await page.goto('/demand/campaigns', routeReady);
     await expectPrimeShellReady(page);
 
-    await expect(page.getByTestId('demand-child-command-bar')).toBeVisible();
-    await expect(page.getByText('Which campaign can run safely now?')).toBeVisible();
-    await expect(page.getByText('Proof & readback')).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Demand tabs' }).getByRole('link', { name: /Campaigns/ })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByText('Campaigns workspace')).toBeVisible();
+    const primaryNav = page.getByRole('navigation', { name: 'Primary navigation' });
+    await expect(primaryNav.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByText('Recommended next action')).toBeVisible();
+    await expect(page.getByText('Campaign operating loop')).toBeVisible();
+
+    await page.goto('/demand/campaigns?tab=results', routeReady);
+    await expect(primaryNav.getByRole('link', { name: 'Results' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByText('Outcome readback')).toBeVisible();
   });
 
   test('preserves Demand query context across legacy redirects', async ({ page }) => {
@@ -123,7 +128,7 @@ test.describe('authenticated route shell', () => {
 
     await expect(page.getByText('Lead focus')).toBeVisible();
     await expect(page.getByText('URL context kept')).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Demand tabs' }).getByRole('link', { name: /Leads & RFQs/ })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: /Leads & RFQs/ })).toHaveAttribute('aria-current', 'page');
   });
 
   test('shows the Customer Profile Floor identity workspace', async ({ page }) => {

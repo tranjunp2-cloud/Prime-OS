@@ -37,6 +37,12 @@ describe('prime navigation utility routes', () => {
     expect(getPrimeNavPath('/demand/sources').map((item) => item.label)).toEqual(['Demand', 'Sources']);
     expect(getPrimeNavPath('/demand/acquisition').map((item) => item.label)).toEqual(['Demand', 'Sources']);
     expect(getPrimeNavPath('/demand/campaign-ops').map((item) => item.label)).toEqual(['Demand', 'Campaigns']);
+    expect(getPrimeNavPath('/demand/campaigns?tab=overview').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Overview']);
+    expect(getPrimeNavPath('/demand/campaigns?tab=pipeline').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Pipeline']);
+    expect(getPrimeNavPath('/demand/campaigns?tab=planner').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Planner']);
+    expect(getPrimeNavPath('/demand/campaigns?tab=readiness').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Readiness']);
+    expect(getPrimeNavPath('/demand/campaigns?tab=execution-queue').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Execution Queue']);
+    expect(getPrimeNavPath('/demand/campaigns?tab=results').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Results']);
     expect(getPrimeNavPath('/demand/lead-response-capture').map((item) => item.label)).toEqual(['Demand', 'Leads & RFQs']);
   });
 });

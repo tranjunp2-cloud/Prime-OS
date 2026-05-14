@@ -42,6 +42,7 @@ export async function installPrimeSession(page: Page) {
   await mockPrimeBackend(page);
   await page.addInitScript(() => {
     window.localStorage.setItem('prime-os-genesis-theme', 'light');
+    window.sessionStorage.setItem('prime-os-auth-token', 'prime-qa-token');
   });
   await page.goto('/overview', { waitUntil: 'domcontentloaded' });
 }

@@ -39,6 +39,34 @@ test('product master edit action stays inside the canonical COS route', async ({
   await expectPrimeShellReady(page);
 });
 
+test('product editor uses the shell scroll container without nested viewport scroll', async ({ page }) => {
+  await page.goto('/ecom/cos/product-master');
+  await expectPrimeShellReady(page);
+
+  await page.getByLabel(/edit product/i).first().click();
+  await expect(page).toHaveURL(/\/ecom\/cos\/product-master\/[^/]+\/edit$/);
+  await expectPrimeShellReady(page);
+
+  await expect(page.getByTestId('product-editor-page')).toBeVisible();
+  await expect(page.getByText('Shipping & Return')).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const main = document.querySelector('#main-content');
+    const pageRoot = document.querySelector('[data-testid="product-editor-page"]');
+    const content = document.querySelector('[data-testid="product-editor-content"]');
+
+    return {
+      mainOverflowY: main ? getComputedStyle(main).overflowY : '',
+      pageMinHeight: pageRoot ? getComputedStyle(pageRoot).minHeight : '',
+      contentOverflowY: content ? getComputedStyle(content).overflowY : '',
+    };
+  });
+
+  expect(layout.mainOverflowY).toBe('auto');
+  expect(layout.pageMinHeight).toBe('100%');
+  expect(layout.contentOverflowY).toBe('visible');
+});
+
 test('OMS order row opens the canonical order detail route', async ({ page }) => {
   await openFirstBodyRow('/ecom/cos/oms', /\/ecom\/cos\/oms\/[^/]+$/, page);
 });

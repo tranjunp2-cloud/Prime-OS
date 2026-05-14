@@ -1191,7 +1191,7 @@ export default function ProductCreatePage() {
   const totalVariants = variantItems.filter(i => i.selected).length;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div data-testid="product-editor-page" className="flex min-h-full flex-col bg-background">
       {/* Top Bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b bg-card shrink-0">
         <div className="flex items-center gap-4">
@@ -1235,8 +1235,8 @@ export default function ProductCreatePage() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+      <div data-testid="product-editor-content">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[1fr_300px]">
 
           {/* Left Column */}
           <div className="space-y-5">
