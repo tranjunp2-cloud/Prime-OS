@@ -27,6 +27,12 @@ describe('primeProductSettingsGroups', () => {
     expect(ids).toContain('product-operation-kanban');
     expect(ids).toContain('product-operation-agent-queue');
     expect(ids).toContain('product-operation-audit');
+    expect(ids).toContain('branding-agent');
+    expect(ids).toContain('branding-agent-dashboard');
+    expect(ids).toContain('branding-agent-library');
+    expect(ids).toContain('branding-agent-create');
+    expect(ids).toContain('branding-agent-assets');
+    expect(ids).not.toContain('branding-agent-share');
     expect(ids).toContain('consulting-agent');
     expect(ids).toContain('consulting-agent-kpi');
     expect(ids).toContain('consulting-agent-signals');

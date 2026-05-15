@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PrimeOS Branding Agent Intelligence Suite Plan</title>
+    <style>
+      :root {
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --panel-2: #fbfcff;
+        --ink: #111217;
+        --muted: #626775;
+        --faint: #8b92a3;
+        --line: #dfe4ee;
+        --line-soft: #edf0f5;
+        --brand: #5546e8;
+        --brand-2: #7466ff;
+        --brand-soft: #eef0ff;
+        --blue: #1266d6;
+        --blue-soft: #eaf3ff;
+        --green: #0f8f67;
+        --green-soft: #e9f8f1;
+        --amber: #b46606;
+        --amber-soft: #fff5dd;
+        --red: #c93545;
+        --red-soft: #fff0f2;
+        --purple: #6b3fea;
+        --purple-soft: #f2ecff;
+        --dark: #171827;
+        --dark-2: #222338;
+        --shadow: 0 18px 50px rgba(16, 24, 40, 0.08);
+        --radius: 14px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 86% 0%, rgba(85, 70, 232, 0.16), transparent 28rem),
+          linear-gradient(180deg, #fbfcff 0%, var(--bg) 48%, #f1f3f8 100%);
+        line-height: 1.55;
+      }
+      a { color: inherit; }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      aside {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+        padding: 28px 20px;
+      }
+
+      main {
+        min-width: 0;
+        padding: 34px;
+      }
+
+      .brand-mark {
+        margin-bottom: 28px;
+      }
+      .brand-mark strong {
+        display: block;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+      .brand-mark span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-title {
+        margin: 22px 0 8px;
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .toc {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .toc a {
+        display: block;
+        border-radius: 10px;
+        padding: 9px 10px;
+        color: #394051;
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .toc a:hover {
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) 420px;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .hero-main,
+      section,
+      .panel,
+      .metric,
+      .route,
+      .phase,
+      .flow-step,
+      .mini-card {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      }
+
+      .hero-main {
+        border-radius: 24px;
+        padding: 34px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero-side {
+        border-radius: 24px;
+        padding: 26px;
+        background:
+          radial-gradient(circle at 84% 0%, rgba(116, 102, 255, 0.34), transparent 40%),
+          linear-gradient(145deg, var(--dark) 0%, var(--dark-2) 100%);
+        color: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 16px;
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 850;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        max-width: 960px;
+        margin: 0;
+        font-size: clamp(38px, 5vw, 72px);
+        line-height: 0.96;
+        letter-spacing: -0.055em;
+      }
+
+      .lead {
+        max-width: 920px;
+        margin: 20px 0 0;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 24px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(85, 70, 232, 0.22);
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .hero-side .pill {
+        border-color: rgba(255,255,255,0.2);
+        background: rgba(255,255,255,0.09);
+        color: #fff;
+      }
+
+      .score {
+        display: grid;
+        grid-template-columns: 94px 1fr;
+        gap: 16px;
+        align-items: center;
+        margin: 20px 0;
+      }
+
+      .score strong {
+        display: grid;
+        place-items: center;
+        width: 94px;
+        height: 94px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, var(--brand), var(--brand-2));
+        font-size: 34px;
+      }
+
+      .hero-side p { color: rgba(255,255,255,0.74); }
+
+      section {
+        margin-top: 22px;
+        border-radius: 18px;
+        overflow: hidden;
+      }
+
+      .section-head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 24px 26px 18px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 25px;
+        line-height: 1.1;
+        letter-spacing: -0.035em;
+      }
+
+      h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+
+      .section-head p,
+      .panel p,
+      .metric p,
+      .route p,
+      .phase p,
+      .flow-step p,
+      li,
+      td {
+        color: var(--muted);
+      }
+
+      .section-head p {
+        max-width: 940px;
+        margin: 6px 0 0;
+      }
+
+      .content {
+        padding: 24px 26px 28px;
+      }
+
+      .grid-2,
+      .grid-3,
+      .grid-4 {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+      .panel,
+      .metric,
+      .route,
+      .phase,
+      .flow-step,
+      .mini-card {
+        border-radius: var(--radius);
+        padding: 18px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 28px;
+        letter-spacing: -0.04em;
+      }
+
+      .metric span,
+      .label {
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .icon {
+        display: inline-grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-weight: 900;
+      }
+
+      .map {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(130px, 1fr));
+        gap: 10px;
+      }
+
+      .map-node {
+        min-height: 138px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        padding: 14px;
+        position: relative;
+      }
+
+      .map-node::after {
+        content: "→";
+        position: absolute;
+        top: 50%;
+        right: -16px;
+        transform: translateY(-50%);
+        color: var(--brand);
+        font-weight: 900;
+      }
+
+      .map-node:last-child::after { display: none; }
+      .map-node small { color: var(--muted); }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .ready { background: var(--green-soft); color: var(--green); }
+      .watch { background: var(--amber-soft); color: var(--amber); }
+      .blocked { background: var(--red-soft); color: var(--red); }
+      .draft { background: var(--brand-soft); color: var(--brand); }
+
+      .flow {
+        display: grid;
+        grid-template-columns: 230px minmax(0, 1fr);
+        gap: 16px;
+      }
+
+      .steps {
+        display: grid;
+        gap: 10px;
+      }
+
+      .step-pill {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .step-pill strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .canvas {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel-2);
+        padding: 18px;
+      }
+
+      .canvas-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 14px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .fake-input {
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        padding: 10px 12px;
+        color: var(--muted);
+      }
+
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(130px, 1fr));
+        gap: 12px;
+      }
+
+      .lane {
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: #fff;
+        padding: 14px;
+      }
+
+      .bar {
+        height: 8px;
+        border-radius: 999px;
+        background: var(--line-soft);
+        overflow: hidden;
+        margin-top: 12px;
+      }
+
+      .bar i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand), var(--green));
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .chart-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fff;
+        padding: 16px;
+      }
+
+      .scatter {
+        position: relative;
+        min-height: 260px;
+        border: 1px solid var(--line-soft);
+        border-radius: 14px;
+        background:
+          linear-gradient(90deg, transparent 49.6%, #e7ebf3 49.6%, #e7ebf3 50.4%, transparent 50.4%),
+          linear-gradient(0deg, transparent 49.6%, #e7ebf3 49.6%, #e7ebf3 50.4%, transparent 50.4%),
+          #fbfcff;
+      }
+
+      .dot {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 900;
+        box-shadow: 0 10px 24px rgba(16, 24, 40, 0.16);
+      }
+
+      .axis {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr) 220px;
+        gap: 16px;
+        align-items: start;
+      }
+
+      .phase strong {
+        color: var(--brand);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+      }
+
+      th, td {
+        border-bottom: 1px solid var(--line-soft);
+        padding: 13px 14px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--brand-soft);
+        color: #38325c;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td { border-bottom: 0; }
+
+      .code {
+        border: 1px solid #2d3048;
+        border-radius: 14px;
+        background: #151624;
+        color: #f8f7ff;
+        padding: 16px;
+        overflow: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .callout {
+        border: 1px solid rgba(180, 102, 6, 0.28);
+        border-radius: 16px;
+        background: var(--amber-soft);
+        padding: 16px;
+        color: #5f3d04;
+      }
+
+      @media (max-width: 1180px) {
+        .shell { grid-template-columns: 1fr; }
+        aside { position: static; height: auto; }
+        .hero, .grid-2, .grid-3, .grid-4, .flow, .canvas-grid { grid-template-columns: 1fr; }
+        .map, .pipeline, .matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .phase { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 720px) {
+        main { padding: 18px; }
+        .hero-main, .hero-side, .content, .section-head { padding: 20px; }
+        .map, .pipeline, .matrix { grid-template-columns: 1fr; }
+        .map-node::after { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside>
+        <div class="brand-mark">
+          <strong>PrimeOS Plan</strong>
+          <span>Branding Agent / Intelligence Suite</span>
+        </div>
+        <div class="nav-title">Plan Sections</div>
+        <ol class="toc">
+          <li><a href="#positioning">01. Product Positioning</a></li>
+          <li><a href="#architecture">02. Product Architecture</a></li>
+          <li><a href="#flows">03. Flow Blueprint</a></li>
+          <li><a href="#screens">04. Screen Plan</a></li>
+          <li><a href="#data">05. Data Model</a></li>
+          <li><a href="#integration">06. PrimeOS Integration</a></li>
+          <li><a href="#implementation">07. Implementation Phases</a></li>
+          <li><a href="#acceptance">08. Acceptance Criteria</a></li>
+          <li><a href="#risks">09. Risks & Decisions</a></li>
+          <li><a href="#handoff">10. Cook Handoff</a></li>
+        </ol>
+      </aside>
+
+      <main>
+        <div class="hero">
+          <div class="hero-main">
+            <div class="eyebrow">Intelligence Suite / New Product / Branding Agent</div>
+            <h1>Branding Agent: nền tảng brand intelligence dùng lại cho agent, launch, signal và demand decisions.</h1>
+            <p class="lead">
+              Kế hoạch này biến flow giống Brand Foundation thành một workspace PrimeOS-native:
+              người dùng nhập brand/business context, AI chuẩn hóa thành intelligence package,
+              operator review bằng evidence, rồi handoff sang Consulting Agent, Signals,
+              Launch Decisions, Demand và Campaigns.
+            </p>
+            <div class="pill-row">
+              <span class="pill">AI-guided intake</span>
+              <span class="pill">Decision-ready outputs</span>
+              <span class="pill">Evidence + guardrails</span>
+              <span class="pill">Agent context package</span>
+              <span class="pill">Versioned library</span>
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="label">MVP Thesis</div>
+            <div class="score">
+              <strong>AI</strong>
+              <div>
+                <h3>Không phải brand doc generator.</h3>
+                <p>Branding Agent phải tạo một decision layer có facts, assumptions, signals, risks và structured context cho toàn bộ PrimeOS.</p>
+              </div>
+            </div>
+            <div class="pill-row">
+              <span class="pill">Founder</span>
+              <span class="pill">Marketing lead</span>
+              <span class="pill">Agency strategist</span>
+              <span class="pill">GTM operator</span>
+            </div>
+          </div>
+        </div>
+
+        <section id="positioning">
+          <div class="section-head">
+            <div>
+              <h2>01. Product Positioning</h2>
+              <p>Branding Agent là foundation product trong Intelligence Suite, nằm trước Consulting Agent, Signals Board và Launch Decisions.</p>
+            </div>
+            <span class="status ready">Recommended scope</span>
+          </div>
+          <div class="content">
+            <div class="grid-3">
+              <div class="panel">
+                <span class="icon">1</span>
+                <h3>Product promise</h3>
+                <p>Nhập business context một lần, PrimeOS tạo brand intelligence foundation có thể dùng lại cho consulting, signal tracking, launch và campaign decisions.</p>
+              </div>
+              <div class="panel">
+                <span class="icon">2</span>
+                <h3>Difference vs Brand Foundation</h3>
+                <p>Brand Foundation tạo tài liệu thương hiệu. Branding Agent tạo intelligence package có evidence, assumptions, decision thresholds và agent-ready schema.</p>
+              </div>
+              <div class="panel">
+                <span class="icon">3</span>
+                <h3>Core user problem</h3>
+                <p>Brand knowledge đang nằm rải rác trong deck, notes, website, sales calls và founder memory. AI agents thiếu context chuẩn để tư vấn đúng.</p>
+              </div>
+            </div>
+
+            <div class="grid-4" style="margin-top:14px">
+              <div class="metric"><span>Primary user</span><strong>Founder</strong><p>Làm rõ brand, offer, ICP, market narrative.</p></div>
+              <div class="metric"><span>Operator user</span><strong>Growth</strong><p>Dùng package cho campaign, launch, demand decisions.</p></div>
+              <div class="metric"><span>Service user</span><strong>Agency</strong><p>Onboard client và tạo strategy brief nhanh.</p></div>
+              <div class="metric"><span>System role</span><strong>Context</strong><p>Structured source of truth cho PrimeOS agents.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="architecture">
+          <div class="section-head">
+            <div>
+              <h2>02. Product Architecture</h2>
+              <p>Branding Agent cần 8 module nội bộ. MVP chỉ cần ship phần tạo package, review và reuse context.</p>
+            </div>
+          </div>
+          <div class="content">
+            <div class="map">
+              <div class="map-node">
+                <span class="status draft">Input</span>
+                <h3>Brand Intake</h3>
+                <small>Name, market, category, URL, notes, file, goals, competitors.</small>
+              </div>
+              <div class="map-node">
+                <span class="status watch">Normalize</span>
+                <h3>Business Understanding</h3>
+                <small>Business model, offer, customer journey, constraints.</small>
+              </div>
+              <div class="map-node">
+                <span class="status ready">Synthesis</span>
+                <h3>Position + ICP</h3>
+                <small>Persona, pains, alternatives, positioning wedge.</small>
+              </div>
+              <div class="map-node">
+                <span class="status ready">Evidence</span>
+                <h3>Signal Layer</h3>
+                <small>Assumptions, proof, gaps, risk indicators, guardrails.</small>
+              </div>
+              <div class="map-node">
+                <span class="status ready">Output</span>
+                <h3>Agent Package</h3>
+                <small>Docs + JSON context + downstream actions.</small>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:16px">
+              <div class="panel">
+                <h3>Output documents</h3>
+                <ul>
+                  <li>Brand Intelligence Foundation</li>
+                  <li>Business & Market Snapshot</li>
+                  <li>ICP & Demand Map</li>
+                  <li>Positioning & Messaging Brief</li>
+                  <li>Signal Map & Hypothesis Register</li>
+                  <li>Launch / Campaign Decision Pack</li>
+                  <li>Agent Context JSON</li>
+                </ul>
+              </div>
+              <div class="panel">
+                <h3>Question sets</h3>
+                <ul>
+                  <li>Brand Foundation: tạo nền tảng brand intelligence mới.</li>
+                  <li>Brand Audit: kiểm tra brand hiện tại và phát hiện gaps.</li>
+                  <li>Repositioning: đổi narrative, category, ICP hoặc offer.</li>
+                  <li>Launch Readiness: chuẩn bị go-to-market và guardrails.</li>
+                  <li>Messaging: tập trung voice, claims, proof points.</li>
+                  <li>Consulting Onboarding: tạo client intelligence package.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="flows">
+          <div class="section-head">
+            <div>
+              <h2>03. Flow Blueprint</h2>
+              <p>Giữ cảm giác giống Brand Foundation nhưng thay nội dung thành enterprise intelligence flow có checkpoint review.</p>
+            </div>
+          </div>
+          <div class="content">
+            <div class="flow">
+              <div class="steps">
+                <div class="step-pill"><strong>1. Brand Identity</strong><span class="label">name, market, category</span></div>
+                <div class="step-pill"><strong>2. Source Selection</strong><span class="label">product, campaign, CRM, VOC</span></div>
+                <div class="step-pill"><strong>3. Intelligence Scope</strong><span class="label">positioning, persona, launch</span></div>
+                <div class="step-pill"><strong>4. Review Setup</strong><span class="label">evidence strictness, human review</span></div>
+              </div>
+              <div class="canvas">
+                <div class="canvas-grid">
+                  <div>
+                    <h3>Create Branding Agent Project</h3>
+                    <div class="field">
+                      <span class="label">Brand name</span>
+                      <div class="fake-input">Venus Beauty</div>
+                    </div>
+                    <div class="field">
+                      <span class="label">Primary goal</span>
+                      <div class="fake-input">Build brand intelligence foundation for launch and demand planning</div>
+                    </div>
+                    <div class="field">
+                      <span class="label">Context sources</span>
+                      <div class="pill-row" style="margin-top:0">
+                        <span class="pill">Product Master</span>
+                        <span class="pill">Campaigns</span>
+                        <span class="pill">Marketplace</span>
+                        <span class="pill">CRM</span>
+                        <span class="pill">Finance guardrails</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <h3>Setup summary</h3>
+                    <p>Inputs → AI agents → Evidence checks → Brand package.</p>
+                    <div class="grid-2" style="margin-top:12px">
+                      <div class="mini-card"><span class="label">Estimate</span><strong>~45s</strong></div>
+                      <div class="mini-card"><span class="label">Sources</span><strong>12</strong></div>
+                      <div class="mini-card"><span class="label">Review</span><strong>Required</strong></div>
+                      <div class="mini-card"><span class="label">Output</span><strong>6 docs</strong></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pipeline" style="margin-top:16px">
+              <div class="lane"><span class="icon">C</span><h3>Collect</h3><p>Text, URL, file, answers, linked PrimeOS sources.</p><div class="bar"><i style="width:100%"></i></div></div>
+              <div class="lane"><span class="icon">U</span><h3>Understand</h3><p>Fact / assumption / inference / unknown separation.</p><div class="bar"><i style="width:82%"></i></div></div>
+              <div class="lane"><span class="icon">P</span><h3>Position</h3><p>ICP, category, alternatives, wedge, narrative risks.</p><div class="bar"><i style="width:64%"></i></div></div>
+              <div class="lane"><span class="icon">G</span><h3>Guardrail</h3><p>Evidence coverage, stale source, launch blockers.</p><div class="bar"><i style="width:48%"></i></div></div>
+              <div class="lane"><span class="icon">A</span><h3>Package</h3><p>Docs, JSON context, handoff actions, version.</p><div class="bar"><i style="width:36%"></i></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="screens">
+          <div class="section-head">
+            <div>
+              <h2>04. Screen Plan</h2>
+              <p>Routes chính cho Branding Agent trong Intelligence Suite. UI ưu tiên biểu đồ, infographic, bảng registry và tooltip thay vì đoạn mô tả dài.</p>
+            </div>
+          </div>
+          <div class="content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Route</th>
+                  <th>Purpose</th>
+                  <th>Primary UI</th>
+                  <th>Key Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>/intelligence/branding-agent</code></td>
+                  <td>Control room cho toàn bộ Branding Agent packages.</td>
+                  <td>DecisionHeader, metric strip, Brand Intelligence Map, registry table.</td>
+                  <td>Create Branding Agent, Open Library, Review stale evidence.</td>
+                </tr>
+                <tr>
+                  <td><code>/intelligence/branding-agent/create</code></td>
+                  <td>4-step wizard tạo package mới.</td>
+                  <td>Vertical stepper, active canvas, source tiles, setup diagram.</td>
+                  <td>Generate Branding Agent, Save Draft.</td>
+                </tr>
+                <tr>
+                  <td><code>/intelligence/branding-agent/:brandId/generating</code></td>
+                  <td>Operational generation state.</td>
+                  <td>5-lane pipeline, live event log, warnings.</td>
+                  <td>Run in background, Cancel, Generate with available evidence.</td>
+                </tr>
+                <tr>
+                  <td><code>/intelligence/branding-agent/:brandId</code></td>
+                  <td>Brand Intelligence Detail.</td>
+                  <td>Brand DNA Matrix, Positioning Map, Persona & Message Flow, EvidenceStack.</td>
+                  <td>Review, Regenerate, Export, Share, Send to Demand.</td>
+                </tr>
+                <tr>
+                  <td><code>/intelligence/branding-agent/library</code></td>
+                  <td>Quản lý nhiều packages.</td>
+                  <td>DataTable, filters, bulk actions.</td>
+                  <td>Open, Assign owner, Export selected, Archive.</td>
+                </tr>
+                <tr>
+                  <td><code>/intelligence/branding-agent/:brandId/review</code></td>
+                  <td>Approve/regenerate từng section có evidence inspector.</td>
+                  <td>Accordion sections, claim inspector, diff view.</td>
+                  <td>Approve, Request evidence, Regenerate section, Suppress claim.</td>
+                </tr>
+                <tr>
+                  <td><code>/intelligence/branding-agent/integrations</code></td>
+                  <td>Nguồn dữ liệu và connectors cho Branding Agent.</td>
+                  <td>IntegrationSourceCard grid.</td>
+                  <td>View evidence, Sync now, Fix connection, Connect.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="grid-2" style="margin-top:16px">
+              <div class="chart-card">
+                <h3>Brand DNA Matrix</h3>
+                <div class="matrix">
+                  <div class="mini-card"><span class="label">Audience</span><strong>Founder-led SMB</strong><p>High urgency</p></div>
+                  <div class="mini-card"><span class="label">Category</span><strong>AI brand OS</strong><p>Emerging</p></div>
+                  <div class="mini-card"><span class="label">Value prop</span><strong>Strategy-ready</strong><p>Reuse across suite</p></div>
+                  <div class="mini-card"><span class="label">Proof</span><strong>12 sources</strong><p>8 verified</p></div>
+                  <div class="mini-card"><span class="label">Message</span><strong>Clarity → action</strong><p>3 angles</p></div>
+                  <div class="mini-card"><span class="label">Risk</span><strong>2 guardrails</strong><p>Review needed</p></div>
+                </div>
+              </div>
+              <div class="chart-card">
+                <h3>Positioning Map</h3>
+                <div class="scatter">
+                  <span class="dot" style="left:66%; top:24%; background:var(--brand)">BAI</span>
+                  <span class="dot" style="left:34%; top:46%; background:var(--blue)">BF</span>
+                  <span class="dot" style="left:20%; top:66%; background:var(--amber)">Doc</span>
+                  <span class="dot" style="left:74%; top:62%; background:var(--green)">Ops</span>
+                </div>
+                <div class="axis"><span>Low strategic proof</span><span>High differentiation</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="data">
+          <div class="section-head">
+            <div>
+              <h2>05. Data Model</h2>
+              <p>Dữ liệu phải đủ cho versioning, audit, permissions và downstream agent context. Không chỉ lưu markdown.</p>
+            </div>
+          </div>
+          <div class="content">
+            <div class="code">BrandAIProject {
+  id: string
+  workspaceId: string
+  brandId: string
+  goal: 'foundation' | 'audit' | 'repositioning' | 'launch' | 'messaging' | 'consulting_onboarding'
+  status: 'draft' | 'generating' | 'needs_review' | 'ready' | 'blocked' | 'archived'
+  confidence: number
+  evidenceCoverage: number
+  sourceIds: string[]
+  currentVersionId: string
+  createdBy: string
+  updatedAt: string
+}
+
+BrandAIAnswerSession {
+  id: string
+  projectId: string
+  questionSetId: string
+  answers: Answer[]
+  completionRate: number
+  submittedAt?: string
+}
+
+BrandAIPackageVersion {
+  id: string
+  projectId: string
+  sourceSessionId: string
+  status: 'draft' | 'reviewed' | 'locked'
+  documents: GeneratedDocument[]
+  facts: Claim[]
+  assumptions: Claim[]
+  unknowns: Claim[]
+  signalWatchlist: Signal[]
+  agentContextJson: object
+}</div>
+
+            <div class="grid-3" style="margin-top:16px">
+              <div class="panel"><h3>Must separate</h3><p>Facts, assumptions, inferences và unknowns phải tách riêng để tránh AI hallucinate thành strategy.</p></div>
+              <div class="panel"><h3>Must version</h3><p>Regenerate không ghi đè package đã reviewed/locked. Mọi package có source session và diff.</p></div>
+              <div class="panel"><h3>Must audit</h3><p>Handoff sang Demand/Launch/Consulting phải ghi usage, version, actor và timestamp.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="integration">
+          <div class="section-head">
+            <div>
+              <h2>06. PrimeOS Integration</h2>
+              <p>Branding Agent là context provider. Output phải dùng được trong các workflow khác, không bị kẹt trong trang detail.</p>
+            </div>
+          </div>
+          <div class="content">
+            <div class="grid-4">
+              <div class="route"><span class="icon">C</span><h3>Consulting Agent</h3><p>Brief agent bằng brand context, positioning, strategy constraints và client assumptions.</p></div>
+              <div class="route"><span class="icon">S</span><h3>Signals Board</h3><p>Tạo signal watchlist cho market, demand, competitor, customer behavior.</p></div>
+              <div class="route"><span class="icon">L</span><h3>Launch Decisions</h3><p>Chuyển package thành launch memo, guardrails và decision thresholds.</p></div>
+              <div class="route"><span class="icon">D</span><h3>Demand</h3><p>Handoff audience-message fit, campaign themes và demand experiment backlog.</p></div>
+            </div>
+
+            <div class="callout" style="margin-top:16px">
+              <strong>Integration rule:</strong> downstream workflows phải cho chọn `latest version` hoặc một `pinned version`.
+              Nếu package bị archive hoặc evidence stale, UI phải cảnh báo trước khi dùng.
+            </div>
+          </div>
+        </section>
+
+        <section id="implementation">
+          <div class="section-head">
+            <div>
+              <h2>07. Implementation Phases</h2>
+              <p>Plan chia 5 phase để có thể cook từng đợt, kiểm thử route và UI shell trước khi nối dữ liệu thật.</p>
+            </div>
+          </div>
+          <div class="content timeline">
+            <div class="phase">
+              <strong>Phase 1</strong>
+              <div>
+                <h3>IA, routes, shell, navigation</h3>
+                <p>Tạo route `/intelligence/branding-agent`, library, create, generating, detail, review, integrations. Thêm Product Settings entry và sidebar nav dưới Intelligence.</p>
+              </div>
+              <span class="status draft">Foundation</span>
+            </div>
+            <div class="phase">
+              <strong>Phase 2</strong>
+              <div>
+                <h3>Mock data + reusable read model</h3>
+                <p>Tạo `brandAiReadModel`, project/package/session/version mock, status helpers, source health, claims, signals, downstream handoff samples.</p>
+              </div>
+              <span class="status ready">Data</span>
+            </div>
+            <div class="phase">
+              <strong>Phase 3</strong>
+              <div>
+                <h3>Create flow + generation state</h3>
+                <p>Build 4-step wizard, validation, source tiles, intelligence scope, review setup, generating pipeline và event log.</p>
+              </div>
+              <span class="status ready">Flow</span>
+            </div>
+            <div class="phase">
+              <strong>Phase 4</strong>
+              <div>
+                <h3>Detail, review, library, export/share UI</h3>
+                <p>Build Brand DNA Matrix, Positioning Map, EvidenceStack, GuardrailCard, DataTable library, section review, diff, export modal.</p>
+              </div>
+              <span class="status watch">UI</span>
+            </div>
+            <div class="phase">
+              <strong>Phase 5</strong>
+              <div>
+                <h3>Integration, tests, accessibility pass</h3>
+                <p>Add downstream handoff buttons, route tests, empty/error states, keyboard/focus checks, responsive screenshots.</p>
+              </div>
+              <span class="status ready">Verify</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="acceptance">
+          <div class="section-head">
+            <div>
+              <h2>08. Acceptance Criteria</h2>
+              <p>MVP đạt khi Branding Agent đi được từ input đến reusable package và handoff sang ít nhất một Intelligence workflow.</p>
+            </div>
+          </div>
+          <div class="content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Area</th>
+                  <th>Acceptance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Question flow</td><td>User chọn question set, tạo/chọn brand, trả lời required questions, save draft, submit khi đủ data.</td></tr>
+                <tr><td>Generation</td><td>AI generation state có pipeline, event log, blocking/non-blocking failures và run-in-background.</td></tr>
+                <tr><td>Output quality</td><td>Package có summary, insights, gaps, facts, assumptions, recommendations, signals và agent context JSON.</td></tr>
+                <tr><td>Review</td><td>User approve/regenerate từng section, xem evidence inspector và diff sau regenerate.</td></tr>
+                <tr><td>Library</td><td>Saved package có metadata: brand, owner, status, confidence, evidence coverage, source session, version.</td></tr>
+                <tr><td>Integration</td><td>Package reviewed có thể gửi sang Consulting Agent, Signals, Launch Decisions hoặc Demand handoff.</td></tr>
+                <tr><td>Permissions</td><td>Viewer không regenerate/approve; Editor sửa draft; Owner/Admin quản lý permission/archive.</td></tr>
+                <tr><td>Accessibility</td><td>Stepper, source tiles, tables, accordions, modals keyboard usable; progress uses text + aria-live.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="risks">
+          <div class="section-head">
+            <div>
+              <h2>09. Risks & Product Decisions</h2>
+              <p>Những quyết định này nên chốt trước khi cook implementation để tránh build sai phạm vi.</p>
+            </div>
+          </div>
+          <div class="content">
+            <div class="grid-2">
+              <div class="panel">
+                <h3>Key risks</h3>
+                <ul>
+                  <li>Output chung chung nếu intake thiếu strategic interview.</li>
+                  <li>AI hallucinate nếu không tách fact / assumption / unknown.</li>
+                  <li>Package lỗi thời nếu thiếu versioning và source freshness.</li>
+                  <li>Downstream agents dùng nhầm package nếu không có pinned version.</li>
+                  <li>External share có thể lộ Customer/Finance evidence nếu permission không rõ.</li>
+                </ul>
+              </div>
+              <div class="panel">
+                <h3>Open decisions</h3>
+                <ul>
+                  <li>Một package theo brand, brand-market, hay brand-market-category?</li>
+                  <li>MVP có hỗ trợ upload file ngay không, hay chỉ URL + text?</li>
+                  <li>Auto-handoff sang Demand hay bắt buộc human review?</li>
+                  <li>Nguồn nào là mandatory để confidence vượt ngưỡng?</li>
+                  <li>Export/share external có được bật trong MVP không?</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="handoff">
+          <div class="section-head">
+            <div>
+              <h2>10. Cook Handoff</h2>
+              <p>Command đề xuất để triển khai theo plan này.</p>
+            </div>
+          </div>
+          <div class="content">
+            <div class="code">/ck:cook /Users/admin/Desktop/PrimeOS_LarkVer/docs/plans/260515-1718-brand-ai-intelligence-suite-plan/brand-ai-intelligence-suite-plan.html</div>
+            <div class="callout" style="margin-top:16px">
+              <strong>Cook note:</strong> triển khai theo thứ tự Phase 1 → 5. Không kết nối API thật trước khi UI shell, mock read model, empty/error states và route tests ổn định.
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

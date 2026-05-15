@@ -790,7 +790,7 @@ export function AppLayout() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 max-w-[240px] justify-start gap-2 rounded-2xl px-2.5 shadow-sm"
+                    className="h-11 min-w-0 max-w-[280px] justify-start gap-2 rounded-2xl px-2.5 shadow-sm lg:min-w-[230px]"
                     aria-label={`Open account menu for ${user?.email || shellCopy.demoWorkspace}`}
                   >
                     <Avatar className="size-8 border border-primary/15 bg-primary/10">
@@ -798,22 +798,22 @@ export function AppLayout() {
                         {accountInitials}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden min-w-0 flex-col items-start text-left lg:flex">
-                      <span className="max-w-[140px] truncate text-xs font-semibold leading-4 text-foreground">
-                        {user?.fullName || shellCopy.demoWorkspace}
+                    <span className="hidden min-w-0 flex-1 flex-col items-start text-left lg:flex">
+                      <span className="max-w-full truncate text-xs font-semibold leading-4 text-foreground">
+                        {user?.workspace || user?.fullName || shellCopy.demoWorkspace}
                       </span>
-                      <span className="max-w-[140px] truncate text-[11px] leading-4 text-muted-foreground">
+                      <span className="max-w-full truncate text-[11px] leading-4 text-muted-foreground">
                         {user?.email || shellCopy.sessionLabel}
                       </span>
                     </span>
-                    <Badge variant="secondary" className="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] md:inline-flex">
+                    <Badge variant="secondary" className="hidden max-w-[76px] shrink-0 truncate rounded-full px-2 py-0.5 text-[10px] xl:inline-flex">
                       {accountRoleLabel}
                     </Badge>
                     <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80 rounded-2xl p-2">
-                  <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <DropdownMenuLabel className="truncate px-2 py-1.5 text-xs font-medium text-muted-foreground">
                     {user?.email || shellCopy.sessionLabel}
                   </DropdownMenuLabel>
                   <DropdownMenuItem className="rounded-xl py-3 text-sm font-semibold" onSelect={() => navigate('/account')}>

@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bot,
   Boxes,
+  BrainCircuit,
   Building2,
   CalendarDays,
   ChartNoAxesCombined,
@@ -10,6 +11,7 @@ import {
   ClipboardList,
   CircleDollarSign,
   Gauge,
+  Library,
   FileBarChart,
   FileText,
   Globe,
@@ -33,6 +35,7 @@ import {
   UserRoundCheck,
   Workflow,
   Settings2,
+  WandSparkles,
 } from 'lucide-react';
 
 export type PrimeNavKind = 'overview' | 'area' | 'tower' | 'floor';
@@ -76,6 +79,40 @@ export const primeNavigation: PrimeNavNode[] = [
           { id: 'product-operation-kanban', label: 'Operating Kanban', kind: 'floor', href: '/intelligence/product-operation-agent?view=kanban', icon: Workflow },
           { id: 'product-operation-agent-queue', label: 'Agent Queue', kind: 'floor', href: '/intelligence/product-operation-agent?view=queue', icon: Bot },
           { id: 'product-operation-audit', label: 'Audit', kind: 'floor', href: '/intelligence/product-operation-agent?view=audit', icon: FileText },
+        ],
+      },
+      {
+        id: 'branding-agent',
+        label: 'Branding Agent',
+        kind: 'tower',
+        href: '/intelligence/branding-agent',
+        matchPaths: ['/intelligence/brand-ai', '/intelligence/branding-agent'],
+        icon: BrainCircuit,
+        badge: 'new',
+        children: [
+          { id: 'branding-agent-dashboard', label: 'Dashboard', kind: 'floor', href: '/intelligence/branding-agent', matchPaths: ['/intelligence/brand-ai'], icon: BrainCircuit },
+          {
+            id: 'branding-agent-library',
+            label: 'Brand Library',
+            kind: 'floor',
+            href: '/intelligence/branding-agent/library',
+            matchPaths: ['/intelligence/brand-ai/library'],
+            icon: Library,
+          },
+          {
+            id: 'branding-agent-assets',
+            label: 'My Assets',
+            kind: 'floor',
+            href: '/intelligence/branding-agent/integrations',
+            matchPaths: [
+              '/intelligence/branding-agent/venus-beauty',
+              '/intelligence/branding-agent/atelier-coffee',
+              '/intelligence/branding-agent/nordic-desk',
+              '/intelligence/brand-ai/integrations',
+            ],
+            icon: Library,
+          },
+          { id: 'branding-agent-create', label: 'Create New', kind: 'floor', href: '/intelligence/branding-agent/create', matchPaths: ['/intelligence/brand-ai/create'], icon: WandSparkles },
         ],
       },
       {

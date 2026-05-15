@@ -20,6 +20,11 @@ describe('prime navigation utility routes', () => {
     expect(getPrimeNavPath('/intelligence/product-operation-agent?view=kanban').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Operating Kanban']);
     expect(getPrimeNavPath('/intelligence/product-operation-agent?view=queue').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Agent Queue']);
     expect(getPrimeNavPath('/intelligence/product-operation-agent?view=audit').map((item) => item.label)).toEqual(['Intelligence', 'Operation Agent', 'Audit']);
+    expect(getPrimeNavPath('/intelligence/branding-agent').map((item) => item.label)).toEqual(['Intelligence', 'Branding Agent', 'Dashboard']);
+    expect(getPrimeNavPath('/intelligence/branding-agent/create').map((item) => item.label)).toEqual(['Intelligence', 'Branding Agent', 'Create New']);
+    expect(getPrimeNavPath('/intelligence/branding-agent/library').map((item) => item.label)).toEqual(['Intelligence', 'Branding Agent', 'Brand Library']);
+    expect(getPrimeNavPath('/intelligence/branding-agent/integrations').map((item) => item.label)).toEqual(['Intelligence', 'Branding Agent', 'My Assets']);
+    expect(getPrimeNavPath('/intelligence/branding-agent/venus-beauty/review').map((item) => item.label)).toEqual(['Intelligence', 'Branding Agent', 'My Assets']);
     expect(getPrimeNavPath('/intelligence/consulting-agent').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
     expect(getPrimeNavPath('/intelligence/consulting-agent?tab=kpi').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'KPI Dashboard']);
     expect(getPrimeNavPath('/intelligence/consulting-agent?tab=signals').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent', 'Signals Board']);

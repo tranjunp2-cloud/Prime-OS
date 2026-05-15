@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -30,6 +29,7 @@ import { PrimeFinSupportPage } from "./pages/prime/PrimeFinSupportPage";
 import { PrimeMdecPage } from "./pages/prime/PrimeMdecPage";
 import { PrimeConsultingAgentPage } from "./pages/prime/PrimeConsultingAgentPage";
 import { PrimeProductOperationAgentPage } from "./pages/prime/PrimeProductOperationAgentPage";
+import { PrimeBrandAiPage } from "./pages/prime/PrimeBrandAiPage";
 import { PrimeDemandHubPage, PrimeDemandSourcesPage, PrimeTowerPage } from "./pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "./pages/prime/CommerceSurfacePage";
 import { CosPolicyRulePage } from "./pages/prime/CosPolicyRulePage";
@@ -47,7 +47,7 @@ const queryClient = new QueryClient({
 });
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -55,10 +55,6 @@ function RequireAuth({ children }: { children: ReactNode }) {
         Loading PrimeOS...
       </div>
     );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
   }
 
   return <>{children}</>;
@@ -88,7 +84,7 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth" element={<Navigate to="/overview" replace />} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route
@@ -154,6 +150,22 @@ const App = () => {
                     <Route path="/intelligence" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
                     <Route path="/intelligence/consulting-agent" element={<PrimeConsultingAgentPage />} />
                     <Route path="/intelligence/product-operation-agent" element={<PrimeProductOperationAgentPage />} />
+                    <Route path="/intelligence/branding-agent" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/create" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/library" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/integrations" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/:brandId" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/:brandId/generating" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/:brandId/review" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/branding-agent/:brandId/share" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/brand-ai" element={<Navigate to="/intelligence/branding-agent" replace />} />
+                    <Route path="/intelligence/brand-ai/create" element={<Navigate to="/intelligence/branding-agent/create" replace />} />
+                    <Route path="/intelligence/brand-ai/library" element={<Navigate to="/intelligence/branding-agent/library" replace />} />
+                    <Route path="/intelligence/brand-ai/integrations" element={<Navigate to="/intelligence/branding-agent/integrations" replace />} />
+                    <Route path="/intelligence/brand-ai/:brandId" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/brand-ai/:brandId/generating" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/brand-ai/:brandId/review" element={<PrimeBrandAiPage />} />
+                    <Route path="/intelligence/brand-ai/:brandId/share" element={<PrimeBrandAiPage />} />
                     <Route path="/intelligence/decision-hub" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
                     <Route path="/intelligence/signals" element={<Navigate to="/intelligence/consulting-agent?tab=signals" replace />} />
                     <Route path="/intelligence/analytics" element={<Navigate to="/intelligence/consulting-agent?tab=kpi&capability=analytics" replace />} />
