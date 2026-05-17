@@ -1,15 +1,18 @@
-import { ArrowRight, CheckCircle2, ClipboardList, Globe, ImagePlus, Instagram, Mail, Megaphone, MessageCircle, PackagePlus, PanelsTopLeft, Phone, RadioTower, ScanSearch, Search, Send, SlidersHorizontal, Sparkles, Target, TrendingUp, Upload, Youtube } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
+import { ArrowRight, BellRing, CalendarCheck, CheckCircle2, CircleUserRound, ClipboardList, Gauge, Globe, Heart, HeartHandshake, ImagePlus, Instagram, Mail, Megaphone, MessageCircle, PackagePlus, PanelsTopLeft, Phone, RadioTower, ScanSearch, Search, Send, SlidersHorizontal, Sparkles, Target, Trash2, TrendingUp, Upload, UserRoundCheck, Youtube } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getSkuLabel, getSkuProductName } from '@/lib/prime/prime-data';
-import { getDemandSourceTypeLabel, type DemandSourceType } from '@/lib/prime/demand-sources';
-import { getMarketplaceSourcePageHref, getMarketplaceSourcePageMeta, type MarketplaceCampaignAttribution, type MarketplaceDataHealthItem, type MarketplaceDemandSignal, type MarketplaceInquiry, type MarketplaceSkuSignal, type MarketplaceSourcePage, type MarketplaceSourceSnapshot } from '@/lib/prime/marketplace-source';
+import { getDemandSourceTypeLabel, type DemandSource, type DemandSourceType } from '@/lib/prime/demand-sources';
+import { MARKETPLACE_SOURCE_PAGES, getMarketplaceSourcePageHref, getMarketplaceSourcePageMeta, type MarketplaceCampaignAttribution, type MarketplaceDataHealthItem, type MarketplaceDemandSignal, type MarketplaceInquiry, type MarketplaceSkuSignal, type MarketplaceSourcePage, type MarketplaceSourceSnapshot } from '@/lib/prime/marketplace-source';
 import { cn } from '@/lib/utils';
 
 export function marketplacePageIcon(page: MarketplaceSourcePage) {
@@ -28,7 +31,9 @@ export function marketplacePageIcon(page: MarketplaceSourcePage) {
   return icons[page] || Globe;
 }
 
-function marketplaceStatusVariant(status: string): 'default' | 'secondary' | 'warning' | 'outline' | 'destructive' {
+type SourceWorkspacePage = MarketplaceSourcePage;
+
+export function marketplaceStatusVariant(status: string): 'default' | 'secondary' | 'warning' | 'outline' | 'destructive' {
   if (status === 'active' || status === 'healthy' || status === 'routed' || status === 'converted_to_rfq') return 'default';
   if (status === 'needs_review' || status === 'stale' || status === 'needs_qualification' || status === 'mapping_issue' || status === 'duplicate_risk') return 'warning';
   if (status === 'failed' || status === 'duplicate' || status === 'suppressed') return 'destructive';
@@ -36,8 +41,16 @@ function marketplaceStatusVariant(status: string): 'default' | 'secondary' | 'wa
   return 'outline';
 }
 
-function prettyMarketplaceLabel(value: string) {
+export function prettyMarketplaceLabel(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export function sourceFunctionIcon(type: DemandSourceType) {
+  if (type === 'social') return MessageCircle;
+  if (type === 'ads') return Megaphone;
+  if (type === 'partner') return HeartHandshake;
+  if (type === 'manual') return Upload;
+  return Globe;
 }
 
 export function sourceGraphicToneClassName(index: number) {
@@ -182,7 +195,7 @@ function MarketplaceVisualRouteMap({ marketplace }: { marketplace: MarketplaceSo
   );
 }
 
-function MarketplaceSourceWorkspace({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
+export function MarketplaceSourceWorkspace({ marketplace }: { marketplace: MarketplaceSourceSnapshot }) {
   const pageMeta = getMarketplaceSourcePageMeta(marketplace.page);
   const PageIcon = marketplacePageIcon(marketplace.page);
 
@@ -764,6 +777,100 @@ function MarketplaceFeedHealthRow({ item }: { item: MarketplaceDataHealthItem })
       <Button asChild size="sm" variant="outline">
         <Link to={getMarketplaceSourcePageHref(item.actionLabel === 'Open detail' ? 'accounts' : 'data-health')}>{item.actionLabel}</Link>
       </Button>
+    </div>
+  );
+}
+
+export function RuntimeContextCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/20 p-3">
+      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-sm font-medium">{value}</div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+export function SummaryMetricCard({
+  label,
+  value,
+  metaTooltip,
+  icon,
+  tone = 'info',
+}: {
+  label: string;
+  value: string | number;
+  metaTooltip?: string;
+  icon: ReactNode;
+  tone?: 'info' | 'success' | 'warning' | 'purple' | 'teal';
+}) {
+  const toneClassName = {
+    info: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    success: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    purple: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
+    teal: 'bg-teal-500/10 text-teal-700 dark:text-teal-300',
+  }[tone];
+
+  return (
+    <Card className="rounded-2xl border">
+      <CardContent className="flex items-start gap-3 p-4">
+        <div className={`grid size-10 shrink-0 place-items-center rounded-xl ${toneClassName}`}>{icon}</div>
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+          <div className="mt-1 truncate text-xl font-semibold">{value}</div>
+          {metaTooltip ? <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{metaTooltip}</p> : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function EvidenceCard({ label, value, meta }: { label: string; value: string | number; meta: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-2.5">
+      <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-sm font-medium">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
+    </div>
+  );
+}
+
+export function formatCompactCount(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 'Not set';
+  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: value >= 1000 ? 1 : 0 }).format(value);
+}
+
+export function sourceStatusVariant(source: DemandSource): 'default' | 'secondary' | 'warning' | 'outline' {
+  if (source.status === 'active' && source.blockers.length === 0) return 'default';
+  if (source.status === 'needs_review' || source.blockers.length > 0) return 'warning';
+  if (source.status === 'suppressed') return 'secondary';
+  return 'outline';
+}
+
+export function sourceRiskBadgeVariant(risk: DemandSource['inventoryRisk'] | DemandSource['financeRisk']): 'default' | 'secondary' | 'warning' | 'outline' {
+  if (risk === 'high') return 'warning';
+  if (risk === 'medium') return 'secondary';
+  if (risk === 'low') return 'default';
+  return 'outline';
+}
+
+export function SourceQualityBar({ value }: { value: number }) {
+  const toneClassName = value >= 78 ? 'bg-emerald-500' : value >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className={`h-full rounded-full ${toneClassName}`} style={{ width: `${Math.max(8, value)}%` }} />
+      </div>
+      <span className="min-w-8 text-right text-xs font-semibold">{value}</span>
     </div>
   );
 }

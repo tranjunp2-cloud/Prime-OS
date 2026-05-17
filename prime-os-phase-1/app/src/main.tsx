@@ -8,9 +8,10 @@ const rootElement = document.getElementById("root");
 function recoverBlankPrimeOsScreen(root: HTMLElement) {
   window.setTimeout(() => {
     const visibleText = root.innerText.trim();
+    const hasMountedDom = root.children.length > 0;
     const alreadyRecovered = window.sessionStorage.getItem("primeos.blank-screen-recovered") === "1";
 
-    if (visibleText.length > 20) {
+    if (visibleText.length > 20 || hasMountedDom) {
       window.sessionStorage.removeItem("primeos.blank-screen-recovered");
       return;
     }
@@ -18,7 +19,7 @@ function recoverBlankPrimeOsScreen(root: HTMLElement) {
     if (!alreadyRecovered) {
       window.sessionStorage.setItem("primeos.blank-screen-recovered", "1");
       for (const key of [
-        "prime.workspace.tabs.v1",
+        "prime-workspace-tabs-v1",
         "prime.assistant.floating-open",
         "prime.ai.audit-events",
       ]) {
@@ -38,7 +39,7 @@ function recoverBlankPrimeOsScreen(root: HTMLElement) {
         </section>
       </main>
     `;
-  }, 2500);
+  }, 10000);
 }
 
 if (!rootElement) {

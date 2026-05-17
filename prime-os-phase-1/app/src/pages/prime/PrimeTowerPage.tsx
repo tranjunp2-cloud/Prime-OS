@@ -143,6 +143,7 @@ import { IntelligencePanel, runtimeStatusVariant, towerJobDescriptions } from '.
 import { FinancePanel } from './PrimeTowerPage.finance-runtime';
 import {
   MarketplaceDetailView,
+  MarketplaceSourceWorkspace,
 } from './PrimeTowerPage.marketplace-workspace';
 import { SourceFunctionWorkspace, getSourceFunctionPage } from './PrimeTowerPage.source-function-workspace';
 import { useToast } from '@/hooks/use-toast';

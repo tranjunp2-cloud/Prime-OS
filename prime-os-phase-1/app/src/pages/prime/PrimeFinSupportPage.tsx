@@ -375,6 +375,7 @@ const loanWizardMoodCopy: Record<LoanWizardStepId, LoanWizardMoodCopy> = {
     ariaLabel: 'Animated funding timeline moving toward lender review milestones',
   },
 };
+type FinSupportCopy = (typeof finSupportCopy)[Locale];
 
 const japanLoanDocuments: JapanLoanDocument[] = [
   {
@@ -832,6 +833,7 @@ export function PrimeFinSupportPage() {
 
         {activeTab === 'overview' ? (
           <OverviewCockpit
+            copy={copy}
             readinessScore={readinessScore}
             eligibleRange={eligibleRange}
             mainBlocker={mainBlocker?.topRisk || copy.noMajorBlocker}
@@ -902,7 +904,7 @@ export function PrimeFinSupportPage() {
 }
 
 
-function FinanceTabs({ activeTab, onChange, copy }: { activeTab: FinanceSupportTab; onChange: (tab: FinanceSupportTab) => void; copy: (typeof finSupportCopy)[Locale] }) {
+function FinanceTabs({ activeTab, onChange, copy }: { activeTab: FinanceSupportTab; onChange: (tab: FinanceSupportTab) => void; copy: FinSupportCopy }) {
   const activeGroup = financeSupportGroups.find((group) => group.tabs.includes(activeTab)) ?? financeSupportGroups[0];
 
   return (
@@ -960,7 +962,7 @@ function TwoColumnTab({ main, side }: { main: ReactNode; side: ReactNode }) {
   return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">{main}<aside className="xl:sticky xl:top-4">{side}</aside></div>;
 }
 
-function FundingDecisionStrip({ readinessScore, eligibleRange, mainBlocker, nextAction, onAskAi, onTabChange }: { readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; onAskAi: () => void; onTabChange: (tab: FinanceSupportTab) => void }) {
+function FundingDecisionStrip({ copy, readinessScore, eligibleRange, mainBlocker, nextAction, onAskAi, onTabChange }: { copy: FinSupportCopy; readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; onAskAi: () => void; onTabChange: (tab: FinanceSupportTab) => void }) {
   return (
     <section className="rounded-2xl border bg-card shadow-sm">
       <div className="grid gap-4 p-4 lg:grid-cols-[280px_minmax(0,1fr)_260px] lg:p-5">
@@ -1010,13 +1012,13 @@ function DecisionFact({ label, value, tone }: { label: string; value: string; to
   );
 }
 
-function OverviewCockpit({ readinessScore, eligibleRange, mainBlocker, nextAction, signals, summary, evidencePack, blockers, lenders, onTabChange, onAskAi }: { readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; signals: EligibilitySignal[]; summary: BankReviewSummary; evidencePack: CommerceEvidencePack; blockers: RiskBlocker[]; lenders: LenderMatch[]; onTabChange: (tab: FinanceSupportTab) => void; onAskAi: () => void }) {
+function OverviewCockpit({ copy, readinessScore, eligibleRange, mainBlocker, nextAction, signals, summary, evidencePack, blockers, lenders, onTabChange, onAskAi }: { copy: FinSupportCopy; readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; signals: EligibilitySignal[]; summary: BankReviewSummary; evidencePack: CommerceEvidencePack; blockers: RiskBlocker[]; lenders: LenderMatch[]; onTabChange: (tab: FinanceSupportTab) => void; onAskAi: () => void }) {
   const [detail, setDetail] = useState<OverviewDetail | null>(null);
   const highPriorityBlockers = [...blockers].sort((left, right) => severityRank(right.severity) - severityRank(left.severity)).slice(0, 4);
 
   return (
     <div className="space-y-4">
-      <FundingDecisionStrip readinessScore={readinessScore} eligibleRange={eligibleRange} mainBlocker={mainBlocker} nextAction={nextAction} onTabChange={onTabChange} onAskAi={onAskAi} />
+      <FundingDecisionStrip copy={copy} readinessScore={readinessScore} eligibleRange={eligibleRange} mainBlocker={mainBlocker} nextAction={nextAction} onTabChange={onTabChange} onAskAi={onAskAi} />
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <ReadinessEvidencePanel signals={signals} evidencePack={evidencePack} onOpenEvidence={() => onTabChange('evidence')} onOpenDetail={setDetail} />
@@ -1374,7 +1376,7 @@ function FundingReadinessHero({ readinessScore, eligibleRange, mainBlocker, next
             <MiniFact label="Blocking issue" value={mainBlocker} />
           </div>
           <div className="mt-4 rounded-xl border bg-background/70 p-4"><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next best action</div><p className="mt-1 text-sm leading-6 text-muted-foreground">{nextAction}</p></div>
-          <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => onTabChange('documents')}>{copy.fixBlockers}</Button><Button type="button" variant="secondary" onClick={() => onTabChange('documents')}>{copy.preparePackage}</Button><Button type="button" variant="outline" onClick={onAskAi}><Bot className="size-4" />Ask Prime AI</Button></div>
+          <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => onTabChange('documents')}>Fix blockers</Button><Button type="button" variant="secondary" onClick={() => onTabChange('documents')}>Prepare review package</Button><Button type="button" variant="outline" onClick={onAskAi}><Bot className="size-4" />Ask Prime AI</Button></div>
         </div>
         <div className="rounded-2xl border bg-background/70 p-4">
           <div className="text-sm font-semibold">First-screen answer</div>
@@ -1446,7 +1448,7 @@ function FinSupportHero({
             <Badge variant="outline" className="rounded-full">Fin Support</Badge>
             <Badge variant="outline" className="rounded-full">Funding review package</Badge>
             {loading ? <Badge variant="outline" className="rounded-full">Refreshing</Badge> : null}
-            {degraded ? <Badge variant="outline" className="rounded-full">{copy.usingLocalSnapshot}</Badge> : null}
+            {degraded ? <Badge variant="outline" className="rounded-full">Using local snapshot</Badge> : null}
           </div>
           <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-4xl">
             Prepare a funding review package from your commerce operations.
