@@ -17,6 +17,12 @@ import { fetchIntelligenceControlPlane, type IntelligenceControlPlaneSnapshot, t
 import { getIntelligenceAssets, removeIntelligenceAsset, type IntelligenceAsset, uploadIntelligenceAsset } from '@/lib/prime/intelligence-assets';
 import { cn } from '@/lib/utils';
 import { formatFileSize } from '@/lib/product-images';
+import {
+  DEMAND_CAMPAIGNS_HREF,
+  DEMAND_CONTENT_SOCIAL_HREF,
+  DEMAND_LEADS_RFQS_HREF,
+  INTELLIGENCE_DECISIONS_HREF,
+} from './PrimeTowerPage.constants';
 
 function creatorStatusPriority(status: string) {
   if (status === 'approved') return 0;

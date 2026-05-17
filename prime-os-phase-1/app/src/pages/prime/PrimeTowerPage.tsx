@@ -186,6 +186,7 @@ import {
   DEMAND_CONTENT_SOCIAL_HREF,
   DEMAND_LEADS_RFQS_HREF,
   DEMAND_REENGAGE_HREF,
+  INTELLIGENCE_DECISIONS_HREF,
   demandTowerIds,
   financeTowerIds,
   intelligenceTowerIds,
@@ -285,8 +286,6 @@ type LaunchDecisionPlan = {
   optimization: string;
   timing: string;
 };
-
-const INTELLIGENCE_DECISIONS_HREF = '/intelligence/launch-decisions';
 
 const currency = new Intl.NumberFormat('ja-JP', {
   style: 'currency',

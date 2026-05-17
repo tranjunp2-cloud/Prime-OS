@@ -8,5 +8,6 @@ export const DEMAND_CAMPAIGNS_HREF = '/demand/campaigns';
 export const DEMAND_CONTENT_SOCIAL_HREF = '/demand/content-social';
 export const DEMAND_LEADS_RFQS_HREF = '/demand/leads-rfqs';
 export const DEMAND_REENGAGE_HREF = '/demand/re-engage';
+export const INTELLIGENCE_DECISIONS_HREF = '/intelligence/launch-decisions';
 
 export type TowerJob = { decide: string; handoff: string; handoffHref: string };
