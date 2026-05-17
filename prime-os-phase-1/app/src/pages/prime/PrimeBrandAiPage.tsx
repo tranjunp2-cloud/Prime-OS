@@ -148,6 +148,138 @@ const projects: BrandFoundationProject[] = [
   },
 ];
 
+const brandAiUiCopy = {
+  'en-US': {
+    shell: { product: 'Branding Agent', workflow: 'Brand Foundation Workflow' },
+    dashboard: {
+      badge: 'Brand Foundation AI',
+      title: 'Create a complete brand foundation from guided questions.',
+      body: 'Answer a structured question set. The agent turns your answers into brand strategy, voice, audience, visual direction, and launch-ready copy assets.',
+      create: 'Create new brand',
+    },
+    assets: {
+      badge: 'Generated brand assets',
+      title: 'My Assets',
+      hint: 'Review generated brand foundations, voice guides, audience maps, visual directions, and handoff packages created from Branding Agent flows.',
+      browse: 'Browse references',
+      create: 'Create New',
+      metrics: {
+        packages: 'Packages',
+        packagesDetail: (count: number) => `${count} packages match the current filters.`,
+        approved: 'Approved',
+        approvedDetail: 'Approved packages are ready to reuse in downstream brand, content, or campaign work.',
+        needsReview: 'Needs review',
+        needsReviewDetail: 'Review these packages before handoff because one or more sections still need operator approval.',
+        readiness: 'Readiness',
+        readinessDetail: (count: number) => `${count} sections are reusable across the generated packages.`,
+      },
+      filters: { all: 'All', approved: 'Approved', review: 'Review', generating: 'Generating', draft: 'Draft' },
+      libraryTitle: 'Asset library',
+      libraryHint: 'Click a package to inspect generated outputs, evidence quality, risks, and next action in a popup.',
+      visible: (count: number) => `${count} visible`,
+      search: 'Search assets, brand, owner, market...',
+      emptyTitle: 'No assets match this filter',
+      emptyBody: 'Create a brand foundation or clear the filter to see generated assets.',
+      evidence: 'Evidence',
+      confidence: 'Confidence',
+      updated: 'Updated',
+      preview: 'Generated asset preview',
+      nextAction: 'Next action',
+      risks: 'Risks',
+      owner: 'Owner',
+      close: 'Close',
+      copyAsset: 'Copy asset',
+      openProject: 'Open brand project',
+    },
+  },
+  'ja-JP': {
+    shell: { product: 'ブランディングエージェント', workflow: 'ブランド基盤ワークフロー' },
+    dashboard: {
+      badge: 'ブランド基盤AI',
+      title: 'ガイド質問から完全なブランド基盤を作成します。',
+      body: '構造化された質問に回答すると、エージェントがブランド戦略、ボイス、オーディエンス、ビジュアル方針、ローンチ用コピーへ変換します。',
+      create: '新規ブランド作成',
+    },
+    assets: {
+      badge: '生成済みブランドアセット',
+      title: 'マイアセット',
+      hint: 'Branding Agentフローで作成されたブランド基盤、ボイスガイド、オーディエンスマップ、ビジュアル方針、ハンドオフパッケージを確認します。',
+      browse: '参考を閲覧',
+      create: '新規作成',
+      metrics: {
+        packages: 'パッケージ',
+        packagesDetail: (count: number) => `${count}件のパッケージが現在のフィルターに一致しています。`,
+        approved: '承認済み',
+        approvedDetail: '承認済みパッケージはブランド、コンテンツ、キャンペーン作業で再利用できます。',
+        needsReview: 'レビュー必要',
+        needsReviewDetail: '一部セクションに運用者承認が必要なため、ハンドオフ前に確認してください。',
+        readiness: '準備度',
+        readinessDetail: (count: number) => `${count}件のセクションが生成済みパッケージ間で再利用可能です。`,
+      },
+      filters: { all: 'すべて', approved: '承認済み', review: 'レビュー', generating: '生成中', draft: '下書き' },
+      libraryTitle: 'アセットライブラリ',
+      libraryHint: 'パッケージをクリックして生成物、根拠品質、リスク、次アクションをポップアップで確認します。',
+      visible: (count: number) => `${count}件表示`,
+      search: 'アセット、ブランド、所有者、市場を検索...',
+      emptyTitle: 'このフィルターに一致するアセットはありません',
+      emptyBody: 'ブランド基盤を作成するか、フィルターを解除して生成済みアセットを表示してください。',
+      evidence: '根拠',
+      confidence: '信頼度',
+      updated: '更新',
+      preview: '生成アセットプレビュー',
+      nextAction: '次アクション',
+      risks: 'リスク',
+      owner: '所有者',
+      close: '閉じる',
+      copyAsset: 'アセットをコピー',
+      openProject: 'ブランドプロジェクトを開く',
+    },
+  },
+  'vi-VN': {
+    shell: { product: 'Branding Agent', workflow: 'Quy trình Brand Foundation' },
+    dashboard: {
+      badge: 'Brand Foundation AI',
+      title: 'Tạo brand foundation hoàn chỉnh từ bộ câu hỏi dẫn dắt.',
+      body: 'Trả lời bộ câu hỏi có cấu trúc. Agent biến câu trả lời thành chiến lược brand, voice, audience, visual direction và copy asset sẵn sàng launch.',
+      create: 'Tạo brand mới',
+    },
+    assets: {
+      badge: 'Brand asset đã tạo',
+      title: 'My Assets',
+      hint: 'Rà soát brand foundation, voice guide, audience map, visual direction và handoff package được tạo từ Branding Agent flow.',
+      browse: 'Xem tham khảo',
+      create: 'Tạo mới',
+      metrics: {
+        packages: 'Packages',
+        packagesDetail: (count: number) => `${count} package khớp bộ lọc hiện tại.`,
+        approved: 'Đã duyệt',
+        approvedDetail: 'Package đã duyệt có thể tái dùng trong brand, content hoặc campaign downstream.',
+        needsReview: 'Cần review',
+        needsReviewDetail: 'Review các package này trước handoff vì một hoặc nhiều section còn cần operator duyệt.',
+        readiness: 'Độ sẵn sàng',
+        readinessDetail: (count: number) => `${count} section có thể tái dùng trên các package đã tạo.`,
+      },
+      filters: { all: 'Tất cả', approved: 'Đã duyệt', review: 'Review', generating: 'Đang tạo', draft: 'Draft' },
+      libraryTitle: 'Thư viện asset',
+      libraryHint: 'Bấm một package để xem output, chất lượng evidence, rủi ro và hành động tiếp theo trong popup.',
+      visible: (count: number) => `${count} hiển thị`,
+      search: 'Tìm asset, brand, owner, thị trường...',
+      emptyTitle: 'Không có asset khớp bộ lọc',
+      emptyBody: 'Tạo brand foundation hoặc xoá bộ lọc để xem asset đã tạo.',
+      evidence: 'Evidence',
+      confidence: 'Độ tin cậy',
+      updated: 'Cập nhật',
+      preview: 'Preview asset đã tạo',
+      nextAction: 'Hành động tiếp theo',
+      risks: 'Rủi ro',
+      owner: 'Owner',
+      close: 'Đóng',
+      copyAsset: 'Copy asset',
+      openProject: 'Mở brand project',
+    },
+  },
+} as Record<Locale, any>;
+
 const brandingAgentCopy: Record<Locale, BrandingAgentCopy> = {
   'en-US': {
     nav: [
@@ -645,6 +777,7 @@ function buildAssetBody(pkg: BrandAiPackage) {
 function FoundationShell({ activeView, children }: { activeView: FoundationView; children: ReactNode }) {
   const { locale } = useI18n();
   const copy = getBrandingAgentCopy(locale);
+  const uiCopy = brandAiUiCopy[locale];
 
   return (
     <div className="-m-4 min-h-[calc(100vh-70px)] bg-background px-4 py-5 md:-m-6 md:px-6 lg:px-8">
@@ -655,8 +788,8 @@ function FoundationShell({ activeView, children }: { activeView: FoundationView;
               <Sparkles className="size-5" />
             </span>
             <div>
-              <div className="text-lg font-semibold text-foreground">Branding Agent</div>
-              <div className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Brand Foundation Workflow</div>
+              <div className="text-lg font-semibold text-foreground">{uiCopy.shell.product}</div>
+              <div className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{uiCopy.shell.workflow}</div>
             </div>
           </div>
           <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-muted/50 p-1">
@@ -685,6 +818,7 @@ function FoundationShell({ activeView, children }: { activeView: FoundationView;
 function DashboardScreen() {
   const { locale } = useI18n();
   const copy = getBrandingAgentCopy(locale);
+  const uiCopy = brandAiUiCopy[locale];
   const fullFlow = copy.questionFlows.find((flow) => flow.id === 'full') ?? copy.questionFlows[0];
 
   return (
@@ -692,14 +826,12 @@ function DashboardScreen() {
       <section className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">Brand Foundation AI</Badge>
-            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Create a complete brand foundation from guided questions.</h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-              Answer a structured question set. The agent turns your answers into brand strategy, voice, audience, visual direction, and launch-ready copy assets.
-            </p>
+            <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{uiCopy.dashboard.badge}</Badge>
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-4xl">{uiCopy.dashboard.title}</h1>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">{uiCopy.dashboard.body}</p>
           </div>
           <Button asChild className="bg-primary text-white hover:bg-primary/90">
-            <Link to={createHref}><Plus className="mr-2 size-4" />Create new brand</Link>
+            <Link to={createHref}><Plus className="mr-2 size-4" />{uiCopy.dashboard.create}</Link>
           </Button>
         </div>
 
@@ -1254,6 +1386,8 @@ function BrandLibraryScreen() {
 }
 
 function MyAssetsScreen() {
+  const { locale } = useI18n();
+  const uiCopy = brandAiUiCopy[locale];
   const snapshot = useMemo(() => buildBrandAiWorkspaceSnapshot(), []);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -1267,11 +1401,11 @@ function MyAssetsScreen() {
   });
   const detailPackage = detailId ? snapshot.packages.find((pkg) => pkg.id === detailId) : null;
   const filterOptions: Array<{ id: 'all' | BrandAiStatus; label: string }> = [
-    { id: 'all', label: 'All' },
-    { id: 'approved', label: 'Approved' },
-    { id: 'review_needed', label: 'Review' },
-    { id: 'generating', label: 'Generating' },
-    { id: 'draft', label: 'Draft' },
+    { id: 'all', label: uiCopy.assets.filters.all },
+    { id: 'approved', label: uiCopy.assets.filters.approved },
+    { id: 'review_needed', label: uiCopy.assets.filters.review },
+    { id: 'generating', label: uiCopy.assets.filters.generating },
+    { id: 'draft', label: uiCopy.assets.filters.draft },
   ];
 
   return (
@@ -1279,25 +1413,25 @@ function MyAssetsScreen() {
       <section className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-end">
           <div>
-            <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">Generated brand assets</Badge>
+            <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{uiCopy.assets.badge}</Badge>
             <h1 className="mt-3 flex items-center gap-2 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-              My Assets
-              <InfoHint>Review generated brand foundations, voice guides, audience maps, visual directions, and handoff packages created from Branding Agent flows.</InfoHint>
+              {uiCopy.assets.title}
+              <InfoHint>{uiCopy.assets.hint}</InfoHint>
             </h1>
           </div>
           <div className="flex flex-wrap gap-2 xl:justify-end">
-            <Button variant="outline" asChild><Link to={libraryHref}><Library className="mr-2 size-4" />Browse references</Link></Button>
-            <Button asChild className="bg-primary text-white hover:bg-primary/90"><Link to={createHref}><Plus className="mr-2 size-4" />Create New</Link></Button>
+            <Button variant="outline" asChild><Link to={libraryHref}><Library className="mr-2 size-4" />{uiCopy.assets.browse}</Link></Button>
+            <Button asChild className="bg-primary text-white hover:bg-primary/90"><Link to={createHref}><Plus className="mr-2 size-4" />{uiCopy.assets.create}</Link></Button>
           </div>
         </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Packages', value: snapshot.metrics.activePackages, detail: `${filteredPackages.length} packages match the current filters.`, icon: Library },
-          { label: 'Approved', value: snapshot.metrics.approvedPackages, detail: 'Approved packages are ready to reuse in downstream brand, content, or campaign work.', icon: BadgeCheck },
-          { label: 'Needs review', value: snapshot.metrics.reviewNeeded, detail: 'Review these packages before handoff because one or more sections still need operator approval.', icon: Info },
-          { label: 'Readiness', value: `${snapshot.metrics.averageReadiness}%`, detail: `${snapshot.metrics.reusableContext} sections are reusable across the generated packages.`, icon: CheckCircle2 },
+          { label: uiCopy.assets.metrics.packages, value: snapshot.metrics.activePackages, detail: uiCopy.assets.metrics.packagesDetail(filteredPackages.length), icon: Library },
+          { label: uiCopy.assets.metrics.approved, value: snapshot.metrics.approvedPackages, detail: uiCopy.assets.metrics.approvedDetail, icon: BadgeCheck },
+          { label: uiCopy.assets.metrics.needsReview, value: snapshot.metrics.reviewNeeded, detail: uiCopy.assets.metrics.needsReviewDetail, icon: Info },
+          { label: uiCopy.assets.metrics.readiness, value: `${snapshot.metrics.averageReadiness}%`, detail: uiCopy.assets.metrics.readinessDetail(snapshot.metrics.reusableContext), icon: CheckCircle2 },
         ].map((metric) => {
           const Icon = metric.icon;
           return (
@@ -1324,16 +1458,16 @@ function MyAssetsScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2 text-xl text-foreground">
-                Asset library
-                <InfoHint>Click a package to inspect generated outputs, evidence quality, risks, and next action in a popup.</InfoHint>
+                {uiCopy.assets.libraryTitle}
+                <InfoHint>{uiCopy.assets.libraryHint}</InfoHint>
               </CardTitle>
             </div>
-            <Badge variant="outline">{filteredPackages.length} visible</Badge>
+            <Badge variant="outline">{uiCopy.assets.visible(filteredPackages.length)}</Badge>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search assets, brand, owner, market..." />
+              <Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={uiCopy.assets.search} />
             </div>
             <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted/50 p-1">
               {filterOptions.map((option) => (
@@ -1354,8 +1488,8 @@ function MyAssetsScreen() {
           {filteredPackages.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border p-8 text-center">
               <Library className="mx-auto size-8 text-muted-foreground" />
-              <div className="mt-3 font-semibold text-foreground">No assets match this filter</div>
-              <p className="mt-1 text-sm text-muted-foreground">Create a brand foundation or clear the filter to see generated assets.</p>
+              <div className="mt-3 font-semibold text-foreground">{uiCopy.assets.emptyTitle}</div>
+              <p className="mt-1 text-sm text-muted-foreground">{uiCopy.assets.emptyBody}</p>
             </div>
           ) : null}
           <div className="grid gap-4 xl:grid-cols-3">
@@ -1448,10 +1582,10 @@ function MyAssetsScreen() {
             <div className="space-y-5 px-6 py-5">
               <div className="grid gap-3 md:grid-cols-4">
                 {[
-                  { label: 'Readiness', value: `${detailPackage.readiness}%` },
-                  { label: 'Evidence', value: `${detailPackage.evidenceCoverage}%` },
-                  { label: 'Confidence', value: `${detailPackage.confidence}%` },
-                  { label: 'Updated', value: detailPackage.freshness },
+                  { label: uiCopy.assets.metrics.readiness, value: `${detailPackage.readiness}%` },
+                  { label: uiCopy.assets.evidence, value: `${detailPackage.evidenceCoverage}%` },
+                  { label: uiCopy.assets.confidence, value: `${detailPackage.confidence}%` },
+                  { label: uiCopy.assets.updated, value: detailPackage.freshness },
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl border border-border/70 bg-muted/20 p-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
@@ -1463,7 +1597,7 @@ function MyAssetsScreen() {
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="space-y-4">
                   <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Generated asset preview</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{uiCopy.assets.preview}</div>
                     <p className="mt-3 whitespace-pre-line text-sm leading-6 text-foreground">{buildAssetBody(detailPackage)}</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1481,17 +1615,17 @@ function MyAssetsScreen() {
 
                 <div className="space-y-4">
                   <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
-                    <div className="text-sm font-semibold text-foreground">Next action</div>
+                    <div className="text-sm font-semibold text-foreground">{uiCopy.assets.nextAction}</div>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{detailPackage.recommendedAction}</p>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
-                    <div className="text-sm font-semibold text-foreground">Risks</div>
+                    <div className="text-sm font-semibold text-foreground">{uiCopy.assets.risks}</div>
                     <div className="mt-3 space-y-2">
                       {detailPackage.risks.map((risk) => (
                         <div key={risk.label} className="rounded-lg border border-border/70 bg-background p-3">
                           <Badge variant="outline" className={risk.severity === 'high' ? 'border-destructive/20 bg-destructive/10 text-destructive' : risk.severity === 'medium' ? 'border-warning/20 bg-warning/10 text-warning-foreground' : ''}>{risk.severity}</Badge>
                           <p className="mt-2 text-sm leading-6 text-foreground">{risk.label}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Owner: {risk.owner}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{uiCopy.assets.owner}: {risk.owner}</p>
                         </div>
                       ))}
                     </div>
@@ -1500,9 +1634,9 @@ function MyAssetsScreen() {
               </div>
             </div>
             <DialogFooter className="border-t border-border/70 px-6 py-4">
-              <Button type="button" variant="outline" onClick={() => setDetailId(null)}>Close</Button>
-              <Button variant="outline"><Copy className="mr-2 size-4" />Copy asset</Button>
-              <Button asChild className="bg-primary text-white hover:bg-primary/90"><Link to={detailPackage.route}>Open brand project</Link></Button>
+              <Button type="button" variant="outline" onClick={() => setDetailId(null)}>{uiCopy.assets.close}</Button>
+              <Button variant="outline"><Copy className="mr-2 size-4" />{uiCopy.assets.copyAsset}</Button>
+              <Button asChild className="bg-primary text-white hover:bg-primary/90"><Link to={detailPackage.route}>{uiCopy.assets.openProject}</Link></Button>
             </DialogFooter>
           </DialogContent>
         ) : null}

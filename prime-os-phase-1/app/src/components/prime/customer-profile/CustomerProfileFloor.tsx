@@ -43,6 +43,8 @@ import {
 } from '@/components/ui/table';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import type { Locale } from '@/lib/i18n/dictionaries';
 import type { PrimeSnapshot } from '@/lib/prime/prime-data';
 import {
   buildCustomerProfileFloor,
@@ -160,6 +162,171 @@ const customerSubFloors: Array<{ id: CustomerSubFloor; label: string; detail: st
   { id: 'account', label: 'Account Profile', detail: 'Account list, profile edit, ownership, lifecycle, contacts, and tags.' },
   { id: 'identity', label: 'Identity Matching', detail: 'Duplicate account/contact review queue.' },
 ];
+
+const customerProfileCopy = {
+  'en-US': {
+    floor: 'Customer Profile Floor',
+    subPage: 'Sub-page',
+    nav: {
+      overview: ['Overview', 'Floor health, next actions, and profile readiness.'],
+      account: ['Account Profile', 'Account list, profile edit, ownership, lifecycle, contacts, and tags.'],
+      identity: ['Identity Matching', 'Duplicate account/contact review queue.'],
+    },
+    metrics: {
+      accounts: ['Accounts', 'visible after filters.'],
+      ownerCoverage: ['Owner coverage', 'Every account needs a relationship owner.'],
+      primaryContacts: ['Primary contacts', 'Primary buyer/contact coverage.'],
+      identityAlerts: ['Identity alerts', 'account records on watch.'],
+    },
+    overview: {
+      title: 'Customer Profile overview',
+      body: 'This overview starts from relationship context. Open a sub-page to manage account records, contacts, duplicate review, or tags.',
+      empty: 'No customer account is available yet. Create an account before connecting Demand, COS, Service, Finance, or Intelligence context.',
+    },
+    account: {
+      title: 'Account list',
+      body: 'Search and filter the customer identity layer before deals, quotes, orders, or intelligence connect.',
+      create: 'Create account',
+      search: 'Search account, code, email...',
+      tag: 'Tag',
+      allTags: 'All tags',
+      owner: 'Owner',
+      allOwners: 'All owners',
+      lifecycle: 'Lifecycle',
+      allLifecycle: 'All lifecycle',
+      customerType: 'Customer type',
+      allCustomerTypes: 'All customer types',
+      reset: 'Reset filters',
+      noMatch: 'No accounts match the current filters.',
+      table: ['Account', 'EC channel', 'Type', 'Lifecycle', 'Owner', 'Contacts', 'Completeness', 'Action'],
+      openProfile: 'Open profile',
+      noChannelRef: 'No channel ref',
+      noPrimaryContact: 'No primary contact',
+      missing: 'Missing',
+      identity: 'Identity',
+      primary: 'Primary',
+      phone: 'Phone',
+      noPhone: 'No phone',
+    },
+    identity: {
+      title: 'Identity Matching',
+      body: 'Review-only duplicate detection. No merge is executed here.',
+      total: 'Total alerts',
+      selected: 'Selected account alerts',
+      account: 'Account',
+      queue: 'Duplicate review queue',
+      queueBody: 'Potential duplicate account/contact warnings with confidence and matching reasons.',
+    },
+  },
+  'ja-JP': {
+    floor: '顧客プロファイルフロア',
+    subPage: 'サブページ',
+    nav: {
+      overview: ['概要', 'フロア健全性、次アクション、プロファイル準備状況。'],
+      account: ['アカウントプロファイル', 'アカウント一覧、編集、所有者、ライフサイクル、連絡先、タグ。'],
+      identity: ['ID照合', '重複アカウント/連絡先レビューキュー。'],
+    },
+    metrics: {
+      accounts: ['アカウント', '件がフィルター後に表示中。'],
+      ownerCoverage: ['所有者カバレッジ', 'すべてのアカウントに関係責任者が必要です。'],
+      primaryContacts: ['主連絡先', '主購入者/連絡先のカバレッジ。'],
+      identityAlerts: ['IDアラート', '件のアカウントが監視対象。'],
+    },
+    overview: {
+      title: '顧客プロファイル概要',
+      body: 'この概要は関係コンテキストから始まります。サブページでアカウント、連絡先、重複レビュー、タグを管理します。',
+      empty: '顧客アカウントはまだありません。Demand、COS、Service、Finance、Intelligenceに接続する前にアカウントを作成してください。',
+    },
+    account: {
+      title: 'アカウント一覧',
+      body: '案件、見積、注文、インテリジェンス連携前に顧客IDレイヤーを検索/絞り込みます。',
+      create: 'アカウント作成',
+      search: 'アカウント、コード、メールを検索...',
+      tag: 'タグ',
+      allTags: 'すべてのタグ',
+      owner: '所有者',
+      allOwners: 'すべての所有者',
+      lifecycle: 'ライフサイクル',
+      allLifecycle: 'すべてのライフサイクル',
+      customerType: '顧客タイプ',
+      allCustomerTypes: 'すべての顧客タイプ',
+      reset: 'フィルターをリセット',
+      noMatch: '現在のフィルターに一致するアカウントはありません。',
+      table: ['アカウント', 'ECチャネル', 'タイプ', 'ライフサイクル', '所有者', '連絡先', '完全性', 'アクション'],
+      openProfile: 'プロファイルを開く',
+      noChannelRef: 'チャネル参照なし',
+      noPrimaryContact: '主連絡先なし',
+      missing: '未設定',
+      identity: 'ID',
+      primary: '主連絡先',
+      phone: '電話',
+      noPhone: '電話なし',
+    },
+    identity: {
+      title: 'ID照合',
+      body: 'レビュー専用の重複検出です。ここではマージを実行しません。',
+      total: '合計アラート',
+      selected: '選択中アカウントのアラート',
+      account: 'アカウント',
+      queue: '重複レビューキュー',
+      queueBody: '信頼度と一致理由付きの重複候補アカウント/連絡先警告。',
+    },
+  },
+  'vi-VN': {
+    floor: 'Tầng hồ sơ khách hàng',
+    subPage: 'Trang con',
+    nav: {
+      overview: ['Tổng quan', 'Sức khỏe tầng, hành động tiếp theo và độ sẵn sàng hồ sơ.'],
+      account: ['Hồ sơ tài khoản', 'Danh sách, chỉnh sửa, chủ sở hữu, lifecycle, liên hệ và tag.'],
+      identity: ['So khớp định danh', 'Hàng đợi rà soát tài khoản/liên hệ trùng.'],
+    },
+    metrics: {
+      accounts: ['Tài khoản', 'hiển thị sau bộ lọc.'],
+      ownerCoverage: ['Độ phủ owner', 'Mỗi tài khoản cần một owner quan hệ.'],
+      primaryContacts: ['Liên hệ chính', 'Độ phủ buyer/contact chính.'],
+      identityAlerts: ['Cảnh báo định danh', 'hồ sơ tài khoản đang watch.'],
+    },
+    overview: {
+      title: 'Tổng quan hồ sơ khách hàng',
+      body: 'Tổng quan bắt đầu từ ngữ cảnh quan hệ. Mở trang con để quản lý tài khoản, liên hệ, rà soát trùng hoặc tag.',
+      empty: 'Chưa có tài khoản khách hàng. Hãy tạo tài khoản trước khi nối Demand, COS, Service, Finance hoặc Intelligence.',
+    },
+    account: {
+      title: 'Danh sách tài khoản',
+      body: 'Tìm kiếm và lọc lớp định danh khách hàng trước khi nối deal, quote, order hoặc intelligence.',
+      create: 'Tạo tài khoản',
+      search: 'Tìm tài khoản, mã, email...',
+      tag: 'Tag',
+      allTags: 'Tất cả tag',
+      owner: 'Owner',
+      allOwners: 'Tất cả owner',
+      lifecycle: 'Lifecycle',
+      allLifecycle: 'Tất cả lifecycle',
+      customerType: 'Loại khách hàng',
+      allCustomerTypes: 'Tất cả loại khách hàng',
+      reset: 'Reset bộ lọc',
+      noMatch: 'Không có tài khoản nào khớp bộ lọc hiện tại.',
+      table: ['Tài khoản', 'Kênh EC', 'Loại', 'Lifecycle', 'Owner', 'Liên hệ', 'Độ đầy đủ', 'Hành động'],
+      openProfile: 'Mở hồ sơ',
+      noChannelRef: 'Không có mã kênh',
+      noPrimaryContact: 'Chưa có liên hệ chính',
+      missing: 'Thiếu',
+      identity: 'Định danh',
+      primary: 'Chính',
+      phone: 'Điện thoại',
+      noPhone: 'Chưa có điện thoại',
+    },
+    identity: {
+      title: 'So khớp định danh',
+      body: 'Chỉ rà soát phát hiện trùng. Không thực thi merge tại đây.',
+      total: 'Tổng cảnh báo',
+      selected: 'Cảnh báo tài khoản đã chọn',
+      account: 'Tài khoản',
+      queue: 'Hàng đợi rà soát trùng',
+      queueBody: 'Cảnh báo tài khoản/liên hệ có thể trùng kèm độ tin cậy và lý do khớp.',
+    },
+  },
+} as Record<Locale, any>;
 
 function resolveSubFloor(value: string | null): CustomerSubFloor {
   if (value === 'account' || value === 'contact' || value === 'tags') return 'account';
@@ -305,6 +472,8 @@ function resolveAccountIdFromCustomerParam(accounts: CustomerAccount[], customer
 }
 
 export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) {
+  const { locale } = useI18n();
+  const copy = customerProfileCopy[locale];
   const seed = useMemo(() => buildCustomerProfileFloor(snapshot), [snapshot]);
   const normalizedSeedAccounts = useMemo(() => seed.accounts.map(normalizeCustomerAccount), [seed.accounts]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -486,6 +655,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
       <CustomerSubFloorNav
         activeSubFloor={activeSubFloor}
         onChange={setActiveSubFloor}
+        copy={copy}
         counts={{
           overview: `${ownerCoverage}%`,
           account: accounts.length,
@@ -504,6 +674,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
           account={selectedAccountRecord}
           contacts={selectedRecordContacts}
           owners={seed.owners}
+          copy={copy}
           onOpenSubFloor={setActiveSubFloor}
           onOpenAccount={() => {
             if (!selectedAccountRecord) return;
@@ -511,7 +682,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
           }}
         />
       ) : (
-        <SubFloorPageHeader activeSubFloor={activeSubFloor} />
+        <SubFloorPageHeader activeSubFloor={activeSubFloor} copy={copy} />
       )}
 
       {activeSubFloor === 'account' ? (
@@ -520,12 +691,12 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
           <CardHeader className="space-y-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle>Account list</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Search and filter the customer identity layer before deals, quotes, orders, or intelligence connect.</p>
+                <CardTitle>{copy.account.title}</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.account.body}</p>
               </div>
               <Button onClick={openCreateAccount}>
                 <Plus className="size-4" />
-                Create account
+                {copy.account.create}
               </Button>
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
@@ -534,30 +705,30 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
                 <Input
                   value={filters.query}
                   onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
-                  placeholder="Search account, code, email..."
+                  placeholder={copy.account.search}
                   className="pl-9"
                 />
               </div>
-              <FilterSelect label="Tag" value={filters.tagId} onValueChange={(tagId) => setFilters((current) => ({ ...current, tagId }))}>
-                <SelectItem value="all">All tags</SelectItem>
+              <FilterSelect label={copy.account.tag} value={filters.tagId} onValueChange={(tagId) => setFilters((current) => ({ ...current, tagId }))}>
+                <SelectItem value="all">{copy.account.allTags}</SelectItem>
                 {tags.map((tag) => <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>)}
               </FilterSelect>
-              <FilterSelect label="Owner" value={filters.ownerId} onValueChange={(ownerId) => setFilters((current) => ({ ...current, ownerId }))}>
-                <SelectItem value="all">All owners</SelectItem>
+              <FilterSelect label={copy.account.owner} value={filters.ownerId} onValueChange={(ownerId) => setFilters((current) => ({ ...current, ownerId }))}>
+                <SelectItem value="all">{copy.account.allOwners}</SelectItem>
                 {seed.owners.map((owner) => <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>)}
               </FilterSelect>
-              <FilterSelect label="Lifecycle" value={filters.lifecycle} onValueChange={(lifecycle) => setFilters((current) => ({ ...current, lifecycle }))}>
-                <SelectItem value="all">All lifecycle</SelectItem>
+              <FilterSelect label={copy.account.lifecycle} value={filters.lifecycle} onValueChange={(lifecycle) => setFilters((current) => ({ ...current, lifecycle }))}>
+                <SelectItem value="all">{copy.account.allLifecycle}</SelectItem>
                 {lifecycleOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
               </FilterSelect>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
-              <FilterSelect label="Customer type" value={filters.customerType} onValueChange={(customerType) => setFilters((current) => ({ ...current, customerType }))}>
-                <SelectItem value="all">All customer types</SelectItem>
+              <FilterSelect label={copy.account.customerType} value={filters.customerType} onValueChange={(customerType) => setFilters((current) => ({ ...current, customerType }))}>
+                <SelectItem value="all">{copy.account.allCustomerTypes}</SelectItem>
                 {customerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
               </FilterSelect>
               <Button variant="outline" onClick={() => setFilters(defaultFilters)}>
-                Reset filters
+                {copy.account.reset}
               </Button>
             </div>
           </CardHeader>
@@ -566,14 +737,14 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
               <Table variant="embedded">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Account</TableHead>
-                    <TableHead>EC channel</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Lifecycle</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Contacts</TableHead>
-                    <TableHead className="text-right">Completeness</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead>{copy.account.table[0]}</TableHead>
+                    <TableHead>{copy.account.table[1]}</TableHead>
+                    <TableHead>{copy.account.table[2]}</TableHead>
+                    <TableHead>{copy.account.table[3]}</TableHead>
+                    <TableHead>{copy.account.table[4]}</TableHead>
+                    <TableHead>{copy.account.table[5]}</TableHead>
+                    <TableHead className="text-right">{copy.account.table[6]}</TableHead>
+                    <TableHead className="text-right">{copy.account.table[7]}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -607,7 +778,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{account.profile?.primaryEcomChannel ?? account.source}</div>
-                          <div className="text-xs text-muted-foreground">{account.profile?.channelOrderRef ?? 'No channel ref'}</div>
+                          <div className="text-xs text-muted-foreground">{account.profile?.channelOrderRef ?? copy.account.noChannelRef}</div>
                         </TableCell>
                         <TableCell>{customerTypeLabels[account.customerType]}</TableCell>
                         <TableCell>
@@ -616,7 +787,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
                         <TableCell>{ownerName(seed.owners, account.ownerId)}</TableCell>
                         <TableCell>
                           <div className="font-medium">{accountContacts.length}</div>
-                          <div className="text-xs text-muted-foreground">{primaryContact?.fullName ?? 'No primary contact'}</div>
+                          <div className="text-xs text-muted-foreground">{primaryContact?.fullName ?? copy.account.noPrimaryContact}</div>
                         </TableCell>
                         <TableCell className="text-right">{account.identityCompleteness}%</TableCell>
                         <TableCell className="text-right">
@@ -628,7 +799,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
                               openAccountProfile(account);
                             }}
                           >
-                            Open profile
+                            {copy.account.openProfile}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -661,12 +832,12 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
                       <Badge variant={lifecycleBadgeVariant(account.lifecycle)} className="capitalize">{humanize(account.lifecycle)}</Badge>
                     </div>
                     <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                      <span>Owner: {ownerName(seed.owners, account.ownerId)}</span>
-                      <span>Identity: {account.identityCompleteness}%</span>
-                      <span>Contacts: {accountContacts.length}</span>
-                      <span>Primary: {primaryContact?.fullName ?? 'Missing'}</span>
-                      <span>EC channel: {account.profile?.primaryEcomChannel ?? account.source}</span>
-                      <span>Phone: {account.profile?.phone ?? 'No phone'}</span>
+                      <span>{copy.account.owner}: {ownerName(seed.owners, account.ownerId)}</span>
+                      <span>{copy.account.identity}: {account.identityCompleteness}%</span>
+                      <span>{copy.account.table[5]}: {accountContacts.length}</span>
+                      <span>{copy.account.primary}: {primaryContact?.fullName ?? copy.account.missing}</span>
+                      <span>{copy.account.table[1]}: {account.profile?.primaryEcomChannel ?? account.source}</span>
+                      <span>{copy.account.phone}: {account.profile?.phone ?? copy.account.noPhone}</span>
                     </div>
                   </button>
                 );
@@ -675,7 +846,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
 
             {filteredAccounts.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                No accounts match the current filters.
+                {copy.account.noMatch}
               </div>
             ) : null}
           </CardContent>
@@ -693,6 +864,7 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
           selectedMatches={selectedRecordMatches}
           selectedAccountId={selectedAccountId}
           onSelectAccount={setSelectedAccountId}
+          copy={copy}
         />
       ) : null}
 
@@ -785,6 +957,7 @@ function OverviewSubFloor({
   account,
   contacts,
   owners,
+  copy,
   onOpenSubFloor,
   onOpenAccount,
 }: {
@@ -797,16 +970,17 @@ function OverviewSubFloor({
   account: CustomerAccount | null;
   contacts: CustomerContact[];
   owners: CustomerOwner[];
+  copy: (typeof customerProfileCopy)[Locale];
   onOpenSubFloor: (subFloor: CustomerSubFloor) => void;
   onOpenAccount: () => void;
 }) {
   return (
     <section className="space-y-4" data-testid="overview-subfloor">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryMetricCard label="Accounts" value={accountsCount} meta={`${filteredAccountsCount} visible after filters.`} icon={<Building2 className="size-5" />} tone="info" />
-        <SummaryMetricCard label="Owner coverage" value={`${ownerCoverage}%`} meta="Every account needs a relationship owner." icon={<UserRoundCheck className="size-5" />} tone="success" />
-        <SummaryMetricCard label="Primary contacts" value={`${primaryContactCoverage}%`} meta="Primary buyer/contact coverage." icon={<CircleUserRound className="size-5" />} tone="purple" />
-        <SummaryMetricCard label="Identity alerts" value={identityAlertsCount} meta={`${atRiskCount} account records on watch.`} icon={<CopyCheck className="size-5" />} tone={identityAlertsCount ? 'warning' : 'success'} />
+        <SummaryMetricCard label={copy.metrics.accounts[0]} value={accountsCount} meta={`${filteredAccountsCount} ${copy.metrics.accounts[1]}`} icon={<Building2 className="size-5" />} tone="info" />
+        <SummaryMetricCard label={copy.metrics.ownerCoverage[0]} value={`${ownerCoverage}%`} meta={copy.metrics.ownerCoverage[1]} icon={<UserRoundCheck className="size-5" />} tone="success" />
+        <SummaryMetricCard label={copy.metrics.primaryContacts[0]} value={`${primaryContactCoverage}%`} meta={copy.metrics.primaryContacts[1]} icon={<CircleUserRound className="size-5" />} tone="purple" />
+        <SummaryMetricCard label={copy.metrics.identityAlerts[0]} value={identityAlertsCount} meta={`${atRiskCount} ${copy.metrics.identityAlerts[1]}`} icon={<CopyCheck className="size-5" />} tone={identityAlertsCount ? 'warning' : 'success'} />
       </div>
 
       {account ? (
@@ -818,15 +992,13 @@ function OverviewSubFloor({
           onOpenSubFloor={onOpenSubFloor}
         />
       ) : (
-        <EmptyBlock text="No customer account is available yet. Create an account before connecting Demand, COS, Service, Finance, or Intelligence context." />
+        <EmptyBlock text={copy.overview.empty} />
       )}
 
       <Card className="rounded-lg border">
         <CardHeader>
-          <CardTitle>Customer Profile overview</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            This overview starts from relationship context. Open a sub-page to manage account records, contacts, duplicate review, or tags.
-          </p>
+          <CardTitle>{copy.overview.title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{copy.overview.body}</p>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {customerSubFloors.filter((subFloor) => subFloor.id !== 'overview').map((subFloor) => (
@@ -836,8 +1008,8 @@ function OverviewSubFloor({
               className="rounded-lg border bg-muted/20 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               onClick={() => onOpenSubFloor(subFloor.id)}
             >
-              <div className="text-sm font-semibold">{subFloor.label}</div>
-              <div className="mt-2 text-xs leading-5 text-muted-foreground">{subFloor.detail}</div>
+              <div className="text-sm font-semibold">{copy.nav[subFloor.id][0]}</div>
+              <div className="mt-2 text-xs leading-5 text-muted-foreground">{copy.nav[subFloor.id][1]}</div>
             </button>
           ))}
         </CardContent>
@@ -903,18 +1075,16 @@ function CustomerRelationshipOverview({
   );
 }
 
-function SubFloorPageHeader({ activeSubFloor }: { activeSubFloor: Exclude<CustomerSubFloor, 'overview'> }) {
-  const subFloor = customerSubFloors.find((item) => item.id === activeSubFloor);
-
+function SubFloorPageHeader({ activeSubFloor, copy }: { activeSubFloor: Exclude<CustomerSubFloor, 'overview'>; copy: (typeof customerProfileCopy)[Locale] }) {
   return (
     <section className="rounded-lg border bg-card p-4" data-testid="customer-subfloor-page-header">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Customer Profile Floor</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-normal">{subFloor?.label}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{subFloor?.detail}</p>
+          <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{copy.floor}</div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-normal">{copy.nav[activeSubFloor][0]}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.nav[activeSubFloor][1]}</p>
         </div>
-        <Badge variant="outline">Sub-page</Badge>
+        <Badge variant="outline">{copy.subPage}</Badge>
       </div>
     </section>
   );
@@ -924,10 +1094,12 @@ function CustomerSubFloorNav({
   activeSubFloor,
   onChange,
   counts,
+  copy,
 }: {
   activeSubFloor: CustomerSubFloor;
   onChange: (subFloor: CustomerSubFloor) => void;
   counts: Record<CustomerSubFloor, number | string>;
+  copy: (typeof customerProfileCopy)[Locale];
 }) {
   return (
     <nav aria-label="Customer Profile sub-pages" className="overflow-x-auto rounded-lg border bg-card p-1" data-testid="customer-subfloor-nav">
@@ -937,11 +1109,11 @@ function CustomerSubFloorNav({
           key={subFloor.id}
           type="button"
           aria-current={activeSubFloor === subFloor.id ? 'page' : undefined}
-          title={subFloor.detail}
+          title={copy.nav[subFloor.id][1]}
           className={`inline-flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeSubFloor === subFloor.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           onClick={() => onChange(subFloor.id)}
         >
-          <span>{subFloor.label}</span>
+          <span>{copy.nav[subFloor.id][0]}</span>
           <Badge variant={activeSubFloor === subFloor.id ? 'secondary' : 'outline'}>{counts[subFloor.id]}</Badge>
         </button>
       ))}
@@ -986,6 +1158,7 @@ function IdentityMatchingSubFloor({
   selectedMatches,
   selectedAccountId,
   onSelectAccount,
+  copy,
 }: {
   account: CustomerAccount | null;
   accounts: CustomerAccount[];
@@ -995,26 +1168,27 @@ function IdentityMatchingSubFloor({
   selectedMatches: IdentityMatch[];
   selectedAccountId: string;
   onSelectAccount: (accountId: string) => void;
+  copy: (typeof customerProfileCopy)[Locale];
 }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]" data-testid="identity-subfloor">
       <Card className="rounded-lg border">
         <CardHeader>
-          <CardTitle>Identity Matching</CardTitle>
-          <p className="text-sm text-muted-foreground">Review-only duplicate detection. No merge is executed here.</p>
+          <CardTitle>{copy.identity.title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{copy.identity.body}</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <AccountSelector accounts={accounts} owners={owners} selectedAccountId={selectedAccountId} onSelectAccount={onSelectAccount} />
-          <SmallMetric label="Total alerts" value={String(matches.length)} />
-          <SmallMetric label="Selected account alerts" value={String(selectedMatches.length)} />
-          {account ? <SmallMetric label="Account" value={account.displayName} /> : null}
+          <SmallMetric label={copy.identity.total} value={String(matches.length)} />
+          <SmallMetric label={copy.identity.selected} value={String(selectedMatches.length)} />
+          {account ? <SmallMetric label={copy.identity.account} value={account.displayName} /> : null}
         </CardContent>
       </Card>
 
       <Card className="rounded-lg border">
         <CardHeader>
-          <CardTitle>Duplicate review queue</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">Potential duplicate account/contact warnings with confidence and matching reasons.</p>
+          <CardTitle>{copy.identity.queue}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.identity.queueBody}</p>
         </CardHeader>
         <CardContent>
           <IdentityMatchAlerts matches={selectedMatches} accounts={accounts} contacts={contacts} />

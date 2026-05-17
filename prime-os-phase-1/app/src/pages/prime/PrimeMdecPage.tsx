@@ -29,6 +29,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import type { Locale } from '@/lib/i18n/dictionaries';
 import { mdecSeedData } from '@/lib/prime/mdec-seed-data';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +38,114 @@ type MdecView = 'dashboard' | 'calendar' | 'composer' | 'approvals' | 'engagemen
 type BadgeTone = 'default' | 'secondary' | 'destructive' | 'warning' | 'outline';
 
 type NavItem = { id: MdecView; label: string; icon: LucideIcon; count?: string; tone?: 'normal' | 'danger' };
+
+const mdecCopy = {
+  'en-US': {
+    nav: {
+      dashboard: 'Dashboard',
+      calendar: 'Calendar',
+      composer: 'Composer',
+      approvals: 'Approvals',
+      engagement: 'Engagement',
+      escalations: 'Escalations',
+      analytics: 'Analytics',
+      listening: 'Listening',
+      reports: 'Reports',
+    },
+    groups: { main: 'Main', workflow: 'Workflow', insight: 'Insight' },
+    header: {
+      route: 'MDEC',
+      search: 'Search posts, mentions, conversations...',
+      agenticMode: 'Agentic Mode',
+      adminRole: 'admin',
+      operations: 'Operations',
+      dashboardTitle: 'Today across the public voice',
+      viewTitleSuffix: 'across the public voice',
+      subtitle: 'Six channels at a glance. Rebuilt with Prime OS design tokens, spacing, cards, buttons, and badges.',
+      latest: 'Latest',
+      composeNew: 'Compose new',
+      loaded: 'MDEC product loaded in Demand Suite',
+      composeOpened: 'Compose new opened',
+      updated: 'Updated 13 MAY 2026',
+    },
+    kpis: {
+      scheduled: ['Scheduled', 'today'],
+      pendingReview: ['Pending review', 'awaiting reviewer'],
+      highSeverity: ['High severity', 'open escalations'],
+      unreadEngagement: ['Unread engagement', 'across all channels'],
+    },
+  },
+  'ja-JP': {
+    nav: {
+      dashboard: 'ダッシュボード',
+      calendar: 'カレンダー',
+      composer: 'コンポーザー',
+      approvals: '承認',
+      engagement: 'エンゲージメント',
+      escalations: 'エスカレーション',
+      analytics: '分析',
+      listening: 'リスニング',
+      reports: 'レポート',
+    },
+    groups: { main: 'メイン', workflow: 'ワークフロー', insight: 'インサイト' },
+    header: {
+      route: 'MDEC',
+      search: '投稿、メンション、会話を検索...',
+      agenticMode: 'エージェントモード',
+      adminRole: '管理者',
+      operations: '運用',
+      dashboardTitle: '今日のパブリックボイス',
+      viewTitleSuffix: 'のパブリックボイス',
+      subtitle: '6つのチャネルを一覧表示。Prime OSのデザイントークン、余白、カード、ボタン、バッジで再構築されています。',
+      latest: '最新',
+      composeNew: '新規作成',
+      loaded: 'MDECプロダクトをDemand Suiteで読み込みました',
+      composeOpened: '新規作成を開きました',
+      updated: '更新 2026年5月13日',
+    },
+    kpis: {
+      scheduled: ['予約済み', '本日'],
+      pendingReview: ['レビュー待ち', 'レビュアー待ち'],
+      highSeverity: ['高重大度', '未解決エスカレーション'],
+      unreadEngagement: ['未読エンゲージメント', '全チャネル'],
+    },
+  },
+  'vi-VN': {
+    nav: {
+      dashboard: 'Dashboard',
+      calendar: 'Lịch',
+      composer: 'Composer',
+      approvals: 'Phê duyệt',
+      engagement: 'Tương tác',
+      escalations: 'Escalations',
+      analytics: 'Analytics',
+      listening: 'Listening',
+      reports: 'Reports',
+    },
+    groups: { main: 'Chính', workflow: 'Workflow', insight: 'Insight' },
+    header: {
+      route: 'MDEC',
+      search: 'Tìm bài viết, đề cập, hội thoại...',
+      agenticMode: 'Chế độ agentic',
+      adminRole: 'quản trị',
+      operations: 'Vận hành',
+      dashboardTitle: 'Tiếng nói công chúng hôm nay',
+      viewTitleSuffix: 'trên tiếng nói công chúng',
+      subtitle: 'Sáu kênh trong một màn hình. Đã dựng lại bằng design token, spacing, card, button và badge của Prime OS.',
+      latest: 'Mới nhất',
+      composeNew: 'Soạn mới',
+      loaded: 'MDEC đã tải trong Demand Suite',
+      composeOpened: 'Đã mở soạn mới',
+      updated: 'Cập nhật 13 MAY 2026',
+    },
+    kpis: {
+      scheduled: ['Đã lên lịch', 'hôm nay'],
+      pendingReview: ['Chờ review', 'đợi người duyệt'],
+      highSeverity: ['Mức nghiêm trọng cao', 'escalation mở'],
+      unreadEngagement: ['Tương tác chưa đọc', 'trên mọi kênh'],
+    },
+  },
+} as Record<Locale, any>;
 
 const mainNav: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: RadioTower },
@@ -78,7 +188,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
   return <div className="flex items-center gap-2 text-xs text-muted-foreground before:h-px before:w-5 before:bg-primary">{children}</div>;
 }
 
-function ShellNavGroup({ label, items, activeView }: { label: string; items: NavItem[]; activeView: MdecView }) {
+function ShellNavGroup({ label, items, activeView, copy }: { label: string; items: NavItem[]; activeView: MdecView; copy: (typeof mdecCopy)[Locale] }) {
   return (
     <div className="space-y-2">
       <SectionLabel>{label}</SectionLabel>
@@ -96,7 +206,7 @@ function ShellNavGroup({ label, items, activeView }: { label: string; items: Nav
               )}
             >
               <Icon className="size-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className="min-w-0 flex-1 truncate">{copy.nav[item.id]}</span>
               {item.count ? <span className={cn('font-identifier text-xs', item.tone === 'danger' ? 'text-destructive' : 'text-primary')}>[{item.count}]</span> : null}
             </Link>
           );
@@ -106,12 +216,12 @@ function ShellNavGroup({ label, items, activeView }: { label: string; items: Nav
   );
 }
 
-function KpiStrip() {
+function KpiStrip({ copy }: { copy: (typeof mdecCopy)[Locale] }) {
   const kpis = [
-    { label: 'Scheduled', value: String(metrics.scheduled).padStart(2, '0'), detail: 'today', color: 'text-foreground' },
-    { label: 'Pending review', value: String(metrics.pendingReview).padStart(2, '0'), detail: 'awaiting reviewer', color: 'text-primary' },
-    { label: 'High severity', value: String(metrics.highSeverity).padStart(2, '0'), detail: 'open escalations', color: 'text-destructive' },
-    { label: 'Unread engagement', value: String(metrics.unreadEngagement).padStart(2, '0'), detail: 'across all channels', color: 'text-foreground' },
+    { label: copy.kpis.scheduled[0], value: String(metrics.scheduled).padStart(2, '0'), detail: copy.kpis.scheduled[1], color: 'text-foreground' },
+    { label: copy.kpis.pendingReview[0], value: String(metrics.pendingReview).padStart(2, '0'), detail: copy.kpis.pendingReview[1], color: 'text-primary' },
+    { label: copy.kpis.highSeverity[0], value: String(metrics.highSeverity).padStart(2, '0'), detail: copy.kpis.highSeverity[1], color: 'text-destructive' },
+    { label: copy.kpis.unreadEngagement[0], value: String(metrics.unreadEngagement).padStart(2, '0'), detail: copy.kpis.unreadEngagement[1], color: 'text-foreground' },
   ];
 
   return (
@@ -152,10 +262,10 @@ function ChannelDot({ label }: { label: string }) {
   return <span className={cn('grid size-5 place-items-center rounded-full text-[9px] font-bold text-white', color)}>{label}</span>;
 }
 
-function DashboardLayout({ onAction }: { onAction: (message: string) => void }) {
+function DashboardLayout({ onAction, copy }: { onAction: (message: string) => void; copy: (typeof mdecCopy)[Locale] }) {
   return (
     <div className="space-y-6">
-      <KpiStrip />
+      <KpiStrip copy={copy} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_352px]">
         <Panel label="Today" title="Scheduled posts" action={<Button asChild variant="ghost" size="sm"><Link to="/demand/mdec?view=calendar">Calendar →</Link></Button>} className="min-h-[440px]">
           <div className="divide-y">
@@ -733,7 +843,7 @@ function ReportsLayout({ onAction }: { onAction: (message: string) => void }) {
   return <div className="space-y-6"><StatStrip items={[{label:'Ready', value:String(readyCount).padStart(2,'0'), tone:'success'}, {label:'Drafts', value:String(draftCount).padStart(2,'0')}, {label:'Campaigns', value:String(new Set(reports.map((report) => report.campaignId)).size).padStart(2,'0'), tone:'primary'}, {label:'Generated', value:String(generatedCount).padStart(2,'0')}]} /><div className="grid gap-6 lg:grid-cols-[1fr_360px]"><Panel label="Library" title="Generated reports" action={<span className="font-identifier text-xs text-muted-foreground">{String(reports.length + generatedCount).padStart(2,'0')} TOTAL</span>}><div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0">{reports.map((report, index) => <div key={report.id} className="p-5"><SectionLabel>{index === 0 ? 'Apr 2026' : 'Wk 18, 2026'}</SectionLabel><h3 className="mt-4 text-2xl font-semibold">{report.title}</h3><p className="mt-4 font-identifier text-xs uppercase tracking-[0.22em] text-muted-foreground">Campaign {report.campaignId}<br/>Status {generatedIds[report.id] ? 'ready' : report.status}</p><div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setPreview(report.id); onAction(`Report preview opened: ${report.title}`); }}>Preview</Button>{report.status === 'draft' && !generatedIds[report.id] ? <Button onClick={() => generateReport(report)}>Generate</Button> : null}</div></div>)}</div>{activeReport ? <div className="border-t p-5 text-sm text-muted-foreground">Previewing: <span className="font-semibold text-foreground">{activeReport.title}</span><br/><span className="font-identifier text-xs uppercase tracking-[0.2em]">Linked campaign {activeReport.campaignId}</span></div> : null}</Panel><Panel label="Builder" title="Compose new"><div className="space-y-5 p-5"><p className="text-muted-foreground">Choose period, channels, and sections — then generate from linked MDEC campaign data.</p>{[['Period',period,'period'],['Channels',channels,'channels'],['Sections',sections,'sections']].map(([label,value,key])=><button key={label} type="button" onClick={() => cycleBuilder(key as 'period' | 'channels' | 'sections')} className="flex w-full justify-between border-b pb-3 text-left"><span className="text-muted-foreground">{label}</span><span className="text-right font-medium">{value}</span></button>)}<Button className="w-full" onClick={() => generateReport()}>Generate next draft →</Button></div></Panel></div></div>;
 }
 
-function WorkQueue({ activeView, onAction }: { activeView: MdecView; onAction: (message: string) => void }) {
+function WorkQueue({ activeView, onAction, copy }: { activeView: MdecView; onAction: (message: string) => void; copy: (typeof mdecCopy)[Locale] }) {
   if (activeView === 'calendar') return <CalendarLayout onAction={onAction} />;
   if (activeView === 'composer') return <ComposerLayout onAction={onAction} />;
   if (activeView === 'approvals') return <ApprovalsLayout onAction={onAction} />;
@@ -742,7 +852,7 @@ function WorkQueue({ activeView, onAction }: { activeView: MdecView; onAction: (
   if (activeView === 'analytics') return <AnalyticsLayout />;
   if (activeView === 'listening') return <ListeningLayout onAction={onAction} />;
   if (activeView === 'reports') return <ReportsLayout onAction={onAction} />;
-  return <DashboardLayout onAction={onAction} />;
+  return <DashboardLayout onAction={onAction} copy={copy} />;
 }
 
 function KpiMini({ label, value }: { label: string; value: string }) {
@@ -884,13 +994,15 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
 
 
 export function PrimeMdecPage() {
+  const { locale } = useI18n();
+  const copy = mdecCopy[locale];
   const [searchParams] = useSearchParams();
   const requestedView = searchParams.get('view') as MdecView | null;
   const activeView: MdecView = allViews.some((view) => view.id === requestedView) ? requestedView! : 'dashboard';
-  const activeLabel = allViews.find((view) => view.id === activeView)?.label ?? 'Dashboard';
+  const activeLabel = copy.nav[activeView] ?? copy.nav.dashboard;
   const [agentic, setAgentic] = useState(false);
-  const [log, setLog] = useState<string[]>(['MDEC product loaded in Demand Suite']);
-  const dateLabel = useMemo(() => 'Kemaskini 13 MAY 2026', []);
+  const [log, setLog] = useState<string[]>([copy.header.loaded]);
+  const dateLabel = useMemo(() => copy.header.updated, [copy.header.updated]);
   const record = (message: string) => setLog((current) => [message, ...current].slice(0, 4));
 
   return (
@@ -900,39 +1012,39 @@ export function PrimeMdecPage() {
           <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
             <div className="flex min-h-16 flex-wrap items-center gap-3 px-4 py-3 md:px-6">
               <div className="min-w-[180px] flex-1">
-                <SectionLabel>MDEC / {activeView}</SectionLabel>
+                <SectionLabel>{copy.header.route} / {activeView}</SectionLabel>
                 <h1 className="font-display text-xl font-semibold leading-tight">{activeLabel}</h1>
               </div>
               <div className="min-w-[260px] flex-[2]">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="h-11 rounded-xl pl-9" placeholder="Search posts, mentions, conversations..." />
+                  <Input className="h-11 rounded-xl pl-9" placeholder={copy.header.search} />
                 </div>
               </div>
               <Button variant="outline" className="h-11 rounded-xl">{dateLabel}</Button>
               <Button size="icon" variant="outline" className="h-11 w-11 rounded-xl"><Moon className="size-4" /></Button>
               <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl"><Bell className="size-4" /></Button>
-              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setAgentic(true)}><Sparkles className="size-4 text-primary" />Agentic Mode</Button>
-              <Button variant="outline" className="h-11 rounded-xl"><span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">AR</span><span className="hidden text-left md:block"><span className="block text-sm font-semibold">Aisyah Rahman</span><span className="block text-xs text-primary">admin</span></span></Button>
+              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setAgentic(true)}><Sparkles className="size-4 text-primary" />{copy.header.agenticMode}</Button>
+              <Button variant="outline" className="h-11 rounded-xl"><span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">AR</span><span className="hidden text-left md:block"><span className="block text-sm font-semibold">Aisyah Rahman</span><span className="block text-xs text-primary">{copy.header.adminRole}</span></span></Button>
             </div>
           </header>
 
           <div className="flex min-h-[calc(100svh-var(--header-height))] flex-col gap-6 p-4 md:p-6">
             <section className={cn('flex flex-col gap-4 border-b xl:flex-row xl:items-end xl:justify-between', activeView === 'engagement' ? 'pb-3' : 'pb-6')}>
               <div>
-                <SectionLabel>Operations / {activeLabel}</SectionLabel>
-                <h2 className={cn('mt-3 max-w-4xl font-semibold tracking-tight', activeView === 'engagement' ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl')}>{activeView === 'dashboard' ? 'Today across the public voice' : `${activeLabel} across the public voice`}</h2>
-                {activeView === 'engagement' ? null : <p className="mt-3 text-base text-muted-foreground">Six channels at a glance. Rebuilt with Prime OS design tokens, spacing, cards, buttons, and badges.</p>}
+                <SectionLabel>{copy.header.operations} / {activeLabel}</SectionLabel>
+                <h2 className={cn('mt-3 max-w-4xl font-semibold tracking-tight', activeView === 'engagement' ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl')}>{activeView === 'dashboard' ? copy.header.dashboardTitle : `${activeLabel} ${copy.header.viewTitleSuffix}`}</h2>
+                {activeView === 'engagement' ? null : <p className="mt-3 text-base text-muted-foreground">{copy.header.subtitle}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-xl border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
-                  Latest: <span className="font-medium text-foreground">{log[0]}</span>
+                  {copy.header.latest}: <span className="font-medium text-foreground">{log[0]}</span>
                 </div>
-                <Button className="h-11 self-start rounded-xl xl:self-auto" onClick={() => record('Compose new opened')}><Rocket className="size-4" />Compose new</Button>
+                <Button className="h-11 self-start rounded-xl xl:self-auto" onClick={() => record(copy.header.composeOpened)}><Rocket className="size-4" />{copy.header.composeNew}</Button>
               </div>
             </section>
 
-            {activeView === 'dashboard' ? <DashboardLayout onAction={record} /> : <WorkQueue activeView={activeView} onAction={record} />}
+            {activeView === 'dashboard' ? <DashboardLayout onAction={record} copy={copy} /> : <WorkQueue activeView={activeView} onAction={record} copy={copy} />}
 
             <div aria-hidden="true" className="min-h-0 flex-1 rounded-2xl bg-card/20" />
 

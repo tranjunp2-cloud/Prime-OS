@@ -61,6 +61,8 @@ import {
 } from '@/lib/prime/finance-trust-profile';
 import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
+import { useI18n } from '@/lib/i18n/I18nContext';
+import type { Locale } from '@/lib/i18n/dictionaries';
 import { cn } from '@/lib/utils';
 
 const currency = new Intl.NumberFormat('ja-JP', {
@@ -170,6 +172,99 @@ type JapanLoanDocument = {
   linkedDocumentId?: string;
   fallbackStatus: DocumentStatus;
 };
+
+const finSupportCopy = {
+  'en-US': {
+    routeLabel: 'Finance / Fin Support',
+    usingLocalSnapshot: 'Using local snapshot',
+    title: 'Bank-ready funding cockpit',
+    titleInfo: 'Prime OS turns commerce operations into bank-reviewable evidence. From operating data to funding readiness.',
+    fixBlockers: 'Fix blockers',
+    preparePackage: 'Prepare bank-ready package',
+    noMajorBlocker: 'No major blocker',
+    tabs: {
+      overview: 'Overview',
+      evidence: 'Evidence',
+      documents: 'Documents',
+      routes: 'Review Routes',
+      applications: 'Applications',
+      audit: 'Audit',
+    },
+    groups: {
+      overview: { label: 'Overview', detail: 'Readiness answer and next action' },
+      package: { label: 'Package', detail: 'Evidence and documents' },
+      routes: { label: 'Routes', detail: 'Review routes and applications' },
+      audit: { label: 'Audit', detail: 'Traceability history' },
+    },
+    aiTitles: {
+      evidence: 'Evidence AI',
+      documents: 'Document AI',
+      routes: 'Route AI',
+      applications: 'Application AI',
+      audit: 'Audit AI',
+    },
+  },
+  'ja-JP': {
+    routeLabel: 'ファイナンス / 資金サポート',
+    usingLocalSnapshot: 'ローカルスナップショットを使用中',
+    title: '銀行提出向け資金調達コックピット',
+    titleInfo: 'Prime OSはコマース運用データを銀行レビュー可能な根拠へ変換し、運用データから資金調達準備度までつなぎます。',
+    fixBlockers: 'ブロッカーを解消',
+    preparePackage: '銀行提出パッケージを準備',
+    noMajorBlocker: '大きなブロッカーなし',
+    tabs: {
+      overview: '概要',
+      evidence: '根拠',
+      documents: '書類',
+      routes: '審査ルート',
+      applications: '申請',
+      audit: '監査',
+    },
+    groups: {
+      overview: { label: '概要', detail: '準備度の回答と次アクション' },
+      package: { label: 'パッケージ', detail: '根拠と書類' },
+      routes: { label: 'ルート', detail: '審査ルートと申請' },
+      audit: { label: '監査', detail: 'トレーサビリティ履歴' },
+    },
+    aiTitles: {
+      evidence: '根拠AI',
+      documents: '書類AI',
+      routes: 'ルートAI',
+      applications: '申請AI',
+      audit: '監査AI',
+    },
+  },
+  'vi-VN': {
+    routeLabel: 'Tài chính / Hỗ trợ vốn',
+    usingLocalSnapshot: 'Đang dùng snapshot cục bộ',
+    title: 'Buồng lái hồ sơ vốn sẵn sàng cho ngân hàng',
+    titleInfo: 'Prime OS chuyển dữ liệu vận hành commerce thành bằng chứng có thể đưa vào quy trình review ngân hàng, từ vận hành tới mức sẵn sàng gọi vốn.',
+    fixBlockers: 'Gỡ điểm chặn',
+    preparePackage: 'Chuẩn bị gói hồ sơ ngân hàng',
+    noMajorBlocker: 'Không có điểm chặn lớn',
+    tabs: {
+      overview: 'Tổng quan',
+      evidence: 'Bằng chứng',
+      documents: 'Tài liệu',
+      routes: 'Route xét duyệt',
+      applications: 'Hồ sơ nộp',
+      audit: 'Kiểm toán',
+    },
+    groups: {
+      overview: { label: 'Tổng quan', detail: 'Mức sẵn sàng và hành động tiếp theo' },
+      package: { label: 'Gói hồ sơ', detail: 'Bằng chứng và tài liệu' },
+      routes: { label: 'Route', detail: 'Route xét duyệt và hồ sơ nộp' },
+      audit: { label: 'Kiểm toán', detail: 'Lịch sử truy vết' },
+    },
+    aiTitles: {
+      evidence: 'AI bằng chứng',
+      documents: 'AI tài liệu',
+      routes: 'AI route',
+      applications: 'AI hồ sơ',
+      audit: 'AI kiểm toán',
+    },
+  },
+} as Record<Locale, any>;
 
 
 const financeSupportTabs: Array<{ id: FinanceSupportTab; label: string }> = [
@@ -577,6 +672,8 @@ function openPrimeAi(context: Record<string, string>) {
 }
 
 export function PrimeFinSupportPage() {
+  const { locale } = useI18n();
+  const copy = finSupportCopy[locale];
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab') as FinanceSupportTab | null;
   const legacyHash = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
@@ -713,31 +810,31 @@ export function PrimeFinSupportPage() {
       <div className="space-y-5 p-4 md:p-6">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            <CircleDollarSign className="size-4 text-primary" /> Finance / Fin Support
-            {usingLocalSnapshot ? <Badge variant="outline" className="rounded-full normal-case tracking-normal">Using local snapshot</Badge> : null}
+            <CircleDollarSign className="size-4 text-primary" /> {copy.routeLabel}
+            {usingLocalSnapshot ? <Badge variant="outline" className="rounded-full normal-case tracking-normal">{copy.usingLocalSnapshot}</Badge> : null}
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Bank-ready funding cockpit</h1>
-                <InfoHint label="Bank-ready funding cockpit info">Prime OS turns commerce operations into bank-reviewable evidence. From operating data to funding readiness.</InfoHint>
+                <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{copy.title}</h1>
+                <InfoHint label={`${copy.title} info`}>{copy.titleInfo}</InfoHint>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => setActiveTab('documents')}>Fix blockers</Button>
-              <Button type="button" variant="secondary" onClick={() => setLoanWizardOpen(true)}>Prepare bank-ready package</Button>
+              <Button type="button" onClick={() => setActiveTab('documents')}>{copy.fixBlockers}</Button>
+              <Button type="button" variant="secondary" onClick={() => setLoanWizardOpen(true)}>{copy.preparePackage}</Button>
             </div>
           </div>
         </div>
 
         {partnerWorkspace ? <PartnerWorkspacePanel summary={partnerWorkspace} /> : null}
-        <FinanceTabs activeTab={activeTab} onChange={setActiveTab} />
+        <FinanceTabs activeTab={activeTab} onChange={setActiveTab} copy={copy} />
 
         {activeTab === 'overview' ? (
           <OverviewCockpit
             readinessScore={readinessScore}
             eligibleRange={eligibleRange}
-            mainBlocker={mainBlocker?.topRisk || 'No major blocker'}
+            mainBlocker={mainBlocker?.topRisk || copy.noMajorBlocker}
             nextAction={financeTrust.bankReviewSummary.nextAction}
             signals={eligibilitySignals}
             summary={financeTrust.bankReviewSummary}
@@ -752,35 +849,35 @@ export function PrimeFinSupportPage() {
         {activeTab === 'evidence' ? (
           <TwoColumnTab
             main={<EvidenceTab evidencePack={financeTrust.evidencePack} signals={eligibilitySignals} onTabChange={setActiveTab} />}
-            side={<PrimeAiPanel title="Evidence AI" actions={aiActions.evidence} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('evidence')} />}
+            side={<PrimeAiPanel title={copy.aiTitles.evidence} actions={aiActions.evidence} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('evidence')} />}
           />
         ) : null}
 
         {activeTab === 'documents' ? (
           <TwoColumnTab
             main={<DocumentsTab documents={documents} verifiedDocs={verifiedDocs} missingDocs={missingDocs} lenders={lenders} onDrop={handleDrop} onFiles={handleFiles} />}
-            side={<PrimeAiPanel title="Document AI" actions={aiActions.documents} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('documents')} />}
+            side={<PrimeAiPanel title={copy.aiTitles.documents} actions={aiActions.documents} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('documents')} />}
           />
         ) : null}
 
         {activeTab === 'routes' ? (
           <TwoColumnTab
             main={<ReviewRoutesTab lenders={lenders} documents={documents} blockers={blockers} />}
-            side={<PrimeAiPanel title="Route AI" actions={aiActions.routes} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('routes')} />}
+            side={<PrimeAiPanel title={copy.aiTitles.routes} actions={aiActions.routes} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('routes')} />}
           />
         ) : null}
 
         {activeTab === 'applications' ? (
           <TwoColumnTab
             main={<ApplicationsTab applications={applications} documents={documents} />}
-            side={<PrimeAiPanel title="Application AI" actions={aiActions.applications} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('applications')} />}
+            side={<PrimeAiPanel title={copy.aiTitles.applications} actions={aiActions.applications} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('applications')} />}
           />
         ) : null}
 
         {activeTab === 'audit' ? (
           <TwoColumnTab
             main={<AuditTab auditEvents={auditEvents} readinessScore={readinessScore} />}
-            side={<PrimeAiPanel title="Audit AI" actions={aiActions.audit} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('audit')} />}
+            side={<PrimeAiPanel title={copy.aiTitles.audit} actions={aiActions.audit} prompt={aiPrompt} onPromptChange={setAiPrompt} onAskAi={() => askAi('audit')} />}
           />
         ) : null}
       </div>
@@ -805,7 +902,7 @@ export function PrimeFinSupportPage() {
 }
 
 
-function FinanceTabs({ activeTab, onChange }: { activeTab: FinanceSupportTab; onChange: (tab: FinanceSupportTab) => void }) {
+function FinanceTabs({ activeTab, onChange, copy }: { activeTab: FinanceSupportTab; onChange: (tab: FinanceSupportTab) => void; copy: (typeof finSupportCopy)[Locale] }) {
   const activeGroup = financeSupportGroups.find((group) => group.tabs.includes(activeTab)) ?? financeSupportGroups[0];
 
   return (
@@ -825,9 +922,9 @@ function FinanceTabs({ activeTab, onChange }: { activeTab: FinanceSupportTab; on
               )}
               aria-current={active ? 'page' : undefined}
             >
-              <span className="block text-sm font-semibold">{group.label}</span>
+              <span className="block text-sm font-semibold">{copy.groups[group.id].label}</span>
               <span className={cn('mt-0.5 hidden text-xs md:block', active ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                {group.detail}
+                {copy.groups[group.id].detail}
               </span>
             </button>
           );
@@ -849,7 +946,7 @@ function FinanceTabs({ activeTab, onChange }: { activeTab: FinanceSupportTab; on
                   activeTab === tab.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 )}
               >
-                {tab.label}
+                {copy.tabs[tab.id]}
               </button>
             );
           })}
@@ -892,7 +989,7 @@ function FundingDecisionStrip({ readinessScore, eligibleRange, mainBlocker, next
             <p className="mt-1 text-sm leading-5 text-muted-foreground">Resolve the blocker first, then prepare the review package.</p>
           </div>
           <div className="grid gap-2">
-            <Button type="button" onClick={() => onTabChange('documents')}>Fix blockers</Button>
+            <Button type="button" onClick={() => onTabChange('documents')}>{copy.fixBlockers}</Button>
             <Button type="button" variant="outline" onClick={onAskAi}>
               <Bot className="size-4" />
               Ask Prime AI
@@ -1277,7 +1374,7 @@ function FundingReadinessHero({ readinessScore, eligibleRange, mainBlocker, next
             <MiniFact label="Blocking issue" value={mainBlocker} />
           </div>
           <div className="mt-4 rounded-xl border bg-background/70 p-4"><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next best action</div><p className="mt-1 text-sm leading-6 text-muted-foreground">{nextAction}</p></div>
-          <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => onTabChange('documents')}>Fix blockers</Button><Button type="button" variant="secondary" onClick={() => onTabChange('documents')}>Prepare bank-ready package</Button><Button type="button" variant="outline" onClick={onAskAi}><Bot className="size-4" />Ask Prime AI</Button></div>
+          <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => onTabChange('documents')}>{copy.fixBlockers}</Button><Button type="button" variant="secondary" onClick={() => onTabChange('documents')}>{copy.preparePackage}</Button><Button type="button" variant="outline" onClick={onAskAi}><Bot className="size-4" />Ask Prime AI</Button></div>
         </div>
         <div className="rounded-2xl border bg-background/70 p-4">
           <div className="text-sm font-semibold">First-screen answer</div>
@@ -1349,7 +1446,7 @@ function FinSupportHero({
             <Badge variant="outline" className="rounded-full">Fin Support</Badge>
             <Badge variant="outline" className="rounded-full">Funding review package</Badge>
             {loading ? <Badge variant="outline" className="rounded-full">Refreshing</Badge> : null}
-            {degraded ? <Badge variant="outline" className="rounded-full">Using local snapshot</Badge> : null}
+            {degraded ? <Badge variant="outline" className="rounded-full">{copy.usingLocalSnapshot}</Badge> : null}
           </div>
           <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-4xl">
             Prepare a funding review package from your commerce operations.
