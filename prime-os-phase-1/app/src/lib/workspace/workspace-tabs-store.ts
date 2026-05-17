@@ -11,6 +11,7 @@ import {
   openWorkspaceTab,
   updateWorkspaceTabUrl,
   WORKSPACE_TABS_STORAGE_KEY,
+  MAX_WORKSPACE_TABS,
   type WorkspaceTabInput,
   type WorkspaceTabsState,
 } from './workspace-tabs';
@@ -36,9 +37,15 @@ function readPersistedState(): WorkspaceTabsState {
     }
 
     const parsed = JSON.parse(raw) as WorkspaceTabsState;
+    const tabs = Array.isArray(parsed.tabs)
+      ? parsed.tabs.map((tab) => ({ ...tab, rootProductId: tab.rootProductId || tab.productId, dirty: false })).slice(-MAX_WORKSPACE_TABS)
+      : [];
+
+    const activeId = tabs.some((tab) => tab.id === parsed.activeId) ? parsed.activeId : tabs.at(-1)?.id ?? null;
+
     return {
-      tabs: Array.isArray(parsed.tabs) ? parsed.tabs.map((tab) => ({ ...tab, rootProductId: tab.rootProductId || tab.productId, dirty: false })) : [],
-      activeId: parsed.activeId || null,
+      tabs,
+      activeId,
       lastClosed: Array.isArray(parsed.lastClosed) ? parsed.lastClosed : [],
     };
   } catch {

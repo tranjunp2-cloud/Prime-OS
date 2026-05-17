@@ -23,7 +23,7 @@ export function TabContentHost() {
   }
 
   return (
-    <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
       {tabs.map((tab) => {
         const active = tab.id === activeId;
 
@@ -34,8 +34,8 @@ export function TabContentHost() {
             aria-label={tab.title}
             aria-hidden={!active}
             className={cn(
-              'min-h-0 min-w-0 overflow-y-auto overflow-x-auto bg-background animate-in fade-in-5 duration-200',
-              active ? 'relative z-10 block h-full' : 'absolute inset-0 z-0 hidden pointer-events-none'
+              'scrollbar-visible min-h-0 min-w-0 overflow-y-auto overflow-x-auto bg-background animate-in fade-in-5 duration-200',
+              active ? 'relative z-10 block h-full w-full flex-1' : 'absolute inset-0 z-0 hidden pointer-events-none'
             )}
           >
             <Routes location={toTabLocation(tab.url)}>{PrimeRoutes()}</Routes>

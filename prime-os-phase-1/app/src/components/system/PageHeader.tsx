@@ -12,7 +12,6 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
   return (
     <ToolbarSurface className={cn('relative overflow-hidden px-4 py-4 sm:px-5 sm:py-4', className)}>
-      <div className="absolute inset-y-4 left-0 w-1 rounded-r-full bg-primary/70" aria-hidden="true" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 max-w-3xl">
           {typeof title === 'string' ? (

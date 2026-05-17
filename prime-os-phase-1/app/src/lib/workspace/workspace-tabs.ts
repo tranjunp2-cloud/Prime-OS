@@ -30,6 +30,7 @@ export interface WorkspaceTabsState {
 }
 
 export const WORKSPACE_TABS_STORAGE_KEY = 'prime-workspace-tabs-v1';
+export const MAX_WORKSPACE_TABS = 10;
 
 export function normalizeWorkspaceUrl(url: string) {
   return url || '/overview';
@@ -96,11 +97,15 @@ export function openWorkspaceTab(state: WorkspaceTabsState, input: WorkspaceTabI
   }
 
   const tab = createWorkspaceTab(input, now);
+  const tabs = [...state.tabs, tab];
+  const overflowTabs = tabs.length > MAX_WORKSPACE_TABS ? tabs.slice(0, tabs.length - MAX_WORKSPACE_TABS) : [];
+  const visibleTabs = overflowTabs.length ? tabs.slice(overflowTabs.length) : tabs;
 
   return {
     ...state,
     activeId: tab.id,
-    tabs: [...state.tabs, tab],
+    tabs: visibleTabs,
+    lastClosed: [...overflowTabs, ...state.lastClosed].slice(0, 8),
   };
 }
 
@@ -201,11 +206,15 @@ export function reopenLastClosedWorkspaceTab(state: WorkspaceTabsState, now = Da
     lastActiveAt: now,
   };
 
+  const tabs = [...state.tabs, reopenedTab];
+  const overflowTabs = tabs.length > MAX_WORKSPACE_TABS ? tabs.slice(0, tabs.length - MAX_WORKSPACE_TABS) : [];
+  const visibleTabs = overflowTabs.length ? tabs.slice(overflowTabs.length) : tabs;
+
   return {
     ...state,
     activeId: reopenedTab.id,
-    tabs: [...state.tabs, reopenedTab],
-    lastClosed: restClosed,
+    tabs: visibleTabs,
+    lastClosed: [...overflowTabs, ...restClosed].slice(0, 8),
   };
 }
 

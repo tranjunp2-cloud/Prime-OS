@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Package, Search, X, CheckCircle2, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Search, X, CheckCircle2, Loader2, ChevronDown, ChevronRight, Sparkles, List, LayoutGrid } from 'lucide-react';
 import { PageHeader } from '@/components/system/PageHeader';
 import { ChannelBadge } from '@/components/system/ChannelBadge';
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/system/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -78,6 +79,7 @@ export default function Products() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   // Simulate initial load hydration (in-memory store is sync)
   useEffect(() => {
@@ -138,6 +140,7 @@ export default function Products() {
 
   const publishedCount = products.filter(p => p.status === 'published').length;
   const draftCount = products.filter(p => p.status === 'draft').length;
+  const featuredProducts = filtered.slice(0, 6);
 
   return (
     <div className="flex flex-col gap-6 p-6 lg:p-8">
@@ -160,37 +163,109 @@ export default function Products() {
         }
       />
 
-      {/* Search */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder={t('products.searchByNameBrand')}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-foreground transition-colors"
+      <div className="surface-toolbar rounded-xl px-3 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="inline-flex w-fit rounded-lg border bg-background p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              className="h-8 rounded-md px-3"
+              onClick={() => setViewMode('list')}
+              aria-pressed={viewMode === 'list'}
             >
-              <X className="size-4 text-muted-foreground" />
-            </button>
-          )}
+              <List className="size-3.5" />
+              List
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              className="h-8 rounded-md px-3"
+              onClick={() => setViewMode('grid')}
+              aria-pressed={viewMode === 'grid'}
+            >
+              <LayoutGrid className="size-3.5" />
+              Grid
+            </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative w-full min-w-[260px] flex-1 lg:w-[360px] lg:flex-none">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t('products.searchByNameBrand')}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="rounded-xl pl-9 pr-9"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="size-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+            {search && (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {formatMessage(t('products.resultCount'), {
+                  count: filtered.length,
+                  suffix: filtered.length !== 1 ? 's' : '',
+                })}
+              </span>
+            )}
+          </div>
         </div>
-        {search && (
-          <span className="text-xs text-muted-foreground">
-            {formatMessage(t('products.resultCount'), {
-              count: filtered.length,
-              suffix: filtered.length !== 1 ? 's' : '',
-            })}
-          </span>
-        )}
       </div>
 
+      {viewMode === 'grid' && featuredProducts.length > 0 && (
+        <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-label="Product gallery">
+          {featuredProducts.map((p) => {
+            const imgUrl = getProductImage(p.id, p.asin);
+            const variantCount = p.skus?.length ?? 0;
+            return (
+              <Card key={p.id} className="group overflow-hidden hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+                <Link to={`/ecom/cos/product-master/${p.id}`} className="block">
+                  <div className="relative h-[200px] overflow-hidden bg-muted">
+                    <img
+                      src={imgUrl}
+                      alt={p.name}
+                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${p.id}/600/400`; }}
+                    />
+                    <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                      <Badge variant={p.status === 'published' ? 'default' : 'secondary'}>{p.status}</Badge>
+                      {variantCount > 0 && <Badge variant="secondary">{variantCount} {t('products.variantLabel')}</Badge>}
+                    </div>
+                  </div>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="font-display text-lg font-semibold tracking-tight text-foreground group-hover:text-primary">{p.name}</h2>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">{p.brand || '—'} · {p.category || '—'}</p>
+                      </div>
+                      <Sparkles className="mt-1 size-4 shrink-0 text-primary" />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+                      <SkuBadge sku={p.sku_code} />
+                      <span className="font-mono text-sm font-semibold text-foreground">
+                        {formatLocalizedMoney(locale, p.retail_price, p.price_currency)}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Link>
+              </Card>
+            );
+          })}
+        </section>
+      )}
+
       {/* Table */}
-      {isLoading ? (
+      {viewMode === 'list' && (isLoading ? (
         <Card>
           <CardContent className="p-0 overflow-x-auto">
             <Table className="min-w-[900px]">
@@ -456,7 +531,7 @@ export default function Products() {
             </Table>
           </CardContent>
         </Card>
-      )}
+      ))}
 
       {/* Create Dialog */}
       <CreateProductDialog

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
@@ -228,6 +229,51 @@ const formatChatTime = () =>
     minute: '2-digit',
   }).format(new Date());
 
+function OperatorMessageContent({ content }: { content: string }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [canExpand, setCanExpand] = useState(false);
+
+  useEffect(() => {
+    const element = contentRef.current;
+    if (!element) return;
+
+    const measureOverflow = () => {
+      const lineHeight = Number.parseFloat(window.getComputedStyle(element).lineHeight) || 20;
+      setCanExpand(element.scrollHeight > lineHeight * 5 + 1);
+    };
+
+    measureOverflow();
+    const resizeObserver = new ResizeObserver(measureOverflow);
+    resizeObserver.observe(element);
+
+    return () => resizeObserver.disconnect();
+  }, [content, expanded]);
+
+  return (
+    <>
+      <div
+        ref={contentRef}
+        className={cn(
+          'mt-1 overflow-hidden whitespace-pre-wrap font-medium transition-[max-height] duration-200',
+          expanded ? 'max-h-none' : 'max-h-[7.5em]',
+        )}
+      >
+        {content}
+      </div>
+      {canExpand ? (
+        <button
+          type="button"
+          className="mt-2 text-xs font-medium text-primary-foreground/90 underline-offset-4 hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? 'Thu gọn' : 'Read more'}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 const emptyCommandStarters = [
   {
     title: 'Approval sweep',
@@ -285,42 +331,53 @@ function AgentResolutionCard({
         }
       }}
       className={cn(
-        'rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-        resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-50/60' : 'bg-muted/30',
-        selected && 'border-primary/50 ring-2 ring-primary/10',
+        'group relative overflow-hidden rounded-[1.75rem] border bg-card text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-50/70' : 'border-border/70',
+        selected && 'border-primary/45 shadow-md ring-4 ring-primary/10',
       )}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        {resolution.intent === 'unsafe_mutation' ? <AlertTriangle className="size-4 text-amber-600" /> : <Bot className="size-4 text-primary" />}
-        <span className="font-semibold">Operation Agent</span>
-        <Badge variant={resolution.intent === 'unsafe_mutation' ? 'outline' : response?.approvalState === 'pending' ? 'outline' : 'secondary'}>{resolution.statusLabel}</Badge>
-        {message.actionState === 'queued' ? <Badge variant="secondary">Queued for approval</Badge> : null}
-        {message.actionState === 'prepared' ? <Badge variant="secondary">Packet prepared</Badge> : null}
-      </div>
-      <h3 className="mt-4 text-xl font-semibold">{resolution.title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground">{resolution.summary}</p>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/8 to-transparent" />
+      <div className="relative p-5 md:p-6">
+        <div className="flex items-start gap-3">
+          <div className={cn(
+            'grid size-10 shrink-0 place-items-center rounded-2xl border shadow-sm',
+            resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-100 text-amber-700' : 'border-primary/20 bg-primary/10 text-primary',
+          )}>
+            {resolution.intent === 'unsafe_mutation' ? <AlertTriangle className="size-5" /> : <Bot className="size-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold">Operation Agent</span>
+              <Badge variant={resolution.intent === 'unsafe_mutation' ? 'outline' : response?.approvalState === 'pending' ? 'outline' : 'secondary'}>{resolution.statusLabel}</Badge>
+              {message.actionState === 'queued' ? <Badge variant="secondary">Queued</Badge> : null}
+              {message.actionState === 'prepared' ? <Badge variant="secondary">Prepared</Badge> : null}
+            </div>
+            <h3 className="mt-3 max-w-4xl text-balance text-xl font-semibold tracking-tight md:text-2xl">{resolution.title}</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground md:text-[15px]">{resolution.summary}</p>
+          </div>
+        </div>
       {response ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border bg-background p-3">
-            <div className="text-xs text-muted-foreground">Owner</div>
-            <div className="mt-1 font-medium">{response.owner ?? 'Product operations'}</div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Owner</div>
+            <div className="mt-1.5 font-semibold">{response.owner ?? 'Product operations'}</div>
           </div>
-          <div className="rounded-xl border bg-background p-3">
-            <div className="text-xs text-muted-foreground">Source</div>
-            <div className="mt-1 font-medium">{response.sourceSuite ?? 'PrimeOS'}</div>
+          <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Source</div>
+            <div className="mt-1.5 font-semibold">{response.sourceSuite ?? 'PrimeOS'}</div>
           </div>
-          <div className="rounded-xl border bg-background p-3">
-            <div className="text-xs text-muted-foreground">Approval</div>
-            <div className="mt-1 font-medium">{response.approvalState ? approvalLabel[response.approvalState] : 'Audit-only'}</div>
+          <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Approval</div>
+            <div className="mt-1.5 font-semibold">{response.approvalState ? approvalLabel[response.approvalState] : 'Audit-only'}</div>
           </div>
         </div>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         {resolution.actions.map((action) => {
           const key = `${message.id}-${action.intent}-${action.label}`;
           if (action.intent === 'queue' && response) {
             return (
-              <Button key={key} type="button" size="sm" disabled={actionLocked} onClick={() => onQueueApproval(message.id, resolution)}>
+              <Button key={key} type="button" size="sm" className="rounded-xl" disabled={actionLocked} onClick={() => onQueueApproval(message.id, resolution)}>
                 {message.actionState === 'queued' ? 'Queued for approval' : action.label} <ArrowRight className="size-4" />
               </Button>
             );
@@ -328,14 +385,14 @@ function AgentResolutionCard({
 
           if (action.intent === 'prepare') {
             return (
-              <Button key={key} type="button" size="sm" variant={actionLocked ? 'secondary' : 'default'} disabled={actionLocked} onClick={() => onPreparePacket(message.id, resolution)}>
+              <Button key={key} type="button" size="sm" className="rounded-xl" variant={actionLocked ? 'secondary' : 'default'} disabled={actionLocked} onClick={() => onPreparePacket(message.id, resolution)}>
                 {message.actionState === 'prepared' ? 'Packet prepared' : action.label} <ArrowRight className="size-4" />
               </Button>
             );
           }
 
           return (
-            <Button key={key} asChild size="sm" variant="outline">
+            <Button key={key} asChild size="sm" variant="outline" className="rounded-xl">
               <Link to={action.route}>
                 {action.label} <ArrowRight className="size-4" />
               </Link>
@@ -343,8 +400,8 @@ function AgentResolutionCard({
           );
         })}
       </div>
-      <div className="mt-4 border-t pt-3">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Follow up</div>
+      <div className="mt-5 border-t border-border/70 pt-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Follow up</div>
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           {followUps.map((command) => (
             <button
@@ -355,12 +412,13 @@ function AgentResolutionCard({
                 event.stopPropagation();
                 onSendPrompt(command.prompt);
               }}
-              className="shrink-0 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 rounded-full border bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               {command.label}
             </button>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
@@ -409,13 +467,14 @@ function CommandCenter({
 }) {
   const [composerValue, setComposerValue] = useState('');
   const messageIdRef = useRef(0);
-  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const timeoutRef = useRef<number | null>(null);
   const welcomeResolution = useMemo(() => buildOperatingChatResolution(cards, proposals, 'hello'), [cards, proposals]);
   const [messages, setMessages] = useState<OperatingChatMessage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const selectedAgentMessage = selectedMessageId ? messages.find((message) => message.id === selectedMessageId && message.role === 'agent' && message.resolution) : undefined;
   const latestAgentMessage = [...messages].reverse().find((message) => message.role === 'agent' && message.resolution);
   const activeResolution = (selectedAgentMessage ?? latestAgentMessage)?.resolution ?? welcomeResolution;
@@ -428,9 +487,15 @@ function CommandCenter({
   const isThinking = messages.some((message) => message.status === 'thinking');
   const hasActionPreview = Boolean(activeResolution.response);
 
-  useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length]);
+  useLayoutEffect(() => {
+    const transcript = transcriptScrollRef.current;
+
+    if (!transcript) {
+      return;
+    }
+
+    transcript.scrollTop = transcript.scrollHeight;
+  }, [messages]);
 
   useEffect(
     () => () => {
@@ -528,16 +593,116 @@ function CommandCenter({
     appendSystemMessage(result.message);
   };
 
+  const inspectorContent = (
+    <div className="space-y-4">
+      <div className="rounded-2xl border bg-card p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Operating pulse</div>
+            <h2 className="mt-2 text-xl font-semibold">Today load</h2>
+          </div>
+          <Badge variant="outline">{suites.length} suites</Badge>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-xl border bg-muted/30 p-3">
+            <div className="text-2xl font-semibold">{cards.length}</div>
+            <div className="text-xs text-muted-foreground">Cards</div>
+          </div>
+          <div className="rounded-xl border bg-primary/5 p-3">
+            <div className="text-2xl font-semibold">{pendingApprovals}</div>
+            <div className="text-xs text-muted-foreground">Approvals</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3">
+            <div className="text-2xl font-semibold text-rose-700">{highRisk}</div>
+            <div className="text-xs text-muted-foreground">High risk</div>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+            <div className="text-2xl font-semibold text-amber-700">{waiting}</div>
+            <div className="text-xs text-muted-foreground">Waiting</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-card p-4">
+        {hasActionPreview ? (
+          <>
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Action preview</div>
+              <h2 className="mt-2 text-xl font-semibold">{focusCard?.title ?? activeResolution.title}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{activeResolution.auditImplication}</p>
+            </div>
+            <div className="mt-4 space-y-4">
+              <div className="rounded-xl bg-muted/30 p-4">
+                <div className="font-semibold">Evidence</div>
+                <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {activeResolution.evidence.slice(0, 3).map((item) => (
+                    <div key={item} className="flex gap-2">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl bg-muted/30 p-4">
+                <div className="font-semibold">Policy checks</div>
+                <div className="mt-3 space-y-2 text-sm">
+                  {activeResolution.policyChecks.slice(0, 2).map((check) => (
+                    <div key={check.label} className="flex items-center gap-2 rounded-lg bg-background p-2">
+                      {check.passed ? <CheckCircle2 className="size-4 text-emerald-600" /> : <Clock3 className="size-4 text-amber-600" />}
+                      <span className="text-muted-foreground">{check.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div>
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agent status</div>
+            <div className="mt-3 flex items-center gap-2">
+              <Clock3 className="size-4 text-amber-600" />
+              <span className="font-semibold">{activeResolution.statusLabel}</span>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">No action is prepared yet. Pick a suggested prompt or ask for approvals, risk, blocked work, or audit changes.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border bg-card p-4">
+        <div className="font-semibold">Urgent cards</div>
+        <div className="mt-3 space-y-2">
+          {urgentCards.map((card) => (
+            <Link key={card.id} to="/intelligence/product-operation-agent?view=kanban" className="block rounded-lg border bg-background p-3 text-sm hover:border-primary/50">
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-medium line-clamp-2">{card.title}</div>
+                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', card.severity === 'high' ? 'bg-rose-100 text-rose-700' : card.laneId === 'waiting' ? 'bg-amber-100 text-amber-700' : 'bg-primary/10 text-primary')}>
+                  {card.severity === 'high' ? 'Risk' : card.laneId === 'waiting' ? 'Blocked' : card.sourceSuite === 'Finance' ? 'Finance' : 'Approval'}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>{card.sourceSuite}</span>
+                <span>{approvalLabel[card.approvalState]}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section data-testid="product-operation-command-chat" className="order-1 flex min-h-[calc(100dvh-220px)] min-w-0 flex-col rounded-2xl border bg-card xl:order-none xl:min-h-[680px]">
-        <div className="border-b p-4">
+    <div className="flex h-full min-h-0">
+      <section data-testid="product-operation-command-chat" className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card">
+        <div className="border-b p-4 md:px-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agent command surface</div>
               <h2 className="mt-2 text-2xl font-semibold">Operation Agent</h2>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => setInspectorOpen(true)}>
+                Context
+              </Button>
               <Badge variant="secondary">
                 <CheckCircle2 className="mr-1 size-3 text-emerald-600" />
                 Agent ready
@@ -560,25 +725,25 @@ function CommandCenter({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" role="log" aria-live="polite" aria-relevant="additions" aria-busy={isThinking}>
+        <div ref={transcriptScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:px-6" role="log" aria-live="polite" aria-relevant="additions" aria-busy={isThinking}>
           {messages.length === 0 ? <CommandEmptyState onSendPrompt={sendPrompt} /> : null}
           {messages.map((message) => (
             <div
               key={message.id}
               className={cn(
                 'min-w-0',
-                message.role === 'operator' && 'ml-auto max-w-[94%] md:max-w-[82%]',
-                message.role === 'agent' && 'mr-auto max-w-[96%] md:max-w-[92%]',
+                message.role === 'operator' && 'ml-auto w-fit max-w-[min(760px,88%)]',
+                message.role === 'agent' && 'mr-auto max-w-[min(1120px,96%)]',
                 message.role === 'system' && 'mx-auto max-w-[96%]',
               )}
             >
               {message.role === 'operator' ? (
-                <div className="rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground">
-                  <div className="flex items-center justify-between gap-3 text-xs opacity-80">
+                <div className="w-fit max-w-full rounded-[1.35rem] rounded-tr-md bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
+                  <div className="flex items-center gap-6 text-xs opacity-75">
                     <span>Operator</span>
                     <span>{message.createdAt}</span>
                   </div>
-                  <div className="mt-1 whitespace-pre-wrap font-medium">{message.content}</div>
+                  <OperatorMessageContent content={message.content} />
                 </div>
               ) : null}
 
@@ -619,10 +784,9 @@ function CommandCenter({
               ) : null}
             </div>
           ))}
-          <div ref={transcriptEndRef} />
         </div>
 
-        <div className="sticky bottom-0 border-t bg-card/95 p-3 pr-24 backdrop-blur md:p-4 md:pr-36">
+        <div className="shrink-0 border-t bg-card/95 p-3 backdrop-blur md:p-4 md:px-6">
           <label className="sr-only" htmlFor="product-operation-command">
             Command composer
           </label>
@@ -669,101 +833,17 @@ function CommandCenter({
           </div>
         </div>
       </section>
-
-      <aside data-testid="product-operation-command-inspector" className="order-2 space-y-4 xl:order-none">
-        <div className="rounded-2xl border bg-card p-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Operating pulse</div>
-              <h2 className="mt-2 text-xl font-semibold">Today load</h2>
-            </div>
-            <Badge variant="outline">{suites.length} suites</Badge>
+      <Sheet open={inspectorOpen} onOpenChange={setInspectorOpen}>
+        <SheetContent className="flex w-[min(92vw,30rem)] flex-col overflow-hidden p-0">
+          <SheetHeader className="border-b px-5 py-4">
+            <SheetTitle>Command context</SheetTitle>
+            <SheetDescription>Operating pulse, action preview, and urgent cards.</SheetDescription>
+          </SheetHeader>
+          <div data-testid="product-operation-command-inspector" className="min-h-0 flex-1 overflow-y-auto p-5">
+            {inspectorContent}
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <div className="text-2xl font-semibold">{cards.length}</div>
-              <div className="text-xs text-muted-foreground">Cards</div>
-            </div>
-            <div className="rounded-xl border bg-primary/5 p-3">
-              <div className="text-2xl font-semibold">{pendingApprovals}</div>
-              <div className="text-xs text-muted-foreground">Approvals</div>
-            </div>
-            <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3">
-              <div className="text-2xl font-semibold text-rose-700">{highRisk}</div>
-              <div className="text-xs text-muted-foreground">High risk</div>
-            </div>
-            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
-              <div className="text-2xl font-semibold text-amber-700">{waiting}</div>
-              <div className="text-xs text-muted-foreground">Waiting</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-card p-4">
-          {hasActionPreview ? (
-            <>
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Action preview</div>
-                <h2 className="mt-2 text-xl font-semibold">{focusCard?.title ?? activeResolution.title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{activeResolution.auditImplication}</p>
-              </div>
-              <div className="mt-4 space-y-4">
-                <div className="rounded-xl bg-muted/30 p-4">
-                  <div className="font-semibold">Evidence</div>
-                  <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    {activeResolution.evidence.slice(0, 3).map((item) => (
-                      <div key={item} className="flex gap-2">
-                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded-xl bg-muted/30 p-4">
-                  <div className="font-semibold">Policy checks</div>
-                  <div className="mt-3 space-y-2 text-sm">
-                    {activeResolution.policyChecks.slice(0, 2).map((check) => (
-                      <div key={check.label} className="flex items-center gap-2 rounded-lg bg-background p-2">
-                        {check.passed ? <CheckCircle2 className="size-4 text-emerald-600" /> : <Clock3 className="size-4 text-amber-600" />}
-                        <span className="text-muted-foreground">{check.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-            </div>
-            </>
-          ) : (
-            <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agent status</div>
-              <div className="mt-3 flex items-center gap-2">
-                <Clock3 className="size-4 text-amber-600" />
-                <span className="font-semibold">{activeResolution.statusLabel}</span>
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">No action is prepared yet. Pick a suggested prompt or ask for approvals, risk, blocked work, or audit changes.</p>
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border bg-card p-4">
-          <div className="font-semibold">Urgent cards</div>
-          <div className="mt-3 space-y-2">
-            {urgentCards.map((card) => (
-              <Link key={card.id} to="/intelligence/product-operation-agent?view=kanban" className="block rounded-lg border bg-background p-3 text-sm hover:border-primary/50">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="font-medium line-clamp-2">{card.title}</div>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', card.severity === 'high' ? 'bg-rose-100 text-rose-700' : card.laneId === 'waiting' ? 'bg-amber-100 text-amber-700' : 'bg-primary/10 text-primary')}>
-                    {card.severity === 'high' ? 'Risk' : card.laneId === 'waiting' ? 'Blocked' : card.sourceSuite === 'Finance' ? 'Finance' : 'Approval'}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>{card.sourceSuite}</span>
-                  <span>{approvalLabel[card.approvalState]}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </aside>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -1169,9 +1249,9 @@ export function PrimeProductOperationAgentPage() {
   };
 
   return (
-    <div className="min-h-full bg-muted/20">
-      <main className="space-y-6 p-4 md:p-6">
-        <ProductOperationHeader activeView={activeView} onChangeView={(view) => setSearchParams({ view })} />
+    <div className="h-full min-h-0 bg-muted/20">
+      <main className={cn(activeView === 'command' ? 'h-full min-h-0 p-0' : 'space-y-6 p-4 md:p-6')}>
+        {activeView === 'command' ? null : <ProductOperationHeader activeView={activeView} onChangeView={(view) => setSearchParams({ view })} />}
         {activeView === 'command' ? null : (
           <div className="grid gap-4 md:grid-cols-5">
             <SummaryMetricCard
@@ -1216,7 +1296,7 @@ export function PrimeProductOperationAgentPage() {
             />
           </div>
         )}
-        <div className={activeView === 'command' ? 'block' : 'hidden'}>
+        <div className={activeView === 'command' ? 'h-full min-h-0' : 'hidden'}>
           <CommandCenter cards={cards} proposals={proposals} onQueueApproval={handleQueueApprovalFromChat} />
         </div>
         {activeView === 'kanban' ? <OperatingKanban cards={cards} lanes={seed.lanes} onMoveCard={handleMoveCard} onOpenCard={setSelectedCardId} /> : null}

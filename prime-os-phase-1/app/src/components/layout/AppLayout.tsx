@@ -988,7 +988,7 @@ export function AppLayout() {
             />
             <main
               id="main-content"
-              className="min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+              className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
             >
               <TabContentHost />
             </main>

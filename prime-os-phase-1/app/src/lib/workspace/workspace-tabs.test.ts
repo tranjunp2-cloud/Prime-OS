@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeOtherWorkspaceTabs, closeRightWorkspaceTabs, closeWorkspaceTab, focusWorkspaceTab, markWorkspaceTabDirty, moveWorkspaceTab, openWorkspaceTab, pinWorkspaceTab, reopenLastClosedWorkspaceTab, type WorkspaceTabsState } from './workspace-tabs';
+import { closeOtherWorkspaceTabs, closeRightWorkspaceTabs, closeWorkspaceTab, focusWorkspaceTab, markWorkspaceTabDirty, moveWorkspaceTab, openWorkspaceTab, pinWorkspaceTab, reopenLastClosedWorkspaceTab, MAX_WORKSPACE_TABS, type WorkspaceTabsState } from './workspace-tabs';
 
 const emptyState: WorkspaceTabsState = { tabs: [], activeId: null, lastClosed: [] };
 
@@ -80,6 +80,30 @@ describe('workspace tabs', () => {
     expect(updated.tabs.map((tab) => tab.rootProductId)).toEqual(['cos', 'mdec']);
   });
 
+
+  it('keeps at most ten tabs and auto-closes the first tab on overflow', () => {
+    const fullState = Array.from({ length: MAX_WORKSPACE_TABS }).reduce<WorkspaceTabsState>((state, _, index) => (
+      openWorkspaceTab(state, {
+        productId: `product-${index}`,
+        url: `/product-${index}`,
+        title: `Product ${index}`,
+        reuseScope: 'none',
+      }, 1000 + index)
+    ), emptyState);
+
+    const overflowed = openWorkspaceTab(fullState, {
+      productId: 'product-10',
+      url: '/product-10',
+      title: 'Product 10',
+      reuseScope: 'none',
+    }, 2000);
+
+    expect(overflowed.tabs).toHaveLength(MAX_WORKSPACE_TABS);
+    expect(overflowed.tabs[0].productId).toBe('product-1');
+    expect(overflowed.tabs.at(-1)?.productId).toBe('product-10');
+    expect(overflowed.activeId).toBe(overflowed.tabs.at(-1)?.id);
+    expect(overflowed.lastClosed[0].productId).toBe('product-0');
+  });
 
   it('reuses a legacy tab when root scope is recovered from match paths', () => {
     const legacyProductsTab = openWorkspaceTab(emptyState, { productId: 'product-master', url: '/ecom/cos/product-master', title: 'Products' }, 1000);

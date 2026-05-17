@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Bot, Sparkles, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GlobalCopilotMessage } from './types';
@@ -36,6 +36,71 @@ function getAssistantMessageTone(intent: GlobalCopilotMessage['intent']) {
     default:
       return null;
   }
+}
+
+function MessageMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+        ul: ({ children }) => <ul className="my-2 list-disc pl-4">{children}</ul>,
+        li: ({ children }) => <li className="mb-1">{children}</li>,
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        a: ({ href, children }) => (
+          <a href={href} className="text-primary underline hover:no-underline">
+            {children}
+          </a>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+function UserMessageContent({ content }: { content: string }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [canExpand, setCanExpand] = useState(false);
+
+  useEffect(() => {
+    const element = contentRef.current;
+    if (!element) return;
+
+    const measureOverflow = () => {
+      const lineHeight = Number.parseFloat(window.getComputedStyle(element).lineHeight) || 24;
+      setCanExpand(element.scrollHeight > lineHeight * 5 + 1);
+    };
+
+    measureOverflow();
+    const resizeObserver = new ResizeObserver(measureOverflow);
+    resizeObserver.observe(element);
+
+    return () => resizeObserver.disconnect();
+  }, [content, expanded]);
+
+  return (
+    <>
+      <div
+        ref={contentRef}
+        className={cn(
+          'overflow-hidden transition-[max-height] duration-200',
+          expanded ? 'max-h-none' : 'max-h-[7.5em]',
+        )}
+      >
+        <MessageMarkdown content={content} />
+      </div>
+      {canExpand ? (
+        <button
+          type="button"
+          className="mt-2 text-xs font-medium text-primary-foreground/90 underline-offset-4 hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? 'Thu gọn' : 'Read more'}
+        </button>
+      ) : null}
+    </>
+  );
 }
 
 export function GlobalCopilotChatThread({
@@ -96,9 +161,9 @@ export function GlobalCopilotChatThread({
 
               <div
                 className={cn(
-                  'max-w-[88%] rounded-2xl px-4 py-3 shadow-sm',
+                  'w-fit max-w-[88%] rounded-2xl px-4 py-3 shadow-sm',
                   message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'ml-auto bg-primary text-primary-foreground'
                     : 'border border-border/70 bg-muted/70',
                   tone?.bubbleClassName,
                 )}
@@ -116,21 +181,11 @@ export function GlobalCopilotChatThread({
                 ) : null}
 
                 <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                      ul: ({ children }) => <ul className="my-2 list-disc pl-4">{children}</ul>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                      a: ({ href, children }) => (
-                        <a href={href} className="text-primary underline hover:no-underline">
-                          {children}
-                        </a>
-                      ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
+                  {message.role === 'user' ? (
+                    <UserMessageContent content={message.content} />
+                  ) : (
+                    <MessageMarkdown content={message.content} />
+                  )}
                 </div>
 
                 {showInlineClarifyChoices ? (

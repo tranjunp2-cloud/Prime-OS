@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { ChannelBadge } from '@/components/system/ChannelBadge';
@@ -86,6 +86,7 @@ function mapRemoteProductToLocalShape(remote: {
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { locale, t } = useI18n();
   const { user } = useAuth();
   const [imgError, setImgError] = useState<Record<number, boolean>>({});
@@ -153,6 +154,7 @@ export default function ProductDetail() {
 
   const skuIds = product.skus?.map(s => s.id) ?? [];
   const productListings = listings.filter(l => skuIds.includes(l.sku_id));
+  const selectedVariantCode = searchParams.get('variant');
 
   const productImages = product.images?.length
     ? product.images
@@ -381,9 +383,13 @@ export default function ProductDetail() {
               </TableHeader>
               <TableBody>
                 {product.skus.map((sku) => (
-                  <TableRow key={sku.id}>
+                  <TableRow
+                    key={sku.id}
+                    data-state={selectedVariantCode === sku.sku_code ? 'selected' : undefined}
+                    className={selectedVariantCode === sku.sku_code ? 'bg-primary/5' : undefined}
+                  >
                     <TableCell>
-                      <Badge variant="secondary" className="font-mono text-xs">
+                      <Badge variant={selectedVariantCode === sku.sku_code ? 'default' : 'secondary'} className="font-mono text-xs">
                         {sku.sku_code}
                       </Badge>
                     </TableCell>

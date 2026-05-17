@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Info, Image, Package, Truck, Layers, Check,
-  Plus, X, Trash2, AlertTriangle, Upload, Loader2,
+  Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes, PackageCheck,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -81,6 +81,11 @@ const CATEGORIES = [
   'Bicycle', 'Headphones', 'Electronics', 'Food & Beverages',
   'Beauty & Personal Care', 'Home & Living', 'Sports', 'Books', 'Toys',
 ];
+const PRODUCT_TYPE_ICONS = {
+  single: Package,
+  variant: Layers,
+  bundle: Boxes,
+} satisfies Record<ProductType, typeof PackageCheck>;
 
 const CATEGORY_LABELS: Record<string, Record<string, string>> = {
   'en-US': Object.fromEntries(CATEGORIES.map((category) => [category, category])),
@@ -1440,29 +1445,30 @@ export default function ProductCreatePage() {
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5 block">{copy.productType}</Label>
                   <div className="flex flex-wrap gap-2">
-                    {(['single', 'variant', 'bundle'] as const).map(pt => (
-                      <label
-                        key={pt}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer border transition-colors ${
-                          form.product_type === pt
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted/50 border-transparent hover:bg-muted'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="product_type"
-                          value={pt}
-                          checked={form.product_type === pt}
-                          onChange={() => setField('product_type', pt)}
-                          className="sr-only"
-                        />
-                        {pt === 'single' && '📦 '}
-                        {pt === 'variant' && '📋 '}
-                        {pt === 'bundle' && '📦📦 '}
-                        {pt === 'single' ? copy.productTypeSingle : pt === 'variant' ? copy.productTypeVariant : copy.productTypeBundle}
-                      </label>
-                    ))}
+                    {(['single', 'variant', 'bundle'] as const).map(pt => {
+                      const TypeIcon = PRODUCT_TYPE_ICONS[pt];
+                      return (
+                        <label
+                          key={pt}
+                          className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            form.product_type === pt
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-transparent bg-muted/50 hover:bg-muted'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="product_type"
+                            value={pt}
+                            checked={form.product_type === pt}
+                            onChange={() => setField('product_type', pt)}
+                            className="sr-only"
+                          />
+                          <TypeIcon className="size-3.5" />
+                          {pt === 'single' ? copy.productTypeSingle : pt === 'variant' ? copy.productTypeVariant : copy.productTypeBundle}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
                 {form.product_type === 'variant' && (
