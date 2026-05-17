@@ -1,4 +1,4 @@
-import { type ChangeEvent, type DragEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, type DragEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
@@ -1426,6 +1426,7 @@ function LoanProfileWizard({
 }) {
   const currentStep = loanWizardSteps[stepIndex] ?? loanWizardSteps[0];
   const StepIcon = currentStep.icon;
+  const wizardBodyRef = useRef<HTMLDivElement | null>(null);
   const isFinalStep = stepIndex === loanWizardSteps.length - 1;
   const wizardProgress = ((stepIndex + 1) / loanWizardSteps.length) * 100;
   const missingDocumentCount = japanLoanDocuments.filter((doc) => {
@@ -1442,28 +1443,45 @@ function LoanProfileWizard({
     onOpenChange(false);
   };
 
+  useEffect(() => {
+    wizardBodyRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentStep.id]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl overflow-hidden rounded-2xl p-0">
-        <DialogHeader className="border-b px-4 py-4 pr-12 md:px-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="rounded-full">Japan SME pre-check</Badge>
-            <Badge variant="outline" className="rounded-full">{readinessGrade(readinessScore)} readiness</Badge>
-            <Badge variant="outline" className="rounded-full">{eligibleRange}</Badge>
+      <DialogContent
+        overlayClassName="z-[190]"
+        className="z-[200] top-[calc(var(--header-height)+3.75rem)] grid max-h-[calc(100dvh-var(--header-height)-5rem)] w-[min(1120px,calc(100vw-3rem))] !max-w-[1120px] grid-rows-[auto_minmax(0,1fr)] translate-y-0 overflow-hidden rounded-[1.75rem] border bg-background p-0 shadow-2xl"
+      >
+        <DialogHeader className="min-w-0 border-b bg-card px-5 py-4 pr-12 md:px-6 md:pr-16">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="rounded-full">Japan SME pre-check</Badge>
+                <Badge variant="outline" className="rounded-full">{readinessGrade(readinessScore)} readiness</Badge>
+                <Badge variant="outline" className="rounded-full">{eligibleRange}</Badge>
+              </div>
+              <DialogTitle className="mt-3 flex items-center gap-2 text-2xl tracking-tight">
+                <StepIcon className="size-5 text-primary" />
+                Funding Readiness Wizard
+              </DialogTitle>
+              <DialogDescription className="mt-1 max-w-3xl">
+                Build a funding review package from commerce signals, Japan SME documents, and partner-bank routing.
+              </DialogDescription>
+            </div>
+            <div className="min-w-[180px] rounded-2xl border bg-background/80 p-3 lg:mr-8">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                <span>Progress</span>
+                <span>{stepIndex + 1}/{loanWizardSteps.length}</span>
+              </div>
+              <Progress value={wizardProgress} className="mt-2 h-1.5" />
+            </div>
           </div>
-          <DialogTitle className="mt-3 flex items-center gap-2 text-xl">
-            <StepIcon className="size-5 text-primary" />
-            Funding Readiness Wizard
-          </DialogTitle>
-          <DialogDescription>
-            Build a funding review package from commerce signals, Japan SME documents, and partner-bank routing.
-          </DialogDescription>
-          <Progress value={wizardProgress} className="mt-3 h-1.5" />
         </DialogHeader>
 
-        <div className="grid min-h-0 md:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="hidden border-r bg-muted/20 p-3 md:block">
-            <div className="space-y-1">
+        <div className="grid min-h-0 min-w-0 overflow-hidden md:grid-cols-[250px_minmax(0,1fr)]">
+          <aside className="hidden min-h-0 overflow-y-auto border-r bg-muted/15 p-3 md:block">
+            <div className="space-y-1.5">
               {loanWizardSteps.map((step, index) => {
                 const Icon = step.icon;
                 const active = index === stepIndex;
@@ -1476,25 +1494,25 @@ function LoanProfileWizard({
                     aria-current={active ? 'step' : undefined}
                     onClick={() => onStepChange(index)}
                     className={cn(
-                      'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                      active ? 'border-primary/40 bg-primary/10 text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:bg-background',
+                      'w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
+                      active ? 'border-primary/35 bg-primary/10 text-foreground shadow-sm ring-2 ring-primary/10' : 'border-transparent text-muted-foreground hover:border-border hover:bg-background',
                     )}
                   >
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      <span className="flex size-7 items-center justify-center rounded-md border bg-background text-xs">{index + 1}</span>
-                      <Icon className="size-4" />
-                      {step.title}
+                    <div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border bg-background text-xs">{index + 1}</span>
+                      <Icon className="size-4 shrink-0" />
+                      <span className="min-w-0 leading-snug">{step.title}</span>
                     </div>
-                    <p className="mt-1 line-clamp-2 pl-9 text-xs leading-5">{step.summary}</p>
+                    <p className="mt-1 line-clamp-1 pl-9 text-xs leading-5">{step.summary}</p>
                   </button>
                 );
               })}
             </div>
           </aside>
 
-          <div className="flex min-h-0 flex-col">
-            <div className="border-b p-3 md:hidden">
-              <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <div className="min-w-0 border-b p-3 md:hidden">
+              <div className="scrollbar-visible flex max-w-full gap-2 overflow-x-auto overflow-y-hidden pb-1">
                 {loanWizardSteps.map((step, index) => (
                   <button
                     key={step.id}
@@ -1512,8 +1530,8 @@ function LoanProfileWizard({
               </div>
             </div>
 
-            <div className="min-h-0 overflow-y-auto p-4 md:max-h-[calc(100dvh-15rem)] md:p-5">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] xl:items-start">
+            <div ref={wizardBodyRef} className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-8">
+              <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_220px] 2xl:items-start">
                 <LoanWizardStepContent
                   stepId={currentStep.id}
                   draft={draft}
@@ -1532,22 +1550,26 @@ function LoanProfileWizard({
               </div>
             </div>
 
-            <DialogFooter className="border-t bg-muted/20 px-4 py-3 md:px-5">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Save draft
-              </Button>
-              <Button type="button" variant="ghost" onClick={onAskAi}>
-                <Bot className="size-4" />
-                Ask Prime AI
-              </Button>
-              <Button type="button" variant="outline" onClick={goBack} disabled={stepIndex === 0}>
-                <ChevronLeft className="size-4" />
-                Back
-              </Button>
-              <Button type="button" onClick={isFinalStep ? submitPreCheck : goNext}>
-                {isFinalStep ? 'Submit pre-check' : 'Next'}
-                {!isFinalStep ? <ArrowRight className="size-4" /> : <CheckCircle2 className="size-4" />}
-              </Button>
+            <DialogFooter className="min-w-0 border-t bg-card px-4 py-3 md:px-6 sm:justify-between">
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
+                  Save draft
+                </Button>
+                <Button type="button" variant="ghost" className="rounded-xl" onClick={onAskAi}>
+                  <Bot className="size-4" />
+                  Ask Prime AI
+                </Button>
+              </div>
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <Button type="button" variant="outline" className="rounded-xl" onClick={goBack} disabled={stepIndex === 0}>
+                  <ChevronLeft className="size-4" />
+                  Back
+                </Button>
+                <Button type="button" className="rounded-xl px-5" onClick={isFinalStep ? submitPreCheck : goNext}>
+                  {isFinalStep ? 'Submit pre-check' : 'Next'}
+                  {!isFinalStep ? <ArrowRight className="size-4" /> : <CheckCircle2 className="size-4" />}
+                </Button>
+              </div>
             </DialogFooter>
           </div>
         </div>
@@ -1560,19 +1582,23 @@ function LoanWizardMoodPanel({ stepId, stepIndex }: { stepId: LoanWizardStepId; 
   const mood = loanWizardMoodCopy[stepId];
 
   return (
-    <aside className="order-first overflow-hidden rounded-xl border bg-gradient-to-br from-background via-muted/20 to-primary/5 p-3 shadow-sm xl:order-none">
+    <aside className="order-first overflow-hidden rounded-2xl border bg-gradient-to-br from-background via-muted/20 to-primary/5 p-3 shadow-sm 2xl:order-none">
       <LoanWizardMotionStyles />
       <div className="flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         <span className="whitespace-nowrap">Step {stepIndex + 1} calm flow</span>
         <Badge variant="outline" className="whitespace-nowrap rounded-full bg-background/70">Saved</Badge>
       </div>
-      <LoanWizardIllustration stepId={stepId} ariaLabel={mood.ariaLabel} />
-      <div className="mt-3">
+      <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)] 2xl:block">
+        <LoanWizardIllustration stepId={stepId} ariaLabel={mood.ariaLabel} />
+        <div>
+      <div className="mt-3 2xl:mt-3">
         <h3 className="text-sm font-semibold">{mood.title}</h3>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">{mood.detail}</p>
       </div>
       <div className="mt-3 rounded-lg border bg-background/70 p-2 text-xs leading-5 text-muted-foreground">
         {mood.reassurance}
+      </div>
+        </div>
       </div>
     </aside>
   );
@@ -1634,7 +1660,7 @@ function LoanWizardMotionStyles() {
 }
 
 function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepId; ariaLabel: string }) {
-  const shellClass = 'prime-loan-anim relative mt-3 h-36 overflow-hidden rounded-xl border bg-background/80';
+  const shellClass = 'prime-loan-anim relative mt-3 h-28 overflow-hidden rounded-xl border bg-background/80 2xl:h-32';
   const glow = <div className="absolute inset-x-8 top-6 h-20 rounded-full bg-primary/10 blur-2xl" />;
 
   if (stepId === 'profile') {
