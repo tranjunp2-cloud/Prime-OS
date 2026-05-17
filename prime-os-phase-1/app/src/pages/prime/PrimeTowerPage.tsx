@@ -9767,16 +9767,16 @@ export function PrimeDemandHubPage() {
   } satisfies ChartConfig;
 
   return (
-    <div className="min-h-full bg-background">
-      <div className="space-y-4 p-4 md:p-6">
-        <section data-testid="demand-command-bar" className="rounded-lg border bg-card shadow-sm">
-          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)_auto] lg:items-center">
+    <div className="min-h-[calc(100dvh-var(--header-height))] bg-background bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.08),transparent_34rem)]">
+      <div className="mx-auto max-w-[1520px] space-y-5 p-4 pb-4 md:p-6 md:pb-6">
+        <section data-testid="demand-command-bar" className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.62fr)_auto] lg:items-center">
             <div className="min-w-0">
               <Badge variant="outline" className="mb-3 rounded-full">Demand Dashboard</Badge>
               <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{dashboard.title}</h1>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{dashboard.operatingDetail}</p>
             </div>
-            <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="rounded-xl border bg-muted/20 p-4">
               <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                 <span>{dashboard.readiness}% readiness</span>
                 <span className="text-muted-foreground">/</span>
@@ -9827,11 +9827,11 @@ export function PrimeDemandHubPage() {
           ))}
         </div>
 
-        <section className="grid gap-3 xl:grid-cols-6">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {dashboard.functions.map((item) => {
             const Icon = demandFunctionIcon(item.id);
             return (
-              <Link key={item.id} to={item.href} className="group rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5">
+              <Link key={item.id} to={item.href} className="group flex min-h-[156px] flex-col rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30 text-primary">
                     <Icon className="size-4" />
@@ -9843,7 +9843,7 @@ export function PrimeDemandHubPage() {
                   <div className="mt-1 text-xl font-semibold">{item.metric}</div>
                   <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{item.detail}</p>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                <div className="mt-auto flex items-center justify-between gap-3 pt-3 text-xs">
                   <span className="font-medium text-primary">{item.nextAction}</span>
                   <span className="text-muted-foreground">{item.readiness}%</span>
                 </div>
@@ -9852,19 +9852,19 @@ export function PrimeDemandHubPage() {
           })}
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-          <Card className="rounded-lg border shadow-sm">
+        <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
+          <Card className="min-h-[390px] rounded-xl border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="size-4" />
                 Function Readiness
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_240px]">
               <div>
                 <ChartContainer
                   config={readinessConfig}
-                  className="h-64 w-full"
+                  className="h-72 w-full"
                   aria-label={`Demand function readiness: ${dashboard.chartData.map((row) => `${row.function} ${row.readiness}%`).join(', ')}`}
                 >
                   <BarChart data={dashboard.chartData} layout="vertical" margin={{ left: 8, right: 44, top: 8, bottom: 8 }}>
@@ -9899,7 +9899,7 @@ export function PrimeDemandHubPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border shadow-sm">
+          <Card className="min-h-[390px] rounded-xl border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <ScanSearch className="size-4" />
@@ -9912,8 +9912,8 @@ export function PrimeDemandHubPage() {
           </Card>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-          <Card id="priority-demand-queue" className="rounded-lg border shadow-sm">
+        <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+          <Card id="priority-demand-queue" className="rounded-xl border shadow-sm">
             <CardHeader className="border-b pb-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -9952,7 +9952,7 @@ export function PrimeDemandHubPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border shadow-sm">
+          <Card className="rounded-xl border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="size-4" />
@@ -9984,14 +9984,14 @@ export function PrimeDemandHubPage() {
           </Card>
         </section>
 
-        <Card className="rounded-lg border shadow-sm">
+        <Card className="flex min-h-[460px] flex-col rounded-xl border shadow-sm">
           <CardHeader className="border-b pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <TrendingUp className="size-4" />
               Outcome Readback
             </CardTitle>
           </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-1 flex-col">
               <Table variant="embedded">
                 <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                   <TableRow>

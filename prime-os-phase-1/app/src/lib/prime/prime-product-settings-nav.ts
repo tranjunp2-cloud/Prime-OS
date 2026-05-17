@@ -6,6 +6,8 @@ export interface PrimeProductSettingsItem {
   label: string;
   kind: PrimeNavNode['kind'];
   href: string;
+  rootProductId: string;
+  rootProductLabel: string;
   icon?: LucideIcon;
   matchPaths: string[];
   children: PrimeProductSettingsItem[];
@@ -22,7 +24,7 @@ export interface PrimeProductSettingsGroup {
 
 const PRODUCT_SETTINGS_AREA_IDS = new Set(['demand', 'customer', 'ecom', 'intelligence', 'finance']);
 
-function toSettingsItem(node: PrimeNavNode): PrimeProductSettingsItem {
+function toSettingsItem(node: PrimeNavNode, rootNode = node): PrimeProductSettingsItem {
   const href = getPrimeNodeHref(node);
 
   return {
@@ -30,9 +32,11 @@ function toSettingsItem(node: PrimeNavNode): PrimeProductSettingsItem {
     label: node.label,
     kind: node.kind,
     href,
+    rootProductId: rootNode.id,
+    rootProductLabel: rootNode.label,
     icon: node.icon,
     matchPaths: [href, ...(node.matchPaths || [])],
-    children: (node.children || []).map(toSettingsItem),
+    children: (node.children || []).map((child) => toSettingsItem(child, rootNode)),
   };
 }
 
@@ -44,7 +48,7 @@ export const primeProductSettingsGroups: PrimeProductSettingsGroup[] = primeNavi
     href: getPrimeNodeHref(node),
     icon: node.icon,
     badgeCount: node.children?.length || 0,
-    items: (node.children || []).map(toSettingsItem),
+    items: (node.children || []).map((child) => toSettingsItem(child)),
   }));
 
 export function flattenPrimeProductSettingsItems(groups = primeProductSettingsGroups) {
@@ -58,6 +62,22 @@ export function flattenPrimeProductSettingsItems(groups = primeProductSettingsGr
   groups.forEach((group) => group.items.forEach(walk));
 
   return items;
+}
+
+
+
+export function getPrimeProductSettingsRootMatchPaths(rootProductId: string, groups = primeProductSettingsGroups) {
+  return flattenPrimeProductSettingsItems(groups)
+    .filter((item) => item.rootProductId === rootProductId)
+    .flatMap((item) => [item.href, ...item.matchPaths]);
+}
+
+export function findPrimeProductSettingsItemByHref(href: string, groups = primeProductSettingsGroups) {
+  const normalizedHref = href.split('#')[0];
+  const items = flattenPrimeProductSettingsItems(groups);
+
+  return items.find((item) => item.href === normalizedHref)
+    || items.find((item) => item.matchPaths.some((path) => path === normalizedHref));
 }
 
 export function getPrimeProductSettingsDefaultHref() {

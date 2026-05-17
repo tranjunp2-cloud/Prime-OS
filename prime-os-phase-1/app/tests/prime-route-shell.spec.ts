@@ -118,7 +118,7 @@ test.describe('authenticated route shell', () => {
 
     await page.goto('/demand/campaigns?tab=results', routeReady);
     await expect(primaryNav.getByRole('link', { name: 'Results' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByText('Outcome readback')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Outcome readback' })).toBeVisible();
   });
 
   test('preserves Demand query context across legacy redirects', async ({ page }) => {
@@ -325,6 +325,62 @@ test.describe('authenticated route shell', () => {
     await expect(page.getByRole('link', { name: 'Orders' })).toHaveAttribute('aria-current', 'page');
   });
 
+
+
+  test('reuses the active product tab for functions under the same product root', async ({ page }) => {
+    await page.goto('/overview', routeReady);
+    await expectPrimeShellReady(page);
+
+    await page.goto('/ecom/cos/product-master', routeReady);
+    await expect(page).toHaveURL(/\/ecom\/cos\/product-master$/);
+    await page.goto('/ecom/cos/fulfillment', routeReady);
+    await expect(page).toHaveURL(/\/ecom\/cos\/fulfillment$/);
+
+    const tablist = page.getByRole('tablist', { name: 'Open product tabs' });
+    await expect(tablist).toBeVisible();
+    await expect(tablist.getByRole('tab', { name: /General Dashboard/ })).toBeVisible();
+    await expect(tablist.getByRole('tab', { name: /Fulfillment/ })).toBeVisible();
+    await expect(tablist.getByRole('tab', { name: /Products/ })).toHaveCount(0);
+    await expect(page.locator('[role="tabpanel"]')).toHaveCount(2);
+
+    await page.goto('/demand/mdec?view=composer', routeReady);
+    await expect(page).toHaveURL(/\/demand\/mdec\?view=composer$/);
+    await expect(tablist.getByRole('tab', { name: /Composer/ })).toBeVisible();
+    await expect(page.locator('[role="tabpanel"]')).toHaveCount(3);
+
+    await page.reload(routeReady);
+    await expectPrimeShellReady(page);
+    await expect(page.getByRole('tablist', { name: 'Open product tabs' }).getByRole('tab', { name: /General Dashboard/ })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Open product tabs' }).getByRole('tab', { name: /Fulfillment/ })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Open product tabs' }).getByRole('tab', { name: /Composer/ })).toBeVisible();
+  });
+
+
+
+  test('supports workspace tab context actions', async ({ page }) => {
+    await page.goto('/overview', routeReady);
+    await expectPrimeShellReady(page);
+
+    await page.goto('/ecom/cos/inventory-brain', routeReady);
+    const tablist = page.getByRole('tablist', { name: 'Open product tabs' });
+    await expect(tablist.getByRole('tab', { name: /Inventory Brain/ })).toBeVisible();
+    await page.goto('/demand/mdec?view=composer', routeReady);
+
+    await expect(tablist.getByRole('tab', { name: /Composer/ })).toBeVisible();
+
+    await tablist.getByRole('tab', { name: /Inventory Brain/ }).click();
+    await expect(page).toHaveURL(/\/ecom\/cos\/inventory-brain$/);
+
+    await tablist.getByRole('tab', { name: /Inventory Brain/ }).click({ button: 'right' });
+    await page.getByRole('menu').getByText('Pin tab').click();
+    await expect(tablist.getByRole('tab', { name: /Inventory Brain pinned/ })).toBeVisible();
+
+    await tablist.getByRole('tab', { name: /Inventory Brain pinned/ }).click({ button: 'right' });
+    await page.getByRole('menu').getByText('Close others').click();
+    await expect(tablist.getByRole('tab')).toHaveCount(1);
+    await expect(page).toHaveURL(/\/ecom\/cos\/inventory-brain$/);
+  });
+
   test('command palette opens, filters, and navigates', async ({ page }) => {
     await page.goto('/overview', routeReady);
     await expectPrimeShellReady(page);
@@ -335,7 +391,7 @@ test.describe('authenticated route shell', () => {
     await dialog.getByPlaceholder('Jump to a workspace, customer, demand module, or COS...').fill('Launch Decisions');
     await dialog.getByText('Launch Decisions').click();
 
-    await expect(page).toHaveURL(/\/intelligence\/launch-decisions$/);
+    await expect(page).toHaveURL(/\/intelligence\/consulting-agent\?tab=launch$/);
     await expectPrimeShellReady(page);
   });
 });

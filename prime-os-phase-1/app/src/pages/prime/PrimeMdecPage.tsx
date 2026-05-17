@@ -26,7 +26,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { mdecSeedData } from '@/lib/prime/mdec-seed-data';
 import { cn } from '@/lib/utils';
 
@@ -284,6 +286,8 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(2026, 4, 1));
   const [posts, setPosts] = useState(scheduledPosts);
   const [selectedPostId, setSelectedPostId] = useState(scheduledPosts[0]?.id || '');
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const channelOptions = ['All channels', ...Array.from(new Set(posts.flatMap((post) => post.channels)))];
   const visiblePosts = channel === 'All channels' ? posts : posts.filter((post) => post.channels.includes(channel));
   const selectedPost = posts.find((post) => post.id === selectedPostId) || visiblePosts[0] || posts[0];
@@ -299,6 +303,7 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
   const weekDays = Array.from({ length: 7 }, (_, index) => { const date = new Date(activeWeekStart); date.setDate(activeWeekStart.getDate() + index); return date; });
   const selectPost = (post: typeof posts[number]) => {
     setSelectedPostId(post.id);
+    setDetailsOpen(true);
     onAction(`Calendar post opened: ${post.title}`);
   };
   const setPostStatus = (postId: string, status: typeof posts[number]['status']) => {
@@ -328,6 +333,8 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
         <div className="inline-flex rounded-2xl bg-muted p-1">{(['Month', 'Week', 'Agenda'] as const).map((item) => <button key={item} type="button" onClick={() => { setMode(item); onAction(`Calendar switched to ${item}`); }} className={cn('rounded-xl px-5 py-2 text-sm font-medium text-muted-foreground', mode === item && 'bg-card text-primary shadow-sm')}>{item}</button>)}</div>
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="outline"><Link to="/demand/mdec?view=composer">New post</Link></Button>
+          <Button variant="outline" onClick={() => setQueueOpen(true)}>Open queue ({visiblePosts.length})</Button>
+          <Button variant="outline" disabled={!selectedPost} onClick={() => setDetailsOpen(true)}>Post details</Button>
           <Button variant="outline" className="min-w-44 justify-between" onClick={cycleChannel}>{channel} <ArrowRight className="size-3 rotate-90" /></Button>
           <Button variant="outline" aria-label="Previous" onClick={() => moveMonth(-1)}>‹</Button>
           <Button variant="outline" onClick={jumpToday}>TODAY</Button>
@@ -335,20 +342,7 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-        <Panel label="Queue" title={`${String(visiblePosts.length).padStart(2, '0')} scheduled ${channel === 'All channels' ? 'this month' : channel}`}>
-          <div className="divide-y">
-            {visiblePosts.map((post) => (
-              <button key={post.id} type="button" onClick={() => selectPost(post)} className={cn('grid w-full grid-cols-[56px_1fr] gap-3 p-4 text-left transition hover:bg-primary/5', selectedPost?.id === post.id && 'bg-primary/10')}>
-                <div className="font-identifier text-xs uppercase text-muted-foreground"><div>{post.when.split(' ')[0]}</div><div className="mt-1 text-primary">{postTime(post)}</div></div>
-                <div className="min-w-0"><div className="font-semibold leading-5">{post.title}</div><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{post.campaign}</p><div className="mt-2 flex flex-wrap gap-1"><Badge variant={tone(post.status)}>{post.status}</Badge>{post.channels.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}</div></div>
-              </button>
-            ))}
-            {!visiblePosts.length ? <div className="p-5 text-sm text-muted-foreground">No posts match this channel.</div> : null}
-          </div>
-        </Panel>
-
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div><SectionLabel>{mode} calendar</SectionLabel><h3 className="mt-2 text-4xl font-semibold tracking-tight">{monthLabel}</h3><p className="mt-2 text-sm text-muted-foreground">Click a calendar item or queue row to inspect status, campaign linkage, and next action.</p></div>
           {mode === 'Month' ? (
             <div className="overflow-hidden rounded-2xl border bg-card">
@@ -364,10 +358,74 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
           ) : null}
         </div>
 
-        <Panel label="Details" title={selectedPost?.title || 'Select post'}>
-          {selectedPost ? <div className="space-y-4 p-5"><div className="flex flex-wrap gap-2"><Badge variant={tone(selectedPost.status)}>{selectedPost.status}</Badge>{selectedPost.channels.map((item)=><Badge key={item} variant="outline">{item}</Badge>)}</div><div className="grid gap-3 text-sm"><MiniRow label="Time" value={selectedPost.when} /><MiniRow label="Campaign" value={selectedPost.campaign} /><MiniRow label="Product" value={selectedPost.productId} /><MiniRow label="SKU" value={selectedPost.skuId} /></div><div className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">Next: {selectedPost.status === 'Review' ? 'Request approval before publishing.' : selectedPost.status === 'Blocked' ? 'Resolve blocker or route to escalation.' : 'Keep schedule and monitor engagement window.'}</div><div className="grid gap-2"><Button asChild><Link to="/demand/mdec?view=composer">Open in composer</Link></Button>{selectedPost.status !== 'Approved' ? <Button variant="outline" onClick={() => setPostStatus(selectedPost.id, 'Approved')}>Mark approved</Button> : null}{selectedPost.status !== 'Review' ? <Button variant="outline" onClick={() => setPostStatus(selectedPost.id, 'Review')}>Send to review</Button> : null}</div></div> : <div className="p-5 text-sm text-muted-foreground">Select a post to inspect.</div>}
-        </Panel>
-      </div>
+      <Sheet open={queueOpen} onOpenChange={setQueueOpen}>
+        <SheetContent side="right" className="flex flex-col p-0 sm:w-[34rem]">
+          <SheetHeader className="border-b px-5 py-4">
+            <SheetTitle>Scheduled post queue</SheetTitle>
+            <SheetDescription>{String(visiblePosts.length).padStart(2, '0')} scheduled {channel === 'All channels' ? 'this month' : `for ${channel}`}</SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto divide-y">
+            {visiblePosts.map((post) => (
+              <button
+                key={post.id}
+                type="button"
+                onClick={() => {
+                  selectPost(post);
+                  setQueueOpen(false);
+                }}
+                className={cn('grid w-full grid-cols-[64px_minmax(0,1fr)] gap-3 p-4 text-left transition hover:bg-primary/5', selectedPost?.id === post.id && 'bg-primary/10')}
+              >
+                <div className="font-identifier text-xs uppercase text-muted-foreground">
+                  <div>{post.when.split(' ')[0]}</div>
+                  <div className="mt-1 text-primary">{postTime(post)}</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="font-semibold leading-5">{post.title}</div>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{post.campaign}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Badge variant={tone(post.status)}>{post.status}</Badge>
+                    {post.channels.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+                  </div>
+                </div>
+              </button>
+            ))}
+            {!visiblePosts.length ? <div className="p-5 text-sm text-muted-foreground">No posts match this channel.</div> : null}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedPost?.title || 'Post details'}</DialogTitle>
+            <DialogDescription>Campaign linkage, schedule state, and next action for the selected calendar post.</DialogDescription>
+          </DialogHeader>
+          {selectedPost ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={tone(selectedPost.status)}>{selectedPost.status}</Badge>
+                {selectedPost.channels.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+              </div>
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <MiniRow label="Time" value={selectedPost.when} />
+                <MiniRow label="Campaign" value={selectedPost.campaign} />
+                <MiniRow label="Product" value={selectedPost.productId} />
+                <MiniRow label="SKU" value={selectedPost.skuId} />
+              </div>
+              <div className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">
+                Next: {selectedPost.status === 'Review' ? 'Request approval before publishing.' : selectedPost.status === 'Blocked' ? 'Resolve blocker or route to escalation.' : 'Keep schedule and monitor engagement window.'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild><Link to="/demand/mdec?view=composer">Open in composer</Link></Button>
+                {selectedPost.status !== 'Approved' ? <Button variant="outline" onClick={() => setPostStatus(selectedPost.id, 'Approved')}>Mark approved</Button> : null}
+                {selectedPost.status !== 'Review' ? <Button variant="outline" onClick={() => setPostStatus(selectedPost.id, 'Review')}>Send to review</Button> : null}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Select a post to inspect.</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

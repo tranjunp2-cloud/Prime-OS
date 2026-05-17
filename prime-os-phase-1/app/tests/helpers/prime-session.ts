@@ -51,7 +51,7 @@ export async function expectPrimeShellReady(page: Page) {
   await page.locator('#main-content').waitFor({ state: 'visible', timeout: 20_000 });
   await page
     .locator('#main-content')
-    .locator('h1, h2, h3, [role="heading"], table, form')
+    .locator('h1:visible, h2:visible, h3:visible, [role="heading"]:visible, table:visible, form:visible')
     .first()
     .waitFor({ state: 'visible', timeout: 20_000 });
 }

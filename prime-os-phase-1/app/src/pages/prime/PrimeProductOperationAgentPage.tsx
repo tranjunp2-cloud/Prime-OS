@@ -228,12 +228,41 @@ const formatChatTime = () =>
     minute: '2-digit',
   }).format(new Date());
 
+const emptyCommandStarters = [
+  {
+    title: 'Approval sweep',
+    prompt: 'Review pending approvals',
+    detail: 'Find approval work that needs operator attention.',
+  },
+  {
+    title: 'Risk packet',
+    prompt: 'Prepare inventory risk packet',
+    detail: 'Ground the top operating risk in evidence and checks.',
+  },
+  {
+    title: 'Blocked work',
+    prompt: 'Find blocked high-risk cards',
+    detail: 'Surface owner response work before it stalls execution.',
+  },
+];
+
+function getOperatingFollowUpPrompts(intent?: OperatingChatIntent) {
+  const commandIntent = intent && ['approval_sweep', 'risk_packet', 'blocked_work', 'audit_summary'].includes(intent) ? intent : null;
+  return OPERATING_COMMAND_PROMPTS.filter((command) => command.id !== commandIntent).slice(0, 3);
+}
+
 function AgentResolutionCard({
   message,
+  selected,
+  onSelect,
+  onSendPrompt,
   onPreparePacket,
   onQueueApproval,
 }: {
   message: OperatingChatMessage
+  selected: boolean
+  onSelect: () => void
+  onSendPrompt: (prompt: string) => void
   onPreparePacket: (messageId: string, resolution: OperatingChatResolution) => void
   onQueueApproval: (messageId: string, resolution: OperatingChatResolution) => void
 }) {
@@ -242,9 +271,25 @@ function AgentResolutionCard({
 
   const response = resolution.response;
   const actionLocked = message.actionState === 'queued' || message.actionState === 'prepared';
+  const followUps = getOperatingFollowUpPrompts(message.intent);
 
   return (
-    <div className={cn('rounded-2xl border p-4', resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-50/60' : 'bg-muted/30')}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      className={cn(
+        'rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-50/60' : 'bg-muted/30',
+        selected && 'border-primary/50 ring-2 ring-primary/10',
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2">
         {resolution.intent === 'unsafe_mutation' ? <AlertTriangle className="size-4 text-amber-600" /> : <Bot className="size-4 text-primary" />}
         <span className="font-semibold">Operation Agent</span>
@@ -298,6 +343,57 @@ function AgentResolutionCard({
           );
         })}
       </div>
+      <div className="mt-4 border-t pt-3">
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Follow up</div>
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+          {followUps.map((command) => (
+            <button
+              key={`${message.id}-${command.id}`}
+              type="button"
+              disabled={message.status === 'thinking'}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSendPrompt(command.prompt);
+              }}
+              className="shrink-0 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {command.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommandEmptyState({ onSendPrompt }: { onSendPrompt: (prompt: string) => void }) {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed bg-background/60 p-5">
+      <div className="max-w-3xl text-center">
+        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <Bot className="size-6" />
+        </div>
+        <h3 className="mt-4 text-2xl font-semibold">Start an operating chat</h3>
+        <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Ask the Operation Agent to review approvals, prepare evidence-backed packets, find blocked work, or summarize audit changes. This mock chat is session-local and does not mutate source systems.
+        </p>
+        <div className="mt-6 grid gap-3 text-left md:grid-cols-3">
+          {emptyCommandStarters.map((starter) => (
+            <button
+              key={starter.title}
+              type="button"
+              onClick={() => onSendPrompt(starter.prompt)}
+              className="rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            >
+              <div className="font-semibold">{starter.title}</div>
+              <div className="mt-2 text-sm text-muted-foreground">{starter.detail}</div>
+              <div className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                Start flow <ArrowRight className="size-4" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -317,31 +413,20 @@ function CommandCenter({
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const timeoutRef = useRef<number | null>(null);
-  const [messages, setMessages] = useState<OperatingChatMessage[]>(() => {
-    const welcome = buildOperatingChatResolution(cards, proposals, 'hello');
-    return [
-      {
-        id: 'agent-welcome',
-        role: 'agent',
-        content: welcome.summary,
-        createdAt: formatChatTime(),
-        status: 'ready',
-        intent: 'greeting',
-        resolution: welcome,
-        actionState: 'none',
-      },
-    ];
-  });
-
-  const latestResolution = [...messages].reverse().find((message) => message.role === 'agent' && message.resolution)?.resolution ?? messages[0]?.resolution;
-  const focusCard = latestResolution?.response?.focusCardId ? cards.find((card) => card.id === latestResolution.response?.focusCardId) : undefined;
+  const welcomeResolution = useMemo(() => buildOperatingChatResolution(cards, proposals, 'hello'), [cards, proposals]);
+  const [messages, setMessages] = useState<OperatingChatMessage[]>([]);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const selectedAgentMessage = selectedMessageId ? messages.find((message) => message.id === selectedMessageId && message.role === 'agent' && message.resolution) : undefined;
+  const latestAgentMessage = [...messages].reverse().find((message) => message.role === 'agent' && message.resolution);
+  const activeResolution = (selectedAgentMessage ?? latestAgentMessage)?.resolution ?? welcomeResolution;
+  const focusCard = activeResolution.response?.focusCardId ? cards.find((card) => card.id === activeResolution.response?.focusCardId) : undefined;
   const urgentCards = cards.filter((card) => card.severity === 'high' || card.approvalState === 'pending').slice(0, 3);
   const suites = Array.from(new Set(cards.map((card) => card.sourceSuite)));
   const pendingApprovals = cards.filter((card) => card.approvalState === 'pending').length;
   const highRisk = cards.filter((card) => card.severity === 'high').length;
   const waiting = cards.filter((card) => card.laneId === 'waiting').length;
   const isThinking = messages.some((message) => message.status === 'thinking');
-  const hasActionPreview = Boolean(latestResolution?.response);
+  const hasActionPreview = Boolean(activeResolution.response);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ block: 'end' });
@@ -385,6 +470,7 @@ function CommandCenter({
     };
 
     setMessages((current) => [...current, operatorMessage, thinkingMessage]);
+    setSelectedMessageId(agentMessageId);
     setComposerValue('');
     composerRef.current?.focus();
 
@@ -404,6 +490,7 @@ function CommandCenter({
             : message,
         ),
       );
+      setSelectedMessageId(agentMessageId);
     }, 350);
   };
 
@@ -474,6 +561,7 @@ function CommandCenter({
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" role="log" aria-live="polite" aria-relevant="additions" aria-busy={isThinking}>
+          {messages.length === 0 ? <CommandEmptyState onSendPrompt={sendPrompt} /> : null}
           {messages.map((message) => (
             <div
               key={message.id}
@@ -520,7 +608,14 @@ function CommandCenter({
               ) : null}
 
               {message.role === 'agent' && message.status !== 'thinking' ? (
-                <AgentResolutionCard message={message} onPreparePacket={handlePreparePacket} onQueueApproval={handleQueueApproval} />
+                <AgentResolutionCard
+                  message={message}
+                  selected={selectedMessageId === message.id}
+                  onSelect={() => setSelectedMessageId(message.id)}
+                  onSendPrompt={sendPrompt}
+                  onPreparePacket={handlePreparePacket}
+                  onQueueApproval={handleQueueApproval}
+                />
               ) : null}
             </div>
           ))}
@@ -609,14 +704,14 @@ function CommandCenter({
             <>
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Action preview</div>
-                <h2 className="mt-2 text-xl font-semibold">{focusCard?.title ?? latestResolution?.title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{latestResolution?.auditImplication}</p>
+                <h2 className="mt-2 text-xl font-semibold">{focusCard?.title ?? activeResolution.title}</h2>
+                <p className="mt-2 text-sm text-muted-foreground">{activeResolution.auditImplication}</p>
               </div>
               <div className="mt-4 space-y-4">
                 <div className="rounded-xl bg-muted/30 p-4">
                   <div className="font-semibold">Evidence</div>
                   <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    {(latestResolution?.evidence ?? []).slice(0, 3).map((item) => (
+                    {activeResolution.evidence.slice(0, 3).map((item) => (
                       <div key={item} className="flex gap-2">
                         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                         <span>{item}</span>
@@ -627,7 +722,7 @@ function CommandCenter({
                 <div className="rounded-xl bg-muted/30 p-4">
                   <div className="font-semibold">Policy checks</div>
                   <div className="mt-3 space-y-2 text-sm">
-                    {(latestResolution?.policyChecks ?? []).slice(0, 2).map((check) => (
+                    {activeResolution.policyChecks.slice(0, 2).map((check) => (
                       <div key={check.label} className="flex items-center gap-2 rounded-lg bg-background p-2">
                         {check.passed ? <CheckCircle2 className="size-4 text-emerald-600" /> : <Clock3 className="size-4 text-amber-600" />}
                         <span className="text-muted-foreground">{check.label}</span>
@@ -642,7 +737,7 @@ function CommandCenter({
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Agent status</div>
               <div className="mt-3 flex items-center gap-2">
                 <Clock3 className="size-4 text-amber-600" />
-                <span className="font-semibold">{latestResolution?.statusLabel ?? 'Ready'}</span>
+                <span className="font-semibold">{activeResolution.statusLabel}</span>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">No action is prepared yet. Pick a suggested prompt or ask for approvals, risk, blocked work, or audit changes.</p>
             </div>
