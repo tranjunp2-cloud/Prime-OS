@@ -1,6 +1,6 @@
 # Reused Files
 
-The Phase 1 app was created by copying the legacy COS frontend into `/prime-os-phase-1/app` and excluding runtime/build artifacts at copy time. The original source workspace now serves as historical reference only.
+The Phase 1 app was created by copying the legacy COS frontend into `/apps/web` and excluding runtime/build artifacts at copy time. The original source workspace now serves as historical reference only.
 
 ## Reused as-is in routes
 

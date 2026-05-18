@@ -60,7 +60,7 @@ flowchart LR
 
 ## Mock data generated mới
 
-Representative static data is captured in `/mock-data/prime-linked-data.json`. Runtime data is generated in the app through `getPrimeSnapshot()`, so UI screens always read the current COS in-memory stores after seeding.
+Representative static data is captured in `/packages/mock-data/prime-linked-data.json`. Runtime data is generated in the web app through `getPrimeSnapshot()`, so UI screens always read the current COS in-memory stores after seeding.
 
 ## Do not create
 

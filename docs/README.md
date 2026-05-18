@@ -19,3 +19,9 @@ Active PrimeOS project docs live here.
 - `migration/reused-files.md` - files reused directly from the COS base
 - `migration/wrapped-modules.md` - modules wrapped by PrimeOS
 - `migration/new-modules.md` - modules created specifically for Phase 1
+
+## Platform notes
+
+- `operations/service-layout.md` - app, API, admin, Docker, and staging environment layout
+- `platform/` - deeper platform plans, ADRs, i18n notes, and UI QA docs
+- `qa-reports/` - preserved QA report artifacts from earlier local validation runs

@@ -3,7 +3,7 @@
 Source of truth audited:
 
 - Legacy COS workspace captured before PrimeOS wrapping
-- Current Phase 1 runtime workspace: `/prime-os-phase-1/app`
+- Current Phase 1 runtime workspace: `/apps/web`
 
 ## Audit result
 

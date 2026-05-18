@@ -195,7 +195,7 @@ async function parseAccountJson<T>(response: Response, backendBase: string): Pro
 
   if (!contentType.toLowerCase().includes('application/json')) {
     const target = backendBase || 'the configured API base';
-    throw new Error(`Prime OS backend at ${target} did not return JSON. Start the local backend with npm run dev in prime-os-phase-1/backend, then reload Account Center.`);
+    throw new Error(`Prime OS backend at ${target} did not return JSON. Start the local API with npm run dev in apps/api, then reload Account Center.`);
   }
 
   return await response.json() as T;
@@ -203,7 +203,7 @@ async function parseAccountJson<T>(response: Response, backendBase: string): Pro
 
 function formatAccountNetworkError(error: unknown, backendBase: string) {
   if (error instanceof TypeError && /fetch/i.test(error.message)) {
-    return `Cannot reach Prime OS backend at ${backendBase || 'the configured API base'}. Start the local backend with npm run dev in prime-os-phase-1/backend, then reload Account Center.`;
+    return `Cannot reach Prime OS backend at ${backendBase || 'the configured API base'}. Start the local API with npm run dev in apps/api, then reload Account Center.`;
   }
 
   return error instanceof Error ? error.message : 'Account request failed.';

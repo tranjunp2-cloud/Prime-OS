@@ -24,7 +24,7 @@
 
 ## Mock-data package
 
-- `mock-data/prime-linked-data.json`
+- `packages/mock-data/prime-linked-data.json`
 
 ## Build artifacts
 

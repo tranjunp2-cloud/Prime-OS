@@ -1,5 +1,5 @@
 {
-  "name": "prime-os-backend",
+  "name": "@primeos/api",
   "version": "1.0.0",
   "private": true,
   "type": "module",

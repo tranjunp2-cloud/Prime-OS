@@ -1,31 +1,31 @@
 services:
-  prime-web:
+  web:
     build:
-      context: ./app
+      context: ./apps/web
       args:
         VITE_SUPABASE_URL: "${VITE_SUPABASE_URL:?Set Supabase project URL for the PrimeOS frontend build}"
         VITE_SUPABASE_PUBLISHABLE_KEY: "${VITE_SUPABASE_PUBLISHABLE_KEY:?Set Supabase anon/publishable key for the PrimeOS frontend build}"
         VITE_PRIME_ADMIN_API_BASE: "${VITE_PRIME_ADMIN_API_BASE:-}"
     container_name: prime-os-prime-web
     depends_on:
-      - backend
+      - api
     ports:
       - "5173:80"
     restart: unless-stopped
 
-  admin-web:
+  admin:
     build:
-      context: ./admin-web
+      context: ./apps/admin
     container_name: prime-os-admin-web
     depends_on:
-      - backend
+      - api
     ports:
       - "5174:80"
     restart: unless-stopped
 
-  backend:
+  api:
     build:
-      context: ./backend
+      context: ./apps/api
     container_name: prime-os-backend
     environment:
       NODE_ENV: production
@@ -40,5 +40,5 @@ services:
     expose:
       - "8080"
     volumes:
-      - ./backend/data:/app/data
+      - ./apps/api/data:/app/data
     restart: unless-stopped

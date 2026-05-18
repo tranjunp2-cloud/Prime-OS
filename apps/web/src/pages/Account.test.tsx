@@ -137,7 +137,7 @@ describe('Account page', () => {
     await waitFor(() => {
       expect(screen.getByText(/Cannot reach Prime OS backend/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/prime-os-phase-1\/backend/i)).toBeInTheDocument();
+    expect(screen.getByText(/apps\/api/i)).toBeInTheDocument();
   });
 
   it('shows a backend recovery hint when local preview returns the SPA shell instead of JSON', async () => {
@@ -150,6 +150,6 @@ describe('Account page', () => {
     await waitFor(() => {
       expect(screen.getByText(/did not return JSON/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/prime-os-phase-1\/backend/i)).toBeInTheDocument();
+    expect(screen.getByText(/apps\/api/i)).toBeInTheDocument();
   });
 });

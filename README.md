@@ -1,55 +1,48 @@
 # PrimeOS
 
-PrimeOS repository, cleaned so `prime-os-phase-1/` is the clear primary codebase for staging.
+PrimeOS is organized as a small monorepo for the Phase 1 commerce operating system prototype.
 
 ## Repository Layout
 
-- `prime-os-phase-1/app/` - main React/Vite application and the only runnable web app in this repository
-- `prime-os-phase-1/mock-data/` - linked mock-data contracts used by the Phase 1 shell
-- `docs/` - active PrimeOS Phase 1 documentation and migration notes
-- `research/` - research notes that informed the system map and wrapper strategy
-- `references/` - supporting prototypes, reports, screenshots, and archived legacy docs
+- `apps/web/` - main React/Vite operator workspace.
+- `apps/admin/` - admin control room for curated data operations.
+- `apps/api/` - local file-backed Express API used by the web and admin apps.
+- `packages/mock-data/` - linked mock-data contracts shared by the prototype.
+- `docs/` - active product, migration, operations, and research documentation.
+- `references/` - supporting prototypes, reports, screenshots, and archived legacy docs.
 
-## Run Local PrimeOS
+## Local Development
 
-Always run both services for local PrimeOS work. The frontend alone is not a complete local build because Account Center and other pages call the backend.
+Run the API and web app in separate terminals:
 
 ```bash
-# Terminal 1: backend API
-cd prime-os-phase-1/backend
+cd apps/api
 npm ci
 npm run dev
+```
 
-# Terminal 2: frontend app
-cd prime-os-phase-1/app
+```bash
+cd apps/web
 npm ci
 npm run dev:5177 -- --host 127.0.0.1
 ```
 
-- Frontend: `http://127.0.0.1:5177`
-- Backend: `http://127.0.0.1:8180`
-
-## Primary Product Scope
-
-The staging-ready Phase 1 prototype is organized around:
-
-- Demand Area
-- Customer Area
-- Ecom Area
-- Intelligence Area
-- COS Tower as the control core
+- Web: `http://127.0.0.1:5177`
+- API: `http://127.0.0.1:8180`
+- Admin: `cd apps/admin && npm ci && npm run dev`
 
 ## Verification
 
 ```bash
-cd prime-os-phase-1/app
+cd apps/web
 npm run lint
 npm run test
 npm run build
+
+cd ../api
+npm test
 ```
 
-## Notes
+## Product Scope
 
-- `prime-os-phase-1/app/` is the deployment path that matters for staging.
-- Legacy non-PrimeOS docs were moved to `references/legacy-docs/`.
-- Old HTML demos and mockups were moved to `references/prototypes-suite/` to keep the root clean without losing context.
+The staging-ready Phase 1 prototype is organized around Demand Area, Customer Area, Ecom Area, Intelligence Area, and COS Tower as the control core.

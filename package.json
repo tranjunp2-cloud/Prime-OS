@@ -1,0 +1,21 @@
+{
+  "name": "primeos",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev:5177 --workspace @primeos/web -- --host 127.0.0.1",
+    "dev:admin": "npm run dev --workspace @primeos/admin",
+    "dev:api": "npm run dev --workspace @primeos/api",
+    "build:web": "npm run build --workspace @primeos/web",
+    "build:web:dev": "npm run build:dev --workspace @primeos/web",
+    "build:admin": "npm run build --workspace @primeos/admin",
+    "test:web": "npm run test --workspace @primeos/web",
+    "test:web:smoke": "npm run test:smoke --workspace @primeos/web",
+    "test:api": "npm run test --workspace @primeos/api",
+    "lint:web": "npm run lint --workspace @primeos/web"
+  }
+}

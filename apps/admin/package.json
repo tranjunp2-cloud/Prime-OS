@@ -1,5 +1,5 @@
 {
-  "name": "prime-os-admin-web",
+  "name": "@primeos/admin",
   "version": "1.0.0",
   "private": true,
   "type": "module",

@@ -33,7 +33,7 @@
 | `App.tsx` routes | Map old COS routes into `/ecom/cos/*` and redirect old URLs | Keep original page components |
 | `AppLayout.tsx` | Remove auth gate for BOD prototype and seed demo data automatically | Do not rewrite COS domain screens |
 | `AppSidebar.tsx` | Replace old nav with Prime OS IA | Preserve visual interaction pattern |
-| `package.json` | Rename app to `prime-os-phase-1` | Keep dependency stack and lockfile lineage |
+| `package.json` | Rename app package to `@primeos/web` | Keep dependency stack and lockfile lineage |
 
 ## Build new
 
