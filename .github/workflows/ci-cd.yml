@@ -30,21 +30,28 @@ jobs:
         with:
           node-version: '20'
           cache: npm
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            apps/web/package-lock.json
+            apps/admin/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci --workspaces=false --prefix apps/api
+          npm ci --workspaces=false --prefix apps/web
+          npm ci --workspaces=false --prefix apps/admin
 
       - name: API tests
-        run: npm run test:api
+        run: npm --prefix apps/api test
 
       - name: Web smoke tests
-        run: npm run test:web:smoke
+        run: npm --prefix apps/web run test:smoke
 
       - name: Build web
-        run: npm run build:web
+        run: npm --prefix apps/web run build
 
       - name: Build admin
-        run: npm run build:admin
+        run: npm --prefix apps/admin run build
 
       - name: Validate Docker Compose
         env:
