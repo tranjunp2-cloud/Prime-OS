@@ -1,0 +1,158 @@
+name: PrimeOS CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: primeos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ci-primeos.supabase.co' }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_ci_primeos' }}
+      VITE_PRIME_ADMIN_API_BASE: ${{ secrets.VITE_PRIME_ADMIN_API_BASE || 'https://backend.btyvietnam.com' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: API tests
+        run: npm run test:api
+
+      - name: Web smoke tests
+        run: npm run test:web:smoke
+
+      - name: Build web
+        run: npm run build:web
+
+      - name: Build admin
+        run: npm run build:admin
+
+      - name: Validate Docker Compose
+        env:
+          PRIME_ALLOWED_ORIGINS: ${{ secrets.PRIME_ALLOWED_ORIGINS || 'https://primeos.btyvietnam.com,https://admin.primeos.btyvietnam.com,https://backend.btyvietnam.com' }}
+          PRIME_SESSION_SECRET: ${{ secrets.PRIME_SESSION_SECRET || 'ci-session-secret-12345678901234567890' }}
+          PRIME_ADMIN_EMAIL: ${{ secrets.PRIME_ADMIN_EMAIL || 'admin@example.com' }}
+          PRIME_ADMIN_PASSWORD: ${{ secrets.PRIME_ADMIN_PASSWORD || 'ci-admin-password' }}
+          PRIME_USER_EMAIL: ${{ secrets.PRIME_USER_EMAIL || 'user@example.com' }}
+          PRIME_USER_PASSWORD: ${{ secrets.PRIME_USER_PASSWORD || 'ci-user-password' }}
+          PRIME_ALLOW_DEMO_CREDENTIALS: ${{ secrets.PRIME_ALLOW_DEMO_CREDENTIALS || 'false' }}
+        run: docker compose config >/dev/null
+
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deploy tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync openssh-client
+
+      - name: Prepare SSH
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/primeos_deploy_key
+          chmod 600 ~/.ssh/primeos_deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Stop previous compose project if present
+        run: |
+          ssh -i ~/.ssh/primeos_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" '
+            set -e
+            cd /opt/primeos/PrimeOS 2>/dev/null || exit 0
+            if [ -f prime-os-phase-1/docker-compose.yml ]; then
+              docker compose --env-file prime-os-phase-1/.env \
+                -f prime-os-phase-1/docker-compose.yml \
+                -f prime-os-phase-1/docker-compose.override.yml \
+                down || true
+            fi
+          '
+
+      - name: Sync repository
+        run: |
+          rsync -az --delete \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='apps/*/node_modules/' \
+            --exclude='apps/*/dist/' \
+            --exclude='.env' \
+            --exclude='docker-compose.override.yml' \
+            -e "ssh -i ~/.ssh/primeos_deploy_key -p $DEPLOY_PORT" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Write production environment
+        run: |
+          cat > .deploy.env <<'ENV'
+          PRIME_ALLOWED_ORIGINS=${{ secrets.PRIME_ALLOWED_ORIGINS }}
+          PRIME_SESSION_SECRET=${{ secrets.PRIME_SESSION_SECRET }}
+          PRIME_ADMIN_EMAIL=${{ secrets.PRIME_ADMIN_EMAIL }}
+          PRIME_ADMIN_PASSWORD=${{ secrets.PRIME_ADMIN_PASSWORD }}
+          PRIME_USER_EMAIL=${{ secrets.PRIME_USER_EMAIL }}
+          PRIME_USER_PASSWORD=${{ secrets.PRIME_USER_PASSWORD }}
+          PRIME_ALLOW_DEMO_CREDENTIALS=${{ secrets.PRIME_ALLOW_DEMO_CREDENTIALS || 'false' }}
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_PRIME_ADMIN_API_BASE=${{ secrets.VITE_PRIME_ADMIN_API_BASE }}
+          ENV
+          sed -i 's/^          //' .deploy.env
+          scp -i ~/.ssh/primeos_deploy_key -P "$DEPLOY_PORT" .deploy.env "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.env"
+          rm -f .deploy.env
+
+      - name: Write production compose override
+        run: |
+          cat > docker-compose.override.yml <<'YAML'
+          services:
+            api:
+              ports:
+                - "127.0.0.1:8180:8080"
+          YAML
+          sed -i 's/^          //' docker-compose.override.yml
+          scp -i ~/.ssh/primeos_deploy_key -P "$DEPLOY_PORT" docker-compose.override.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.override.yml"
+
+      - name: Deploy containers
+        run: |
+          ssh -i ~/.ssh/primeos_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" '
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            docker compose --env-file .env up -d --build --remove-orphans
+            docker image prune -f
+            docker compose ps
+          '
+
+      - name: Smoke check production
+        run: |
+          curl -fsSL --retry 5 --retry-delay 5 https://primeos.btyvietnam.com/overview >/tmp/primeos.html
+          grep -q '<div id="root"></div>' /tmp/primeos.html

@@ -43,6 +43,10 @@ cd ../api
 npm test
 ```
 
+## CI/CD
+
+Pushes to `main` run GitHub Actions and deploy production automatically after verification passes. See `docs/operations/ci-cd.md`.
+
 ## Product Scope
 
 The staging-ready Phase 1 prototype is organized around Demand Area, Customer Area, Ecom Area, Intelligence Area, and COS Tower as the control core.

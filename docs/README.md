@@ -23,5 +23,6 @@ Active PrimeOS project docs live here.
 ## Platform notes
 
 - `operations/service-layout.md` - app, API, admin, Docker, and staging environment layout
+- `operations/ci-cd.md` - GitHub Actions verification and production deploy workflow
 - `platform/` - deeper platform plans, ADRs, i18n notes, and UI QA docs
 - `qa-reports/` - preserved QA report artifacts from earlier local validation runs
