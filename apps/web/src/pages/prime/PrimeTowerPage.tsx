@@ -157,17 +157,17 @@ import {
 import { getPartnerWorkspaceSummary } from '@/lib/prime/partner-workspace';
 import {
   SOURCE_FUNCTION_CATALOG,
-  buildDemandSources,
-  buildDemandSourcesOverview,
-  getDemandSourceTypeLabel,
-  type DemandSource,
-  type DemandSourceFunction,
-  type DemandSourceType,
-} from '@/lib/prime/demand-sources';
+  buildCrmSources,
+  buildCrmSourcesOverview,
+  getCrmSourceTypeLabel,
+  type CrmSource,
+  type CrmSourceFunction,
+  type CrmSourceType,
+} from '@/lib/prime/crm-sources';
 import {
-  buildDemandDashboardSnapshot,
-  type DemandDashboardSeverity,
-} from '@/lib/prime/demand-dashboard';
+  buildCrmDashboardSnapshot,
+  type CrmDashboardSeverity,
+} from '@/lib/prime/crm-dashboard';
 import {
   MARKETPLACE_SOURCE_PAGES,
   buildMarketplaceSourceSnapshot,
@@ -176,19 +176,19 @@ import {
   getMarketplaceSourcePageMeta,
   type MarketplaceCampaignAttribution,
   type MarketplaceDataHealthItem,
-  type MarketplaceDemandSignal,
+  type MarketplaceCrmSignal,
   type MarketplaceInquiry,
   type MarketplaceSkuSignal,
   type MarketplaceSourcePage,
   type MarketplaceSourceSnapshot,
 } from '@/lib/prime/marketplace-source';
 import {
-  DEMAND_CAMPAIGNS_HREF,
-  DEMAND_CONTENT_SOCIAL_HREF,
-  DEMAND_LEADS_RFQS_HREF,
-  DEMAND_REENGAGE_HREF,
+  CRM_CAMPAIGNS_HREF,
+  CRM_CONTENT_SOCIAL_HREF,
+  CRM_LEADS_RFQS_HREF,
+  CRM_REENGAGE_HREF,
   INTELLIGENCE_DECISIONS_HREF,
-  demandTowerIds,
+  crmTowerIds,
   financeTowerIds,
   intelligenceTowerIds,
   type TowerJob,
@@ -298,7 +298,7 @@ function getTowerChromeCopy(locale: Locale) {
   const copy = {
     'en-US': {
       areas: {
-        'Demand Area': 'Demand Area',
+        'CRM Area': 'CRM Area',
         'Customer Area': 'Customer Area',
         'Ecom Area': 'Ecom Area',
         'Intelligence Area': 'Intelligence Area',
@@ -328,7 +328,7 @@ function getTowerChromeCopy(locale: Locale) {
     },
     'ja-JP': {
       areas: {
-        'Demand Area': 'デマンド領域',
+        'CRM Area': 'CRM領域',
         'Customer Area': '顧客領域',
         'Ecom Area': 'Eコマース領域',
         'Intelligence Area': 'インテリジェンス領域',
@@ -344,7 +344,7 @@ function getTowerChromeCopy(locale: Locale) {
       tower: 'タワー',
       orders: '注文',
       signals: 'シグナル',
-      outcomeOrders: 'デマンド実行後の注文をOMSから読み戻します。',
+      outcomeOrders: 'CRM実行後の注文をOMSから読み戻します。',
       outcomeIntelligence: 'オペレーターへ引き渡せるアクティベーション施策です。',
       outcomeCustomer: '運用コンテキストに使える顧客・アカウント記録です。',
       continueHandoff: '責任ある引き渡しを続ける',
@@ -358,7 +358,7 @@ function getTowerChromeCopy(locale: Locale) {
     },
     'vi-VN': {
       areas: {
-        'Demand Area': 'Khu vực tạo nhu cầu',
+        'CRM Area': 'Khu vực CRM',
         'Customer Area': 'Khu vực khách hàng',
         'Ecom Area': 'Khu vực thương mại',
         'Intelligence Area': 'Khu vực trí tuệ vận hành',
@@ -374,7 +374,7 @@ function getTowerChromeCopy(locale: Locale) {
       tower: 'Tháp',
       orders: 'Đơn hàng',
       signals: 'Tín hiệu',
-      outcomeOrders: 'Đơn hàng được đọc lại từ OMS sau khi Demand thực thi.',
+      outcomeOrders: 'Đơn hàng được đọc lại từ OMS sau khi CRM thực thi.',
       outcomeIntelligence: 'Các play kích hoạt đã sẵn sàng để operator bàn giao.',
       outcomeCustomer: 'Hồ sơ khách hàng/tài khoản sẵn sàng cho ngữ cảnh vận hành.',
       continueHandoff: 'Tiếp tục bàn giao có trách nhiệm',
@@ -426,7 +426,7 @@ function getPrimeTowerPromise(locale: Locale, towerId: PrimeTowerId, fallback: s
 }
 
 function getTowerConfidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot) {
-  if (demandTowerIds.includes(towerId)) {
+  if (crmTowerIds.includes(towerId)) {
     return Math.min(94, 62 + snapshot.campaigns.length * 5 + Math.round(snapshot.metrics.leadToOrderRate / 3));
   }
 
@@ -453,13 +453,13 @@ function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale
       orders: 'Orders',
       revenueContext: (amount: string) => `${amount} revenue context from OMS.`,
       guardrail: 'Guardrail',
-      guardrailDetail: 'Demand actions must keep COS, finance, and customer controls visible.',
+guardrailDetail: 'CRM actions must keep COS, finance, and customer controls visible.',
       signals: 'Signals',
       intelligenceSignals: 'Social, creator, VOC, and product signals are joined before action.',
       models: 'Models',
       modelDetail: 'Mock ML/DL models explain what to activate next.',
       actions: 'Actions',
-      actionsDetail: 'Recommendations hand off into Demand, Customer, or COS.',
+actionsDetail: 'Recommendations hand off into CRM, Customer, or COS.',
       revenue: 'Revenue',
       financeRevenue: 'Finance reads operating reality from OMS.',
       risk: 'Risk',
@@ -484,13 +484,13 @@ function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale
       orders: '注文',
       revenueContext: (amount: string) => `${amount} の売上文脈をOMSから取得しています。`,
       guardrail: 'ガードレール',
-      guardrailDetail: 'デマンド施策ではCOS、財務、顧客の制御を常に見える状態にします。',
+      guardrailDetail: 'CRM施策ではCOS、財務、顧客の制御を常に見える状態にします。',
       signals: 'シグナル',
       intelligenceSignals: 'ソーシャル、クリエイター、VOC、商品シグナルをアクション前に統合します。',
       models: 'モデル',
       modelDetail: 'モックML/DLモデルが次に何を起動すべきかを説明します。',
       actions: 'アクション',
-      actionsDetail: '推奨アクションをDemand、Customer、COSへ引き渡します。',
+      actionsDetail: '推奨アクションをCRM、Customer、COSへ引き渡します。',
       revenue: '売上',
       financeRevenue: '財務はOMSから運用実態を読み取ります。',
       risk: 'リスク',
@@ -515,13 +515,13 @@ function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale
       orders: 'Đơn hàng',
       revenueContext: (amount: string) => `${amount} bối cảnh doanh thu từ OMS.`,
       guardrail: 'Rào chắn',
-      guardrailDetail: 'Hành động Demand phải luôn nhìn thấy kiểm soát COS, tài chính và khách hàng.',
+      guardrailDetail: 'Hành động CRM phải luôn nhìn thấy kiểm soát COS, tài chính và khách hàng.',
       signals: 'Tín hiệu',
       intelligenceSignals: 'Tín hiệu social, creator, VOC và sản phẩm được nối trước khi hành động.',
       models: 'Mô hình',
       modelDetail: 'Mô hình ML/DL mock giải thích nên kích hoạt gì tiếp theo.',
       actions: 'Hành động',
-      actionsDetail: 'Khuyến nghị được bàn giao sang Demand, Customer hoặc COS.',
+      actionsDetail: 'Khuyến nghị được bàn giao sang CRM, Customer hoặc COS.',
       revenue: 'Doanh thu',
       financeRevenue: 'Tài chính đọc thực tế vận hành từ OMS.',
       risk: 'Rủi ro',
@@ -546,13 +546,13 @@ function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale
     orders: 'Orders',
     revenueContext: (amount: string) => `${amount} revenue context from OMS.`,
     guardrail: 'Guardrail',
-    guardrailDetail: 'Demand actions must keep COS, finance, and customer controls visible.',
+    guardrailDetail: 'CRM actions must keep COS, finance, and customer controls visible.',
     signals: 'Signals',
     intelligenceSignals: 'Social, creator, VOC, and product signals are joined before action.',
     models: 'Models',
     modelDetail: 'Mock ML/DL models explain what to activate next.',
     actions: 'Actions',
-    actionsDetail: 'Recommendations hand off into Demand, Customer, or COS.',
+    actionsDetail: 'Recommendations hand off into CRM, Customer, or COS.',
     revenue: 'Revenue',
     financeRevenue: 'Finance reads operating reality from OMS.',
     risk: 'Risk',
@@ -572,7 +572,7 @@ function getTowerEvidence(towerId: PrimeTowerId, snapshot: PrimeSnapshot, locale
     serviceContext: 'Service context is previewed without absorbing the Service tower.',
   };
 
-  if (demandTowerIds.includes(towerId)) {
+  if (crmTowerIds.includes(towerId)) {
     return [
       { label: copy.campaigns, value: snapshot.campaigns.length, detail: copy.leadsRfqsAttached(snapshot.leads.length, snapshot.rfqs.length), tone: 'info' },
       { label: copy.orders, value: snapshot.orders.length, detail: copy.revenueContext(currency.format(snapshot.metrics.revenue)), tone: 'success' },
@@ -622,7 +622,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
       demandSignalTitle: 'Warm buyer or launch route appears',
       demandSignalDetail: (campaigns: number, leads: number) => `${campaigns} campaign routes and ${leads} leads are available.`,
       demandDecisionTitle: 'Choose message, CTA, and owner',
-      demandDecisionDetail: 'Demand works only after a clear route, audience, and guardrail exist.',
+      demandDecisionDetail: 'CRM works only after a clear route, audience, and guardrail exist.',
       demandHandoffTitle: 'Capture and CRM receive response',
       demandHandoffDetail: 'RFQs, replies, and owner tasks should not disappear into marketing reporting.',
       demandOutcomeTitle: 'OMS/CRM read back result',
@@ -632,7 +632,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
       intelDecisionTitle: 'Recommend the next move',
       intelDecisionDetail: 'The tower answers what to do now, not just what happened.',
       intelHandoffTitle: 'Send action to the owning tower',
-      intelHandoffDetail: 'Demand, COS, Finance, or Customer receives the next step.',
+      intelHandoffDetail: 'CRM, COS, Finance, or Customer receives the next step.',
       intelOutcomeTitle: 'Read execution back',
       intelOutcomeDetail: 'Orders, RFQs, and CRM outcomes return as evidence.',
       defaultContextTitle: 'Read the operating record',
@@ -654,7 +654,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
       demandSignalTitle: '温度の高い買い手またはローンチ経路を検知',
       demandSignalDetail: (campaigns: number, leads: number) => `${campaigns} 件のキャンペーン経路と ${leads} 件のリードがあります。`,
       demandDecisionTitle: 'メッセージ、CTA、担当者を選ぶ',
-      demandDecisionDetail: '明確な経路、オーディエンス、ガードレールがある場合のみDemandを動かします。',
+      demandDecisionDetail: '明確な経路、オーディエンス、ガードレールがある場合のみCRMを動かします。',
       demandHandoffTitle: 'レスポンスを取得しCRMへ渡す',
       demandHandoffDetail: 'RFQ、返信、担当タスクをマーケティングレポート内に埋もれさせません。',
       demandOutcomeTitle: 'OMS/CRMから結果を読み戻す',
@@ -664,7 +664,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
       intelDecisionTitle: '次の一手を推奨',
       intelDecisionDetail: '何が起きたかだけでなく、今何をすべきかを示します。',
       intelHandoffTitle: '担当タワーへアクションを送る',
-      intelHandoffDetail: 'Demand、COS、Finance、Customerのいずれかが次のステップを受け取ります。',
+      intelHandoffDetail: 'CRM、COS、Finance、Customerのいずれかが次のステップを受け取ります。',
       intelOutcomeTitle: '実行結果を読み戻す',
       intelOutcomeDetail: '注文、RFQ、CRMの成果がエビデンスとして戻ります。',
       defaultContextTitle: '運用記録を読む',
@@ -686,7 +686,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
       demandSignalTitle: 'Xuất hiện người mua ấm hoặc tuyến launch',
       demandSignalDetail: (campaigns: number, leads: number) => `Có ${campaigns} tuyến chiến dịch và ${leads} lead.`,
       demandDecisionTitle: 'Chọn thông điệp, CTA và owner',
-      demandDecisionDetail: 'Demand chỉ chạy khi có tuyến, audience và guardrail rõ ràng.',
+      demandDecisionDetail: 'CRM chỉ chạy khi có tuyến, audience và guardrail rõ ràng.',
       demandHandoffTitle: 'Capture và CRM nhận phản hồi',
       demandHandoffDetail: 'RFQ, phản hồi và task owner không được biến mất trong báo cáo marketing.',
       demandOutcomeTitle: 'OMS/CRM đọc lại kết quả',
@@ -696,7 +696,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
       intelDecisionTitle: 'Đề xuất bước tiếp theo',
       intelDecisionDetail: 'Tháp trả lời cần làm gì bây giờ, không chỉ chuyện gì đã xảy ra.',
       intelHandoffTitle: 'Gửi hành động sang tháp sở hữu',
-      intelHandoffDetail: 'Demand, COS, Finance hoặc Customer nhận bước tiếp theo.',
+      intelHandoffDetail: 'CRM, COS, Finance hoặc Customer nhận bước tiếp theo.',
       intelOutcomeTitle: 'Đọc lại kết quả thực thi',
       intelOutcomeDetail: 'Đơn hàng, RFQ và kết quả CRM quay lại làm bằng chứng.',
       defaultContextTitle: 'Đọc hồ sơ vận hành',
@@ -711,7 +711,7 @@ function getTowerLoop(towerId: PrimeTowerId, job: TowerJob | undefined, snapshot
     },
   }[locale];
 
-  if (demandTowerIds.includes(towerId)) {
+  if (crmTowerIds.includes(towerId)) {
     return [
       { label: copy.signal, title: copy.demandSignalTitle, detail: copy.demandSignalDetail(snapshot.campaigns.length, snapshot.leads.length), href: '/intelligence/launch-decisions', tone: 'purple' },
       { label: copy.decision, title: copy.demandDecisionTitle, detail: copy.demandDecisionDetail, tone: 'info' },
@@ -804,14 +804,14 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot, l
     },
   }[locale];
 
-  if (demandTowerIds.includes(towerId)) {
+  if (crmTowerIds.includes(towerId)) {
     return snapshot.campaigns.slice(0, 5).map((campaign) => ({
       id: campaign.id,
       label: copy.campaign,
       title: campaign.name,
       detail: `${getSkuLabel(campaign.skuCode)} · ${campaign.leads} ${copy.leads} · ${campaign.orders} ${copy.orders}`,
       meta: campaign.status,
-      href: DEMAND_CAMPAIGNS_HREF,
+      href: CRM_CAMPAIGNS_HREF,
       tone: 'info',
     }));
   }
@@ -823,7 +823,7 @@ function getTowerRegistryItems(towerId: PrimeTowerId, snapshot: PrimeSnapshot, l
       title: getLocalizedActivationPlay(locale, play).audience,
       detail: getLocalizedActivationPlay(locale, play).nextBestAction,
       meta: `+${play.projectedLift}%`,
-      href: DEMAND_CAMPAIGNS_HREF,
+      href: CRM_CAMPAIGNS_HREF,
       tone: 'purple',
     }));
   }
@@ -956,8 +956,8 @@ function ActivationBoard({ plays }: { plays: PrimeActivationPlay[] }) {
 const intelligenceStatusCopy: Record<IntelligencePackageStatus, { label: string; tone: 'default' | 'secondary' | 'outline' | 'warning' | 'success' | 'info' | 'purple' }> = {
   running: { label: 'Running', tone: 'info' },
   review_needed: { label: 'Needs review', tone: 'warning' },
-  ready_for_demand: { label: 'Ready for Demand', tone: 'success' },
-  sent_to_demand: { label: 'Sent to Demand', tone: 'purple' },
+  ready_for_crm: { label: 'Ready for CRM', tone: 'success' },
+  sent_to_crm: { label: 'Sent to CRM', tone: 'purple' },
   blocked: { label: 'Blocked', tone: 'warning' },
   outcome_learned: { label: 'Outcome learned', tone: 'default' },
 };
@@ -968,28 +968,28 @@ function getDecisionHubCopy(locale: Locale) {
       title: 'AI Decision Review',
       statusSummary: (ready: number, review: number, blocked: number) => `${ready} ready · ${review} review · ${blocked} blocked`,
       workflow: 'Operator workflow',
-      headline: 'Review AI-prepared growth decisions before sending to Demand.',
-      description: 'Pick one decision package, inspect evidence and blockers, then either send a reviewed payload to Demand or ask the agent for more evidence.',
+      headline: 'Review AI-prepared growth decisions before sending to CRM.',
+      description: 'Pick one decision package, inspect evidence and blockers, then either send a reviewed payload to CRM or ask the agent for more evidence.',
       selectedNextStep: 'Selected next step',
       noPackage: 'No package selected',
       operatorNext: {
         wait: 'Wait for Intelligence package',
         guardrail: 'Resolve guardrail first',
-        readback: 'Review Demand outcome',
-        review: 'Review evidence, then send to Demand',
+        readback: 'Review CRM outcome',
+        review: 'Review evidence, then send to CRM',
       },
       needsReview: 'Needs review',
       needsReviewMeta: 'Human proof check.',
       readyToSend: 'Ready to send',
-      readyToSendMeta: 'Demand-ready payloads.',
+      readyToSendMeta: 'CRM-ready payloads.',
       blocked: 'Blocked',
       blockedMeta: 'Needs guardrail owner.',
-      processSteps: ['Signal', 'Agent run', 'Evidence', 'Decision', 'Demand', 'Readback'],
+      processSteps: ['Signal', 'Agent run', 'Evidence', 'Decision', 'CRM', 'Readback'],
       queueTitle: 'Decision Queue',
       queueDescription: 'Select one AI package to review.',
       noPackages: 'No packages in this state.',
       reviewTitle: 'Package Review',
-      reviewDescription: 'Recommendation, evidence, risk, and Demand payload for the selected package.',
+      reviewDescription: 'Recommendation, evidence, risk, and CRM payload for the selected package.',
       recommendation: 'Recommendation',
       confidence: 'Confidence',
       impact: 'Impact',
@@ -997,18 +997,18 @@ function getDecisionHubCopy(locale: Locale) {
       preparedBy: 'Prepared by',
       evidence: 'Evidence',
       risks: 'Risks / blockers',
-      sendToDemand: 'Send to Demand',
+      sendToCrm: 'Send to CRM',
       objective: 'Objective:',
       audience: 'Audience:',
       channel: 'Channel:',
       cta: 'CTA:',
-      fallbackChannel: 'Demand Ops',
+      fallbackChannel: 'CRM Ops',
       fallbackCta: 'Review setup',
       whyNot: 'Why not the other route',
-      demandReadback: 'Demand readback',
-      sendPreview: 'Send to Demand preview',
+      crmReadback: 'CRM readback',
+      sendPreview: 'Send to CRM preview',
       runningAction: 'Agent still preparing evidence',
-      learnedAction: 'View Demand readback',
+      learnedAction: 'View CRM readback',
       blockedAction: 'Blocked: resolve guardrail first',
       askFollowUp: 'Ask follow-up',
       requestEvidence: 'Request more evidence',
@@ -1022,16 +1022,16 @@ function getDecisionHubCopy(locale: Locale) {
         all: 'All packages',
         running: 'Running',
         review_needed: 'Needs review',
-        ready_for_demand: 'Ready Demand',
+        ready_for_crm: 'Ready CRM',
         blocked: 'Blocked',
-        sent_to_demand: 'Sent',
+        sent_to_crm: 'Sent',
         outcome_learned: 'Learned',
       },
       statuses: {
         running: 'Running',
         review_needed: 'Needs review',
-        ready_for_demand: 'Ready for Demand',
-        sent_to_demand: 'Sent to Demand',
+        ready_for_crm: 'Ready for CRM',
+        sent_to_crm: 'Sent to CRM',
         blocked: 'Blocked',
         outcome_learned: 'Outcome learned',
       },
@@ -1040,28 +1040,28 @@ function getDecisionHubCopy(locale: Locale) {
       title: 'AI判断レビュー',
       statusSummary: (ready: number, review: number, blocked: number) => `送信可 ${ready} · 要レビュー ${review} · ブロック ${blocked}`,
       workflow: 'オペレーターワークフロー',
-      headline: 'Demandへ送る前に、AIが準備した成長判断を確認します。',
-      description: '判断パッケージを選び、エビデンスとブロッカーを確認してから、レビュー済みペイロードをDemandへ送るか、追加エビデンスを依頼します。',
+      headline: 'CRMへ送る前に、AIが準備した成長判断を確認します。',
+      description: '判断パッケージを選び、エビデンスとブロッカーを確認してから、レビュー済みペイロードをCRMへ送るか、追加エビデンスを依頼します。',
       selectedNextStep: '選択中の次ステップ',
       noPackage: 'パッケージ未選択',
       operatorNext: {
         wait: 'Intelligenceパッケージを待機',
         guardrail: '先にガードレールを解消',
-        readback: 'Demandの結果を確認',
-        review: 'エビデンスを確認してDemandへ送信',
+        readback: 'CRMの結果を確認',
+        review: 'エビデンスを確認してCRMへ送信',
       },
       needsReview: '要レビュー',
       needsReviewMeta: '人による証拠確認。',
       readyToSend: '送信準備完了',
-      readyToSendMeta: 'Demandへ渡せるペイロード。',
+      readyToSendMeta: 'CRMへ渡せるペイロード。',
       blocked: 'ブロック中',
       blockedMeta: 'ガードレール担当が必要。',
-      processSteps: ['シグナル', 'エージェント実行', 'エビデンス', '判断', 'Demand', '読み戻し'],
+      processSteps: ['シグナル', 'エージェント実行', 'エビデンス', '判断', 'CRM', '読み戻し'],
       queueTitle: '判断キュー',
       queueDescription: 'レビューするAIパッケージを1つ選択します。',
       noPackages: 'この状態のパッケージはありません。',
       reviewTitle: 'パッケージレビュー',
-      reviewDescription: '選択中パッケージの推奨、エビデンス、リスク、Demandペイロード。',
+      reviewDescription: '選択中パッケージの推奨、エビデンス、リスク、CRMペイロード。',
       recommendation: '推奨',
       confidence: '信頼度',
       impact: 'インパクト',
@@ -1069,18 +1069,18 @@ function getDecisionHubCopy(locale: Locale) {
       preparedBy: '作成',
       evidence: 'エビデンス',
       risks: 'リスク / ブロッカー',
-      sendToDemand: 'Demandへ送信',
+      sendToCrm: 'CRMへ送信',
       objective: '目的:',
       audience: '対象:',
       channel: 'チャネル:',
       cta: 'CTA:',
-      fallbackChannel: 'Demand Ops',
+      fallbackChannel: 'CRM Ops',
       fallbackCta: '設定を確認',
       whyNot: '別ルートにしない理由',
-      demandReadback: 'Demand読み戻し',
-      sendPreview: 'Demandプレビューへ送信',
+      crmReadback: 'CRM読み戻し',
+      sendPreview: 'CRMプレビューへ送信',
       runningAction: 'エージェントがエビデンス準備中',
-      learnedAction: 'Demand読み戻しを見る',
+      learnedAction: 'CRM読み戻しを見る',
       blockedAction: 'ブロック中: 先にガードレール解消',
       askFollowUp: '追加質問',
       requestEvidence: 'エビデンス追加依頼',
@@ -1094,16 +1094,16 @@ function getDecisionHubCopy(locale: Locale) {
         all: '全パッケージ',
         running: '実行中',
         review_needed: '要レビュー',
-        ready_for_demand: 'Demand送信可',
+        ready_for_crm: 'CRM送信可',
         blocked: 'ブロック',
-        sent_to_demand: '送信済み',
+        sent_to_crm: '送信済み',
         outcome_learned: '学習済み',
       },
       statuses: {
         running: '実行中',
         review_needed: '要レビュー',
-        ready_for_demand: 'Demand送信可',
-        sent_to_demand: 'Demand送信済み',
+        ready_for_crm: 'CRM送信可',
+        sent_to_crm: 'CRM送信済み',
         blocked: 'ブロック',
         outcome_learned: '結果学習済み',
       },
@@ -1112,28 +1112,28 @@ function getDecisionHubCopy(locale: Locale) {
       title: 'Review quyết định AI',
       statusSummary: (ready: number, review: number, blocked: number) => `${ready} sẵn sàng · ${review} cần review · ${blocked} bị chặn`,
       workflow: 'Quy trình operator',
-      headline: 'Review các quyết định tăng trưởng do AI chuẩn bị trước khi gửi sang Demand.',
-      description: 'Chọn một gói quyết định, kiểm tra bằng chứng và blocker, rồi gửi payload đã review sang Demand hoặc yêu cầu agent bổ sung bằng chứng.',
+      headline: 'Review các quyết định tăng trưởng do AI chuẩn bị trước khi gửi sang CRM.',
+      description: 'Chọn một gói quyết định, kiểm tra bằng chứng và blocker, rồi gửi payload đã review sang CRM hoặc yêu cầu agent bổ sung bằng chứng.',
       selectedNextStep: 'Bước tiếp theo đang chọn',
       noPackage: 'Chưa chọn gói',
       operatorNext: {
         wait: 'Chờ gói Intelligence',
         guardrail: 'Xử lý guardrail trước',
-        readback: 'Review kết quả Demand',
-        review: 'Review bằng chứng rồi gửi sang Demand',
+        readback: 'Review kết quả CRM',
+        review: 'Review bằng chứng rồi gửi sang CRM',
       },
       needsReview: 'Cần review',
       needsReviewMeta: 'Kiểm chứng bằng chứng bởi người.',
       readyToSend: 'Sẵn sàng gửi',
-      readyToSendMeta: 'Payload đã sẵn sàng cho Demand.',
+      readyToSendMeta: 'Payload đã sẵn sàng cho CRM.',
       blocked: 'Bị chặn',
       blockedMeta: 'Cần owner xử lý guardrail.',
-      processSteps: ['Tín hiệu', 'Agent chạy', 'Bằng chứng', 'Quyết định', 'Demand', 'Đọc lại'],
+      processSteps: ['Tín hiệu', 'Agent chạy', 'Bằng chứng', 'Quyết định', 'CRM', 'Đọc lại'],
       queueTitle: 'Hàng chờ quyết định',
       queueDescription: 'Chọn một gói AI để review.',
       noPackages: 'Không có gói ở trạng thái này.',
       reviewTitle: 'Review gói quyết định',
-      reviewDescription: 'Khuyến nghị, bằng chứng, rủi ro và payload Demand cho gói đang chọn.',
+      reviewDescription: 'Khuyến nghị, bằng chứng, rủi ro và payload CRM cho gói đang chọn.',
       recommendation: 'Khuyến nghị',
       confidence: 'Độ tin cậy',
       impact: 'Tác động',
@@ -1141,18 +1141,18 @@ function getDecisionHubCopy(locale: Locale) {
       preparedBy: 'Chuẩn bị bởi',
       evidence: 'Bằng chứng',
       risks: 'Rủi ro / blocker',
-      sendToDemand: 'Gửi sang Demand',
+      sendToCrm: 'Gửi sang CRM',
       objective: 'Mục tiêu:',
       audience: 'Tệp nhận:',
       channel: 'Kênh:',
       cta: 'CTA:',
-      fallbackChannel: 'Demand Ops',
+      fallbackChannel: 'CRM Ops',
       fallbackCta: 'Review thiết lập',
       whyNot: 'Vì sao không chọn tuyến khác',
-      demandReadback: 'Demand đọc lại',
-      sendPreview: 'Gửi preview sang Demand',
+      crmReadback: 'CRM đọc lại',
+      sendPreview: 'Gửi preview sang CRM',
       runningAction: 'Agent vẫn đang chuẩn bị bằng chứng',
-      learnedAction: 'Xem Demand đọc lại',
+      learnedAction: 'Xem CRM đọc lại',
       blockedAction: 'Bị chặn: xử lý guardrail trước',
       askFollowUp: 'Hỏi tiếp',
       requestEvidence: 'Yêu cầu thêm bằng chứng',
@@ -1163,19 +1163,19 @@ function getDecisionHubCopy(locale: Locale) {
         next: 'Tiếp',
       },
       lanes: {
-        all: 'Tất cả gói',
+        all: 'Toàn bộ gói',
         running: 'Đang chạy',
         review_needed: 'Cần review',
-        ready_for_demand: 'Sẵn sàng Demand',
+        ready_for_crm: 'Sẵn sàng gửi CRM',
         blocked: 'Bị chặn',
-        sent_to_demand: 'Đã gửi',
+        sent_to_crm: 'Đã gửi',
         outcome_learned: 'Đã học',
       },
       statuses: {
         running: 'Đang chạy',
         review_needed: 'Cần review',
-        ready_for_demand: 'Sẵn sàng cho Demand',
-        sent_to_demand: 'Đã gửi sang Demand',
+        ready_for_crm: 'Sẵn sàng gửi CRM',
+        sent_to_crm: 'Đã gửi CRM',
         blocked: 'Bị chặn',
         outcome_learned: 'Đã học kết quả',
       },
@@ -1191,9 +1191,9 @@ function getIntelligenceBoardLanes(locale: Locale): Array<{ id: 'all' | Intellig
     { id: 'all', label: copy.lanes.all },
     { id: 'running', label: copy.lanes.running },
     { id: 'review_needed', label: copy.lanes.review_needed },
-    { id: 'ready_for_demand', label: copy.lanes.ready_for_demand },
+    { id: 'ready_for_crm', label: copy.lanes.ready_for_crm },
     { id: 'blocked', label: copy.lanes.blocked },
-    { id: 'sent_to_demand', label: copy.lanes.sent_to_demand },
+    { id: 'sent_to_crm', label: copy.lanes.sent_to_crm },
     { id: 'outcome_learned', label: copy.lanes.outcome_learned },
   ];
 }
@@ -1227,7 +1227,7 @@ function localizeDecisionHubText(locale: Locale, value: string | undefined) {
       'Throttle acquisition and trigger replenishment review': '獲得施策を抑制し、補充レビューを起動',
       'Request quote / review campaign setup': '見積依頼 / キャンペーン設定を確認',
       'Hold scale until COS clears.': 'COSがクリアするまで拡大を保留します。',
-      'Human approval required before Demand execution.': 'Demand実行前に人の承認が必要です。',
+      'Human approval required before CRM execution.': 'CRM実行前に人の承認が必要です。',
       'Scale paid spend immediately': '広告費をすぐ拡大',
       'Stock guardrail must clear first.': '先に在庫ガードレールをクリアする必要があります。',
       'Operator should approve message and CTA first.': '先にオペレーターがメッセージとCTAを承認する必要があります。',
@@ -1251,7 +1251,7 @@ function localizeDecisionHubText(locale: Locale, value: string | undefined) {
       'Throttle acquisition and trigger replenishment review': 'Giảm tốc acquisition và kích hoạt review bổ sung hàng',
       'Request quote / review campaign setup': 'Yêu cầu báo giá / review thiết lập campaign',
       'Hold scale until COS clears.': 'Giữ scale cho tới khi COS đã clear.',
-      'Human approval required before Demand execution.': 'Cần người duyệt trước khi Demand thực thi.',
+      'Human approval required before CRM execution.': 'Cần người duyệt trước khi CRM thực thi.',
       'Scale paid spend immediately': 'Scale chi tiêu paid ngay',
       'Stock guardrail must clear first.': 'Guardrail tồn kho phải được clear trước.',
       'Operator should approve message and CTA first.': 'Operator cần duyệt thông điệp và CTA trước.',
@@ -1272,11 +1272,11 @@ function localizeDecisionHubText(locale: Locale, value: string | undefined) {
       : `Nhu cầu 7 ngày ${numberCloseToAts[1]} đang sát ATS ${numberCloseToAts[2]}.`;
   }
 
-  const campaignHypothesis = value.match(/^Demand should test (.+) with a reviewed campaign package before broader scale\.$/);
+  const campaignHypothesis = value.match(/^CRM should test (.+) with a reviewed campaign package before broader scale\.$/);
   if (campaignHypothesis) {
     return locale === 'ja-JP'
-      ? `本格拡大前に、Demandはレビュー済みキャンペーンパッケージで${campaignHypothesis[1]}をテストすべきです。`
-      : `Demand nên test ${campaignHypothesis[1]} bằng gói campaign đã review trước khi scale rộng hơn.`;
+      ? `本格拡大前に、CRMはレビュー済みキャンペーンパッケージで${campaignHypothesis[1]}をテストすべきです。`
+      : `CRM nên test ${campaignHypothesis[1]} bằng gói campaign đã review trước khi scale rộng hơn.`;
   }
 
   const officeProof = value.match(/^(.+) is resonating with office buyers because the craft-paper proof is concrete\.$/);
@@ -1320,7 +1320,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
   }, [selectedPackage, selectedPackageId, workspace.packages]);
 
   const selectPackage = (item: DecisionPackage) => setSelectedPackageId(item.id);
-  const canSendToDemand = selectedPackage?.status === 'ready_for_demand' || selectedPackage?.status === 'review_needed';
+  const canSendToCrm = selectedPackage?.status === 'ready_for_crm' || selectedPackage?.status === 'review_needed';
   const selectedStatus = selectedPackage ? getPackageStatusBadge(selectedPackage.status, locale) : null;
   const operatorNextStep = !selectedPackage
     ? copy.operatorNext.wait
@@ -1333,9 +1333,9 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
     all: workspace.packages.length,
     running: workspace.packages.filter((item) => item.status === 'running').length,
     review_needed: workspace.stats.needsReview,
-    ready_for_demand: workspace.stats.readyForDemand,
+    ready_for_crm: workspace.stats.readyForCrm,
     blocked: workspace.stats.blocked,
-    sent_to_demand: workspace.packages.filter((item) => item.status === 'sent_to_demand').length,
+    sent_to_crm: workspace.packages.filter((item) => item.status === 'sent_to_crm').length,
     outcome_learned: workspace.stats.learned,
   };
 
@@ -1343,11 +1343,11 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
+      <Card className="overflow-hidden rounded-lg border border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardContent className="space-y-4 p-5 md:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{copy.title}</Badge>
-            <Badge variant={workspace.stats.readyForDemand ? 'success' : workspace.stats.blocked ? 'warning' : 'secondary'}>{copy.statusSummary(workspace.stats.readyForDemand, workspace.stats.needsReview, workspace.stats.blocked)}</Badge>
+            <Badge variant={workspace.stats.readyForCrm ? 'success' : workspace.stats.blocked ? 'warning' : 'secondary'}>{copy.statusSummary(workspace.stats.readyForCrm, workspace.stats.needsReview, workspace.stats.blocked)}</Badge>
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
             <div className="min-w-0">
@@ -1357,7 +1357,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                 {copy.description}
               </p>
             </div>
-            <div className="rounded-xl border bg-background/85 p-4">
+            <div className="rounded-lg border bg-background/85 p-4">
               <div className="text-metadata">{copy.selectedNextStep}</div>
               <div className="mt-2 text-lg font-semibold">{operatorNextStep}</div>
               <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedPackage ? localizeDecisionHubText(locale, selectedPackage.title) : copy.noPackage}</p>
@@ -1365,9 +1365,9 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">{copy.needsReview}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.needsReview}</div><p className="mt-1 text-xs text-muted-foreground">{copy.needsReviewMeta}</p></div>
-            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">{copy.readyToSend}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.readyForDemand}</div><p className="mt-1 text-xs text-muted-foreground">{copy.readyToSendMeta}</p></div>
-            <div className="rounded-xl border bg-background/80 p-3"><div className="text-metadata">{copy.blocked}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.blocked}</div><p className="mt-1 text-xs text-muted-foreground">{copy.blockedMeta}</p></div>
+            <div className="rounded-lg border bg-background/80 p-3"><div className="text-metadata">{copy.needsReview}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.needsReview}</div><p className="mt-1 text-xs text-muted-foreground">{copy.needsReviewMeta}</p></div>
+            <div className="rounded-lg border bg-background/80 p-3"><div className="text-metadata">{copy.readyToSend}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.readyForCrm}</div><p className="mt-1 text-xs text-muted-foreground">{copy.readyToSendMeta}</p></div>
+            <div className="rounded-lg border bg-background/80 p-3"><div className="text-metadata">{copy.blocked}</div><div className="mt-1 text-2xl font-semibold">{workspace.stats.blocked}</div><p className="mt-1 text-xs text-muted-foreground">{copy.blockedMeta}</p></div>
           </div>
           <div className="grid gap-2 md:grid-cols-6">
             {copy.processSteps.map((step, index) => (
@@ -1380,7 +1380,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
       </Card>
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <Card className="rounded-xl border">
+        <Card className="rounded-lg border">
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1407,7 +1407,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                   type="button"
                   aria-current={selected ? 'true' : undefined}
                   onClick={() => selectPackage(item)}
-                  className={`w-full rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? 'border-primary/60 bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/35 hover:bg-muted/20'}`}
+                  className={`w-full rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? 'border-primary/60 bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/35 hover:bg-muted/20'}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -1428,12 +1428,12 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                 </button>
               );
             }) : (
-              <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">{copy.noPackages}</div>
+              <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">{copy.noPackages}</div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 rounded-xl border border-primary/20 bg-primary/5">
+        <Card className="min-w-0 rounded-lg border border-primary/20 bg-primary/5">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -1446,7 +1446,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
           <CardContent className="space-y-3 pt-0">
             {selectedPackage ? (
               <>
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-lg border bg-background p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="text-metadata">{copy.recommendation}</div>
@@ -1462,12 +1462,12 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
 
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="space-y-3">
-                    <div className="rounded-xl border bg-background p-4">
+                    <div className="rounded-lg border bg-background p-4">
                       <div className="text-metadata">{copy.whyNow}</div>
                       <p className="mt-2 text-sm font-medium">{localizeDecisionHubText(locale, selectedPackage.evidenceReport.hypothesis)}</p>
                       <p className="mt-2 text-xs leading-5 text-muted-foreground">{copy.preparedBy} {selectedPackage.evidenceReport.agentName} · {selectedPackage.evidenceReport.generatedAt}</p>
                     </div>
-                    <div className="rounded-xl border bg-background p-4">
+                    <div className="rounded-lg border bg-background p-4">
                       <div className="text-metadata">{copy.evidence}</div>
                       <div className="mt-3 grid gap-2 md:grid-cols-3">
                         {selectedPackage.evidenceReport.evidence.map((item) => (
@@ -1478,7 +1478,7 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                         ))}
                       </div>
                     </div>
-                    <div className="rounded-xl border bg-background p-4">
+                    <div className="rounded-lg border bg-background p-4">
                       <div className="text-metadata">{copy.risks}</div>
                       <div className="mt-3 grid gap-2 md:grid-cols-2">
                         {selectedPackage.evidenceReport.risks.map((risk) => (
@@ -1492,8 +1492,8 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                   </div>
 
                   <div className="space-y-3">
-                    <div className="rounded-xl border bg-background p-4">
-                      <div className="text-metadata">{copy.sendToDemand}</div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <div className="text-metadata">{copy.sendToCrm}</div>
                       <div className="mt-3 grid gap-2 text-sm">
                         <div><span className="font-semibold">{copy.objective}</span> {localizeDecisionHubText(locale, selectedPackage.handoffPayload.objective)}</div>
                         <div><span className="font-semibold">{copy.audience}</span> {localizeDecisionHubText(locale, selectedPackage.handoffPayload.audience)}</div>
@@ -1504,12 +1504,12 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                         {selectedPackage.handoffPayload.guardrails.map((guardrail) => <Badge key={guardrail} variant="outline">{localizeDecisionHubText(locale, guardrail)}</Badge>)}
                       </div>
                     </div>
-                    <div className="rounded-xl border bg-background p-4">
+                    <div className="rounded-lg border bg-background p-4">
                       <div className="text-metadata">{copy.whyNot}</div>
                       <p className="mt-2 text-xs leading-5 text-muted-foreground">{localizeDecisionHubText(locale, selectedPackage.evidenceReport.rejectedAlternatives[0]?.option)}: {localizeDecisionHubText(locale, selectedPackage.evidenceReport.rejectedAlternatives[0]?.reason)}</p>
                     </div>
                     {selectedPackage.readback ? (
-                      <div className="rounded-xl border bg-background p-4">
+                      <div className="rounded-lg border bg-background p-4">
                         <div className="text-metadata">{copy.demandReadback}</div>
                         <p className="mt-2 text-sm font-medium">{localizeDecisionHubText(locale, selectedPackage.readback.note)}</p>
                         <Badge variant="success" className="mt-3">{selectedPackage.readback.state.replace(/_/g, ' ')}</Badge>
@@ -1517,9 +1517,9 @@ function IntelligenceDecisionHubPanel({ snapshot }: { snapshot: PrimeSnapshot })
                     ) : null}
                     <RecommendationEvidencePanel selectedPackage={selectedPackage} />
                     <FeedbackOutcomeCard selectedPackage={selectedPackage} />
-                    <div className="sticky bottom-3 flex flex-col gap-2 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur">
-                      <Button disabled={!canSendToDemand} asChild={canSendToDemand}>
-                        {canSendToDemand ? (
+                    <div className="sticky bottom-3 flex flex-col gap-2 rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur">
+                      <Button disabled={!canSendToCrm} asChild={canSendToCrm}>
+                        {canSendToCrm ? (
                           <Link to={`${selectedPackage.handoffPayload.targetRoute}?handoff=${encodeURIComponent(selectedPackage.id)}`}>{copy.sendPreview} <ArrowRight className="size-4" /></Link>
                         ) : (
                           <span>{selectedPackage.status === 'running' ? copy.runningAction : selectedPackage.status === 'outcome_learned' ? copy.learnedAction : copy.blockedAction}</span>
@@ -1548,7 +1548,7 @@ function RecommendationEvidencePanel({ selectedPackage }: { selectedPackage: Dec
   const evidence = selectedPackage.recommendationEvidence;
 
   return (
-    <div data-testid="recommendation-evidence-panel" className="rounded-xl border bg-background p-4">
+    <div data-testid="recommendation-evidence-panel" className="rounded-lg border bg-background p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-metadata">Recommendation evidence</div>
@@ -1584,7 +1584,7 @@ function FeedbackOutcomeCard({ selectedPackage }: { selectedPackage: DecisionPac
   const outcome = selectedPackage.actionOutcome;
 
   return (
-    <div data-testid="feedback-readback-card" className="rounded-xl border bg-background p-4">
+    <div data-testid="feedback-readback-card" className="rounded-lg border bg-background p-4">
       <div className="text-metadata">Feedback and outcome loop</div>
       {feedback || outcome ? (
         <div className="mt-3 grid gap-2 text-xs">
@@ -1659,7 +1659,7 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       strength: insight.sentiment === 'positive' ? 82 : insight.sentiment === 'negative' ? 76 : 63,
       freshness: 'today',
       recommendation: insight.action,
-      targetHref: insight.sentiment === 'negative' ? '/customer/service' : DEMAND_CAMPAIGNS_HREF,
+      targetHref: insight.sentiment === 'negative' ? '/customer/service' : CRM_CAMPAIGNS_HREF,
       detail: insight.summary,
     })),
     ...snapshot.forecasts.map((forecast) => ({
@@ -1679,13 +1679,13 @@ function buildIntelligenceSignals(snapshot: PrimeSnapshot): IntelligenceSignalRo
       id: campaign.id,
       family: 'Attribution',
       source: campaign.channel,
-      sourceOwner: 'Demand' as const,
-      lineage: [campaign.channel, campaign.id, 'Demand outcome'],
+      sourceOwner: 'CRM' as const,
+      lineage: [campaign.channel, campaign.id, 'CRM outcome'],
       linkedEntity: campaign.skuCode,
       strength: Math.min(95, 45 + campaign.orders * 8 + campaign.rfqs * 3),
       freshness: campaign.status,
       recommendation: `${campaign.leads} leads, ${campaign.rfqs} RFQs, ${campaign.orders} orders.`,
-      targetHref: DEMAND_CAMPAIGNS_HREF,
+      targetHref: CRM_CAMPAIGNS_HREF,
       detail: `${campaign.name} is tied to ${getSkuLabel(campaign.skuCode)}.`,
     })),
   ].sort((left, right) => right.strength - left.strength);
@@ -1721,7 +1721,7 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-background via-background to-sky-500/5">
+      <Card className="overflow-hidden rounded-lg border border-primary/20 bg-gradient-to-br from-background via-background to-sky-500/5">
         <CardContent className="p-0">
           <div className="grid gap-0 xl:grid-cols-[1.35fr_0.65fr]">
             <div className="space-y-4 p-5 md:p-6">
@@ -1800,7 +1800,7 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
       </div>
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <Card className="min-w-0 rounded-xl border">
+        <Card className="min-w-0 rounded-lg border">
           <CardHeader className="pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -1884,7 +1884,7 @@ function IntelligenceSignalsPanel({ snapshot }: { snapshot: PrimeSnapshot }) {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 rounded-xl border border-sky-500/20 bg-sky-500/5">
+        <Card className="min-w-0 rounded-lg border border-sky-500/20 bg-sky-500/5">
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -2034,7 +2034,7 @@ function LaunchDecisionStateBoard({ decisions }: { decisions: IntelligenceLaunch
   };
 
   return (
-    <Card className="rounded-xl border">
+    <Card className="rounded-lg border">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -2052,7 +2052,7 @@ function LaunchDecisionStateBoard({ decisions }: { decisions: IntelligenceLaunch
           {lanes.map((lane) => {
             const laneItems = decisions.filter((decision) => launchDecisionLane(decision.approvalStatus) === lane);
             return (
-              <div key={lane} className={`min-w-[250px] rounded-xl border p-3 ${laneMeta[lane].className}`}>
+              <div key={lane} className={`min-w-[250px] rounded-lg border p-3 ${laneMeta[lane].className}`}>
                 <div className="sticky top-0 z-10 -mx-3 -mt-3 rounded-t-xl border-b bg-background/95 px-3 py-2 backdrop-blur">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-semibold">{lane}</div>
@@ -2119,7 +2119,7 @@ function LinkedIntelligenceAssetCard({
   onRemove: (assetId: string) => Promise<void>;
 }) {
   return (
-    <div className="mt-4 rounded-2xl border bg-muted/10 p-4">
+    <div className="mt-4 rounded-lg border bg-muted/10 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-sm font-semibold">{title}</div>
@@ -2152,7 +2152,7 @@ function LinkedIntelligenceAssetCard({
       {assets.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {assets.slice(0, 3).map((asset) => (
-            <div key={asset.id} className="overflow-hidden rounded-2xl border bg-background">
+            <div key={asset.id} className="overflow-hidden rounded-lg border bg-background">
               <div className="relative">
                 <img src={asset.url} alt={asset.filename} className="h-28 w-full object-cover" />
                 <Button
@@ -2173,7 +2173,7 @@ function LinkedIntelligenceAssetCard({
           ))}
         </div>
       ) : (
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-dashed bg-background/60 p-4">
+        <div className="mt-4 flex items-start gap-3 rounded-lg border border-dashed bg-background/60 p-4">
           <ImagePlus className="mt-0.5 size-4 text-muted-foreground" />
           <div>
             <div className="text-sm font-medium">No image inputs yet</div>
@@ -2199,7 +2199,7 @@ function LinkedDecisionAssetLane({
   emptyLabel: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-background p-4">
+    <div className="rounded-lg border bg-background p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-sm font-semibold">{title}</div>
@@ -2211,7 +2211,7 @@ function LinkedDecisionAssetLane({
       {assets.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {assets.slice(0, 3).map((asset) => (
-            <div key={asset.id} className="overflow-hidden rounded-2xl border bg-muted/20">
+            <div key={asset.id} className="overflow-hidden rounded-lg border bg-muted/20">
               <img src={asset.url} alt={asset.filename} className="h-28 w-full object-cover" />
               <div className="space-y-1 p-3">
                 <div className="truncate text-sm font-medium">{asset.entityLabel}</div>
@@ -2222,7 +2222,7 @@ function LinkedDecisionAssetLane({
           ))}
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl border border-dashed bg-muted/10 p-4">
+        <div className="mt-4 rounded-lg border border-dashed bg-muted/10 p-4">
           <div className="text-sm font-medium">No linked visuals yet</div>
           <div className="mt-1 text-xs text-muted-foreground">This source has not uploaded any images into the decision flow yet.</div>
           <div className="mt-3">
@@ -2285,7 +2285,7 @@ function CreatorEvidenceBoard({
   marketFilter: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-background p-4">
+    <div className="rounded-lg border bg-background p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold">Prime evidence board</div>
@@ -2301,7 +2301,7 @@ function CreatorEvidenceBoard({
         <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground capitalize">{marketFilter === 'all' ? 'Global market' : marketFilter}</Badge>
       </div>
 
-      <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+      <div className="mt-4 rounded-lg border bg-muted/20 p-4">
         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime readout</div>
         <div className="mt-2 text-sm font-medium">{creator.summary}</div>
         <div className="mt-1 text-xs text-muted-foreground">{creator.recommendation}</div>
@@ -2314,7 +2314,7 @@ function CreatorEvidenceBoard({
         <EvidenceCard label="Bench position" value={`Index ${creator.benchmarkIndex}`} meta={`${creator.engagementRate.toFixed(1)}% engagement vs platform benchmark`} />
       </div>
 
-      <div className="mt-4 space-y-3 rounded-2xl border bg-muted/10 p-4">
+      <div className="mt-4 space-y-3 rounded-lg border bg-muted/10 p-4">
         <EvidenceMeter label="Product fit" value={creator.fitScore} hint={`${creator.product} is the strongest SKU match for this creator.`} />
         <EvidenceMeter label="Audience quality" value={creator.audienceQualityScore} hint="Follower mix and platform signal quality remain healthy." />
         <EvidenceMeter label="Conversion trust" value={Math.round((creator.authenticityScore + creator.audienceQualityScore) / 2)} hint="Prime prefers creators with proof-first credibility, not just reach." />
@@ -2335,7 +2335,7 @@ function CustomerEvidenceBoard({
   activationReadiness: number;
 }) {
   return (
-    <div className="rounded-2xl border bg-background p-4">
+    <div className="rounded-lg border bg-background p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold">Prime evidence board</div>
@@ -2351,7 +2351,7 @@ function CustomerEvidenceBoard({
         <Badge variant="secondary" className="max-w-[220px] truncate px-3 py-1 text-xs font-medium text-muted-foreground">{customer.segmentLabel}</Badge>
       </div>
 
-      <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+      <div className="mt-4 rounded-lg border bg-muted/20 p-4">
         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime readout</div>
         <div className="mt-2 text-sm font-medium">{customer.signalSummary}</div>
         <div className="mt-1 text-xs text-muted-foreground">{customer.reasoning}</div>
@@ -2364,7 +2364,7 @@ function CustomerEvidenceBoard({
         <EvidenceCard label="Revenue contribution" value={`${customer.revenueContribution}%`} meta={`${currency.format(customer.totalRevenue)} currently sits in this segment.`} />
       </div>
 
-      <div className="mt-4 space-y-3 rounded-2xl border bg-muted/10 p-4">
+      <div className="mt-4 space-y-3 rounded-lg border bg-muted/10 p-4">
         <EvidenceMeter label="Potential score" value={customer.potentialScore} hint="Fit between lifecycle, product need, and response readiness." />
         <EvidenceMeter label="Conversion likelihood" value={customer.conversionLikelihood} hint="Expected chance of a positive action if this segment is activated next." />
         <EvidenceMeter label="Churn watch" value={customer.churnRisk} hint="Higher values mean Prime is seeing urgency or reactivation pressure." />
@@ -2389,7 +2389,7 @@ function LaunchDecisionBoard({
   linkedCustomerAssets: IntelligenceAsset[];
 }) {
   return (
-    <div className="rounded-2xl border bg-background p-4">
+    <div className="rounded-lg border bg-background p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold">Decision thesis</div>
@@ -2404,7 +2404,7 @@ function LaunchDecisionBoard({
         <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">Avg match {averageMatch}%</Badge>
       </div>
 
-      <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+      <div className="mt-4 rounded-lg border bg-muted/20 p-4">
         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime readout</div>
         <div className="mt-2 text-sm font-medium">{plan.whyItWins}</div>
         <div className="mt-1 text-xs text-muted-foreground">{plan.nextBestAction}</div>
@@ -2417,7 +2417,7 @@ function LaunchDecisionBoard({
         <EvidenceCard label="Visual inputs" value={`${linkedCreatorAssets.length + linkedCustomerAssets.length} linked`} meta={`${linkedCreatorAssets.length} creator + ${linkedCustomerAssets.length} customer inputs`} />
       </div>
 
-      <div className="mt-4 space-y-3 rounded-2xl border bg-muted/10 p-4">
+      <div className="mt-4 space-y-3 rounded-lg border bg-muted/10 p-4">
         <EvidenceMeter label="Creator fit" value={plan.creatorFit} hint="Measures whether the creator can carry this message credibly." />
         <EvidenceMeter label="Customer fit" value={plan.customerFit} hint="Measures intent, lifecycle timing, and product relevance." />
         <EvidenceMeter label="Launch readiness" value={plan.launchReadiness} hint={`Risk watch sits at ${plan.riskLevel}% while the system checks execution readiness.`} />
@@ -2650,7 +2650,7 @@ function CreatorIntelligencePanel() {
                 <Badge variant="outline" className="gap-1"><CircleUserRound className="size-3" /> Drill-down profile modal</Badge>
               </div>
             </div>
-            <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
+            <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
               <div className="space-y-2">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Search query</div>
                 <div className="relative">
@@ -2704,7 +2704,7 @@ function CreatorIntelligencePanel() {
             </div>
             <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
               <CreatorEvidenceBoard creator={selectedCreator} platformFilter={platformFilter} marketFilter={marketFilter} />
-              <div className="rounded-2xl border bg-background p-4">
+              <div className="rounded-lg border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">Prime recommendation strip</div>
@@ -2725,7 +2725,7 @@ function CreatorIntelligencePanel() {
                         <div className="mt-2 text-sm font-medium">{selectedCreator.product}</div>
                         <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.topFollowerSegment}</div>
                       </div>
-                      <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="rounded-lg border bg-muted/20 p-3">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
                         <div className="mt-2 text-sm font-medium">{selectedCreator.recommendation}</div>
                         <div className="mt-1 text-xs text-muted-foreground">{selectedCreator.matchedPosts} matched posts ready for review.</div>
@@ -2746,7 +2746,7 @@ function CreatorIntelligencePanel() {
                 ) : null}
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {(selectedCreator?.contentPreview || []).map((preview: string, index: number) => (
-                    <div key={`${selectedCreator?.id || 'preview'}-${preview}`} className="overflow-hidden rounded-2xl border bg-muted/20">
+                    <div key={`${selectedCreator?.id || 'preview'}-${preview}`} className="overflow-hidden rounded-lg border bg-muted/20">
                       <div className={`h-28 bg-gradient-to-br ${selectedCreator?.avatarTone || 'from-primary/20 to-primary/10'}`} />
                       <div className="space-y-1 p-3">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Post {index + 1}</div>
@@ -2798,7 +2798,7 @@ function CreatorIntelligencePanel() {
                             setIsDialogOpen(true);
                           }}
                         >
-                          <div className={`flex size-12 items-center justify-center rounded-2xl border bg-gradient-to-br ${creator.avatarTone} text-sm font-semibold text-foreground shadow-sm`}>
+                          <div className={`flex size-12 items-center justify-center rounded-lg border bg-gradient-to-br ${creator.avatarTone} text-sm font-semibold text-foreground shadow-sm`}>
                             {initials(creator.name)}
                           </div>
                           <div className="min-w-0 space-y-1">
@@ -2871,10 +2871,10 @@ function CreatorIntelligencePanel() {
             </DialogHeader>
             <div className="space-y-6">
               <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
-                <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+                <div className="rounded-lg border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex gap-4">
-                      <div className={`flex size-28 items-center justify-center rounded-3xl border bg-gradient-to-br ${selectedCreator.avatarTone} text-2xl font-semibold shadow-sm`}>
+                      <div className={`flex size-28 items-center justify-center rounded-lg border bg-gradient-to-br ${selectedCreator.avatarTone} text-2xl font-semibold shadow-sm`}>
                         {initials(selectedCreator.name)}
                       </div>
                       <div className="space-y-3">
@@ -2912,7 +2912,7 @@ function CreatorIntelligencePanel() {
                   <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                     <div className="grid gap-3 sm:grid-cols-3">
                       {selectedCreator.contentPreview.map((preview: string, index: number) => (
-                        <div key={`${selectedCreator.id}-content-${preview}`} className="overflow-hidden rounded-3xl border bg-background shadow-sm">
+                        <div key={`${selectedCreator.id}-content-${preview}`} className="overflow-hidden rounded-lg border bg-background shadow-sm">
                           <div className={`h-40 bg-gradient-to-br ${selectedCreator.avatarTone}`} />
                           <div className="space-y-2 p-3">
                             <div className="flex items-center justify-between gap-2">
@@ -2930,15 +2930,15 @@ function CreatorIntelligencePanel() {
                         <CardTitle className="text-base">Content fit summary</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 text-sm">
-                        <div className="rounded-xl border bg-muted/20 p-3">
+                        <div className="rounded-lg border bg-muted/20 p-3">
                           <div className="font-medium">Top follower segment</div>
                           <div className="mt-1 text-muted-foreground">{selectedCreator.topFollowerSegment}</div>
                         </div>
-                        <div className="rounded-xl border bg-muted/20 p-3">
+                        <div className="rounded-lg border bg-muted/20 p-3">
                           <div className="font-medium">Top brands mentioned</div>
                           <div className="mt-1 text-muted-foreground">{selectedCreator.brandsMentioned.join(', ')}</div>
                         </div>
-                        <div className="rounded-xl border bg-muted/20 p-3">
+                        <div className="rounded-lg border bg-muted/20 p-3">
                           <div className="font-medium">Posting cadence</div>
                           <div className="mt-1 text-muted-foreground">Last posted {selectedCreator.lastPosted}. {selectedCreator.matchedPosts} posts align with this campaign query.</div>
                         </div>
@@ -3189,7 +3189,7 @@ function CustomerIntelligencePanel() {
               </div>
             </div>
 
-            <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
+            <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
               <div className="space-y-2">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Search query</div>
                 <div className="relative">
@@ -3246,7 +3246,7 @@ function CustomerIntelligencePanel() {
 
             <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
               <CustomerEvidenceBoard customer={selectedCustomer} lifecycleFilter={lifecycleFilter} channelFilter={channelFilter} activationReadiness={activationReadiness} />
-              <div className="rounded-2xl border bg-background p-4">
+              <div className="rounded-lg border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">Prime recommendation strip</div>
@@ -3256,7 +3256,7 @@ function CustomerIntelligencePanel() {
                 </div>
                 {selectedCustomer ? (
                   <>
-                    <div className="mt-4 rounded-2xl border bg-muted/20 p-4">
+                    <div className="mt-4 rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended move</div>
                       <div className="mt-2 text-sm font-medium">{selectedCustomer.nextBestAction}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -3264,12 +3264,12 @@ function CustomerIntelligencePanel() {
                       </div>
                     </div>
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="rounded-lg border bg-muted/20 p-3">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended SKU</div>
                         <div className="mt-2 text-sm font-medium">{selectedCustomer.recommendedProduct}</div>
                         <div className="mt-1 text-xs text-muted-foreground">{selectedCustomer.segmentLabel}</div>
                       </div>
-                      <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="rounded-lg border bg-muted/20 p-3">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best channels</div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {selectedCustomer.recommendedChannels.map((channel) => (
@@ -3277,7 +3277,7 @@ function CustomerIntelligencePanel() {
                           ))}
                         </div>
                       </div>
-                      <div className="rounded-2xl border bg-muted/20 p-3">
+                      <div className="rounded-lg border bg-muted/20 p-3">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Momentum</div>
                         <div className="mt-2 text-sm font-medium">{selectedCustomer.momentum}</div>
                       </div>
@@ -3336,7 +3336,7 @@ function CustomerIntelligencePanel() {
                           setIsDialogOpen(true);
                         }}
                       >
-                        <div className="flex size-12 items-center justify-center rounded-2xl border bg-gradient-to-br from-sky-500/15 to-cyan-500/10 text-sm font-semibold text-foreground shadow-sm">
+                        <div className="flex size-12 items-center justify-center rounded-lg border bg-gradient-to-br from-sky-500/15 to-cyan-500/10 text-sm font-semibold text-foreground shadow-sm">
                           {initials(customer.name)}
                         </div>
                         <div className="min-w-0 space-y-1">
@@ -3396,10 +3396,10 @@ function CustomerIntelligencePanel() {
             </DialogHeader>
             <div className="space-y-6">
               <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+                <div className="rounded-lg border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex gap-4">
-                      <div className="flex size-24 items-center justify-center rounded-3xl border bg-gradient-to-br from-sky-500/15 to-cyan-500/10 text-2xl font-semibold shadow-sm">
+                      <div className="flex size-24 items-center justify-center rounded-lg border bg-gradient-to-br from-sky-500/15 to-cyan-500/10 text-2xl font-semibold shadow-sm">
                         {initials(selectedCustomer.name)}
                       </div>
                       <div className="space-y-3">
@@ -3420,20 +3420,20 @@ function CustomerIntelligencePanel() {
                     <Button>Send to journey</Button>
                   </div>
                 </div>
-                <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+                <Card className="rounded-lg border bg-muted/10 shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Decision snapshot</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best move</div>
                       <div className="mt-2 font-medium">{selectedCustomer.nextBestAction}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended product</div>
                       <div className="mt-2 font-medium">{selectedCustomer.recommendedProduct}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Expected upside</div>
                       <div className="mt-2 font-medium">+8-12% reactivation or cross-sell lift</div>
                     </div>
@@ -3459,17 +3459,17 @@ function CustomerIntelligencePanel() {
                 </TabsContent>
 
                 <TabsContent value="signals" className="space-y-3">
-                  <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">{selectedCustomer.signalSummary}</div>
+                  <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">{selectedCustomer.signalSummary}</div>
                   <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Momentum</div>
                       <div className="mt-2 font-medium text-foreground">{selectedCustomer.momentum}</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next category</div>
                       <div className="mt-2 font-medium text-foreground">{selectedCustomer.nextCategory}</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime target</div>
                       <div className="mt-2 font-medium text-foreground">{selectedCustomer.target}</div>
                     </div>
@@ -3489,7 +3489,7 @@ function CustomerIntelligencePanel() {
                 </TabsContent>
 
                 <TabsContent value="actions" className="space-y-3">
-                  <div className="rounded-xl border bg-muted/20 p-4">
+                  <div className="rounded-lg border bg-muted/20 p-4">
                     <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Prime AI recommendation</div>
                     <div className="mt-2 font-medium">{selectedCustomer.nextBestAction}</div>
                     <p className="mt-2 text-sm text-muted-foreground">Lead with {selectedCustomer.recommendedProduct}, sequence {selectedCustomer.recommendedChannels.join(' + ')}, and time the message around the {selectedCustomer.nextCategory.toLowerCase()} window.</p>
@@ -3630,7 +3630,7 @@ function LaunchDecisionPanel() {
               </div>
             </div>
 
-            <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
+            <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 xl:grid-cols-[1.3fr_0.9fr_0.9fr_0.8fr]">
               <div className="space-y-2">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Search query</div>
                 <div className="relative">
@@ -3652,9 +3652,9 @@ function LaunchDecisionPanel() {
                 linkedCreatorAssets={linkedCreatorAssets}
                 linkedCustomerAssets={linkedCustomerAssets}
               />
-              <div className="rounded-2xl border bg-background p-4">
+              <div className="rounded-lg border bg-background p-4">
                 <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold">Prime approval strip</div><div className="text-xs text-muted-foreground">A compressed answer for how creators, customers, and visuals should converge before execution.</div></div>{selectedPlan ? <Badge>{selectedPlan.outcomeScore}% match</Badge> : null}</div>
-                {selectedPlan ? <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Product</div><div className="mt-2 text-sm font-medium">{selectedPlan.productLabel}</div><div className="mt-1 text-xs text-muted-foreground">{selectedPlan.skuCode}</div></div><div className="rounded-2xl border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Buyer + creator</div><div className="mt-2 text-sm font-medium">{selectedPlan.customerSegment}</div><div className="mt-1 text-xs text-muted-foreground">via {selectedPlan.creatorName}</div></div><div className="rounded-2xl border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended move</div><div className="mt-2 text-sm font-medium">{selectedPlan.offerHook}</div></div></div> : null}
+                {selectedPlan ? <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Product</div><div className="mt-2 text-sm font-medium">{selectedPlan.productLabel}</div><div className="mt-1 text-xs text-muted-foreground">{selectedPlan.skuCode}</div></div><div className="rounded-lg border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Buyer + creator</div><div className="mt-2 text-sm font-medium">{selectedPlan.customerSegment}</div><div className="mt-1 text-xs text-muted-foreground">via {selectedPlan.creatorName}</div></div><div className="rounded-lg border bg-muted/20 p-3"><div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Recommended move</div><div className="mt-2 text-sm font-medium">{selectedPlan.offerHook}</div></div></div> : null}
               </div>
             </div>
 
@@ -3681,7 +3681,7 @@ function LaunchDecisionPanel() {
               <TableBody>
                 {filteredPlans.map((plan) => (
                   <TableRow key={plan.id} className={selectedPlan?.id === plan.id ? 'bg-primary/5' : ''}>
-                    <TableCell className="font-medium"><button type="button" className="flex items-start gap-3 text-left" onClick={() => { setSelectedCampaignId(plan.id); setIsDialogOpen(true); }}><div className="flex size-12 items-center justify-center rounded-2xl border bg-gradient-to-br from-amber-500/15 to-orange-500/10 text-sm font-semibold text-foreground shadow-sm">{initials(plan.name)}</div><div className="min-w-0 space-y-1"><div className="font-semibold text-foreground">{plan.name}</div><div className="text-xs text-muted-foreground">{plan.angle}</div><div className="text-[11px] text-muted-foreground">{plan.timing} · readiness {plan.launchReadiness}%</div></div></button></TableCell>
+                    <TableCell className="font-medium"><button type="button" className="flex items-start gap-3 text-left" onClick={() => { setSelectedCampaignId(plan.id); setIsDialogOpen(true); }}><div className="flex size-12 items-center justify-center rounded-lg border bg-gradient-to-br from-amber-500/15 to-orange-500/10 text-sm font-semibold text-foreground shadow-sm">{initials(plan.name)}</div><div className="min-w-0 space-y-1"><div className="font-semibold text-foreground">{plan.name}</div><div className="text-xs text-muted-foreground">{plan.angle}</div><div className="text-[11px] text-muted-foreground">{plan.timing} · readiness {plan.launchReadiness}%</div></div></button></TableCell>
                     <TableCell><div className="space-y-1"><div className="font-medium">{plan.productLabel}</div><div className="text-xs text-muted-foreground">{plan.skuCode}</div></div></TableCell>
                     <TableCell><div className="space-y-1"><div className="font-medium">{plan.customerName}</div><div className="text-xs text-muted-foreground">{plan.customerSegment} · {plan.customerLifecycle}</div><div className="text-xs text-primary">Fit {plan.customerFit}%</div></div></TableCell>
                     <TableCell><div className="space-y-1"><div className="font-medium">{plan.creatorName}</div><div className="text-xs text-muted-foreground">{plan.creatorHandle}</div><div className="text-xs text-primary">Fit {plan.creatorFit}%</div></div></TableCell>
@@ -3705,10 +3705,10 @@ function LaunchDecisionPanel() {
             </DialogHeader>
             <div className="space-y-6">
               <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+                <div className="rounded-lg border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex gap-4">
-                      <div className="flex size-24 items-center justify-center rounded-3xl border bg-gradient-to-br from-amber-500/15 to-orange-500/10 text-2xl font-semibold shadow-sm">
+                      <div className="flex size-24 items-center justify-center rounded-lg border bg-gradient-to-br from-amber-500/15 to-orange-500/10 text-2xl font-semibold shadow-sm">
                         {initials(selectedPlan.productLabel)}
                       </div>
                       <div className="space-y-3">
@@ -3727,24 +3727,24 @@ function LaunchDecisionPanel() {
                       </div>
                     </div>
                     <Button asChild>
-                      <Link to={DEMAND_CAMPAIGNS_HREF}>Send to Campaign Ops</Link>
+                      <Link to={CRM_CAMPAIGNS_HREF}>Send to Campaign Ops</Link>
                     </Button>
                   </div>
                 </div>
-                <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+                <Card className="rounded-lg border bg-muted/10 shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Decision snapshot</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best move</div>
                       <div className="mt-2 font-medium">{selectedPlan.nextBestAction}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Offer framing</div>
                       <div className="mt-2 font-medium">{selectedPlan.offerHook}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Risk watch</div>
                       <div className="mt-2 font-medium">{selectedPlan.executionRisk}</div>
                     </div>
@@ -3768,12 +3768,12 @@ function LaunchDecisionPanel() {
                     <MetricPill label="Risk" value={`${selectedPlan.riskLevel}%`} />
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Creator visuals linked</div>
                       <div className="mt-2 font-medium text-foreground">{linkedCreatorAssets.length}</div>
                       <p className="mt-2 text-sm text-muted-foreground">Images uploaded from the Creators screen that match this decision.</p>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Customer visuals linked</div>
                       <div className="mt-2 font-medium text-foreground">{linkedCustomerAssets.length}</div>
                       <p className="mt-2 text-sm text-muted-foreground">Images uploaded from the Customers screen that stay attached here.</p>
@@ -3783,12 +3783,12 @@ function LaunchDecisionPanel() {
 
                 <TabsContent value="audience" className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best customer</div>
                       <div className="mt-2 font-medium text-foreground">{selectedPlan.customerName}</div>
                       <p className="mt-2 text-sm text-muted-foreground">{selectedPlan.customerCompany} · {selectedPlan.customerSegment} · {selectedPlan.customerLifecycle}</p>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best creator</div>
                       <div className="mt-2 font-medium text-foreground">{selectedPlan.creatorName}</div>
                       <p className="mt-2 text-sm text-muted-foreground">{selectedPlan.creatorHandle} · strongest trust carrier for this product story.</p>
@@ -3809,17 +3809,17 @@ function LaunchDecisionPanel() {
                 </TabsContent>
 
                 <TabsContent value="playbook" className="space-y-3">
-                  <div className="rounded-xl border bg-muted/20 p-4">
+                  <div className="rounded-lg border bg-muted/20 p-4">
                     <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">How to run this launch</div>
                     <div className="mt-2 font-medium">{selectedPlan.offerHook}</div>
                     <p className="mt-2 text-sm text-muted-foreground">Message to {selectedPlan.messageHook.toLowerCase()}, let {selectedPlan.creatorName} open the trust layer, then follow with {selectedPlan.channels.slice(1).join(' + ')} to close demand.</p>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Optimization</div>
                       <div className="mt-2 font-medium text-foreground">{selectedPlan.optimization}</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Timing</div>
                       <div className="mt-2 font-medium text-foreground">{selectedPlan.timing}</div>
                     </div>
@@ -3843,7 +3843,7 @@ function socialIcon(icon: 'instagram' | 'youtube' | 'web') {
 
 function MetricPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-muted/20 px-4 py-3">
+    <div className="rounded-lg border bg-muted/20 px-4 py-3">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-xl font-semibold">{value}</div>
     </div>
@@ -3852,7 +3852,7 @@ function MetricPill({ label, value }: { label: string; value: string }) {
 
 function DistributionCurveCard({ creator }: { creator: CreatorProfile }) {
   return (
-    <div className="space-y-3 rounded-2xl border bg-background p-4">
+    <div className="space-y-3 rounded-lg border bg-background p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Distribution curve</div>
@@ -3897,7 +3897,7 @@ function AudienceDonutCard({ creator, compact = true }: { creator: CreatorProfil
     .join(', ');
 
   return (
-    <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+    <Card className="rounded-lg border bg-muted/10 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Audience connections</CardTitle>
       </CardHeader>
@@ -3944,7 +3944,7 @@ function segmentsColor(colorClass: string) {
 
 function GenderCard({ creator }: { creator: CreatorProfile }) {
   return (
-    <Card className="rounded-2xl border shadow-sm">
+    <Card className="rounded-lg border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
           Gender
@@ -3952,7 +3952,7 @@ function GenderCard({ creator }: { creator: CreatorProfile }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 pt-4">
-        <div className="flex h-10 w-full overflow-hidden rounded-xl border bg-muted/20">
+        <div className="flex h-10 w-full overflow-hidden rounded-lg border bg-muted/20">
           <div className="flex items-center justify-center bg-sky-400 font-bold text-white transition-all duration-500" style={{ width: `${creator.genderSplit.male}%` }}>
             {creator.genderSplit.male > 20 && `${creator.genderSplit.male.toFixed(0)}%`}
           </div>
@@ -3979,7 +3979,7 @@ function GenderCard({ creator }: { creator: CreatorProfile }) {
 
 function AgeDistributionCard({ creator }: { creator: CreatorProfile }) {
   return (
-    <Card className="rounded-2xl border shadow-sm">
+    <Card className="rounded-lg border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Age Distribution</CardTitle>
       </CardHeader>
@@ -4005,7 +4005,7 @@ function AgeDistributionCard({ creator }: { creator: CreatorProfile }) {
 
 function TopCountriesCard({ creator }: { creator: CreatorProfile }) {
   return (
-    <Card className="rounded-2xl border shadow-sm">
+    <Card className="rounded-lg border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Top Countries</CardTitle>
       </CardHeader>
@@ -4075,11 +4075,11 @@ function StrategicNarrativeBanner({ towerId }: { towerId: PrimeTowerId }) {
     },
     'campaign-ops': {
       label: 'Narrative role',
-      detail: 'Demand is where PrimeOS actively brings traffic and response into the system, not just monitors it.',
+      detail: 'CRM is where PrimeOS actively brings traffic and response into the system, not just monitors it.',
     },
     'content-creator-ops': {
       label: 'Narrative role',
-      detail: 'Demand execution includes creators and content as managed operating flows tied to products and outcomes.',
+      detail: 'CRM execution includes creators and content as managed operating flows tied to products and outcomes.',
     },
     'lead-response-capture': {
       label: 'Narrative role',
@@ -4131,11 +4131,11 @@ function StrategicNarrativeBanner({ towerId }: { towerId: PrimeTowerId }) {
   );
 }
 
-function DemandPanel({ towerId }: { towerId: PrimeTowerId }) {
-  return <DemandExecutionPanel towerId={towerId} />;
+function CrmPanel({ towerId }: { towerId: PrimeTowerId }) {
+  return <CrmExecutionPanel towerId={towerId} />;
 }
 
-function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
+function CrmExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const snapshot = getPrimeSnapshot();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -4182,9 +4182,9 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   const replenishmentUnits = primaryForecast ? Math.max(48, primaryForecast.demand7d - primaryForecast.ats + 40) : 120;
   const projectedLift = snapshot.activationPlays.reduce((sum, play) => sum + play.projectedLift, 0);
 
-  type DemandActionStatus = 'ready' | 'drafted' | 'queued' | 'assigned';
+  type CrmActionStatus = 'ready' | 'drafted' | 'queued' | 'assigned';
   type HandoffDecisionStatus = 'pending' | 'accepted' | 'rejected';
-  type DemandExecutionAction = {
+  type CrmExecutionAction = {
     id: string;
     stage: string;
     kind: string;
@@ -4201,25 +4201,25 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     buttonLabel: string;
     doneLabel: string;
     result: string;
-    statusAfter: DemandActionStatus;
+    statusAfter: CrmActionStatus;
     icon: ReactNode;
     nextSystem: string;
   };
 
-  const [actionStatuses, setActionStatuses] = useState<Record<string, DemandActionStatus>>({});
+  const [actionStatuses, setActionStatuses] = useState<Record<string, CrmActionStatus>>({});
   const [handoffDecisions, setHandoffDecisions] = useState<Record<string, HandoffDecisionStatus>>({});
   const [executionLog, setExecutionLog] = useState<Array<{ id: string; title: string; result: string; at: string; owner: string }>>([]);
-  const [selectedAction, setSelectedAction] = useState<DemandExecutionAction | null>(null);
+  const [selectedAction, setSelectedAction] = useState<CrmExecutionAction | null>(null);
   const handoffDecision = handoffPackage ? handoffDecisions[handoffPackage.id] ?? 'pending' : null;
 
-  const statusLabel: Record<DemandActionStatus, string> = {
+  const statusLabel: Record<CrmActionStatus, string> = {
     ready: 'Ready',
     drafted: 'Drafted',
     queued: 'Queued',
     assigned: 'Assigned',
   };
 
-  const statusToneMap: Record<DemandActionStatus, 'default' | 'outline'> = {
+  const statusToneMap: Record<CrmActionStatus, 'default' | 'outline'> = {
     ready: 'outline',
     drafted: 'default',
     queued: 'default',
@@ -4231,11 +4231,11 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     setHandoffDecisions((current) => ({ ...current, [handoffPackage.id]: status }));
     toast({
       title: status === 'accepted' ? 'Intelligence handoff accepted' : 'Intelligence handoff rejected',
-      description: status === 'accepted' ? `${handoffPackage.title} is now staged inside Demand.` : `${handoffPackage.title} stays in Intelligence review.`,
+      description: status === 'accepted' ? `${handoffPackage.title} is now staged inside CRM.` : `${handoffPackage.title} stays in Intelligence review.`,
     });
   };
 
-  const runDemandAction = (action: DemandExecutionAction) => {
+  const runCrmAction = (action: CrmExecutionAction) => {
     setActionStatuses((current) => ({ ...current, [action.id]: action.statusAfter }));
     setExecutionLog((current) => [
       {
@@ -4251,7 +4251,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     toast({ title: action.doneLabel, description: action.result });
   };
 
-  const campaignActions: DemandExecutionAction[] = [
+  const campaignActions: CrmExecutionAction[] = [
     {
       id: 'campaign-message-repeat-buyers',
       stage: '01',
@@ -4354,7 +4354,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     },
   ];
 
-  const creatorActions: DemandExecutionAction[] = [
+  const creatorActions: CrmExecutionAction[] = [
     {
       id: 'creator-book-kol-akira',
       stage: '01',
@@ -4439,7 +4439,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       channel: 'Asset library',
       audience: 'Campaign Ops + marketplace team',
       owner: 'Creative QA - Yuna Park',
-      signal: 'Demand needs reusable proof assets, not one-off creator posts.',
+      signal: 'CRM needs reusable proof assets, not one-off creator posts.',
       setup: [
         { label: 'Assets', value: '6 stills, 3 creator frames, 2 banners' },
         { label: 'Caption', value: 'Premium notebook refill for teams' },
@@ -4457,7 +4457,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     },
   ];
 
-  const leadActions: DemandExecutionAction[] = [
+  const leadActions: CrmExecutionAction[] = [
     {
       id: 'lead-rfq-reply-draft',
       stage: '01',
@@ -4492,7 +4492,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       channel: 'CRM Compact',
       audience: `${qualifiedLeads} qualified leads`,
       owner: 'Sales Lead - Mika Sato',
-      signal: `${totalLeads} leads and ${totalRfqs} RFQs came from live Demand routes.`,
+      signal: `${totalLeads} leads and ${totalRfqs} RFQs came from live CRM routes.`,
       setup: [
         { label: 'Owner', value: 'Mika Sato' },
         { label: 'SLA', value: 'First response within 2 hours' },
@@ -4542,7 +4542,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       channel: 'CRM Compact',
       audience: 'CRM customer memory',
       owner: 'CRM Ops - Hana Lee',
-      signal: 'Demand gets smarter only if response history flows back into CRM memory.',
+      signal: 'CRM gets smarter only if response history flows back into CRM memory.',
       setup: [
         { label: 'Fields', value: 'Source, product, RFQ, score, owner' },
         { label: 'Next SLA', value: '2-hour owner response' },
@@ -4560,7 +4560,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     },
   ];
 
-  const retargetingActions: DemandExecutionAction[] = [
+  const retargetingActions: CrmExecutionAction[] = [
     {
       id: 'retarget-abandoned-cart-sequence',
       stage: '01',
@@ -4663,7 +4663,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     },
   ];
 
-  const getActionStatus = (action: DemandExecutionAction) => actionStatuses[action.id] ?? 'ready';
+  const getActionStatus = (action: CrmExecutionAction) => actionStatuses[action.id] ?? 'ready';
   const activeActions = towerId === 'content-creator-ops'
     ? creatorActions
     : towerId === 'lead-response-capture'
@@ -4691,7 +4691,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     { label: 'Impact', value: roas, detail: `${currency.format(totalRevenue)} revenue proof` },
     { label: 'Guardrail', value: stockGuardrail, detail: primaryForecast?.risk === 'high' ? 'Hold scale until stock clears.' : 'Safe to review before scale.' },
   ];
-  const getActionImpact = (action: DemandExecutionAction) => {
+  const getActionImpact = (action: CrmExecutionAction) => {
     if (action.id.includes('inventory') || action.id.includes('stock')) return { label: 'Guardrail', value: stockGuardrail };
     if (action.id.includes('paid') || action.id.includes('adset')) return { label: 'Paid proof', value: roas };
     if (action.id.includes('message') || action.id.includes('sequence')) return { label: 'Audience', value: `${qualifiedLeads} qualified` };
@@ -4705,9 +4705,9 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       eyebrow: 'Campaigns command bar',
       title: 'Which campaign can run safely now?',
       description: 'Pick the next market move with audience, owner, stock guardrail, and outcome readback visible before anything scales.',
-      actionTitle: 'Demand actions',
+      actionTitle: 'CRM actions',
       actionDescription: 'Four complete execution paths generated from the current Intelligence route.',
-      nextHref: DEMAND_LEADS_RFQS_HREF,
+      nextHref: CRM_LEADS_RFQS_HREF,
       nextLabel: 'Open Leads & RFQs',
     },
     'content-creator-ops': {
@@ -4716,7 +4716,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       description: 'Turn creator, content, and social proof into assets Campaigns can reuse across ads, marketplace, SEO, and lead capture.',
       actionTitle: 'Creator actions',
       actionDescription: 'Creator work becomes reusable proof for ads, marketplace pages, and SEO.',
-      nextHref: DEMAND_CAMPAIGNS_HREF,
+      nextHref: CRM_CAMPAIGNS_HREF,
       nextLabel: 'Send proof to Campaigns',
     },
     'lead-response-capture': {
@@ -4738,12 +4738,12 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       nextLabel: 'Open CRM Memory',
     },
   }[towerId] ?? {
-    eyebrow: 'Demand command center',
+    eyebrow: 'CRM command center',
     title: 'Move the Intelligence route into execution.',
-    description: 'Demand coordinates messages, ads, content, creator proof, lead response, retargeting, and stock guardrails.',
-    actionTitle: 'Demand actions',
+    description: 'CRM coordinates messages, ads, content, creator proof, lead response, retargeting, and stock guardrails.',
+    actionTitle: 'CRM actions',
     actionDescription: 'Concrete seller actions generated from the current Intelligence route.',
-    nextHref: DEMAND_CAMPAIGNS_HREF,
+    nextHref: CRM_CAMPAIGNS_HREF,
     nextLabel: 'Open Campaigns',
   };
 
@@ -4751,7 +4751,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     'campaign-ops': [
       { label: 'Readiness', value: `${routeCampaign?.status || 'pending'} · ${roas}`, detail: 'Objective, audience, offer, channel, owner, and budget are reviewed before launch.' },
       { label: 'Content readiness', value: queryView === 'creator-proof' ? 'Creator proof attached' : 'CTA + proof check', detail: 'Campaigns must reuse approved content/social proof instead of inventing new source truth.' },
-      { label: 'COS guardrail', value: stockGuardrail, detail: 'Demand can preview stock risk, but COS/Ecom owns order, quote, inventory, and ATS truth.' },
+      { label: 'COS guardrail', value: stockGuardrail, detail: 'CRM can preview stock risk, but COS/Ecom owns order, quote, inventory, and ATS truth.' },
     ],
     'content-creator-ops': [
       { label: 'Creator proof lane', value: `${snapshot.socialStreams.length} streams`, detail: 'Creator proof is one reusable lane inside Content & Social, not a separate creator CRM.' },
@@ -4759,9 +4759,9 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
       { label: 'Forward path', value: 'Campaign + Lead/RFQ', detail: 'Content links back to Campaign readiness and forward to response capture.' },
     ],
     'lead-response-capture': [
-      { label: 'Queue routing', value: `${openRfqs.length} open RFQs`, detail: 'Demand owns intake, priority, owner, SLA, and handoff status.' },
-      { label: 'CRM handoff', value: topLead?.company || 'Buyer context', detail: 'Customer/CRM owns customer master; Demand only sends source and response context.' },
-      { label: 'COS preview', value: topRfq ? `${topRfq.quantity} units` : 'RFQ pending', detail: 'COS/Ecom owns quote/order truth; Demand previews RFQ/order linkage only.' },
+      { label: 'Queue routing', value: `${openRfqs.length} open RFQs`, detail: 'CRM owns intake, priority, owner, SLA, and handoff status.' },
+      { label: 'CRM handoff', value: topLead?.company || 'Buyer context', detail: 'Customer/CRM owns customer master; CRM only sends source and response context.' },
+      { label: 'COS preview', value: topRfq ? `${topRfq.quantity} units` : 'RFQ pending', detail: 'COS/Ecom owns quote/order truth; CRM previews RFQ/order linkage only.' },
     ],
     'retargeting-outreach': [
       { label: 'Program trigger', value: topPlay?.trigger || 'Warm intent', detail: 'Re-engage starts from prior intent, not cold blast automation.' },
@@ -4771,10 +4771,10 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
   }[towerId] ?? [];
 
   const demandRouteTabs = [
-    { id: 'campaign-ops', label: 'Campaigns', href: DEMAND_CAMPAIGNS_HREF, detail: 'Message, ad, SEO, stock handoff' },
-    { id: 'content-creator-ops', label: 'Content & Social', href: DEMAND_CONTENT_SOCIAL_HREF, detail: 'Creator proof, briefs, assets' },
-    { id: 'lead-response-capture', label: 'Leads & RFQs', href: DEMAND_LEADS_RFQS_HREF, detail: 'Reply, owner, SLA, CRM sync' },
-    { id: 'retargeting-outreach', label: 'Re-engage', href: DEMAND_REENGAGE_HREF, detail: 'Sequence, offer, suppression' },
+    { id: 'campaign-ops', label: 'Campaigns', href: CRM_CAMPAIGNS_HREF, detail: 'Message, ad, SEO, stock handoff' },
+    { id: 'content-creator-ops', label: 'Content & Social', href: CRM_CONTENT_SOCIAL_HREF, detail: 'Creator proof, briefs, assets' },
+    { id: 'lead-response-capture', label: 'Leads & RFQs', href: CRM_LEADS_RFQS_HREF, detail: 'Reply, owner, SLA, CRM sync' },
+    { id: 'retargeting-outreach', label: 'Re-engage', href: CRM_REENGAGE_HREF, detail: 'Sequence, offer, suppression' },
   ];
 
   const focusedContext = handoffPackage
@@ -4805,12 +4805,12 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           ? {
               label: 'View focus',
               value: queryView === 'creator-proof' ? 'Creator proof' : queryView,
-              detail: 'The route opened with a specific Demand view hint.',
+              detail: 'The route opened with a specific CRM view hint.',
             }
           : null;
 
-  const renderDemandRouteTabs = () => (
-    <nav aria-label="Demand tabs" className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+  const renderCrmRouteTabs = () => (
+    <nav aria-label="CRM tabs" className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
       {demandRouteTabs.map((tab) => {
         const active = tab.id === towerId;
         return (
@@ -4819,7 +4819,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
             to={tab.href}
             aria-current={active ? 'page' : undefined}
             className={[
-              'min-w-[180px] rounded-2xl border p-3 transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:min-w-0',
+              'min-w-[180px] rounded-lg border p-3 transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:min-w-0',
               active ? 'border-primary/40 bg-primary/10 text-foreground ring-1 ring-primary/20' : 'bg-background text-muted-foreground',
             ].join(' ')}
           >
@@ -4859,7 +4859,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     params.set('tab', tab);
     if (queryCampaignId) params.set('campaign', queryCampaignId);
     if (queryHandoffId) params.set('handoff', queryHandoffId);
-    return `${DEMAND_CAMPAIGNS_HREF}?${params.toString()}`;
+    return `${CRM_CAMPAIGNS_HREF}?${params.toString()}`;
   };
 
   const readinessBadgeVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'warning' | 'outline' => {
@@ -5044,7 +5044,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
             {campaignWorkspace.campaigns.map((campaign) => (
               <TableRow key={campaign.id}>
                 <TableCell className="font-medium">
-                  <Link className="hover:text-primary" to={`${DEMAND_CAMPAIGNS_HREF}?tab=pipeline&campaign=${campaign.id}`}>{campaign.name}</Link>
+                  <Link className="hover:text-primary" to={`${CRM_CAMPAIGNS_HREF}?tab=pipeline&campaign=${campaign.id}`}>{campaign.name}</Link>
                 </TableCell>
                 <TableCell><Badge variant={readinessBadgeVariant(campaign.stage)}>{getCampaignWorkspaceStatusLabel(campaign.stage)}</Badge></TableCell>
                 <TableCell>{campaign.owner}</TableCell>
@@ -5090,7 +5090,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <CardTitle>Planner route</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Read-only MVP draft from current Demand signals. No source mutation is performed.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Read-only MVP draft from current CRM signals. No source mutation is performed.</p>
             </div>
             <Badge variant="outline">Draft surface</Badge>
           </div>
@@ -5370,7 +5370,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         ['3', 'PrimeOS opens setup', 'Seed copy, owner, audience, channel'],
         ['4', 'Queue or assign', 'Local task moves to next system'],
       ].map(([step, title, detail]) => (
-        <div key={step} className="rounded-2xl border bg-muted/20 p-3">
+        <div key={step} className="rounded-lg border bg-muted/20 p-3">
           <div className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{step}</div>
           <div className="mt-2 text-sm font-semibold">{title}</div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
@@ -5388,7 +5388,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{pageCopy.description}</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {heroMetrics.map((metric) => (
-              <div key={metric.label} className="rounded-xl border bg-background/80 p-3">
+              <div key={metric.label} className="rounded-lg border bg-background/80 p-3">
                 <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{metric.label}</div>
                 <div className="mt-1 truncate text-sm font-semibold" title={metric.value}>{metric.value}</div>
                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{metric.detail}</p>
@@ -5430,8 +5430,8 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-start gap-3 rounded-3xl border bg-primary/5 p-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border bg-background text-primary">{recommendedAction.icon}</div>
+          <div className="flex items-start gap-3 rounded-lg border bg-primary/5 p-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">{recommendedAction.icon}</div>
             <div className="min-w-0">
               <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{recommendedAction.kind}</div>
               <div className="mt-1 text-xl font-semibold">{recommendedAction.title}</div>
@@ -5443,7 +5443,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
             <RuntimeContextCard label="Channel" value={recommendedAction.channel} detail="Where the action will run." />
             <RuntimeContextCard label="Owner" value={recommendedAction.owner} detail="Who owns the next step." />
           </div>
-          <div className="rounded-2xl border bg-muted/20 p-3">
+          <div className="rounded-lg border bg-muted/20 p-3">
             <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Why this now</div>
             <p className="mt-1 text-sm font-medium">{recommendedAction.signal}</p>
           </div>
@@ -5534,11 +5534,11 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         </CardHeader>
         <CardContent className="space-y-3">
           {executionLog.length === 0 ? (
-            <div className="rounded-2xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
               Open an action setup, review the mock seed, then queue it. The result will appear here.
             </div>
           ) : executionLog.map((item) => (
-            <div key={item.id} className="rounded-2xl border bg-muted/20 p-3">
+            <div key={item.id} className="rounded-lg border bg-muted/20 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold">{item.title}</div>
@@ -5559,12 +5559,12 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           {handoffPackage ? (
-            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
+            <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Intelligence readback</div>
-                  <div className="mt-1 text-sm font-semibold">{handoffDecision === 'accepted' ? 'Demand accepted the package' : handoffDecision === 'rejected' ? 'Demand rejected the package' : 'Awaiting Demand decision'}</div>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{handoffDecision === 'accepted' ? `Package ${handoffPackage.id} can now become a Demand execution draft.` : handoffDecision === 'rejected' ? 'Return this package to Intelligence for more evidence or suppression.' : 'Accept or reject the Intelligence payload before treating it as Demand work.'}</p>
+                  <div className="mt-1 text-sm font-semibold">{handoffDecision === 'accepted' ? 'CRM accepted the package' : handoffDecision === 'rejected' ? 'CRM rejected the package' : 'Awaiting CRM decision'}</div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{handoffDecision === 'accepted' ? `Package ${handoffPackage.id} can now become a CRM execution draft.` : handoffDecision === 'rejected' ? 'Return this package to Intelligence for more evidence or suppression.' : 'Accept or reject the Intelligence payload before treating it as CRM work.'}</p>
                 </div>
                 <Badge variant={handoffDecision === 'accepted' ? 'success' : handoffDecision === 'rejected' ? 'warning' : 'outline'} className="w-fit shrink-0">{handoffDecision ?? 'pending'}</Badge>
               </div>
@@ -5585,7 +5585,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
     <Card className="rounded-lg border" data-testid="demand-phase-contracts">
       <CardHeader className="pb-3">
         <CardTitle>Phase contract</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">What this Demand workspace owns, what must stay in downstream source-of-truth systems.</p>
+        <p className="mt-1 text-sm text-muted-foreground">What this CRM workspace owns, what must stay in downstream source-of-truth systems.</p>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-3">
         {phaseContractCards.map((card) => (
@@ -5622,14 +5622,14 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
               </DialogHeader>
 
               <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                <Card className="rounded-3xl border bg-muted/20">
+                <Card className="rounded-lg border bg-muted/20">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Setup summary</CardTitle>
-                    <p className="text-sm text-muted-foreground">PrimeOS pre-fills this from Intelligence, COS, CRM, and Demand signals.</p>
+                    <p className="text-sm text-muted-foreground">PrimeOS pre-fills this from Intelligence, COS, CRM, and CRM signals.</p>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-start gap-3 rounded-2xl border bg-background p-3">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border bg-primary/10 text-primary">{selectedAction.icon}</div>
+                    <div className="flex items-start gap-3 rounded-lg border bg-background p-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-primary/10 text-primary">{selectedAction.icon}</div>
                       <div>
                         <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{selectedAction.kind}</div>
                         <div className="mt-1 font-semibold">{selectedAction.channel}</div>
@@ -5640,13 +5640,13 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
                       <RuntimeContextCard label="Audience" value={selectedAction.audience} detail="Target selected from current route." />
                       <RuntimeContextCard label="Owner" value={selectedAction.owner} detail="Person or team accountable." />
                     </div>
-                    <div className="rounded-2xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Intelligence signal</div>
                       <p className="mt-2 text-sm leading-6">{selectedAction.signal}</p>
                     </div>
                     <div className="grid gap-2">
                       {selectedAction.setup.map((item) => (
-                        <div key={`${selectedAction.id}-${item.label}`} className="flex items-start justify-between gap-3 rounded-2xl border bg-background p-3 text-sm">
+                        <div key={`${selectedAction.id}-${item.label}`} className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
                           <span className="text-muted-foreground">{item.label}</span>
                           <span className="max-w-[65%] text-right font-medium">{item.value}</span>
                         </div>
@@ -5655,15 +5655,15 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-3xl border">
+                <Card className="rounded-lg border">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">{selectedAction.previewTitle}</CardTitle>
                     <p className="text-sm text-muted-foreground">Mock sub-screen preview. Seller reviews this before anything goes live.</p>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-4">
+                    <div className="rounded-lg border bg-gradient-to-br from-primary/10 via-background to-background p-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-14 w-14 overflow-hidden rounded-2xl border bg-background">
+                        <div className="h-14 w-14 overflow-hidden rounded-lg border bg-background">
                           {primaryProductImage ? (
                             <img src={primaryProductImage} alt={launchProductName} className="h-full w-full object-cover" />
                           ) : (
@@ -5675,19 +5675,19 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
                           <div className="font-semibold">{launchProductName}</div>
                         </div>
                       </div>
-                      <p className="mt-4 whitespace-pre-line rounded-2xl border bg-background/75 p-3 text-sm leading-6 text-muted-foreground">{selectedAction.previewBody}</p>
+                      <p className="mt-4 whitespace-pre-line rounded-lg border bg-background/75 p-3 text-sm leading-6 text-muted-foreground">{selectedAction.previewBody}</p>
                     </div>
 
                     <div className="grid gap-2">
                       {selectedAction.checklist.map((item, index) => (
-                        <div key={`${selectedAction.id}-check-${item}`} className="flex items-center gap-3 rounded-2xl border bg-muted/20 p-3 text-sm">
+                        <div key={`${selectedAction.id}-check-${item}`} className="flex items-center gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
                           <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
                           <span>{item}</span>
                         </div>
                       ))}
                     </div>
 
-                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground">
                       Safety note: this button only creates a local mock draft/task in PrimeOS. It does not send messages, publish ads, book creators, or change inventory externally.
                     </div>
                   </CardContent>
@@ -5696,7 +5696,7 @@ function DemandExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
 
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button variant="outline" onClick={() => setSelectedAction(null)}>Close</Button>
-                <Button onClick={() => runDemandAction(selectedAction)}>
+                <Button onClick={() => runCrmAction(selectedAction)}>
                   {selectedAction.buttonLabel}
                   <ArrowRight className="size-4" />
                 </Button>
@@ -5823,7 +5823,7 @@ function buildSeedLaunchDecisions(snapshot: PrimeSnapshot): IntelligenceLaunchDe
     'Mythical art print guardrail check',
   ];
   const blockers = [
-    'Ecom stock and listing health are ready; handoff can move into Demand execution.',
+    'Ecom stock and listing health are ready; handoff can move into CRM execution.',
     'Needs one approved creator usage clip before budget moves from review to live.',
     'ATS coverage is tight; confirm replenishment date before scaling paid traffic.',
     'Audience proof is not strong enough yet; collect one more VOC or attribution signal.',
@@ -5874,7 +5874,7 @@ function RuntimeContextCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-muted/20 p-3">
+    <div className="rounded-lg border bg-muted/20 p-3">
       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
       <div className="mt-2 text-sm font-medium">{value}</div>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
@@ -5983,7 +5983,7 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <RuntimeContextCard label="Case owner" value={activeServiceRecord.owner} detail="Customer Service DRI" />
                 <RuntimeContextCard label="SLA state" value={activeServiceRecord.ticket.sla} detail={activeServiceRecord.ticket.status.replace('_', ' ')} />
-                <RuntimeContextCard label="Pending action" value={activeServiceRecord.pendingAction} detail="No Demand follow-up until blocker is clear." />
+                <RuntimeContextCard label="Pending action" value={activeServiceRecord.pendingAction} detail="No CRM follow-up until blocker is clear." />
                 <RuntimeContextCard label="Related customer" value={activeServiceRecord.customer?.company ?? 'Unknown customer'} detail={activeServiceRecord.order?.order_id ?? activeServiceRecord.ticket.linkedEntity} />
               </div>
               <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
@@ -6053,7 +6053,7 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
                   CRM Compact turns buyer memory into one next action: {selectedCustomer.nextFollowUp.toLowerCase()} for {selectedCustomer.segmentLabel.toLowerCase()}, with owner, product route, service context, and demand source attached.
                 </p>
               </div>
-              <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm xl:order-3">
+              <div className="rounded-lg border bg-background/80 p-4 text-right shadow-sm xl:order-3">
                 <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Customer fit</div>
                 <div className="mt-1 text-3xl font-semibold">{selectedCustomer.score}%</div>
                 <Badge variant={runtimeStatusVariant(selectedCustomer.customer.lifecycle)} className="mt-2 capitalize">
@@ -6069,7 +6069,7 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
               <RuntimeContextCard label="Product route" value={getSkuLabel(selectedCustomer.recommendedSku)} detail={selectedCustomer.campaign?.name || selectedCustomer.customer.notes[0] || 'Product interest from CRM.'} />
               <RuntimeContextCard label="Channel" value={selectedCustomer.channel} detail={selectedCustomer.ticket ? `Service watch: ${selectedCustomer.ticket.subject}` : 'Ready for seller follow-up.'} />
             </div>
-            <div className="rounded-2xl border bg-muted/20 p-3">
+            <div className="rounded-lg border bg-muted/20 p-3">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
               <div className="mt-2 text-sm font-medium">Open the customer profile, confirm the latest timeline, then create the follow-up or hand this customer back into Trends Intelligence.</div>
             </div>
@@ -6084,7 +6084,7 @@ function CustomerPanel({ towerId }: { towerId: PrimeTowerId }) {
                 </Link>
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link to={DEMAND_LEADS_RFQS_HREF}>
+                <Link to={CRM_LEADS_RFQS_HREF}>
                   Create follow-up
                   <ArrowRight className="size-4" />
                 </Link>
@@ -6245,9 +6245,7 @@ function CrmCustomerVisual({
   const productLabel = getSkuLabel(record.recommendedSku);
 
   return (
-    <div className={`${className} relative min-h-[210px] overflow-hidden rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-4 shadow-sm`}>
-      <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-sky-300/25 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-12 left-8 size-28 rounded-full bg-emerald-300/20 blur-3xl" />
+    <div className={`${className} relative min-h-[210px] overflow-hidden rounded-lg border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-4 shadow-sm`}>
       <div className="relative flex items-start gap-3">
         <CrmCustomerAvatar record={record} size="xl" />
         <div className="min-w-0 pt-1">
@@ -6258,9 +6256,9 @@ function CrmCustomerVisual({
           <div className="text-xs text-muted-foreground">{record.owner} owns next touch</div>
         </div>
       </div>
-      <div className="relative mt-4 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
+      <div className="relative mt-4 overflow-hidden rounded-lg border bg-background/80 shadow-sm">
         <div className="flex items-center gap-3 p-3">
-          <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl border bg-muted/30">
+          <div className="h-16 w-20 shrink-0 overflow-hidden rounded-lg border bg-muted/30">
             {productImage ? (
               <img src={productImage} alt={productLabel} className="h-full w-full object-cover" />
             ) : (
@@ -6275,7 +6273,7 @@ function CrmCustomerVisual({
           </div>
         </div>
       </div>
-      <div className="relative mt-3 rounded-2xl border bg-background/80 p-3 text-xs text-muted-foreground shadow-sm">
+      <div className="relative mt-3 rounded-lg border bg-background/80 p-3 text-xs text-muted-foreground shadow-sm">
         <span className="font-medium text-foreground">{record.nextFollowUp}</span> from CRM memory.
       </div>
     </div>
@@ -6310,14 +6308,14 @@ function CrmCustomerProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-hidden rounded-3xl p-0">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-hidden rounded-lg p-0">
         <DialogHeader className="sticky top-0 z-10 border-b bg-background/95 px-5 py-4 backdrop-blur sm:px-6">
           <DialogTitle>{record.customer.name}</DialogTitle>
           <DialogDescription>Customer profile, CRM memory, buyer context, and next-best follow-up guidance.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[calc(100dvh-8rem)] space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:space-y-6">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:items-start">
-            <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+            <div className="rounded-lg border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
               <div className="flex flex-col gap-5">
                 <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
                   <CrmCustomerAvatar record={record} size="lg" />
@@ -6337,16 +6335,16 @@ function CrmCustomerProfileDialog({
                       <Badge variant="outline">Owner {record.owner}</Badge>
                       <Badge variant="outline">Product {productLabel}</Badge>
                     </div>
-                    <div className="rounded-2xl border bg-muted/20 p-3 text-sm">
+                    <div className="rounded-lg border bg-muted/20 p-3 text-sm">
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best next action</div>
                       <div className="mt-2 font-medium">{record.nextFollowUp}</div>
-                      <div className="mt-1 text-muted-foreground">Use {record.channel} and keep the buyer attached to {productLabel.toLowerCase()} before the next Demand or Intelligence handoff.</div>
+                      <div className="mt-1 text-muted-foreground">Use {record.channel} and keep the buyer attached to {productLabel.toLowerCase()} before the next CRM or Intelligence handoff.</div>
                     </div>
                   </div>
                 </div>
                 <div className="grid w-full gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
                   <Button asChild className="w-full whitespace-nowrap sm:w-auto">
-                    <Link to={DEMAND_LEADS_RFQS_HREF}>Create follow-up</Link>
+                    <Link to={CRM_LEADS_RFQS_HREF}>Create follow-up</Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full whitespace-nowrap sm:w-auto">
                     <Link to="/intelligence/trends">Send to Trends</Link>
@@ -6354,14 +6352,14 @@ function CrmCustomerProfileDialog({
                 </div>
               </div>
             </div>
-            <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+            <Card className="rounded-lg border bg-muted/10 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Customer snapshot</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="overflow-hidden rounded-2xl border bg-background">
+                <div className="overflow-hidden rounded-lg border bg-background">
                   <div className="flex items-center gap-3 p-3">
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-muted/30">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-muted/30">
                       {productImage ? (
                         <img src={productImage} alt={productLabel} className="h-full w-full object-cover" />
                       ) : (
@@ -6388,7 +6386,7 @@ function CrmCustomerProfileDialog({
             <TabsList className="h-auto max-w-full flex-wrap justify-start gap-2 bg-transparent p-0">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="route">Demand route</TabsTrigger>
+              <TabsTrigger value="route">CRM route</TabsTrigger>
               <TabsTrigger value="service">Service / RFQ</TabsTrigger>
             </TabsList>
 
@@ -6418,7 +6416,7 @@ function CrmCustomerProfileDialog({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {record.customer.timeline.slice(0, 6).map((entry, index) => (
-                    <div key={`${record.customer.id}-timeline-${entry}`} className="flex items-start gap-3 rounded-2xl border bg-muted/20 p-3">
+                    <div key={`${record.customer.id}-timeline-${entry}`} className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3">
                       <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold">{index + 1}</div>
                       <div className="text-sm text-muted-foreground">{entry}</div>
                     </div>
@@ -6451,7 +6449,7 @@ function CrmCustomerProfileDialog({
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <RuntimeContextCard label="Lead status" value={record.lead?.status || 'No lead'} detail={record.lead?.source || 'No lead source attached'} />
-                    <RuntimeContextCard label="RFQ" value={record.rfq?.status || 'No RFQ'} detail={record.rfq ? `${record.rfq.quantity} units · ${currency.format(record.rfq.value)}` : 'Create RFQ from Demand if buyer replies.'} />
+                    <RuntimeContextCard label="RFQ" value={record.rfq?.status || 'No RFQ'} detail={record.rfq ? `${record.rfq.quantity} units · ${currency.format(record.rfq.value)}` : 'Create RFQ from CRM if buyer replies.'} />
                   </CardContent>
                 </Card>
                 <Card className="rounded-lg border">
@@ -6579,9 +6577,9 @@ function getLocalizedTowerJob(towerId: PrimeTowerId, locale: Locale): TowerJob |
   };
 }
 
-export function PrimeDemandHubPage() {
+export function PrimeCrmHubPage() {
   const snapshot = getPrimeSnapshot();
-  const dashboard = useMemo(() => buildDemandDashboardSnapshot(snapshot), [snapshot]);
+  const dashboard = useMemo(() => buildCrmDashboardSnapshot(snapshot), [snapshot]);
 
   const kpiIcons: Record<string, ReactNode> = {
     readiness: <Gauge className="size-5" />,
@@ -6611,16 +6609,16 @@ export function PrimeDemandHubPage() {
   } satisfies ChartConfig;
 
   return (
-    <div className="min-h-[calc(100dvh-var(--header-height))] bg-background bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.08),transparent_34rem)]">
+    <div className="min-h-[calc(100dvh-var(--header-height))] bg-background">
       <div className="mx-auto max-w-[1520px] space-y-5 p-4 pb-4 md:p-6 md:pb-6">
-        <section data-testid="demand-command-bar" className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <section data-testid="demand-command-bar" className="overflow-hidden rounded-lg border bg-card shadow-sm">
           <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.62fr)_auto] lg:items-center">
             <div className="min-w-0">
-              <Badge variant="outline" className="mb-3 rounded-full">Demand Dashboard</Badge>
+              <Badge variant="outline" className="mb-3 rounded-full">CRM Dashboard</Badge>
               <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{dashboard.title}</h1>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{dashboard.operatingDetail}</p>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-4">
+            <div className="rounded-lg border bg-muted/20 p-4">
               <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                 <span>{dashboard.readiness}% readiness</span>
                 <span className="text-muted-foreground">/</span>
@@ -6650,9 +6648,9 @@ export function PrimeDemandHubPage() {
 
         <LinkedEntityStrip
           entities={[
-            { label: 'Area', value: 'Demand Area', tone: 'purple' },
+            { label: 'Area', value: 'CRM Area', tone: 'purple' },
             { label: 'Dashboard', value: 'Suite overview', tone: 'info' },
-            { label: 'Functions', value: String(dashboard.functions.length), href: '/demand/sources', tone: 'purple' },
+            { label: 'Functions', value: String(dashboard.functions.length), href: '/crm/sources', tone: 'purple' },
             { label: 'Orders', value: String(dashboard.totalOrders), href: '/ecom/cos/oms', tone: 'success' },
           ]}
         />
@@ -6675,12 +6673,12 @@ export function PrimeDemandHubPage() {
           {dashboard.functions.map((item) => {
             const Icon = demandFunctionIcon(item.id);
             return (
-              <Link key={item.id} to={item.href} className="group flex min-h-[156px] flex-col rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5">
+              <Link key={item.id} to={item.href} className="group flex min-h-[156px] flex-col rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30 text-primary">
                     <Icon className="size-4" />
                   </div>
-                  <DemandSeverityBadge severity={item.status} />
+                  <CrmSeverityBadge severity={item.status} />
                 </div>
                 <div className="mt-3">
                   <div className="truncate text-sm font-semibold">{item.label}</div>
@@ -6697,7 +6695,7 @@ export function PrimeDemandHubPage() {
         </section>
 
         <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
-          <Card className="min-h-[390px] rounded-xl border shadow-sm">
+          <Card className="min-h-[390px] rounded-lg border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="size-4" />
@@ -6709,7 +6707,7 @@ export function PrimeDemandHubPage() {
                 <ChartContainer
                   config={readinessConfig}
                   className="h-72 w-full"
-                  aria-label={`Demand function readiness: ${dashboard.chartData.map((row) => `${row.function} ${row.readiness}%`).join(', ')}`}
+                  aria-label={`CRM function readiness: ${dashboard.chartData.map((row) => `${row.function} ${row.readiness}%`).join(', ')}`}
                 >
                   <BarChart data={dashboard.chartData} layout="vertical" margin={{ left: 8, right: 44, top: 8, bottom: 8 }}>
                     <CartesianGrid horizontal={false} />
@@ -6735,7 +6733,7 @@ export function PrimeDemandHubPage() {
                         <div className="text-sm font-semibold">{item.label}</div>
                         <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.detail}</p>
                       </div>
-                      <DemandSeverityBadge severity={item.severity} label={item.value} />
+                      <CrmSeverityBadge severity={item.severity} label={item.value} />
                     </div>
                   </Link>
                 ))}
@@ -6743,27 +6741,27 @@ export function PrimeDemandHubPage() {
             </CardContent>
           </Card>
 
-          <Card className="min-h-[390px] rounded-xl border shadow-sm">
+          <Card className="min-h-[390px] rounded-lg border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <ScanSearch className="size-4" />
-                Demand Funnel
+                CRM Funnel
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <DemandFunnel stages={dashboard.funnel} />
+              <CrmFunnel stages={dashboard.funnel} />
             </CardContent>
           </Card>
         </section>
 
         <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-          <Card id="priority-demand-queue" className="rounded-xl border shadow-sm">
+          <Card id="priority-demand-queue" className="rounded-lg border shadow-sm">
             <CardHeader className="border-b pb-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <ClipboardList className="size-5" />
-                    Priority Demand Queue
+                    Priority CRM Queue
                   </CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Ranked by guardrail risk, buyer intent, and next owner clarity.
@@ -6780,7 +6778,7 @@ export function PrimeDemandHubPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <DemandSeverityBadge severity={move.severity} />
+                      <CrmSeverityBadge severity={move.severity} />
                       <Badge variant="outline">{move.owner}</Badge>
                     </div>
                     <h2 className="mt-2 text-base font-semibold leading-tight">{move.title}</h2>
@@ -6796,7 +6794,7 @@ export function PrimeDemandHubPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl border shadow-sm">
+          <Card className="rounded-lg border shadow-sm">
             <CardHeader className="border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="size-4" />
@@ -6807,7 +6805,7 @@ export function PrimeDemandHubPage() {
               <ChartContainer
                 config={outcomeConfig}
                 className="h-64 w-full"
-                aria-label={`Demand outcomes: ${dashboard.outcomes.map((row) => `${row.label}: ${row.leads} leads, ${row.rfqs} RFQs, ${row.orders} orders`).join(', ')}`}
+                aria-label={`CRM outcomes: ${dashboard.outcomes.map((row) => `${row.label}: ${row.leads} leads, ${row.rfqs} RFQs, ${row.orders} orders`).join(', ')}`}
               >
                 <BarChart data={dashboard.outcomes} margin={{ left: 8, right: 8, top: 12, bottom: 8 }}>
                   <CartesianGrid vertical={false} />
@@ -6828,7 +6826,7 @@ export function PrimeDemandHubPage() {
           </Card>
         </section>
 
-        <Card className="flex min-h-[460px] flex-col rounded-xl border shadow-sm">
+        <Card className="flex min-h-[460px] flex-col rounded-lg border shadow-sm">
           <CardHeader className="border-b pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <TrendingUp className="size-4" />
@@ -6880,27 +6878,27 @@ function demandFunctionIcon(id: string) {
   return icons[id as keyof typeof icons] || PanelsTopLeft;
 }
 
-function demandSeverityClassName(severity: DemandDashboardSeverity) {
+function crmSeverityClassName(severity: CrmDashboardSeverity) {
   if (severity === 'critical') return 'border-rose-500/35 bg-rose-500/10 text-rose-700 dark:text-rose-300';
   if (severity === 'watch') return 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300';
   return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
 }
 
-function demandSeverityLabel(severity: DemandDashboardSeverity) {
+function crmSeverityLabel(severity: CrmDashboardSeverity) {
   if (severity === 'critical') return 'Critical';
   if (severity === 'watch') return 'Watch';
   return 'Ready';
 }
 
-function DemandSeverityBadge({ severity, label }: { severity: DemandDashboardSeverity; label?: string }) {
+function CrmSeverityBadge({ severity, label }: { severity: CrmDashboardSeverity; label?: string }) {
   return (
-    <Badge variant="outline" className={demandSeverityClassName(severity)}>
-      {label || demandSeverityLabel(severity)}
+    <Badge variant="outline" className={crmSeverityClassName(severity)}>
+      {label || crmSeverityLabel(severity)}
     </Badge>
   );
 }
 
-function DemandFunnel({ stages }: { stages: Array<{ id: string; label: string; displayValue: string; href: string; detail: string }> }) {
+function CrmFunnel({ stages }: { stages: Array<{ id: string; label: string; displayValue: string; href: string; detail: string }> }) {
   return (
     <div className="grid gap-3">
       {stages.map((stage, index) => (
@@ -6926,20 +6924,20 @@ function DemandFunnel({ stages }: { stages: Array<{ id: string; label: string; d
   );
 }
 
-function sourceStatusVariant(source: DemandSource): 'default' | 'secondary' | 'warning' | 'outline' {
+function sourceStatusVariant(source: CrmSource): 'default' | 'secondary' | 'warning' | 'outline' {
   if (source.status === 'active' && source.blockers.length === 0) return 'default';
   if (source.status === 'needs_review' || source.blockers.length > 0) return 'warning';
   if (source.status === 'suppressed') return 'secondary';
   return 'outline';
 }
 
-function sourceActionVariant(action: DemandSource['nextAction']): 'default' | 'secondary' | 'outline' {
+function sourceActionVariant(action: CrmSource['nextAction']): 'default' | 'secondary' | 'outline' {
   if (action === 'Scale' || action === 'Route leads') return 'default';
   if (action === 'Fix' || action === 'Review') return 'outline';
   return 'secondary';
 }
 
-function sourceRiskBadgeVariant(risk: DemandSource['inventoryRisk'] | DemandSource['financeRisk']): 'default' | 'secondary' | 'warning' | 'outline' {
+function sourceRiskBadgeVariant(risk: CrmSource['inventoryRisk'] | CrmSource['financeRisk']): 'default' | 'secondary' | 'warning' | 'outline' {
   if (risk === 'high') return 'warning';
   if (risk === 'medium') return 'secondary';
   if (risk === 'low') return 'default';
@@ -6958,16 +6956,16 @@ function SourceQualityBar({ value }: { value: number }) {
   );
 }
 
-function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; onClose: () => void }) {
+function SourceDetailDialog({ source, onClose }: { source: CrmSource | null; onClose: () => void }) {
   if (!source) return null;
 
   return (
     <Dialog open={Boolean(source)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto rounded-2xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto rounded-lg">
         <DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={sourceStatusVariant(source)}>{source.status.replace('_', ' ')}</Badge>
-            <Badge variant="outline">{getDemandSourceTypeLabel(source.type)}</Badge>
+            <Badge variant="outline">{getCrmSourceTypeLabel(source.type)}</Badge>
             <Badge variant="outline">{source.market}</Badge>
           </div>
           <DialogTitle className="text-2xl">{source.name}</DialogTitle>
@@ -6975,7 +6973,7 @@ function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; 
         </DialogHeader>
 
         <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
-          <Card className="rounded-xl">
+          <Card className="rounded-lg">
             <CardHeader>
               <CardTitle className="text-base">Source identity</CardTitle>
             </CardHeader>
@@ -7006,7 +7004,7 @@ function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; 
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl">
+          <Card className="rounded-lg">
             <CardHeader>
               <CardTitle className="text-base">Quality engine</CardTitle>
             </CardHeader>
@@ -7049,7 +7047,7 @@ function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; 
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Card className="rounded-xl">
+          <Card className="rounded-lg">
             <CardHeader>
               <CardTitle className="text-base">Attribution preview</CardTitle>
             </CardHeader>
@@ -7066,12 +7064,12 @@ function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; 
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl">
+          <Card className="rounded-lg">
             <CardHeader>
               <CardTitle className="text-base">Recommended action</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-xl border bg-primary/5 p-4">
+              <div className="rounded-lg border bg-primary/5 p-4">
                 <div className="text-lg font-semibold">{source.nextAction}</div>
                 <p className="mt-2 text-sm text-muted-foreground">{source.actionReason}</p>
                 {source.importBatch ? (
@@ -7096,20 +7094,20 @@ function SourceDetailDialog({ source, onClose }: { source: DemandSource | null; 
 
 
 
-export function PrimeDemandSourcesPage() {
+export function PrimeCrmSourcesPage() {
   const snapshot = getPrimeSnapshot();
   const [searchParams] = useSearchParams();
-  const sources = useMemo(() => buildDemandSources(snapshot), [snapshot]);
+  const sources = useMemo(() => buildCrmSources(snapshot), [snapshot]);
   const requestedFunction = searchParams.get('function');
   const selectedFunction = SOURCE_FUNCTION_CATALOG.some((item) => item.id === requestedFunction)
-    ? requestedFunction as DemandSourceType
+    ? requestedFunction as CrmSourceType
     : 'all';
   const visibleSources = useMemo(() => (
     selectedFunction === 'all'
       ? sources
       : sources.filter((source) => source.type === selectedFunction)
   ), [selectedFunction, sources]);
-  const overview = useMemo(() => buildDemandSourcesOverview(visibleSources), [visibleSources]);
+  const overview = useMemo(() => buildCrmSourcesOverview(visibleSources), [visibleSources]);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const selectedSource = sources.find((source) => source.id === selectedSourceId) || null;
   const selectedFunctionMeta = selectedFunction === 'all'
@@ -7165,7 +7163,7 @@ export function PrimeDemandSourcesPage() {
     <div className="min-h-full bg-background">
       <div className="space-y-6 p-4 md:p-6">
         <DecisionHeader
-          eyebrow="Demand Center / Source Quality Engine"
+          eyebrow="CRM Center / Source Quality Engine"
           title={selectedFunctionMeta?.label || 'Sources'}
           description={selectedFunctionMeta?.description || 'Track where demand comes from, measure source quality, and turn raw signals into leads, RFQs, and sales opportunities.'}
           confidence={overview.averageQualityScore}
@@ -7173,13 +7171,13 @@ export function PrimeDemandSourcesPage() {
           actions={(
             <>
               <Button asChild>
-                <Link to={overview.topSource?.nextActionRoute || '/demand/campaigns'}>
+                <Link to={overview.topSource?.nextActionRoute || '/crm/campaigns'}>
                   {overview.topSource ? overview.topSource.nextAction : 'Build campaign'}
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to="/demand/leads-rfqs">
+                <Link to="/crm/leads-rfqs">
                   Open leads/RFQs
                   <ArrowRight className="size-4" />
                 </Link>
@@ -7195,8 +7193,8 @@ export function PrimeDemandSourcesPage() {
             { label: 'Workspace', value: 'Sources', tone: 'purple' },
             { label: 'Function', value: selectedFunctionMeta?.label || 'All source functions', tone: 'info' },
             { label: 'Signals', value: formatCompactCount(totalSignals), href: '/intelligence/signals', tone: 'info' },
-            { label: 'Leads', value: String(overview.totalLeads), href: '/demand/leads-rfqs', tone: 'success' },
-            { label: 'RFQs', value: String(overview.totalRfqs), href: '/demand/leads-rfqs', tone: 'warning' },
+            { label: 'Leads', value: String(overview.totalLeads), href: '/crm/leads-rfqs', tone: 'success' },
+            { label: 'RFQs', value: String(overview.totalRfqs), href: '/crm/leads-rfqs', tone: 'warning' },
             { label: 'Top source', value: overview.topSource?.name || 'None', href: overview.topSource?.nextActionRoute, tone: 'muted' },
           ]}
         />
@@ -7221,7 +7219,7 @@ export function PrimeDemandSourcesPage() {
           <SummaryMetricCard
             label="Leads"
             value={overview.totalLeads}
-            metaTooltip="Total source-linked leads derived from current Demand campaign and lead records."
+            metaTooltip="Total source-linked leads derived from current CRM campaign and lead records."
             status={<Badge variant="outline">Source-linked</Badge>}
             icon={<UserRoundCheck className="size-5" />}
             tone="teal"
@@ -7244,7 +7242,7 @@ export function PrimeDemandSourcesPage() {
           />
         </div>
 
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -7255,7 +7253,7 @@ export function PrimeDemandSourcesPage() {
               </div>
               {selectedFunctionMeta ? (
                 <Button asChild size="sm" variant="outline">
-                  <Link to="/demand/sources">Show all functions</Link>
+                  <Link to="/crm/sources">Show all functions</Link>
                 </Button>
               ) : null}
             </div>
@@ -7266,8 +7264,8 @@ export function PrimeDemandSourcesPage() {
               return (
                 <Link
                   key={item.id}
-                  to={`/demand/sources?function=${item.id}`}
-                  className={`rounded-2xl border p-4 transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/50 bg-primary/10 shadow-sm' : 'bg-background'}`}
+                  to={`/crm/sources?function=${item.id}`}
+                  className={`rounded-lg border p-4 transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/50 bg-primary/10 shadow-sm' : 'bg-background'}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -7293,7 +7291,7 @@ export function PrimeDemandSourcesPage() {
         </Card>
 
         <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader className="space-y-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -7307,31 +7305,31 @@ export function PrimeDemandSourcesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {overview.topSource ? (
-                <div className="rounded-2xl border bg-primary/5 p-5">
+                <div className="rounded-lg border bg-primary/5 p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-2xl font-semibold tracking-tight">{overview.topSource.name}</div>
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{overview.topSource.actionReason}</p>
                     </div>
-                    <div className="min-w-24 rounded-xl bg-background p-3 text-center shadow-sm">
+                    <div className="min-w-24 rounded-lg bg-background p-3 text-center shadow-sm">
                       <div className="text-xs text-muted-foreground">Quality</div>
                       <div className="text-2xl font-semibold">{overview.topSource.qualityScore}</div>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs text-muted-foreground">Type</div>
-                      <div className="mt-1 font-medium">{getDemandSourceTypeLabel(overview.topSource.type)}</div>
+                      <div className="mt-1 font-medium">{getCrmSourceTypeLabel(overview.topSource.type)}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs text-muted-foreground">Owner</div>
                       <div className="mt-1 font-medium">{overview.topSource.ownerLabel}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs text-muted-foreground">Leads / RFQs</div>
                       <div className="mt-1 font-medium">{overview.topSource.leadCount} / {overview.topSource.rfqCount}</div>
                     </div>
-                    <div className="rounded-xl border bg-background p-3">
+                    <div className="rounded-lg border bg-background p-3">
                       <div className="text-xs text-muted-foreground">SKU signal</div>
                       <div className="mt-1 truncate font-medium">{overview.topSource.skuCode}</div>
                     </div>
@@ -7349,21 +7347,21 @@ export function PrimeDemandSourcesPage() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">No source data available.</div>
+                <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">No source data available.</div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle className="text-xl">Source type mix</CardTitle>
               <p className="text-sm text-muted-foreground">Quality by acquisition class.</p>
             </CardHeader>
             <CardContent className="space-y-3">
               {overview.typeMix.map((item) => (
-                <div key={item.type} className="rounded-xl border p-3">
+                <div key={item.type} className="rounded-lg border p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="font-medium">{getDemandSourceTypeLabel(item.type)}</div>
+                    <div className="font-medium">{getCrmSourceTypeLabel(item.type)}</div>
                     <Badge variant="outline">{item.count} sources</Badge>
                   </div>
                   <SourceQualityBar value={item.quality} />
@@ -7374,7 +7372,7 @@ export function PrimeDemandSourcesPage() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle className="text-xl">Source quality ranking</CardTitle>
               <p className="text-sm text-muted-foreground">Ranked by lead/RFQ quality, freshness, duplicate risk, and guardrails.</p>
@@ -7385,26 +7383,26 @@ export function PrimeDemandSourcesPage() {
                   key={source.id}
                   type="button"
                   onClick={() => setSelectedSourceId(source.id)}
-                  className="w-full rounded-xl border bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  className="w-full rounded-lg border bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
                 >
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate font-semibold">{source.name}</div>
-                      <div className="text-xs text-muted-foreground">{getDemandSourceTypeLabel(source.type)} / {source.ownerLabel}</div>
+                      <div className="text-xs text-muted-foreground">{getCrmSourceTypeLabel(source.type)} / {source.ownerLabel}</div>
                     </div>
                     <Badge variant={sourceStatusVariant(source)}>{source.nextAction}</Badge>
                   </div>
                   <SourceQualityBar value={source.qualityScore} />
                 </button>
               )) : (
-                <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                   No source rows are mapped to this function yet.
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle className="text-xl">Source to SKU signal</CardTitle>
               <p className="text-sm text-muted-foreground">Which SKU routes are receiving source quality.</p>
@@ -7412,7 +7410,7 @@ export function PrimeDemandSourcesPage() {
             <CardContent>
               <div className="grid gap-3">
                 {overview.skuSignals.length ? overview.skuSignals.map((sku) => (
-                  <div key={sku.skuCode} className="rounded-xl border p-3">
+                  <div key={sku.skuCode} className="rounded-lg border p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="font-semibold">{sku.skuCode}</div>
@@ -7430,7 +7428,7 @@ export function PrimeDemandSourcesPage() {
                     </div>
                   </div>
                 )) : (
-                  <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                     No SKU signal is mapped to this function yet.
                   </div>
                 )}
@@ -7440,7 +7438,7 @@ export function PrimeDemandSourcesPage() {
         </section>
 
         {reviewSources.length ? (
-          <Card className="rounded-2xl border border-warning/30 bg-warning/5" data-testid="demand-source-warning-lane">
+          <Card className="rounded-lg border border-warning/30 bg-warning/5" data-testid="demand-source-warning-lane">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -7452,7 +7450,7 @@ export function PrimeDemandSourcesPage() {
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-3">
               {reviewSources.map((source) => (
-                <div key={source.id} className="rounded-xl border bg-background p-4">
+                <div key={source.id} className="rounded-lg border bg-background p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate font-semibold">{source.name}</div>
@@ -7473,7 +7471,7 @@ export function PrimeDemandSourcesPage() {
           </Card>
         ) : null}
 
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -7489,13 +7487,13 @@ export function PrimeDemandSourcesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {visibleSources.length ? visibleSources.map((source) => (
-              <div key={source.id} className="rounded-2xl border bg-background p-4 transition-colors hover:border-primary/30">
+              <div key={source.id} className="rounded-lg border bg-background p-4 transition-colors hover:border-primary/30">
                 <div className="grid gap-4 xl:grid-cols-[1.4fr_0.8fr_0.8fr_0.9fr_auto]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate text-base font-semibold">{source.name}</h3>
                       <Badge variant={sourceStatusVariant(source)}>{source.status.replace('_', ' ')}</Badge>
-                      <Badge variant="outline">{getDemandSourceTypeLabel(source.type)}</Badge>
+                      <Badge variant="outline">{getCrmSourceTypeLabel(source.type)}</Badge>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{source.sourceSignal}</p>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -7541,7 +7539,7 @@ export function PrimeDemandSourcesPage() {
                 </div>
               </div>
             )) : (
-              <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
                 No source registry rows are currently mapped to {selectedFunctionMeta?.label || 'this function'}.
               </div>
             )}
@@ -7549,7 +7547,7 @@ export function PrimeDemandSourcesPage() {
         </Card>
 
         <section className="grid gap-4 lg:grid-cols-3">
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle>Source to campaign</CardTitle>
             </CardHeader>
@@ -7558,36 +7556,36 @@ export function PrimeDemandSourcesPage() {
                 .filter((campaign) => selectedFunction === 'all' || visibleSources.some((source) => source.linkedCampaignIds.includes(campaign.id)))
                 .slice(0, 3)
                 .map((campaign) => (
-                <Link key={campaign.id} to={`/demand/campaigns?campaign=${encodeURIComponent(campaign.id)}`} className="block rounded-xl border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+                <Link key={campaign.id} to={`/crm/campaigns?campaign=${encodeURIComponent(campaign.id)}`} className="block rounded-lg border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
                   <div className="font-semibold">{campaign.name}</div>
                   <p className="mt-1 text-xs text-muted-foreground">{campaign.channel} / {campaign.leads} leads / {campaign.rfqs} RFQs</p>
                 </Link>
               ))}
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle>Source to leads/RFQs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {visibleSources.filter((source) => source.leadCount > 0).slice(0, 3).map((source) => (
-                <button key={source.id} type="button" onClick={() => setSelectedSourceId(source.id)} className="block w-full rounded-xl border p-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/5">
+                <button key={source.id} type="button" onClick={() => setSelectedSourceId(source.id)} className="block w-full rounded-lg border p-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/5">
                   <div className="font-semibold">{source.name}</div>
                   <p className="mt-1 text-xs text-muted-foreground">{source.leadCount} leads with {source.rfqCount} RFQs ready for lineage review.</p>
                 </button>
               ))}
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border">
+          <Card className="rounded-lg border">
             <CardHeader>
               <CardTitle>Import and rules</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="rounded-xl border p-3">
+              <div className="rounded-lg border p-3">
                 <div className="flex items-center gap-2 font-semibold"><Upload className="size-4" /> Manual import batch</div>
                 <p className="mt-1 text-xs text-muted-foreground">CSV/event rows must keep batch owner, duplicate risk, and source mapping.</p>
               </div>
-              <div className="rounded-xl border p-3">
+              <div className="rounded-lg border p-3">
                 <div className="flex items-center gap-2 font-semibold"><SlidersHorizontal className="size-4" /> Mapping rules</div>
                 <p className="mt-1 text-xs text-muted-foreground">Owner, source origin, SKU/category, campaign, and attribution override rules.</p>
               </div>
@@ -7680,8 +7678,8 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
               <RegistryList items={registryItems} />
               <div className="grid gap-4">
                 <OutcomePreview
-                  value={demandTowerIds.includes(towerId) ? snapshot.orders.length : intelligenceTowerIds.includes(towerId) ? snapshot.activationPlays.length : snapshot.customers.length}
-                  detail={demandTowerIds.includes(towerId) ? chromeCopy.outcomeOrders : intelligenceTowerIds.includes(towerId) ? chromeCopy.outcomeIntelligence : chromeCopy.outcomeCustomer}
+                  value={crmTowerIds.includes(towerId) ? snapshot.orders.length : intelligenceTowerIds.includes(towerId) ? snapshot.activationPlays.length : snapshot.customers.length}
+                  detail={crmTowerIds.includes(towerId) ? chromeCopy.outcomeOrders : intelligenceTowerIds.includes(towerId) ? chromeCopy.outcomeIntelligence : chromeCopy.outcomeCustomer}
                   tone={confidence >= 80 ? 'success' : 'info'}
                 />
                 <ActionSetupPanel
@@ -7712,7 +7710,7 @@ export function PrimeTowerPage({ towerId }: PrimeTowerPageProps) {
         ) : null}
 
         {financeTowerIds.includes(towerId) ? <FinancePanel towerId={towerId} /> : null}
-        {demandTowerIds.includes(towerId) ? <DemandPanel towerId={towerId} /> : null}
+        {crmTowerIds.includes(towerId) ? <CrmPanel towerId={towerId} /> : null}
         {towerId === 'crm-compact' ? <CustomerProfileFloor snapshot={snapshot} /> : null}
         {towerId === 'service' ? <CustomerPanel towerId={towerId} /> : null}
         {intelligenceTowerIds.includes(towerId) ? <IntelligencePanel towerId={towerId} /> : null}

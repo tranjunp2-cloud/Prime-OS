@@ -20,6 +20,7 @@ import { getFulfillmentJobs } from '@/lib/fulfillment-store';
 import { ATSBucketChart } from '@/components/inventory/ATSBucketChart';
 import { ATSHealthDonut } from '@/components/inventory/ATSHealthDonut';
 import { ReservationLedger } from '@/components/inventory/ReservationLedger';
+import { ReservationLedger5State } from '@/components/inventory/ReservationLedger5State';
 import { InventoryStatusBadge } from '@/components/inventory/InventoryStatusBadge';
 import { useInitialLoading } from '@/hooks/use-initial-loading';
 import { useI18n } from '@/lib/i18n/I18nContext';
@@ -76,10 +77,11 @@ export default function Inventory() {
     return warehouseMatch && searchMatch;
   });
 
-  // Aggregate by SKU
-  const atsBySku = filteredPositions.reduce<Record<string, {
+  // Aggregate by SKU using 5-state model
+  const atpBySku = filteredPositions.reduce<Record<string, {
     skuId: string; name: string; skuCode: string;
-    onHand: number; reserved: number; ats: number;
+    onHand: number; reservedUnpaid: number; reservedPaid: number;
+    allocated: number; safetyStock: number; atp: number;
     health: 'healthy' | 'low' | 'critical';
   }>>((acc, p) => {
     const skuInfo = skuProductMap.get(p.sku_id);
@@ -87,25 +89,37 @@ export default function Inventory() {
     if (!acc[p.sku_id]) {
       acc[p.sku_id] = {
         skuId: p.sku_id, name: skuInfo.name, skuCode: skuInfo.skuCode,
-        onHand: 0, reserved: 0, ats: 0,
+        onHand: 0, reservedUnpaid: 0, reservedPaid: 0,
+        allocated: 0, safetyStock: 0, atp: 0,
         health: 'healthy',
       };
     }
     acc[p.sku_id].onHand += p.on_hand ?? 0;
-    acc[p.sku_id].reserved += p.reserved ?? 0;
-    const skuAts = Math.max(0, (p.on_hand ?? 0) - (p.reserved ?? 0));
-    acc[p.sku_id].ats += skuAts;
+    acc[p.sku_id].reservedUnpaid += p.reserved_unpaid ?? 0;
+    acc[p.sku_id].reservedPaid += p.reserved_paid ?? 0;
+    acc[p.sku_id].allocated += p.allocated ?? 0;
+    acc[p.sku_id].safetyStock += p.safety_stock ?? 0;
+    const skuAtp = Math.max(0, (p.on_hand ?? 0)
+      - (p.reserved_unpaid ?? 0)
+      - (p.reserved_paid ?? 0)
+      - (p.allocated ?? 0)
+      - (p.safety_stock ?? 0)
+      - (p.campaign_lock ?? 0));
+    acc[p.sku_id].atp += skuAtp;
     return acc;
   }, {});
 
   // Set health
-  for (const sku of Object.values(atsBySku)) {
-    sku.health = sku.ats === 0 ? 'critical' : sku.ats < 10 ? 'low' : 'healthy';
+  for (const sku of Object.values(atpBySku)) {
+    sku.health = sku.atp === 0 ? 'critical' : sku.atp < 10 ? 'low' : 'healthy';
   }
 
-  const totalATS = Object.values(atsBySku).reduce((sum, s) => sum + s.ats, 0);
-  const totalOnHand = Object.values(atsBySku).reduce((sum, s) => sum + s.onHand, 0);
-  const skuRows = Object.values(atsBySku).sort((a, b) => b.ats - a.ats);
+  const totalATP = Object.values(atpBySku).reduce((sum, s) => sum + s.atp, 0);
+  const totalOnHand = Object.values(atpBySku).reduce((sum, s) => sum + s.onHand, 0);
+  const totalReservedUnpaid = Object.values(atpBySku).reduce((sum, s) => sum + s.reservedUnpaid, 0);
+  const totalReservedPaid = Object.values(atpBySku).reduce((sum, s) => sum + s.reservedPaid, 0);
+  const totalAllocated = Object.values(atpBySku).reduce((sum, s) => sum + s.allocated, 0);
+  const skuRows = Object.values(atpBySku).sort((a, b) => b.atp - a.atp);
   const localInventoryColumns: Column<(typeof skuRows)[number]>[] = [
     {
       header: t('products.colProduct'),
@@ -124,22 +138,50 @@ export default function Inventory() {
       cell: (stats) => <span className="block text-right font-mono text-sm">{formatLocalizedNumber(locale, stats.onHand)}</span>,
     },
     {
-      header: t('inventory.colReserved'),
+      header: 'Resv. Unpaid',
       className: 'text-right',
       cell: (stats) => (
-        <span className="block text-right font-mono text-sm text-muted-foreground">
-          {stats.reserved > 0 ? formatLocalizedNumber(locale, stats.reserved) : '—'}
+        <span className="block text-right font-mono text-sm text-purple-600 dark:text-purple-300">
+          {stats.reservedUnpaid > 0 ? formatLocalizedNumber(locale, stats.reservedUnpaid) : '—'}
         </span>
       ),
     },
     {
-      header: t('inventory.kpiTotalAts'),
+      header: 'Resv. Paid',
+      className: 'text-right',
+      cell: (stats) => (
+        <span className="block text-right font-mono text-sm text-violet-600 dark:text-violet-300">
+          {stats.reservedPaid > 0 ? formatLocalizedNumber(locale, stats.reservedPaid) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Allocated',
+      className: 'text-right',
+      cell: (stats) => (
+        <span className="block text-right font-mono text-sm text-amber-600 dark:text-amber-300">
+          {stats.allocated > 0 ? formatLocalizedNumber(locale, stats.allocated) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Safety Stock',
+      className: 'text-right',
+      cell: (stats) => {
+        const actualSafety = positions
+          .filter(p => p.sku_id === stats.skuId)
+          .reduce((sum, p) => sum + (p.safety_stock ?? 0), 0);
+        return <span className="block text-right font-mono text-sm text-muted-foreground">{actualSafety > 0 ? formatLocalizedNumber(locale, actualSafety) : '—'}</span>;
+      },
+    },
+    {
+      header: 'ATP',
       className: 'text-right',
       cell: (stats) => (
         <span className={`block text-right font-mono text-sm font-semibold ${
-          stats.ats === 0 ? 'text-rose-700 dark:text-rose-300' : stats.ats < 10 ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'
+          stats.atp === 0 ? 'text-rose-700 dark:text-rose-300' : stats.atp < 10 ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'
         }`}>
-          {formatLocalizedNumber(locale, stats.ats)}
+          {formatLocalizedNumber(locale, stats.atp)}
         </span>
       ),
     },
@@ -214,11 +256,11 @@ export default function Inventory() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryMetricCard
-          label={t('inventory.kpiTotalAts')}
-          value={formatLocalizedNumber(locale, totalATS)}
-          meta={t('inventory.kpiTotalAtsMeta')}
+          label="ATP (Available to Promise)"
+          value={formatLocalizedNumber(locale, totalATP)}
+          meta="After all holds & safety stock"
           icon={<Boxes className="size-4" />}
           tone="success"
         />
@@ -228,6 +270,13 @@ export default function Inventory() {
           meta={t('inventory.kpiTotalOnHandMeta')}
           icon={<Package className="size-4" />}
           tone="info"
+        />
+        <SummaryMetricCard
+          label="Reserved (Unpaid + Paid + Allocated)"
+          value={formatLocalizedNumber(locale, totalReservedUnpaid + totalReservedPaid + totalAllocated)}
+          meta={`${formatLocalizedNumber(locale, totalReservedUnpaid)} unpaid · ${formatLocalizedNumber(locale, totalReservedPaid)} paid · ${formatLocalizedNumber(locale, totalAllocated)} allocated`}
+          icon={<ClipboardList className="size-4" />}
+          tone="warning"
         />
         <SummaryMetricCard
           label={t('inventory.kpiWarehouses')}
@@ -278,7 +327,7 @@ export default function Inventory() {
             <ClipboardList className="size-4 text-muted-foreground" />
             <h2 className="text-base font-semibold">{t('inventory.reservationLedgerTitle')}</h2>
           </div>
-          <ReservationLedger />
+          <ReservationLedger5State />
         </div>
       )}
 
@@ -318,7 +367,7 @@ export default function Inventory() {
               />
             ) : null}
             {skuRows.map((stats) => (
-              <div key={stats.skuId} className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div key={stats.skuId} className="rounded-lg border bg-card p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">{stats.name}</div>
@@ -327,18 +376,18 @@ export default function Inventory() {
                   <InventoryStatusBadge status={stats.health} className="shrink-0 capitalize" />
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl border bg-muted/20 p-2">
+                  <div className="rounded-lg border bg-muted/20 p-2">
                     <div className="text-[11px] text-muted-foreground">On hand</div>
                     <div className="mt-1 font-mono text-sm font-semibold">{formatLocalizedNumber(locale, stats.onHand)}</div>
                   </div>
-                  <div className="rounded-xl border bg-muted/20 p-2">
-                    <div className="text-[11px] text-muted-foreground">Reserved</div>
-                    <div className="mt-1 font-mono text-sm font-semibold">{stats.reserved > 0 ? formatLocalizedNumber(locale, stats.reserved) : '—'}</div>
+                  <div className="rounded-lg border bg-muted/20 p-2">
+                    <div className="text-[11px] text-muted-foreground">Holds</div>
+                    <div className="mt-1 font-mono text-sm font-semibold">{stats.reservedUnpaid + stats.reservedPaid + stats.allocated > 0 ? formatLocalizedNumber(locale, stats.reservedUnpaid + stats.reservedPaid + stats.allocated) : '—'}</div>
                   </div>
-                  <div className="rounded-xl border bg-muted/20 p-2">
-                    <div className="text-[11px] text-muted-foreground">ATS</div>
-                    <div className={`mt-1 font-mono text-sm font-semibold ${stats.ats === 0 ? 'text-rose-700 dark:text-rose-300' : stats.ats < 10 ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'}`}>
-                      {formatLocalizedNumber(locale, stats.ats)}
+                  <div className="rounded-lg border bg-muted/20 p-2">
+                    <div className="text-[11px] text-muted-foreground">ATP</div>
+                    <div className={`mt-1 font-mono text-sm font-semibold ${stats.atp === 0 ? 'text-rose-700 dark:text-rose-300' : stats.atp < 10 ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'}`}>
+                      {formatLocalizedNumber(locale, stats.atp)}
                     </div>
                   </div>
                 </div>
@@ -350,7 +399,7 @@ export default function Inventory() {
             data={skuRows}
             keyExtractor={(stats) => stats.skuId}
             isLoading={isInitialLoading}
-            wrapperClassName="[&_table]:min-w-[760px]"
+            wrapperClassName="[&_table]:min-w-[960px]"
             className="hidden md:block"
             emptyState={!isInitialLoading ? (
               <EmptyState

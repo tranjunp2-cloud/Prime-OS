@@ -61,7 +61,7 @@ export function VariantSelectionStep({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="surface-solid rounded-[1.25rem] border border-edge-divider/60">
+        <div className="surface-solid rounded-lg border border-edge-divider/60">
           <Table variant="embedded" wrapperClassName="max-h-none">
             <TableHeader>
               <TableRow>

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { SOURCE_FUNCTION_CATALOG, buildDemandSources, buildDemandSourcesOverview } from './demand-sources';
+import { SOURCE_FUNCTION_CATALOG, buildCrmSources, buildCrmSourcesOverview } from './crm-sources';
 import { getPrimeSnapshot } from './prime-data';
 
-describe('Demand Sources read model', () => {
+describe('CRM Sources read model', () => {
   it('derives a source registry from current PrimeOS snapshot records', () => {
     const snapshot = getPrimeSnapshot();
-    const sources = buildDemandSources(snapshot);
+    const sources = buildCrmSources(snapshot);
 
     expect(sources.length).toBeGreaterThan(snapshot.socialStreams.length);
     expect(sources.every((source) => source.id && source.name && source.ownerLabel)).toBe(true);
@@ -15,8 +15,8 @@ describe('Demand Sources read model', () => {
   });
 
   it('returns overview metrics that stay consistent with the registry', () => {
-    const sources = buildDemandSources(getPrimeSnapshot());
-    const overview = buildDemandSourcesOverview(sources);
+    const sources = buildCrmSources(getPrimeSnapshot());
+    const overview = buildCrmSourcesOverview(sources);
 
     expect(overview.totalActiveSources).toBe(sources.filter((source) => source.status === 'active').length);
     expect(overview.totalLeads).toBe(sources.reduce((sum, source) => sum + source.leadCount, 0));

@@ -64,7 +64,7 @@ type ResourceKey =
   | 'admins'
   | 'users';
 type ViewerRole = 'admin' | 'user';
-type ResourceGroupKey = 'intelligence' | 'ecom' | 'demand' | 'finance' | 'customer' | 'identity';
+type ResourceGroupKey = 'intelligence' | 'ecom' | 'crm' | 'finance' | 'customer' | 'identity';
 type FieldType = 'text' | 'email' | 'number' | 'select' | 'textarea' | 'boolean' | 'image';
 type SortMode = 'updated' | 'title' | 'status';
 type AdminValue = string | number | boolean | undefined;
@@ -188,8 +188,8 @@ const resourceGroups: ResourceGroup[] = [
     resources: ['products', 'listings', 'inventoryBrain', 'warehouses', 'omsOrders', 'fulfillmentControl', 'policies', 'eventAudit']
   },
   {
-    key: 'demand',
-    label: 'Demand',
+    key: 'crm',
+    label: 'CRM',
     description: 'Control the execution lanes that turn PrimeOS decisions into demand.',
     resources: ['campaignOps', 'contentCreatorOps', 'leadResponseCapture', 'retargetingOutreach']
   },
@@ -378,7 +378,7 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
     description: 'Control the launch plan rows shown in Intelligence / Launch Decisions.',
     tableTitle: 'Launch decision planner',
     strategy: 'Launch Decisions should act like a real commercial approval layer, with clear thesis, owner, blocker, and expected response.',
-    evidence: ['Creator and customer inputs stay linked', 'Approval status and owner are explicit', 'Demand, CRM, Ecom, and Finance can all be traced back to the decision'],
+    evidence: ['Creator and customer inputs stay linked', 'Approval status and owner are explicit', 'CRM, CRM Compact, Ecom, and Finance can all be traced back to the decision'],
     statusKey: 'approvalStatus',
     createDefault: () => ({
       decisionName: '',
@@ -906,13 +906,13 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
     ]
   },
   campaignOps: {
-    group: 'demand',
+    group: 'crm',
     label: 'Campaign Ops',
     singular: 'Campaign plan',
-    description: 'Control the operating rows behind Demand / Campaign Ops.',
+    description: 'Control the operating rows behind CRM / Campaign Ops.',
     tableTitle: 'Campaign operations',
     strategy: 'Campaign Ops should inherit approved launch context and execute against the same SKU, owner, and budget truth.',
-    evidence: ['Campaigns inherit launch approvals', 'Demand ownership is explicit', 'Budget and channel rows stay readable'],
+    evidence: ['Campaigns inherit launch approvals', 'CRM ownership is explicit', 'Budget and channel rows stay readable'],
     statusKey: 'status',
     createDefault: () => ({
       campaignName: '',
@@ -960,13 +960,13 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
     ]
   },
   contentCreatorOps: {
-    group: 'demand',
+    group: 'crm',
     label: 'Content & Creator Ops',
     singular: 'Creator ops brief',
-    description: 'Control the execution briefs behind Demand / Content & Creator Ops.',
+    description: 'Control the execution briefs behind CRM / Content & Creator Ops.',
     tableTitle: 'Content and creator operations',
     strategy: 'Creator execution should read approved briefs, linked SKUs, and delivery stages from one admin lane.',
-    evidence: ['Content stages stay visible', 'Creator brief ownership is explicit', 'Demand execution traces back to approved decisions'],
+    evidence: ['Content stages stay visible', 'Creator brief ownership is explicit', 'CRM execution traces back to approved decisions'],
     statusKey: 'status',
     createDefault: () => ({
       briefName: '',
@@ -1014,10 +1014,10 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
     ]
   },
   leadResponseCapture: {
-    group: 'demand',
+    group: 'crm',
     label: 'Lead & Response Capture',
     singular: 'Lead flow',
-    description: 'Control lead capture and response SLAs behind Demand / Lead & Response Capture.',
+    description: 'Control lead capture and response SLAs behind CRM / Lead & Response Capture.',
     tableTitle: 'Lead capture controls',
     strategy: 'PrimeOS lead workflows need explicit source, owner, and SLA controls so response speed stays consistent.',
     evidence: ['Lead sources are normalized', 'SLA ownership stays visible', 'Response flow is not hidden inside ad ops screens'],
@@ -1078,10 +1078,10 @@ const resourceConfig: Record<ResourceKey, ResourceConfig> = {
     ]
   },
   retargetingOutreach: {
-    group: 'demand',
+    group: 'crm',
     label: 'Retargeting & Outreach',
     singular: 'Retargeting play',
-    description: 'Control audience reactivation and outreach rules behind Demand / Retargeting & Outreach.',
+    description: 'Control audience reactivation and outreach rules behind CRM / Retargeting & Outreach.',
     tableTitle: 'Retargeting plays',
     strategy: 'PrimeOS outreach works best when triggers, channels, and cadence are governed in one admin surface.',
     evidence: ['Audience triggers stay explicit', 'Cadence is governed centrally', 'Retargeting stays tied to customer intent data'],
@@ -1717,7 +1717,7 @@ const resourceIcons: Record<ResourceKey, LucideIcon> = {
 const groupIcons: Record<ResourceGroupKey, LucideIcon> = {
   intelligence: BarChart3,
   ecom: Store,
-  demand: RadioTower,
+  crm: RadioTower,
   finance: CircleDollarSign,
   customer: HeartHandshake,
   identity: ShieldUser
@@ -2089,7 +2089,7 @@ function App() {
   const [openGroups, setOpenGroups] = useState<Record<ResourceGroupKey, boolean>>({
     intelligence: true,
     ecom: false,
-    demand: false,
+    crm: false,
     finance: false,
     customer: false,
     identity: false

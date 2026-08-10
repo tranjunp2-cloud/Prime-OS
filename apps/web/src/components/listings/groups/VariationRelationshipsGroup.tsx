@@ -78,7 +78,7 @@ export function VariationRelationshipsGroup({
         {selectedVariants.length > 0 && (
           <div className="flex border-t pt-4 flex-col gap-3">
             <Label>SKU Attribute Mapping</Label>
-            <div className="surface-solid overflow-x-auto rounded-[1.25rem] border border-edge-divider/60">
+            <div className="surface-solid overflow-x-auto rounded-lg border border-edge-divider/60">
               <Table variant="embedded" wrapperClassName="max-h-none">
                 <TableHeader>
                   <TableRow>

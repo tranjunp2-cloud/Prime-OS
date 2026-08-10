@@ -49,4 +49,4 @@ Pushes to `main` run GitHub Actions and deploy production automatically after ve
 
 ## Product Scope
 
-The staging-ready Phase 1 prototype is organized around Demand Area, Customer Area, Ecom Area, Intelligence Area, and COS Tower as the control core.
+The staging-ready Phase 1 prototype is organized around CRM Area, Customer Area, Ecom Area, Intelligence Area, and COS Tower as the control core.

@@ -58,7 +58,7 @@ interface GlobalSearchResult {
 const productSettingsDisplayLabels: Record<string, string> = {
   ecom: 'Commerce',
   cos: 'Commerce Operations',
-  mdec: 'Multi-channel Demand Engagement Center',
+  mdec: 'Multi-channel CRM Engagement Center',
   'content-creator-ops': 'Content and Social',
   'sources-ads': 'Advertising Source',
   'fin-support': 'Finance Support',
@@ -98,9 +98,9 @@ function ProductSettingsFlyout({
 
   return (
     <div
-      className="panel-shadow absolute left-0 top-[calc(100%+0.5rem)] z-[120] grid h-[min(520px,calc(100svh_-_var(--header-height)_-_1rem))] w-[min(1240px,calc(100vw_-_var(--sidebar-width-expanded)_-_2rem))] grid-cols-[minmax(250px,0.82fr)_minmax(320px,1fr)_minmax(360px,1.35fr)] overflow-hidden rounded-2xl border border-border/80 bg-card text-sm"
+      className="panel-shadow absolute left-0 top-[calc(100%+0.5rem)] z-[120] grid h-[min(520px,calc(100svh_-_var(--header-height)_-_1rem))] w-[min(1160px,calc(100vw_-_15rem_-_2rem))] grid-cols-[minmax(240px,0.78fr)_minmax(300px,0.95fr)_minmax(360px,1.25fr)] overflow-hidden rounded-lg border bg-popover text-sm text-popover-foreground"
     >
-      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r border-border/70 bg-muted/20 p-3">
+      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r bg-muted/30 p-3">
         <div className="flex items-center justify-between gap-2 px-2 pb-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Suites</div>
           <div className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Layer 1</div>
@@ -115,14 +115,14 @@ function ProductSettingsFlyout({
                 key={group.id}
                 type="button"
                 className={cn(
-                  'group flex w-full min-w-0 items-center gap-3 rounded-xl px-2.5 py-2.5 text-left font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
-                  active ? 'bg-primary/10 text-primary ring-1 ring-primary/25 shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  'group flex w-full min-w-0 items-center gap-3 rounded-md px-2.5 py-2.5 text-left font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
                 )}
                 onMouseEnter={() => onActiveGroupChange(group.id)}
                 onFocus={() => onActiveGroupChange(group.id)}
                 onClick={() => onActiveGroupChange(group.id)}
               >
-                <span className={cn('grid size-8 shrink-0 place-items-center rounded-xl border transition-colors', active ? 'border-primary/25 bg-primary/10' : 'border-border bg-background/70 group-hover:border-primary/25')}>
+                <span className={cn('grid size-8 shrink-0 place-items-center rounded-md border transition-colors', active ? 'border-primary/25 bg-primary/10 text-primary' : 'border-border bg-background/70 group-hover:border-primary/25')}>
                   {Icon ? <Icon className="size-4" /> : null}
                 </span>
                 <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{getProductSettingsDisplayLabel(group)}</span>
@@ -133,7 +133,7 @@ function ProductSettingsFlyout({
         </div>
       </div>
 
-      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r border-border/70 p-3">
+      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r p-3">
         <div className="flex items-center justify-between gap-2 px-2 pb-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Products</div>
           <div className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Layer 2</div>
@@ -148,14 +148,14 @@ function ProductSettingsFlyout({
                 key={item.id}
                 type="button"
                 className={cn(
-                  'group flex w-full min-w-0 items-center gap-2.5 rounded-xl border px-2.5 py-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
-                  active ? 'border-primary/30 bg-primary/10 text-primary shadow-sm' : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/70 hover:text-foreground'
+                  'group flex w-full min-w-0 items-center gap-2.5 rounded-md border px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active ? 'border-primary/25 bg-primary/10 text-primary shadow-sm' : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/70 hover:text-foreground'
                 )}
                 onMouseEnter={() => setActiveProductId(item.id)}
                 onFocus={() => setActiveProductId(item.id)}
                 onClick={() => setActiveProductId(item.id)}
               >
-                <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border transition-colors', active ? 'border-primary/25 bg-background text-primary' : 'border-border bg-background/70 group-hover:border-primary/25')}>
+                <span className={cn('grid size-8 shrink-0 place-items-center rounded-md border transition-colors', active ? 'border-primary/25 bg-background text-primary' : 'border-border bg-background/70 group-hover:border-primary/25')}>
                   {Icon ? <Icon className="size-4" /> : null}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -170,7 +170,6 @@ function ProductSettingsFlyout({
       </div>
 
       <div className="relative flex min-h-0 flex-col overflow-hidden p-4">
-        <div className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative mb-3 flex min-w-0 shrink-0 items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -185,7 +184,7 @@ function ProductSettingsFlyout({
           {activeProduct ? (
             <button
               type="button"
-              className="max-w-full shrink-0 whitespace-normal rounded-full border border-border bg-background/80 px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:whitespace-nowrap"
+              className="max-w-full shrink-0 whitespace-normal rounded-md border bg-background px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:whitespace-nowrap"
               onClick={() => onNavigate(activeProduct)}
             >
               Open product
@@ -202,10 +201,10 @@ function ProductSettingsFlyout({
                 <button
                   key={item.id}
                   type="button"
-                  className="group flex min-h-[116px] flex-col rounded-xl border border-border/80 bg-background/70 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                  className="group flex min-h-[116px] flex-col rounded-md border bg-background p-3 text-left shadow-sm transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onNavigate(item)}
                 >
-                  <span className="mb-3 grid size-9 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary transition-transform group-hover:scale-105">
+                  <span className="mb-3 grid size-9 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary">
                     {Icon ? <Icon className="size-4" /> : null}
                   </span>
                   <span className="block whitespace-normal text-base font-semibold leading-snug text-foreground [overflow-wrap:normal] [word-break:normal] hyphens-none">{getProductSettingsDisplayLabel(item)}</span>
@@ -216,9 +215,9 @@ function ProductSettingsFlyout({
             </div>
           </div>
         ) : (
-          <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-border/70 bg-background/70 p-4 shadow-sm">
+          <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-background p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+              <span className="grid size-10 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary">
                 <ActiveProductIcon className="size-5" />
               </span>
               <div className="min-w-0 flex-1">
@@ -231,7 +230,7 @@ function ProductSettingsFlyout({
             {activeProduct ? (
               <button
                 type="button"
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => onNavigate(activeProduct)}
               >
                 Open product <ChevronRight className="size-3.5" />
@@ -321,9 +320,9 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
       id: `area-${group.id}`,
       kind: 'Area',
       title: group.label,
-      detail: `Product Settings · ${group.badgeCount} products/towers`,
+      detail: `Workspace map · ${group.badgeCount} products/towers`,
       href: group.href,
-      keywords: buildSearchText([group.id, group.label, 'product settings', 'area overview', 'tower catalog']),
+      keywords: buildSearchText([group.id, group.label, 'workspace map', 'area overview', 'tower catalog']),
       priority: 95,
     };
 
@@ -331,9 +330,9 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
       id: `${item.kind}-${item.id}`,
       kind: item.kind === 'floor' ? 'Floor' as const : 'Tower' as const,
       title: item.label,
-      detail: `${group.label} · Product Settings · ${item.kind}`,
+      detail: `${group.label} · Workspace map · ${item.kind}`,
       href: item.href,
-      keywords: buildSearchText([item.id, item.label, item.kind, group.label, item.matchPaths.join(' '), 'product settings']),
+      keywords: buildSearchText([item.id, item.label, item.kind, group.label, item.matchPaths.join(' '), 'workspace map']),
       priority: item.kind === 'floor' ? 78 : 88,
     }));
 
@@ -346,7 +345,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
       kind: 'Product',
       title: product.name,
       detail: `${product.brand} · ${product.sku_code} · ${product.status}`,
-      href: `/ecom/cos/product-master/${product.id}`,
+      href: '/overview?module=cos&view=pim',
       keywords: buildSearchText([
         product.name,
         product.brand,
@@ -366,7 +365,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
       kind: 'SKU' as const,
       title: sku.sku_code,
       detail: `${product.name} · ${sku.variation_name}`,
-      href: `/ecom/cos/product-master/${product.id}`,
+      href: '/overview?module=cos&view=pim',
       keywords: buildSearchText([sku.sku_code, sku.variation_name, product.name, product.brand, product.category]),
       priority: 90,
     }));
@@ -379,7 +378,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'Order' as const,
     title: order.order_id,
     detail: `${order.customer_name} · ${order.channel} · ${order.status}`,
-    href: `/ecom/cos/oms/${order.id}`,
+    href: '/overview?module=cos&view=oms',
     keywords: buildSearchText([
       order.order_id,
       order.channel_order_ref,
@@ -417,7 +416,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'Lead' as const,
     title: lead.company,
     detail: `${lead.contact} · ${lead.score} lead score · ${lead.status}`,
-    href: `/demand/leads-rfqs?lead=${encodeURIComponent(lead.id)}`,
+    href: `/crm/leads-rfqs?lead=${encodeURIComponent(lead.id)}`,
     keywords: buildSearchText([
       lead.id,
       lead.company,
@@ -435,7 +434,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'RFQ' as const,
     title: rfq.id.toUpperCase(),
     detail: `${rfq.requestedBy} · ${rfq.quantity} units · ${rfq.status}`,
-    href: `/demand/leads-rfqs?rfq=${encodeURIComponent(rfq.id)}`,
+    href: `/crm/leads-rfqs?rfq=${encodeURIComponent(rfq.id)}`,
     keywords: buildSearchText([rfq.id, rfq.requestedBy, rfq.status, rfq.skuId, rfq.quantity]),
     priority: 72,
   }));
@@ -445,7 +444,7 @@ function buildGlobalSearchResults(): GlobalSearchResult[] {
     kind: 'Campaign' as const,
     title: campaign.name,
     detail: `${campaign.channel} · ${campaign.targetSegment} · ${campaign.status}`,
-    href: `/demand/campaigns?campaign=${encodeURIComponent(campaign.id)}`,
+    href: `/crm/campaigns?campaign=${encodeURIComponent(campaign.id)}`,
     keywords: buildSearchText([
       campaign.name,
       campaign.channel,
@@ -564,6 +563,9 @@ export function AppLayout() {
   const shouldShowSearchPanel = searchOpen && searchQuery.trim().length > 0;
   const searchListboxId = 'primeos-global-search-results';
   const activeSearchResult = shouldShowSearchPanel ? visibleSearchResults[activeSearchIndex] : undefined;
+  const isCrmInboxWorkspace = ['/crm', '/crm/hub', '/crm/chat'].includes(location.pathname);
+  const isCustomerServiceWorkspace = location.pathname === '/customer/service';
+  const isMinimalWorkspace = location.pathname === '/overview' || isCrmInboxWorkspace || isCustomerServiceWorkspace;
 
   useEffect(() => {
     let cancelled = false;
@@ -776,14 +778,14 @@ export function AppLayout() {
 
   if (bootstrapping) {
     return (
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="prime-stage flex h-screen overflow-hidden">
         <AppSidebar />
         <main id="main-content" className="flex-1 overflow-auto">
           <div className="flex flex-col gap-4 p-8">
             <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-40 w-full rounded-xl" />
-            <Skeleton className="h-60 w-full rounded-xl" />
-            <Skeleton className="h-60 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <Skeleton className="h-60 w-full rounded-lg" />
+            <Skeleton className="h-60 w-full rounded-lg" />
           </div>
         </main>
       </div>
@@ -791,7 +793,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="prime-stage flex h-screen overflow-hidden">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded focus:shadow-lg"
@@ -801,18 +803,19 @@ export function AppLayout() {
       <AppSidebar />
       <div className="flex-1 min-w-0 overflow-hidden">
         <GlobalCopilotWorkspace>
-          <header className="sticky top-0 z-[100] flex min-h-[var(--header-height)] items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-xl md:px-6">
+          {!isMinimalWorkspace ? (
+          <header className="sticky top-0 z-[100] flex min-h-[var(--header-height)] items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-5">
             <div ref={productSettingsRef} className="relative hidden shrink-0 md:block">
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl border-primary/20 bg-card px-3 font-semibold shadow-sm"
+                className="h-9 gap-2 px-3 font-semibold"
                 aria-haspopup="dialog"
                 aria-expanded={productSettingsOpen}
                 onClick={() => setProductSettingsOpen((value) => !value)}
               >
                 <Grid3X3 className="size-4 text-primary" />
-                Product Settings
+                Workspace Map
                 <ChevronDown className={cn('size-3.5 text-muted-foreground transition-transform', productSettingsOpen && 'rotate-180')} />
               </Button>
 
@@ -836,7 +839,7 @@ export function AppLayout() {
                 aria-activedescendant={activeSearchResult ? `primeos-search-result-${activeSearchResult.id}` : undefined}
                 role="combobox"
                 autoComplete="off"
-                className="h-10 w-full rounded-xl border-input bg-card pl-9 pr-16 text-sm transition-[border-color,box-shadow] focus-visible:border-primary/45"
+                className="h-9 w-full bg-background pl-9 pr-16"
                 placeholder={shellCopy.searchPlaceholder}
                 value={searchQuery}
                 onChange={(event) => {
@@ -850,7 +853,7 @@ export function AppLayout() {
                 <button
                   type="button"
                   aria-label={shellCopy.clearSearch}
-                  className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   onClick={() => {
                     setSearchQuery('');
                     setSearchOpen(false);
@@ -862,7 +865,7 @@ export function AppLayout() {
                 <button
                   type="button"
                   aria-label={shellCopy.openCommandPalette}
-                  className="font-identifier prime-transition-fast absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary/35 hover:text-foreground sm:block"
+                  className="font-identifier absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-sm border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground sm:block"
                   onClick={() => setCommandOpen(true)}
                 >
                   ⌘K
@@ -870,7 +873,7 @@ export function AppLayout() {
               )}
 
               {shouldShowSearchPanel ? (
-                <div className="panel-shadow absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-2xl border bg-card" role="region" aria-label={shellCopy.searchPanelHeading}>
+                <div className="panel-shadow absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-lg border bg-popover text-popover-foreground" role="region" aria-label={shellCopy.searchPanelHeading}>
                   <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     {shellCopy.searchPanelHeading}
                   </div>
@@ -892,14 +895,14 @@ export function AppLayout() {
                             role="option"
                             aria-selected={isActive}
                             className={cn(
-                              'prime-transition-fast flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left',
+                              'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
                               isActive ? 'bg-primary/10 text-foreground ring-1 ring-primary/20' : 'hover:bg-muted/70'
                             )}
                             onMouseEnter={() => setActiveSearchIndex(index)}
                             onClick={() => openSearchResult(result)}
                           >
                             <span className={cn(
-                              'flex size-9 shrink-0 items-center justify-center rounded-xl border',
+                              'flex size-9 shrink-0 items-center justify-center rounded-md border',
                               isActive ? 'border-primary/20 bg-primary/10 text-primary' : 'bg-muted/50 text-muted-foreground'
                             )}>
                               {meta.icon}
@@ -942,7 +945,7 @@ export function AppLayout() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 min-w-0 max-w-[280px] justify-start gap-2 rounded-2xl px-2.5 shadow-sm lg:min-w-[230px]"
+                    className="h-9 min-w-0 max-w-[260px] justify-start gap-2 px-2 lg:min-w-[220px]"
                     aria-label={`Open account menu for ${user?.email || shellCopy.demoWorkspace}`}
                   >
                     <Avatar className="size-8 border border-primary/15 bg-primary/10">
@@ -958,21 +961,21 @@ export function AppLayout() {
                         {user?.email || shellCopy.sessionLabel}
                       </span>
                     </span>
-                    <Badge variant="secondary" className="hidden max-w-[76px] shrink-0 truncate rounded-full px-2 py-0.5 text-[10px] xl:inline-flex">
+                    <Badge variant="secondary" className="hidden max-w-[76px] shrink-0 truncate px-2 py-0.5 text-[10px] xl:inline-flex">
                       {accountRoleLabel}
                     </Badge>
                     <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 rounded-2xl p-2">
+                <DropdownMenuContent align="end" className="w-80 p-2">
                   <DropdownMenuLabel className="truncate px-2 py-1.5 text-xs font-medium text-muted-foreground">
                     {user?.email || shellCopy.sessionLabel}
                   </DropdownMenuLabel>
-                  <DropdownMenuItem className="rounded-xl py-3 text-sm font-semibold" onSelect={() => navigate('/account')}>
+                  <DropdownMenuItem className="rounded-md py-2.5 text-sm font-semibold" onSelect={() => navigate('/account')}>
                     {accountRoleLabel}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="gap-2 rounded-xl text-destructive focus:text-destructive" disabled={signingOut} onSelect={handleSignOut}>
+                  <DropdownMenuItem className="gap-2 rounded-md text-destructive focus:text-destructive" disabled={signingOut} onSelect={handleSignOut}>
                     <LogOut className="size-4" />
                     {signingOut ? shellCopy.signingOut : shellCopy.logout}
                   </DropdownMenuItem>
@@ -980,12 +983,15 @@ export function AppLayout() {
               </DropdownMenu>
             </div>
           </header>
+          ) : null}
           <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
-          <div className="flex h-[calc(100%-var(--header-height))] min-h-0 flex-col">
-            <WorkspaceTabBar
-              onNavigate={(url) => navigate(url)}
-              onOpenProductSettings={() => setProductSettingsOpen(true)}
-            />
+          <div className={cn('flex min-h-0 flex-col', isMinimalWorkspace ? 'h-full' : 'h-[calc(100%-var(--header-height))]')}>
+            {!isMinimalWorkspace ? (
+              <WorkspaceTabBar
+                onNavigate={(url) => navigate(url)}
+                onOpenProductSettings={() => setProductSettingsOpen(true)}
+              />
+            ) : null}
             <main
               id="main-content"
               className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"

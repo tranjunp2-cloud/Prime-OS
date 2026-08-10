@@ -87,13 +87,13 @@ export function InventorySummaryTable({
       </p>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-[1.75rem] border border-edge-divider/70 bg-surface-data/82 py-16 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-edge-divider/70 bg-surface-data/82 py-16 text-muted-foreground">
           <Package className="size-12 mb-4 opacity-50" />
           <p className="font-medium">{t('inventory.tableNoData')}</p>
           <p className="text-sm mt-1">{t('inventory.tableNoDataDesc')}</p>
         </div>
       ) : (
-        <div className="surface-solid overflow-hidden rounded-[1.75rem] flex flex-col">
+        <div className="surface-solid overflow-hidden rounded-lg flex flex-col">
           <Table wrapperClassName="max-h-[calc(100vh-260px)]">
             <TableHeader>
               <TableRow>

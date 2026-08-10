@@ -41,7 +41,7 @@ export function StockTable({ items, isLoading }: StockTableProps) {
     return (
       <div className="flex flex-col gap-2">
         {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-[68px] w-full rounded-[1.35rem]" />
+          <Skeleton key={i} className="h-[68px] w-full rounded-lg" />
         ))}
       </div>
     );
@@ -49,7 +49,7 @@ export function StockTable({ items, isLoading }: StockTableProps) {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-[1.75rem] border border-edge-divider/70 bg-surface-data/82 py-12 text-center text-muted-foreground">
+      <div className="rounded-lg border border-edge-divider/70 bg-surface-data/82 py-12 text-center text-muted-foreground">
         <p>{t('inventory.tableNoData')}</p>
         <p className="text-sm mt-1">{t('inventory.tableNoDataDesc')}</p>
       </div>
@@ -57,7 +57,7 @@ export function StockTable({ items, isLoading }: StockTableProps) {
   }
 
   return (
-    <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+    <div className="surface-solid overflow-hidden rounded-lg">
       <Table wrapperClassName="max-h-[calc(100vh-260px)]">
         <TableHeader>
           <TableRow>

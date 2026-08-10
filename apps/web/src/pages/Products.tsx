@@ -163,7 +163,7 @@ export default function Products() {
         }
       />
 
-      <div className="surface-toolbar rounded-xl px-3 py-3">
+      <div className="surface-toolbar rounded-lg px-3 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="inline-flex w-fit rounded-lg border bg-background p-1">
             <Button
@@ -196,7 +196,7 @@ export default function Products() {
                 placeholder={t('products.searchByNameBrand')}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="rounded-xl pl-9 pr-9"
+                className="rounded-lg pl-9 pr-9"
               />
               {search && (
                 <button
@@ -305,7 +305,7 @@ export default function Products() {
                     <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-3 w-16" /></TableCell>
-                    <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-xl" /><Skeleton className="h-8 w-8 rounded-xl" /></div></TableCell>
+                    <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-lg" /><Skeleton className="h-8 w-8 rounded-lg" /></div></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

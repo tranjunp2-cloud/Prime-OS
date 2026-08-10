@@ -78,7 +78,7 @@ export function WarehouseTable({
     return (
       <div className="flex flex-col gap-2">
         {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-[82px] w-full rounded-[1.5rem]" />
+          <Skeleton key={i} className="h-[82px] w-full rounded-lg" />
         ))}
       </div>
     );
@@ -86,7 +86,7 @@ export function WarehouseTable({
 
   if (warehouses.length === 0) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-[1.75rem] border border-edge-divider/70 bg-surface-data/88 px-6 text-center text-muted-foreground">
+      <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-edge-divider/70 bg-surface-data/88 px-6 text-center text-muted-foreground">
         <div>
           <p className="text-sm text-foreground">{t('warehouses.noWarehouses')}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t('warehouses.addFirstWarehouse')}</p>
@@ -96,7 +96,7 @@ export function WarehouseTable({
   }
 
   return (
-    <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+    <div className="surface-solid overflow-hidden rounded-lg">
       <Table wrapperClassName="max-h-[calc(100vh-310px)]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">

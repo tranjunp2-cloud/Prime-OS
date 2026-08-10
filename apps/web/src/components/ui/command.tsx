@@ -13,7 +13,7 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-xl bg-popover text-popover-foreground",
+      "flex h-full w-full flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground",
       className,
     )}
     {...props}
@@ -26,7 +26,7 @@ type CommandDialogProps = DialogProps;
 const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent className="surface-command w-[calc(100vw-2rem)] max-w-[46rem] overflow-hidden rounded-2xl border border-border/70 p-0 shadow-[0_24px_80px_hsl(var(--overlay-scrim)/0.24)]">
+      <DialogContent className="surface-command w-[calc(100vw-2rem)] max-w-[46rem] overflow-hidden rounded-lg border border-border/70 p-0 shadow-[0_24px_80px_hsl(var(--overlay-scrim)/0.24)]">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <Command className="bg-background/98 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-14 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2.5 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4">
           {children}
@@ -106,7 +106,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors data-[disabled=true]:pointer-events-none data-[selected='true']:bg-primary data-[selected=true]:text-primary-foreground data-[disabled=true]:opacity-50 [&[data-selected=true]_svg]:text-primary-foreground [&[data-selected=true]_.command-route-meta]:text-primary-foreground/80 [&[data-selected=true]_.command-route-chip]:border-primary-foreground/30 [&[data-selected=true]_.command-route-chip]:bg-primary-foreground/10 [&[data-selected=true]_.command-route-chip]:text-primary-foreground",
+      "relative flex cursor-default select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[disabled=true]:pointer-events-none data-[selected='true']:bg-primary data-[selected=true]:text-primary-foreground data-[disabled=true]:opacity-50 [&[data-selected=true]_svg]:text-primary-foreground [&[data-selected=true]_.command-route-meta]:text-primary-foreground/80 [&[data-selected=true]_.command-route-chip]:border-primary-foreground/30 [&[data-selected=true]_.command-route-chip]:bg-primary-foreground/10 [&[data-selected=true]_.command-route-chip]:text-primary-foreground",
       className,
     )}
     {...props}

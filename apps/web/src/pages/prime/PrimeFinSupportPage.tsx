@@ -730,7 +730,7 @@ export function PrimeFinSupportPage() {
     { label: 'Repeat customers', value: `${snapshot.customers.filter((customer) => customer.totalOrders > 1).length} repeat`, detail: 'Repeat purchase behavior improves trust in future cashflow.', score: clamp(70 + snapshot.customers.length * 2), icon: UsersRound },
     { label: 'Fulfillment reliability', value: `${snapshot.orderEvents.length} events`, detail: 'OMS and shipment history create operational repayment evidence.', score: clamp(76 + snapshot.orderEvents.length), icon: Truck },
     { label: 'Settlement consistency', value: `${controlPlane.settlementRepayment.length} lanes`, detail: 'Settlement records connect revenue collection to repayment paths.', score: clamp(72 + controlPlane.settlementRepayment.length * 8), icon: CircleDollarSign },
-    { label: 'Campaign efficiency', value: `${snapshot.campaigns.length} campaigns`, detail: 'Demand data proves the business can deploy capital into growth.', score: clamp(66 + snapshot.metrics.leadToOrderRate), icon: Sparkles },
+      { label: 'Campaign efficiency', value: `${snapshot.campaigns.length} campaigns`, detail: 'CRM data proves the business can deploy capital into growth.', score: clamp(66 + snapshot.metrics.leadToOrderRate), icon: Sparkles },
     { label: 'Marketplace health', value: `${snapshot.returnsCount} returns`, detail: 'Low refund pressure and service visibility protect lender confidence.', score: clamp(85 - snapshot.returnsCount * 4), icon: ShieldCheck },
   ];
 
@@ -908,7 +908,7 @@ function FinanceTabs({ activeTab, onChange, copy }: { activeTab: FinanceSupportT
   const activeGroup = financeSupportGroups.find((group) => group.tabs.includes(activeTab)) ?? financeSupportGroups[0];
 
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card p-1">
+    <div className="overflow-x-auto rounded-lg border bg-card p-1">
       <div className="flex min-w-max gap-1">
         {financeSupportGroups.map((group) => {
           const active = activeGroup.id === group.id;
@@ -964,9 +964,9 @@ function TwoColumnTab({ main, side }: { main: ReactNode; side: ReactNode }) {
 
 function FundingDecisionStrip({ copy, readinessScore, eligibleRange, mainBlocker, nextAction, onAskAi, onTabChange }: { copy: FinSupportCopy; readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; onAskAi: () => void; onTabChange: (tab: FinanceSupportTab) => void }) {
   return (
-    <section className="rounded-2xl border bg-card shadow-sm">
+    <section className="rounded-lg border bg-card shadow-sm">
       <div className="grid gap-4 p-4 lg:grid-cols-[280px_minmax(0,1fr)_260px] lg:p-5">
-        <div className="rounded-xl border bg-muted/20 p-4">
+        <div className="rounded-lg border bg-muted/20 p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Readiness</div>
           <div className="mt-3 flex items-end gap-3">
             <div className="text-5xl font-semibold tracking-tight">{readinessGrade(readinessScore)}</div>
@@ -979,13 +979,13 @@ function FundingDecisionStrip({ copy, readinessScore, eligibleRange, mainBlocker
         <div className="grid gap-3 sm:grid-cols-2">
           <DecisionFact label="Indicative range" value={eligibleRange} />
           <DecisionFact label="Top blocker" value={mainBlocker} tone="risk" />
-          <div className="rounded-xl border bg-background p-3 sm:col-span-2">
+          <div className="rounded-lg border bg-background p-3 sm:col-span-2">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next action</div>
             <p className="mt-1 text-sm font-medium leading-6">{nextAction}</p>
           </div>
         </div>
 
-        <div className="flex flex-col justify-between gap-3 rounded-xl border bg-background p-3">
+        <div className="flex flex-col justify-between gap-3 rounded-lg border bg-background p-3">
           <div>
             <div className="text-sm font-semibold">Funding command</div>
             <p className="mt-1 text-sm leading-5 text-muted-foreground">Resolve the blocker first, then prepare the review package.</p>
@@ -1005,7 +1005,7 @@ function FundingDecisionStrip({ copy, readinessScore, eligibleRange, mainBlocker
 
 function DecisionFact({ label, value, tone }: { label: string; value: string; tone?: 'risk' }) {
   return (
-    <div className={cn('rounded-xl border bg-background p-3', tone === 'risk' && 'border-amber-500/30 bg-amber-500/5')}>
+    <div className={cn('rounded-lg border bg-background p-3', tone === 'risk' && 'border-amber-500/30 bg-amber-500/5')}>
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-semibold leading-6">{value}</div>
     </div>
@@ -1046,7 +1046,7 @@ function ReadinessEvidencePanel({ signals, evidencePack, onOpenEvidence, onOpenD
   const exceptions = evidencePack.items.filter((item) => item.status === 'missing' || item.status === 'rejected' || item.status === 'uploaded').slice(0, 3);
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-lg">
       <CardHeader className="border-b">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1154,7 +1154,7 @@ function EvidenceCoverageBar({ evidencePack }: { evidencePack: CommerceEvidenceP
   const readyCount = evidencePack.items.length - openIssueCount;
 
   return (
-    <div className="rounded-xl border bg-muted/20 p-3">
+    <div className="rounded-lg border bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-semibold">Evidence coverage</div>
         <Badge variant="outline" className="rounded-full">{readyCount}/{evidencePack.items.length} ready</Badge>
@@ -1176,7 +1176,7 @@ function EvidenceCoverageBar({ evidencePack }: { evidencePack: CommerceEvidenceP
 
 function WorkQueuePanel({ blockers, onOpenDetail, onTabChange }: { blockers: RiskBlocker[]; onOpenDetail: (detail: OverviewDetail) => void; onTabChange: (tab: FinanceSupportTab) => void }) {
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-lg">
       <CardHeader className="border-b">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1191,7 +1191,7 @@ function WorkQueuePanel({ blockers, onOpenDetail, onTabChange }: { blockers: Ris
       </CardHeader>
       <CardContent className="space-y-2 p-3">
         {blockers.length ? blockers.map((blocker) => (
-          <div key={blocker.blocker} className="rounded-xl border bg-background p-3">
+          <div key={blocker.blocker} className="rounded-lg border bg-background p-3">
             <button
               type="button"
               onClick={() => onOpenDetail({
@@ -1228,7 +1228,7 @@ function WorkQueuePanel({ blockers, onOpenDetail, onTabChange }: { blockers: Ris
             </div>
           </div>
         )) : (
-          <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">No critical blockers detected. Prepare the package for route review.</div>
+          <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">No critical blockers detected. Prepare the package for route review.</div>
         )}
       </CardContent>
     </Card>
@@ -1237,7 +1237,7 @@ function WorkQueuePanel({ blockers, onOpenDetail, onTabChange }: { blockers: Ris
 
 function FundingPathPanel({ lenders, onOpenDetail, onTabChange }: { lenders: LenderMatch[]; onOpenDetail: (detail: OverviewDetail) => void; onTabChange: (tab: FinanceSupportTab) => void }) {
   return (
-    <Card id="lenders" className="rounded-2xl">
+    <Card id="lenders" className="rounded-lg">
       <CardHeader className="border-b">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1251,7 +1251,7 @@ function FundingPathPanel({ lenders, onOpenDetail, onTabChange }: { lenders: Len
         </div>
       </CardHeader>
       <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(320px,1fr)]">
-        {lenders.length ? <RouteFitBars lenders={lenders} /> : <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">No review routes are available from the current evidence package.</div>}
+        {lenders.length ? <RouteFitBars lenders={lenders} /> : <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">No review routes are available from the current evidence package.</div>}
         <div className="space-y-2">
           {lenders.slice(0, 3).map((lender) => (
             <button
@@ -1270,7 +1270,7 @@ function FundingPathPanel({ lenders, onOpenDetail, onTabChange }: { lenders: Len
                 actionLabel: 'Open routes',
                 actionTab: 'routes',
               })}
-              className="w-full rounded-xl border bg-background p-3 text-left transition hover:border-primary/35 hover:bg-muted/30"
+              className="w-full rounded-lg border bg-background p-3 text-left transition hover:border-primary/35 hover:bg-muted/30"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1289,7 +1289,7 @@ function FundingPathPanel({ lenders, onOpenDetail, onTabChange }: { lenders: Len
 
 function RouteFitBars({ lenders }: { lenders: LenderMatch[] }) {
   return (
-    <div className="rounded-xl border bg-muted/20 p-3">
+    <div className="rounded-lg border bg-muted/20 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="text-sm font-semibold">Route fit</div>
         <Badge variant="outline" className="rounded-full">Top {Math.min(4, lenders.length)}</Badge>
@@ -1318,7 +1318,7 @@ function RouteFitBars({ lenders }: { lenders: LenderMatch[] }) {
 function OverviewDetailDialog({ detail, onOpenChange, onTabChange }: { detail: OverviewDetail | null; onOpenChange: (open: boolean) => void; onTabChange: (tab: FinanceSupportTab) => void }) {
   return (
     <Dialog open={Boolean(detail)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-2xl">
+      <DialogContent className="max-w-2xl rounded-lg">
         {detail ? (
           <>
             <DialogHeader>
@@ -1366,7 +1366,7 @@ function severityClass(severity: RiskBlocker['severity']) {
 
 function FundingReadinessHero({ readinessScore, eligibleRange, mainBlocker, nextAction, onAskAi, onTabChange }: { readinessScore: number; eligibleRange: string; mainBlocker: string; nextAction: string; onAskAi: () => void; onTabChange: (tab: FinanceSupportTab) => void }) {
   return (
-    <section className="overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/20 via-card to-card shadow-sm">
+    <section className="overflow-hidden rounded-lg border bg-gradient-to-br from-primary/20 via-card to-card shadow-sm">
       <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-6">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2"><Badge className="rounded-full">Prime OS readiness score</Badge><Badge variant="outline" className="rounded-full">Bank-ready evidence package</Badge></div>
@@ -1375,10 +1375,10 @@ function FundingReadinessHero({ readinessScore, eligibleRange, mainBlocker, next
             <MiniFact label="Indicative range" value={eligibleRange} />
             <MiniFact label="Blocking issue" value={mainBlocker} />
           </div>
-          <div className="mt-4 rounded-xl border bg-background/70 p-4"><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next best action</div><p className="mt-1 text-sm leading-6 text-muted-foreground">{nextAction}</p></div>
+          <div className="mt-4 rounded-lg border bg-background/70 p-4"><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next best action</div><p className="mt-1 text-sm leading-6 text-muted-foreground">{nextAction}</p></div>
           <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => onTabChange('documents')}>Fix blockers</Button><Button type="button" variant="secondary" onClick={() => onTabChange('documents')}>Prepare review package</Button><Button type="button" variant="outline" onClick={onAskAi}><Bot className="size-4" />Ask Prime AI</Button></div>
         </div>
-        <div className="rounded-2xl border bg-background/70 p-4">
+        <div className="rounded-lg border bg-background/70 p-4">
           <div className="text-sm font-semibold">First-screen answer</div>
           <div className="mt-4 space-y-3 text-sm"><DecisionAnswer label="Am I ready?" value={`${readinessGrade(readinessScore)} / ${readinessScore}% — reviewable after blocker cleanup.`} /><DecisionAnswer label="What blocks me?" value={mainBlocker} /><DecisionAnswer label="What next?" value={nextAction} /></div>
           <Progress value={readinessScore} className="mt-5 h-2" />
@@ -1388,38 +1388,38 @@ function FundingReadinessHero({ readinessScore, eligibleRange, mainBlocker, next
   );
 }
 
-function DecisionAnswer({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border bg-card p-3"><div className="text-xs font-medium text-muted-foreground">{label}</div><div className="mt-1 font-medium">{value}</div></div>; }
+function DecisionAnswer({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border bg-card p-3"><div className="text-xs font-medium text-muted-foreground">{label}</div><div className="mt-1 font-medium">{value}</div></div>; }
 
 function readinessStatus(score: number) { return score >= 85 ? 'Strong' : score >= 72 ? 'Stable' : score >= 55 ? 'Watch' : 'Blocked'; }
 
 function ReadinessBreakdownGrid({ signals }: { signals: EligibilitySignal[] }) {
-  return <Card className="rounded-2xl"><CardHeader><CardTitle className="flex items-center gap-1.5 text-base">Readiness Breakdown<InfoHint label="Readiness Breakdown info">Compact diagnostics from verified operating sources.</InfoHint></CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{signals.map((signal) => <ReadinessMetricCard key={signal.label} signal={signal} />)}</CardContent></Card>;
+  return <Card className="rounded-lg"><CardHeader><CardTitle className="flex items-center gap-1.5 text-base">Readiness Breakdown<InfoHint label="Readiness Breakdown info">Compact diagnostics from verified operating sources.</InfoHint></CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{signals.map((signal) => <ReadinessMetricCard key={signal.label} signal={signal} />)}</CardContent></Card>;
 }
-function ReadinessMetricCard({ signal }: { signal: EligibilitySignal }) { const Icon=signal.icon; const status=readinessStatus(signal.score); return <div className="rounded-xl border bg-background p-3"><div className="flex items-start justify-between gap-2"><div><div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{signal.label}<InfoHint label={`${signal.label} info`}>{signal.detail}</InfoHint></div><div className="mt-1 font-semibold">{signal.value}</div></div><Icon className="size-4 text-primary" /></div><div className="mt-3 flex items-center justify-between gap-2"><Badge variant="outline" className={status === 'Blocked' ? 'border-destructive/30 bg-destructive/10 text-destructive' : status === 'Watch' ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'}>{status}</Badge><span className="text-sm font-semibold">{Math.round(signal.score)}%</span></div></div>; }
+function ReadinessMetricCard({ signal }: { signal: EligibilitySignal }) { const Icon=signal.icon; const status=readinessStatus(signal.score); return <div className="rounded-lg border bg-background p-3"><div className="flex items-start justify-between gap-2"><div><div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{signal.label}<InfoHint label={`${signal.label} info`}>{signal.detail}</InfoHint></div><div className="mt-1 font-semibold">{signal.value}</div></div><Icon className="size-4 text-primary" /></div><div className="mt-3 flex items-center justify-between gap-2"><Badge variant="outline" className={status === 'Blocked' ? 'border-destructive/30 bg-destructive/10 text-destructive' : status === 'Watch' ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'}>{status}</Badge><span className="text-sm font-semibold">{Math.round(signal.score)}%</span></div></div>; }
 
-function EvidencePackageSnapshot({ evidencePack, onOpenEvidence }: { evidencePack: CommerceEvidencePack; onOpenEvidence: () => void }) { return <Card className="rounded-2xl"><CardHeader className="border-b"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="flex items-center gap-1.5 text-base">Evidence Package Snapshot<InfoHint label="Evidence Package Snapshot info">Summary only. Full source details live in Evidence.</InfoHint></CardTitle></div><Button type="button" variant="outline" size="sm" onClick={onOpenEvidence}>Open Evidence tab</Button></div></CardHeader><CardContent className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-5">{evidencePack.items.slice(0,5).map((item) => <div key={item.id} className="rounded-xl border bg-background p-3"><div className="flex items-center justify-between gap-2"><div className="font-medium line-clamp-1">{item.label}</div><Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge></div><div className="mt-3 text-sm text-muted-foreground">{item.records} records</div><div className="mt-1 text-xs text-muted-foreground">Owner: {item.sourceOfTruthOwner}</div></div>)}</CardContent></Card>; }
+function EvidencePackageSnapshot({ evidencePack, onOpenEvidence }: { evidencePack: CommerceEvidencePack; onOpenEvidence: () => void }) { return <Card className="rounded-lg"><CardHeader className="border-b"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="flex items-center gap-1.5 text-base">Evidence Package Snapshot<InfoHint label="Evidence Package Snapshot info">Summary only. Full source details live in Evidence.</InfoHint></CardTitle></div><Button type="button" variant="outline" size="sm" onClick={onOpenEvidence}>Open Evidence tab</Button></div></CardHeader><CardContent className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-5">{evidencePack.items.slice(0,5).map((item) => <div key={item.id} className="rounded-lg border bg-background p-3"><div className="flex items-center justify-between gap-2"><div className="font-medium line-clamp-1">{item.label}</div><Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge></div><div className="mt-3 text-sm text-muted-foreground">{item.records} records</div><div className="mt-1 text-xs text-muted-foreground">Owner: {item.sourceOfTruthOwner}</div></div>)}</CardContent></Card>; }
 
-function RiskBlockerPanel({ blockers, onTabChange }: { blockers: RiskBlocker[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="flex items-center gap-1.5 text-base">Risk Blockers<InfoHint label="Risk Blockers info">Most important issues before partner review.</InfoHint></CardTitle></CardHeader><CardContent className="space-y-3">{blockers.map((blocker) => <div key={blocker.blocker} className="rounded-xl border bg-background p-3"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={blocker.severity === 'high' ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'bg-muted/30'}>{humanize(blocker.severity)}</Badge><span className="font-semibold">{blocker.blocker}</span></div><p className="mt-2 text-sm text-muted-foreground">Impact: {blocker.impact}</p><p className="mt-1 text-sm text-muted-foreground">Recommendation: {blocker.recommendation}</p><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Owner: Finance / Ops</span><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('documents')}>Resolve</Button></div></div>)}</CardContent></Card>; }
+function RiskBlockerPanel({ blockers, onTabChange }: { blockers: RiskBlocker[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-lg"><CardHeader><CardTitle className="flex items-center gap-1.5 text-base">Risk Blockers<InfoHint label="Risk Blockers info">Most important issues before partner review.</InfoHint></CardTitle></CardHeader><CardContent className="space-y-3">{blockers.map((blocker) => <div key={blocker.blocker} className="rounded-lg border bg-background p-3"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={blocker.severity === 'high' ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'bg-muted/30'}>{humanize(blocker.severity)}</Badge><span className="font-semibold">{blocker.blocker}</span></div><p className="mt-2 text-sm text-muted-foreground">Impact: {blocker.impact}</p><p className="mt-1 text-sm text-muted-foreground">Recommendation: {blocker.recommendation}</p><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Owner: Finance / Ops</span><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('documents')}>Resolve</Button></div></div>)}</CardContent></Card>; }
 
-function RecommendedRoutesPreview({ lenders, onTabChange }: { lenders: LenderMatch[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-2xl"><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle className="flex items-center gap-1.5 text-base">Recommended Review Routes<InfoHint label="Recommended Review Routes info">Preview only. No approval promise.</InfoHint></CardTitle></div><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('routes')}>Compare routes</Button></div></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{lenders.map((lender) => <ReviewRouteCard key={lender.id} lender={lender} compact />)}</CardContent></Card>; }
+function RecommendedRoutesPreview({ lenders, onTabChange }: { lenders: LenderMatch[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-lg"><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle className="flex items-center gap-1.5 text-base">Recommended Review Routes<InfoHint label="Recommended Review Routes info">Preview only. No approval promise.</InfoHint></CardTitle></div><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('routes')}>Compare routes</Button></div></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{lenders.map((lender) => <ReviewRouteCard key={lender.id} lender={lender} compact />)}</CardContent></Card>; }
 
-function EvidenceTab({ evidencePack, signals, onTabChange }: { evidencePack: CommerceEvidencePack; signals: EligibilitySignal[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <div id="commerce-evidence-pack" className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Evidence mapped to verified operating sources</CardTitle><p className="text-sm text-muted-foreground">Coverage: {evidencePack.summary}</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><MiniFact label="Evidence quality score" value={`${Math.round(signals.reduce((sum, item) => sum + item.score, 0) / Math.max(1, signals.length))}%`} /><MiniFact label="Reusable evidence" value={`${evidencePack.reusableDocumentCount} document(s)`} /><MiniFact label="Open issues" value={`${evidencePack.openIssueCount} issue(s)`} /></CardContent></Card><EvidenceSourceTable evidencePack={evidencePack} onTabChange={onTabChange} /></div>; }
-function EvidenceSourceTable({ evidencePack, onTabChange }: { evidencePack: CommerceEvidencePack; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Evidence source lines</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[860px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Evidence group</th><th className="p-3">Source owner</th><th className="p-3">Records</th><th className="p-3">Status</th><th className="p-3">Readiness dimension</th><th className="p-3">Action</th></tr></thead><tbody className="divide-y">{evidencePack.items.map((item) => <tr key={item.id}><td className="p-3 font-medium">{item.label}<div className="mt-1 text-xs text-muted-foreground">{item.summary}</div></td><td className="p-3">{item.sourceOfTruthOwner}</td><td className="p-3">{item.records}</td><td className="p-3"><Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge></td><td className="p-3">{humanize(item.category)}</td><td className="p-3"><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('audit')}>Open source records</Button></td></tr>)}</tbody></table></CardContent></Card>; }
+function EvidenceTab({ evidencePack, signals, onTabChange }: { evidencePack: CommerceEvidencePack; signals: EligibilitySignal[]; onTabChange: (tab: FinanceSupportTab) => void }) { return <div id="commerce-evidence-pack" className="space-y-4"><Card className="rounded-lg"><CardHeader><CardTitle>Evidence mapped to verified operating sources</CardTitle><p className="text-sm text-muted-foreground">Coverage: {evidencePack.summary}</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><MiniFact label="Evidence quality score" value={`${Math.round(signals.reduce((sum, item) => sum + item.score, 0) / Math.max(1, signals.length))}%`} /><MiniFact label="Reusable evidence" value={`${evidencePack.reusableDocumentCount} document(s)`} /><MiniFact label="Open issues" value={`${evidencePack.openIssueCount} issue(s)`} /></CardContent></Card><EvidenceSourceTable evidencePack={evidencePack} onTabChange={onTabChange} /></div>; }
+function EvidenceSourceTable({ evidencePack, onTabChange }: { evidencePack: CommerceEvidencePack; onTabChange: (tab: FinanceSupportTab) => void }) { return <Card className="rounded-lg"><CardHeader><CardTitle className="text-base">Evidence source lines</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[860px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Evidence group</th><th className="p-3">Source owner</th><th className="p-3">Records</th><th className="p-3">Status</th><th className="p-3">Readiness dimension</th><th className="p-3">Action</th></tr></thead><tbody className="divide-y">{evidencePack.items.map((item) => <tr key={item.id}><td className="p-3 font-medium">{item.label}<div className="mt-1 text-xs text-muted-foreground">{item.summary}</div>{item.connectorEvidence ? <div className="mt-1 text-[11px] font-medium text-muted-foreground">{item.connectorEvidence.label}: {humanize(item.connectorEvidence.status)}. {item.connectorEvidence.detail}</div> : null}</td><td className="p-3">{item.sourceOfTruthOwner}</td><td className="p-3">{item.records}</td><td className="p-3"><Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge></td><td className="p-3">{humanize(item.category)}</td><td className="p-3"><Button type="button" size="sm" variant="outline" onClick={() => onTabChange('audit')}>Open source records</Button></td></tr>)}</tbody></table></CardContent></Card>; }
 
-function DocumentsTab({ documents, verifiedDocs, missingDocs, lenders, onDrop, onFiles }: { documents: FinancingDocument[]; verifiedDocs: number; missingDocs: number; lenders: LenderMatch[]; onDrop: (event: DragEvent<HTMLDivElement>) => void; onFiles: (files: FileList | null) => void }) { return <div className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Document completeness</CardTitle><p className="text-sm text-muted-foreground">{verifiedDocs}/{documents.length} verified or reusable. {missingDocs} missing/rejected blocker(s).</p></CardHeader><CardContent><Progress value={(verifiedDocs / Math.max(1, documents.length)) * 100} className="h-2" /></CardContent></Card><DocumentSubmissionCenter documents={documents} verifiedDocs={verifiedDocs} onDrop={onDrop} onFiles={onFiles} /><DocumentRequirementList documents={documents} lenders={lenders} /></div>; }
-function DocumentRequirementList({ documents, lenders }: { documents: FinancingDocument[]; lenders: LenderMatch[] }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Document mapping to review routes</CardTitle></CardHeader><CardContent className="divide-y p-0">{documents.map((doc) => <div key={doc.id} className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_180px]"><div><div className="flex flex-wrap items-center gap-2"><span className="font-medium">{doc.label}</span><Badge variant="outline" className={statusClass(doc.status)}>{humanize(doc.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">Required by: {(doc.banks.length ? doc.banks : lenders.slice(0, 2).map((lender) => lender.bankName)).join(', ')}</p>{doc.issue ? <p className="mt-1 text-sm text-destructive">Issue: {doc.issue}</p> : null}<p className="mt-1 text-xs text-muted-foreground">Last updated: {doc.fileName ? 'May 13, 2026' : 'Pending upload'}</p></div><Button type="button" variant="outline" size="sm">{doc.status === 'missing' ? 'Upload' : doc.status === 'rejected' ? 'Replace' : doc.status === 'verifying' ? 'Verify' : 'View'}</Button></div>)}</CardContent></Card>; }
+function DocumentsTab({ documents, verifiedDocs, missingDocs, lenders, onDrop, onFiles }: { documents: FinancingDocument[]; verifiedDocs: number; missingDocs: number; lenders: LenderMatch[]; onDrop: (event: DragEvent<HTMLDivElement>) => void; onFiles: (files: FileList | null) => void }) { return <div className="space-y-4"><Card className="rounded-lg"><CardHeader><CardTitle>Document completeness</CardTitle><p className="text-sm text-muted-foreground">{verifiedDocs}/{documents.length} verified or reusable. {missingDocs} missing/rejected blocker(s).</p></CardHeader><CardContent><Progress value={(verifiedDocs / Math.max(1, documents.length)) * 100} className="h-2" /></CardContent></Card><DocumentSubmissionCenter documents={documents} verifiedDocs={verifiedDocs} onDrop={onDrop} onFiles={onFiles} /><DocumentRequirementList documents={documents} lenders={lenders} /></div>; }
+function DocumentRequirementList({ documents, lenders }: { documents: FinancingDocument[]; lenders: LenderMatch[] }) { return <Card className="rounded-lg"><CardHeader><CardTitle className="text-base">Document mapping to review routes</CardTitle></CardHeader><CardContent className="divide-y p-0">{documents.map((doc) => <div key={doc.id} className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_180px]"><div><div className="flex flex-wrap items-center gap-2"><span className="font-medium">{doc.label}</span><Badge variant="outline" className={statusClass(doc.status)}>{humanize(doc.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">Required by: {(doc.banks.length ? doc.banks : lenders.slice(0, 2).map((lender) => lender.bankName)).join(', ')}</p>{doc.issue ? <p className="mt-1 text-sm text-destructive">Issue: {doc.issue}</p> : null}<p className="mt-1 text-xs text-muted-foreground">Last updated: {doc.fileName ? 'May 13, 2026' : 'Pending upload'}</p></div><Button type="button" variant="outline" size="sm">{doc.status === 'missing' ? 'Upload' : doc.status === 'rejected' ? 'Replace' : doc.status === 'verifying' ? 'Verify' : 'View'}</Button></div>)}</CardContent></Card>; }
 
-function ReviewRoutesTab({ lenders, documents, blockers }: { lenders: LenderMatch[]; documents: FinancingDocument[]; blockers: RiskBlocker[] }) { return <div id="lenders" className="space-y-4"><div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">Preview only. No approval promise. Eligibility and underwriting depend on partner review.</div><div className="grid gap-3 md:grid-cols-2">{lenders.map((lender) => <ReviewRouteCard key={lender.id} lender={lender} blockers={blockers} />)}</div><ReviewRouteComparisonTable lenders={lenders} documents={documents} /></div>; }
-function ReviewRouteCard({ lender, blockers, compact }: { lender: LenderMatch; blockers?: RiskBlocker[]; compact?: boolean }) { return <Card className="rounded-2xl"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-1.5 text-base">{lender.bankName}<InfoHint label={`${lender.bankName} info`}>{lender.financingType}</InfoHint></CardTitle></div><Badge variant="outline">{Math.round(lender.matchPercent)}%</Badge></div></CardHeader><CardContent className="space-y-3 text-sm"><MiniFact label="Indicative range" value={lender.estimatedRange} /><MiniFact label="Review window" value={lender.reviewWindow} />{!compact ? <><div><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Main requirements</div><ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">{lender.requirements.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="text-muted-foreground">Missing requirements: {blockers?.[0]?.blocker || 'No critical missing requirement'}</div><Button type="button" className="w-full" variant="outline">View route</Button></> : <Button type="button" size="sm" variant="outline">View route</Button>}</CardContent></Card>; }
-function ReviewRouteComparisonTable({ lenders, documents }: { lenders: LenderMatch[]; documents: FinancingDocument[] }) { const missing=documents.filter((doc)=>doc.status==='missing'||doc.status==='rejected').length; return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Route comparison</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[900px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Route</th><th className="p-3">Funding type</th><th className="p-3">Indicative range</th><th className="p-3">Review window</th><th className="p-3">Evidence required</th><th className="p-3">Missing docs</th><th className="p-3">Match</th><th className="p-3">Status</th></tr></thead><tbody className="divide-y">{lenders.map((lender)=><tr key={lender.id}><td className="p-3 font-medium">{lender.bankName}</td><td className="p-3">{lender.financingType}</td><td className="p-3">{lender.estimatedRange}</td><td className="p-3">{lender.reviewWindow}</td><td className="p-3">{lender.requirements.join(', ')}</td><td className="p-3">{missing}</td><td className="p-3">{Math.round(lender.matchPercent)}%</td><td className="p-3"><Badge variant="outline">Preview</Badge></td></tr>)}</tbody></table></CardContent></Card>; }
+function ReviewRoutesTab({ lenders, documents, blockers }: { lenders: LenderMatch[]; documents: FinancingDocument[]; blockers: RiskBlocker[] }) { return <div id="lenders" className="space-y-4"><div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">Preview only. No approval promise. Eligibility and underwriting depend on partner review.</div><div className="grid gap-3 md:grid-cols-2">{lenders.map((lender) => <ReviewRouteCard key={lender.id} lender={lender} blockers={blockers} />)}</div><ReviewRouteComparisonTable lenders={lenders} documents={documents} /></div>; }
+function ReviewRouteCard({ lender, blockers, compact }: { lender: LenderMatch; blockers?: RiskBlocker[]; compact?: boolean }) { return <Card className="rounded-lg"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-1.5 text-base">{lender.bankName}<InfoHint label={`${lender.bankName} info`}>{lender.financingType}</InfoHint></CardTitle></div><Badge variant="outline">{Math.round(lender.matchPercent)}%</Badge></div></CardHeader><CardContent className="space-y-3 text-sm"><MiniFact label="Indicative range" value={lender.estimatedRange} /><MiniFact label="Review window" value={lender.reviewWindow} />{!compact ? <><div><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Main requirements</div><ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">{lender.requirements.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="text-muted-foreground">Missing requirements: {blockers?.[0]?.blocker || 'No critical missing requirement'}</div><Button type="button" className="w-full" variant="outline">View route</Button></> : <Button type="button" size="sm" variant="outline">View route</Button>}</CardContent></Card>; }
+function ReviewRouteComparisonTable({ lenders, documents }: { lenders: LenderMatch[]; documents: FinancingDocument[] }) { const missing=documents.filter((doc)=>doc.status==='missing'||doc.status==='rejected').length; return <Card className="rounded-lg"><CardHeader><CardTitle className="text-base">Route comparison</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[900px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Route</th><th className="p-3">Funding type</th><th className="p-3">Indicative range</th><th className="p-3">Review window</th><th className="p-3">Evidence required</th><th className="p-3">Missing docs</th><th className="p-3">Match</th><th className="p-3">Status</th></tr></thead><tbody className="divide-y">{lenders.map((lender)=><tr key={lender.id}><td className="p-3 font-medium">{lender.bankName}</td><td className="p-3">{lender.financingType}</td><td className="p-3">{lender.estimatedRange}</td><td className="p-3">{lender.reviewWindow}</td><td className="p-3">{lender.requirements.join(', ')}</td><td className="p-3">{missing}</td><td className="p-3">{Math.round(lender.matchPercent)}%</td><td className="p-3"><Badge variant="outline">Preview</Badge></td></tr>)}</tbody></table></CardContent></Card>; }
 
-function ApplicationsTab({ applications, documents }: { applications: ApplicationItem[]; documents: FinancingDocument[] }) { return <div id="status" className="space-y-4"><Card id="funding-application-flow" className="rounded-2xl"><CardHeader><CardTitle>Funding application tracker</CardTitle><p className="text-sm text-muted-foreground">Drafts, partner milestones, pending requirements, and internal notes.</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><MiniFact label="Applications" value={String(applications.length)} /><MiniFact label="Pending requirements" value={String(documents.filter((doc)=>doc.status==='missing'||doc.status==='rejected').length)} /><MiniFact label="Next action" value={applications[0]?.nextAction || 'No active application'} /></CardContent></Card><ApplicationStatusTracker applications={applications} /><ApplicationTimeline applications={applications} /></div>; }
-function ApplicationTimeline({ applications }: { applications: ApplicationItem[] }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Partner milestones</CardTitle></CardHeader><CardContent className="space-y-3">{applications.map((app, index)=><div key={app.lender} className="flex gap-3 rounded-xl border bg-background p-3"><div className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted/30 text-sm font-semibold">{index+1}</div><div><div className="font-medium">{app.lender} — {app.status}</div><p className="mt-1 text-sm text-muted-foreground">{app.timeline}. Next: {app.nextAction}. Owner: Finance lead.</p></div></div>)}</CardContent></Card>; }
+function ApplicationsTab({ applications, documents }: { applications: ApplicationItem[]; documents: FinancingDocument[] }) { return <div id="status" className="space-y-4"><Card id="funding-application-flow" className="rounded-lg"><CardHeader><CardTitle>Funding application tracker</CardTitle><p className="text-sm text-muted-foreground">Drafts, partner milestones, pending requirements, and internal notes.</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><MiniFact label="Applications" value={String(applications.length)} /><MiniFact label="Pending requirements" value={String(documents.filter((doc)=>doc.status==='missing'||doc.status==='rejected').length)} /><MiniFact label="Next action" value={applications[0]?.nextAction || 'No active application'} /></CardContent></Card><ApplicationStatusTracker applications={applications} /><ApplicationTimeline applications={applications} /></div>; }
+function ApplicationTimeline({ applications }: { applications: ApplicationItem[] }) { return <Card className="rounded-lg"><CardHeader><CardTitle className="text-base">Partner milestones</CardTitle></CardHeader><CardContent className="space-y-3">{applications.map((app, index)=><div key={app.lender} className="flex gap-3 rounded-lg border bg-background p-3"><div className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted/30 text-sm font-semibold">{index+1}</div><div><div className="font-medium">{app.lender} — {app.status}</div><p className="mt-1 text-sm text-muted-foreground">{app.timeline}. Next: {app.nextAction}. Owner: Finance lead.</p></div></div>)}</CardContent></Card>; }
 
-function AuditTab({ auditEvents, readinessScore }: { auditEvents: Array<{ timestamp: string; eventType: string; source: string; description: string; actor: string }>; readinessScore: number }) { return <div className="space-y-4"><Card className="rounded-2xl"><CardHeader><CardTitle>Traceability and confidence history</CardTitle><p className="text-sm text-muted-foreground">Current readiness score: {readinessScore}%. Audit supports enterprise trust, not lender approval.</p></CardHeader></Card><AuditTrailTable auditEvents={auditEvents} /></div>; }
-function AuditTrailTable({ auditEvents }: { auditEvents: Array<{ timestamp: string; eventType: string; source: string; description: string; actor: string }> }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Audit trail</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[820px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Timestamp</th><th className="p-3">Event</th><th className="p-3">Source</th><th className="p-3">Description</th><th className="p-3">Actor</th></tr></thead><tbody className="divide-y">{auditEvents.map((event, index)=><tr key={`${event.eventType}-${index}`}><td className="p-3">{formatShortDate(event.timestamp)}</td><td className="p-3 font-medium">{event.eventType}</td><td className="p-3">{event.source}</td><td className="p-3 text-muted-foreground">{event.description}</td><td className="p-3">{event.actor}</td></tr>)}</tbody></table></CardContent></Card>; }
+function AuditTab({ auditEvents, readinessScore }: { auditEvents: Array<{ timestamp: string; eventType: string; source: string; description: string; actor: string }>; readinessScore: number }) { return <div className="space-y-4"><Card className="rounded-lg"><CardHeader><CardTitle>Traceability and confidence history</CardTitle><p className="text-sm text-muted-foreground">Current readiness score: {readinessScore}%. Audit supports enterprise trust, not lender approval.</p></CardHeader></Card><AuditTrailTable auditEvents={auditEvents} /></div>; }
+function AuditTrailTable({ auditEvents }: { auditEvents: Array<{ timestamp: string; eventType: string; source: string; description: string; actor: string }> }) { return <Card className="rounded-lg"><CardHeader><CardTitle className="text-base">Audit trail</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[820px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Timestamp</th><th className="p-3">Event</th><th className="p-3">Source</th><th className="p-3">Description</th><th className="p-3">Actor</th></tr></thead><tbody className="divide-y">{auditEvents.map((event, index)=><tr key={`${event.eventType}-${index}`}><td className="p-3">{formatShortDate(event.timestamp)}</td><td className="p-3 font-medium">{event.eventType}</td><td className="p-3">{event.source}</td><td className="p-3 text-muted-foreground">{event.description}</td><td className="p-3">{event.actor}</td></tr>)}</tbody></table></CardContent></Card>; }
 
-function PrimeAiPanel({ title, actions, prompt, onPromptChange, onAskAi }: { title: string; actions: string[]; prompt: string; onPromptChange: (value: string) => void; onAskAi: () => void }) { return <Card className="rounded-2xl"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bot className="size-4" />{title}</CardTitle><p className="text-sm text-muted-foreground">Contextual assistant. It explains evidence and drafts summaries; it does not make credit decisions.</p></CardHeader><CardContent className="space-y-3"><div className="space-y-2">{actions.map((action)=><button key={action} type="button" onClick={() => onPromptChange(action)} className="flex w-full items-center gap-2 rounded-lg border bg-background p-2 text-left text-sm hover:bg-muted/40"><Sparkles className="size-4 text-primary" />{action}</button>)}</div><Textarea value={prompt} onChange={(event)=>onPromptChange(event.target.value)} className="min-h-[96px]" /><Button type="button" className="w-full justify-between" onClick={onAskAi}>Ask Prime AI<Send className="size-4" /></Button></CardContent></Card>; }
+function PrimeAiPanel({ title, actions, prompt, onPromptChange, onAskAi }: { title: string; actions: string[]; prompt: string; onPromptChange: (value: string) => void; onAskAi: () => void }) { return <Card className="rounded-lg"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bot className="size-4" />{title}</CardTitle><p className="text-sm text-muted-foreground">Contextual assistant. It explains evidence and drafts summaries; it does not make credit decisions.</p></CardHeader><CardContent className="space-y-3"><div className="space-y-2">{actions.map((action)=><button key={action} type="button" onClick={() => onPromptChange(action)} className="flex w-full items-center gap-2 rounded-lg border bg-background p-2 text-left text-sm hover:bg-muted/40"><Sparkles className="size-4 text-primary" />{action}</button>)}</div><Textarea value={prompt} onChange={(event)=>onPromptChange(event.target.value)} className="min-h-[96px]" /><Button type="button" className="w-full justify-between" onClick={onAskAi}>Ask Prime AI<Send className="size-4" /></Button></CardContent></Card>; }
 
 function FinSupportHero({
   readinessScore,
@@ -1441,7 +1441,7 @@ function FinSupportHero({
   onOpenLoanWizard: () => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
       <div className="grid gap-4 p-4 md:p-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(520px,0.85fr)]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -1550,7 +1550,7 @@ function LoanProfileWizard({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="z-[190]"
-        className="z-[200] top-[calc(var(--header-height)+3.75rem)] grid max-h-[calc(100dvh-var(--header-height)-5rem)] w-[min(1120px,calc(100vw-3rem))] !max-w-[1120px] grid-rows-[auto_minmax(0,1fr)] translate-y-0 overflow-hidden rounded-[1.75rem] border bg-background p-0 shadow-2xl"
+        className="z-[200] top-[calc(var(--header-height)+3.75rem)] grid max-h-[calc(100dvh-var(--header-height)-5rem)] w-[min(1120px,calc(100vw-3rem))] !max-w-[1120px] grid-rows-[auto_minmax(0,1fr)] translate-y-0 overflow-hidden rounded-lg border bg-background p-0 shadow-lg"
       >
         <DialogHeader className="min-w-0 border-b bg-card px-5 py-4 pr-12 md:px-6 md:pr-16">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1568,7 +1568,7 @@ function LoanProfileWizard({
                 Build a funding review package from commerce signals, Japan SME documents, and partner-bank routing.
               </DialogDescription>
             </div>
-            <div className="min-w-[180px] rounded-2xl border bg-background/80 p-3 lg:mr-8">
+            <div className="min-w-[180px] rounded-lg border bg-background/80 p-3 lg:mr-8">
               <div className="flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 <span>Progress</span>
                 <span>{stepIndex + 1}/{loanWizardSteps.length}</span>
@@ -1593,7 +1593,7 @@ function LoanProfileWizard({
                     aria-current={active ? 'step' : undefined}
                     onClick={() => onStepChange(index)}
                     className={cn(
-                      'w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
+                      'w-full rounded-lg border px-3 py-2.5 text-left transition-colors',
                       active ? 'border-primary/35 bg-primary/10 text-foreground shadow-sm ring-2 ring-primary/10' : 'border-transparent text-muted-foreground hover:border-border hover:bg-background',
                     )}
                   >
@@ -1651,20 +1651,20 @@ function LoanProfileWizard({
 
             <DialogFooter className="min-w-0 border-t bg-card px-4 py-3 md:px-6 sm:justify-between">
               <div className="flex min-w-0 flex-wrap gap-2">
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" className="rounded-lg" onClick={() => onOpenChange(false)}>
                   Save draft
                 </Button>
-                <Button type="button" variant="ghost" className="rounded-xl" onClick={onAskAi}>
+                <Button type="button" variant="ghost" className="rounded-lg" onClick={onAskAi}>
                   <Bot className="size-4" />
                   Ask Prime AI
                 </Button>
               </div>
               <div className="flex min-w-0 flex-wrap gap-2">
-                <Button type="button" variant="outline" className="rounded-xl" onClick={goBack} disabled={stepIndex === 0}>
+                <Button type="button" variant="outline" className="rounded-lg" onClick={goBack} disabled={stepIndex === 0}>
                   <ChevronLeft className="size-4" />
                   Back
                 </Button>
-                <Button type="button" className="rounded-xl px-5" onClick={isFinalStep ? submitPreCheck : goNext}>
+                <Button type="button" className="rounded-lg px-5" onClick={isFinalStep ? submitPreCheck : goNext}>
                   {isFinalStep ? 'Submit pre-check' : 'Next'}
                   {!isFinalStep ? <ArrowRight className="size-4" /> : <CheckCircle2 className="size-4" />}
                 </Button>
@@ -1681,7 +1681,7 @@ function LoanWizardMoodPanel({ stepId, stepIndex }: { stepId: LoanWizardStepId; 
   const mood = loanWizardMoodCopy[stepId];
 
   return (
-    <aside className="order-first overflow-hidden rounded-2xl border bg-gradient-to-br from-background via-muted/20 to-primary/5 p-3 shadow-sm 2xl:order-none">
+    <aside className="order-first overflow-hidden rounded-lg border bg-gradient-to-br from-background via-muted/20 to-primary/5 p-3 shadow-sm 2xl:order-none">
       <LoanWizardMotionStyles />
       <div className="flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         <span className="whitespace-nowrap">Step {stepIndex + 1} calm flow</span>
@@ -1759,14 +1759,12 @@ function LoanWizardMotionStyles() {
 }
 
 function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepId; ariaLabel: string }) {
-  const shellClass = 'prime-loan-anim relative mt-3 h-28 overflow-hidden rounded-xl border bg-background/80 2xl:h-32';
-  const glow = <div className="absolute inset-x-8 top-6 h-20 rounded-full bg-primary/10 blur-2xl" />;
+  const shellClass = 'prime-loan-anim relative mt-3 h-28 overflow-hidden rounded-lg border bg-background/80 2xl:h-32';
 
   if (stepId === 'profile') {
     return (
       <div className={shellClass} role="img" aria-label={ariaLabel}>
-        {glow}
-        <div className="absolute left-5 top-7 flex size-14 items-center justify-center rounded-xl border bg-card shadow-sm">
+        <div className="absolute left-5 top-7 flex size-14 items-center justify-center rounded-lg border bg-card shadow-sm">
           <Building2 className="size-7 text-primary" />
         </div>
         <div className="prime-loan-float absolute right-7 top-6 w-20 rounded-lg border bg-card p-2 shadow-sm">
@@ -1788,7 +1786,7 @@ function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepI
     return (
       <div className={shellClass} role="img" aria-label={ariaLabel}>
         {glow}
-        <div className="absolute bottom-5 left-8 right-8 h-10 rounded-xl border bg-muted/30" />
+        <div className="absolute bottom-5 left-8 right-8 h-10 rounded-lg border bg-muted/30" />
         {[0, 1, 2].map((index) => (
           <div
             key={index}
@@ -1819,7 +1817,7 @@ function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepI
             />
           ))}
         </div>
-        <div className="prime-loan-pulse absolute right-7 top-9 flex size-16 items-center justify-center rounded-2xl border bg-card shadow-sm">
+        <div className="prime-loan-pulse absolute right-7 top-9 flex size-16 items-center justify-center rounded-lg border bg-card shadow-sm">
           <ShieldCheck className="size-8 text-emerald-600 dark:text-emerald-400" />
         </div>
       </div>
@@ -1830,7 +1828,7 @@ function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepI
     return (
       <div className={shellClass} role="img" aria-label={ariaLabel}>
         {glow}
-        <div className="absolute bottom-6 left-7 right-7 h-16 rounded-2xl border bg-card shadow-sm">
+        <div className="absolute bottom-6 left-7 right-7 h-16 rounded-lg border bg-card shadow-sm">
           <div className="absolute -top-3 left-5 h-5 w-16 rounded-t-lg border bg-card" />
           <Upload className="absolute bottom-4 right-5 size-5 text-primary" />
         </div>
@@ -1862,7 +1860,7 @@ function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepI
         ].map((node, index) => (
           <div
             key={node.label}
-            className={cn('prime-loan-pulse absolute flex size-12 items-center justify-center rounded-xl border bg-card shadow-sm', node.left, node.top)}
+            className={cn('prime-loan-pulse absolute flex size-12 items-center justify-center rounded-lg border bg-card shadow-sm', node.left, node.top)}
             style={{ animationDelay: `${index * 240}ms` }}
           >
             <Building2 className="size-6 text-primary" />
@@ -1876,7 +1874,7 @@ function LoanWizardIllustration({ stepId, ariaLabel }: { stepId: LoanWizardStepI
     return (
       <div className={shellClass} role="img" aria-label={ariaLabel}>
         {glow}
-        <div className="absolute inset-x-7 top-6 space-y-2 rounded-xl border bg-card p-3 shadow-sm">
+        <div className="absolute inset-x-7 top-6 space-y-2 rounded-lg border bg-card p-3 shadow-sm">
           {['Identity', 'Documents', 'Consent'].map((item, index) => (
             <div key={item} className="flex items-center gap-2 rounded-lg bg-muted/25 px-2 py-1.5">
               <CheckCircle2
@@ -2335,6 +2333,11 @@ function CommerceEvidencePackPanel({ evidencePack }: { evidencePack: CommerceEvi
               <div>
                 <div className="text-sm font-semibold">{item.label}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{item.sourceOfTruthOwner}</div>
+                {item.connectorEvidence ? (
+                  <div className="mt-1 text-[11px] font-medium text-muted-foreground">
+                    {item.connectorEvidence.label}: {humanize(item.connectorEvidence.status)}. {item.connectorEvidence.detail}
+                  </div>
+                ) : null}
               </div>
               <Badge variant="outline" className={statusClass(item.status)}>{humanize(item.status)}</Badge>
             </div>

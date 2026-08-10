@@ -136,7 +136,7 @@ export const CAMPAIGN_OBJECTIVES: Array<{ id: CampaignObjective; label: string; 
   { id: 'improve-marketplace-traffic', label: 'Improve Marketplace Traffic', detail: 'Increase marketplace discovery.' },
 ];
 
-const owners = ['CRM Ops', 'Demand Team', 'Content Team', 'Ecom Ops', 'Finance Ops', 'Marketplace Ops'];
+const owners = ['CRM Ops', 'CRM Team', 'Content Team', 'Ecom Ops', 'Finance Ops', 'Marketplace Ops'];
 const stageByIndex: CampaignStage[] = ['queued', 'draft', 'running', 'ready', 'paused', 'completed'];
 const objectiveByIndex: CampaignObjective[] = [
   're-engage-buyers',
@@ -259,7 +259,7 @@ export function buildCampaignWorkspace(snapshot: PrimeSnapshot, options: { selec
         id: `${campaign.id}-inventory`,
         area: 'Stock / ATS',
         status: stockBlocked ? 'blocked' : 'ready',
-        blocker: stockBlocked ? `${forecast?.ats ?? 0} ATS vs ${forecast?.demand7d ?? campaign.leads} demand` : 'None',
+        blocker: stockBlocked ? `${forecast?.ats ?? 0} ATS vs ${forecast?.crm7d ?? campaign.leads} demand` : 'None',
         owner: 'Ecom Ops',
         fix: stockBlocked ? 'Create stock top-up task before scale' : 'Monitor daily ATS',
         campaignId: campaign.id,

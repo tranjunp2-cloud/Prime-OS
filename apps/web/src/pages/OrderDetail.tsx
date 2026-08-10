@@ -32,6 +32,7 @@ import { getWarehouses } from '@/lib/warehouse-store';
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
 import { LifecycleStageBadge } from '@/components/orders/LifecycleStageBadge';
 import { OrderEventTimeline } from '@/components/orders/OrderEventTimeline';
+import { MyInvoisStatusPanel } from '@/components/prime/MyInvoisStatusPanel';
 import { useToast } from '@/hooks/use-toast';
 import { useDetailNavigation } from '@/hooks/use-detail-navigation';
 import { useMutation } from '@tanstack/react-query';
@@ -42,6 +43,7 @@ import {
   formatLocalizedMoney,
   formatMessage,
 } from '@/lib/i18n/format';
+import { buildMyInvoisOrderReadiness } from '@/lib/prime/myinvois';
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -152,6 +154,7 @@ export default function OrderDetail() {
   }
 
   const allocatedWarehouse = warehouses.find((w) => w.id === order.resolved_warehouse_id);
+  const myInvoisReadiness = buildMyInvoisOrderReadiness(order, items, events);
 
   return (
     <div className="flex flex-col gap-6 p-6 lg:p-8">
@@ -246,6 +249,8 @@ export default function OrderDetail() {
         />
       </div>
 
+      <MyInvoisStatusPanel readiness={myInvoisReadiness} />
+
       {/* Action Buttons */}
       {order.status !== 'cancelled' && order.status !== 'completed' && order.status !== 'returned' && (
         <Card>
@@ -326,7 +331,7 @@ export default function OrderDetail() {
 
             {/* Allocate Dialog */}
             {showAllocateDialog && (
-              <div className="mt-2 rounded-2xl border border-border/60 bg-muted/10 p-4">
+              <div className="mt-2 rounded-lg border border-border/60 bg-muted/10 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium">{t('orders.detailSelectWarehouse')}</p>

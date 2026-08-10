@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PrimeOS 10 Slides</title>
+  <link rel="preload" as="image" href="image-slides-clean-assets/slide-01.png">
+  <style>
+    :root {
+      --page-bg: #eef4ff;
+      --ink: #07144a;
+      --accent: #135dff;
+      --control-bg: rgba(255, 255, 255, 0.78);
+      --control-border: rgba(31, 92, 210, 0.22);
+      --shadow: 0 24px 70px rgba(10, 42, 118, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--page-bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .deck {
+      position: fixed;
+      inset: 0;
+      background: var(--page-bg);
+    }
+
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: var(--page-bg);
+      touch-action: pan-y;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.985);
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    .slide img {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1672 / 941;
+      object-fit: contain;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .nav {
+      position: fixed;
+      top: 50%;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 64px;
+      margin: 0;
+      padding: 0;
+      border: 1px solid var(--control-border);
+      border-radius: 999px;
+      background: var(--control-bg);
+      color: var(--accent);
+      box-shadow: 0 12px 28px rgba(9, 50, 120, 0.16);
+      cursor: pointer;
+      transform: translateY(-50%);
+      transition: background 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .nav:hover {
+      background: #fff;
+      box-shadow: 0 16px 36px rgba(9, 50, 120, 0.22);
+    }
+
+    .nav:focus-visible {
+      outline: 3px solid rgba(19, 93, 255, 0.38);
+      outline-offset: 3px;
+    }
+
+    .nav span {
+      display: block;
+      font-size: 2rem;
+      line-height: 1;
+      transform: translateY(-1px);
+    }
+
+    .prev {
+      left: 18px;
+    }
+
+    .next {
+      right: 18px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (hover: hover) {
+      .nav {
+        opacity: 0.54;
+      }
+
+      .deck:hover .nav {
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .slide {
+        padding: 6px;
+      }
+
+      .nav {
+        top: auto;
+        bottom: 52px;
+        width: 40px;
+        height: 48px;
+        transform: none;
+      }
+
+      .nav span {
+        font-size: 1.65rem;
+      }
+
+      .prev {
+        left: 16px;
+      }
+
+      .next {
+        right: 16px;
+      }
+
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .slide,
+      .nav {
+        transition: none;
+      }
+    }
+
+    @page {
+      size: 16in 9in;
+      margin: 0;
+    }
+
+    @media print {
+      html,
+      body {
+        width: auto;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+      }
+
+      .deck,
+      .stage {
+        position: static;
+        display: block;
+        background: #fff;
+      }
+
+      .slide {
+        position: relative;
+        display: block;
+        padding: 0;
+        opacity: 1;
+        page-break-after: always;
+        pointer-events: auto;
+        transform: none;
+      }
+
+      .slide:last-child {
+        page-break-after: auto;
+      }
+
+      .slide img {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" aria-label="PrimeOS image slide deck">
+    <div class="stage" data-stage>
+      <section class="slide active" aria-label="Slide 1" aria-hidden="false">
+        <img src="image-slides-clean-assets/slide-01.png" alt="PrimeOS slide 1" width="1672" height="941" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 2" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-02.png" alt="PrimeOS slide 2" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 3" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-03.png" alt="PrimeOS slide 3" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 4" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-04.png" alt="PrimeOS slide 4" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 5" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-05.png" alt="PrimeOS slide 5" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 6" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-06.png" alt="PrimeOS slide 6" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 7" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-07.png" alt="PrimeOS slide 7" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 8" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-08.png" alt="PrimeOS slide 8" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 9" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-09.png" alt="PrimeOS slide 9" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+      <section class="slide" aria-label="Slide 10" aria-hidden="true">
+        <img src="image-slides-clean-assets/slide-10.png" alt="PrimeOS slide 10" width="1672" height="941" loading="lazy" decoding="async">
+      </section>
+    </div>
+
+    <button class="nav prev" type="button" data-prev aria-label="Previous slide">
+      <span aria-hidden="true">&lsaquo;</span>
+    </button>
+    <button class="nav next" type="button" data-next aria-label="Next slide">
+      <span aria-hidden="true">&rsaquo;</span>
+    </button>
+
+    <p class="sr-only" aria-live="polite" data-counter>Slide 1 of 10</p>
+  </main>
+
+  <script>
+    (function () {
+      var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+      var deck = document.querySelector(".deck");
+      var stage = document.querySelector("[data-stage]");
+      var counter = document.querySelector("[data-counter]");
+      var active = 0;
+      var pointerStartX = 0;
+
+      function parseHash() {
+        var number = Number(window.location.hash.replace("#", ""));
+        if (!Number.isInteger(number) || number < 1 || number > slides.length) {
+          return 0;
+        }
+        return number - 1;
+      }
+
+      function setSlide(next, updateHash) {
+        active = (next + slides.length) % slides.length;
+
+        slides.forEach(function (slide, index) {
+          var isActive = index === active;
+          slide.classList.toggle("active", isActive);
+          slide.setAttribute("aria-hidden", isActive ? "false" : "true");
+        });
+
+        counter.textContent = "Slide " + (active + 1) + " of " + slides.length;
+
+        if (updateHash !== false) {
+          window.history.replaceState(null, "", "#" + (active + 1));
+        }
+      }
+
+      function nextSlide() {
+        setSlide(active + 1);
+      }
+
+      function previousSlide() {
+        setSlide(active - 1);
+      }
+
+      document.querySelector("[data-next]").addEventListener("click", nextSlide);
+      document.querySelector("[data-prev]").addEventListener("click", previousSlide);
+
+      document.addEventListener("keydown", function (event) {
+        if (event.metaKey || event.ctrlKey || event.altKey) {
+          return;
+        }
+
+        if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+          event.preventDefault();
+          nextSlide();
+        }
+
+        if (event.key === "ArrowLeft" || event.key === "PageUp") {
+          event.preventDefault();
+          previousSlide();
+        }
+
+        if (event.key === "Home") {
+          event.preventDefault();
+          setSlide(0);
+        }
+
+        if (event.key === "End") {
+          event.preventDefault();
+          setSlide(slides.length - 1);
+        }
+
+        if (event.key.toLowerCase() === "f") {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else if (deck.requestFullscreen) {
+            deck.requestFullscreen();
+          }
+        }
+      });
+
+      stage.addEventListener("pointerdown", function (event) {
+        pointerStartX = event.clientX;
+      });
+
+      stage.addEventListener("pointerup", function (event) {
+        var distance = event.clientX - pointerStartX;
+        if (Math.abs(distance) < 60) {
+          return;
+        }
+        setSlide(active + (distance < 0 ? 1 : -1));
+      });
+
+      window.addEventListener("hashchange", function () {
+        setSlide(parseHash(), false);
+      });
+
+      setSlide(parseHash(), false);
+    }());
+  </script>
+</body>
+</html>

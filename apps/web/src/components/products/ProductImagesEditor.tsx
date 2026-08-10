@@ -139,7 +139,7 @@ export function ProductImagesEditor({
         />
 
         {images.length === 0 ? (
-          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[1.35rem] border border-dashed border-edge-divider/70 bg-surface-hover/45 px-6 text-center">
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-edge-divider/70 bg-surface-hover/45 px-6 text-center">
             <ImagePlus className="mb-3 size-10 text-muted-foreground" />
             <p className="text-sm font-medium text-foreground">{t('products.noImagesYet')}</p>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t('products.noImagesYetDescription')}</p>
@@ -153,7 +153,7 @@ export function ProductImagesEditor({
               return (
                 <div
                   key={`${image}-${index}`}
-                  className="surface-solid overflow-hidden rounded-[1.35rem] border border-edge-divider/60"
+                  className="surface-solid overflow-hidden rounded-lg border border-edge-divider/60"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-surface-hover/45">
                     <img

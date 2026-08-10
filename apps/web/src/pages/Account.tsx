@@ -453,7 +453,7 @@ export default function Account() {
   return (
     <div className="min-h-full bg-[hsl(var(--surface-stage))]">
       <div className="space-y-4 p-4 pb-24 md:p-6 md:pb-28">
-        <section className="surface-solid rounded-xl border border-border/80 px-4 py-4" aria-labelledby="account-title">
+        <section className="surface-solid rounded-lg border border-border/80 px-4 py-4" aria-labelledby="account-title">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -489,14 +489,14 @@ export default function Account() {
         </section>
 
         {error ? (
-          <div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div role="alert" className="rounded-lg border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Account health summary">
           {healthCards.map((card) => (
-            <div key={card.title} className="surface-solid rounded-xl border border-border/75 p-3">
+            <div key={card.title} className="surface-solid rounded-lg border border-border/75 p-3">
               <div className="flex items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-[hsl(var(--surface-control))]">
                   <card.icon className={`size-4 ${card.tone}`} />
@@ -711,7 +711,7 @@ export default function Account() {
               </CardHeader>
               <CardContent className="space-y-4 p-4">
                 {canManageMembers ? (
-                  <form className="rounded-xl border border-border/75 bg-[hsl(var(--surface-control))] p-4" onSubmit={inviteMember}>
+                  <form className="rounded-lg border border-border/75 bg-[hsl(var(--surface-control))] p-4" onSubmit={inviteMember}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                       <div className="min-w-0 flex-1 space-y-2">
                         <Label htmlFor="invite-member-email">Email address</Label>

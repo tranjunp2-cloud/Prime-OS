@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 import { getProducts } from '@/lib/product-store';
-import { getInventoryPositions, getTotalATS } from '@/lib/inventory-store';
+import { getInventoryPositions, getLegacyTotalATS as getTotalATS } from '@/lib/inventory-store';
 import { getWarehouses } from '@/lib/warehouse-store';
 import { getOrders } from '@/lib/order-store';
 import { getFulfillmentJobs, getExceptionsByJobId } from '@/lib/fulfillment-store';
@@ -431,7 +431,7 @@ export default function UIRegressionReview() {
               description="This section anchors the manual review contract to the automated snapshots."
               testId="fixture-guardrail-note"
             >
-              <div className="rounded-[1.25rem] border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground">
                 Every page or tower visual change should be checked against this route, then validated with `npm run test:smoke` and `npm run test:ui`.
               </div>
             </FixtureCard>

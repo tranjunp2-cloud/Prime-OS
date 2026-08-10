@@ -5,7 +5,7 @@ const towerRoutes = [
   { path: '/intelligence/decision-hub', heading: 'Decision Hub' },
   { path: '/intelligence/signals', heading: 'Signals' },
   { path: '/intelligence/launch-decisions', heading: 'Launch Decisions' },
-  { path: '/demand/campaign-ops', heading: 'Campaign Ops' },
+  { path: '/crm/campaign-ops', heading: 'Campaign Ops' },
   { path: '/customer/crm-compact', heading: 'CRM Tower' },
 ];
 

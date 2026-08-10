@@ -50,7 +50,7 @@ export function SkuBadge({
         secondary: 'rounded px-1.5 py-0.5 text-[9px] tracking-[0.16em]',
       }
     : {
-        shell: 'min-w-[132px] max-w-[168px] rounded-xl px-2.5 py-2',
+        shell: 'min-w-[132px] max-w-[168px] rounded-lg px-2.5 py-2',
         primary: 'text-[11px] tracking-[0.12em]',
         secondary: 'rounded-md px-1.5 py-0.5 text-[10px] tracking-[0.18em]',
       };

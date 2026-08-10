@@ -1,0 +1,9 @@
+Month,Phase,Milestone,What Happens,Success Criteria
+May 2026,Preparation,Story and scope locked,"Finalize PrimeOS narrative, CR/Masuda pitch, competitor angle, demo scope, and roadmap","The team can explain PrimeOS simply as commerce OS plus intelligence layer"
+Jun 2026,Phase 1: MVP,Foundation build,"Build Intelligence hub, Product Master, COS foundation, CRM/RFQ flow, Customer timeline, and Finance readiness concept","Core modules exist and can be shown in one product story"
+Jul 2026,Phase 1: MVP,Operating loop connected,"Connect market signal, product setup, crm/RFQ, customer context, order flow, and evidence pack","One end-to-end user journey works across the product"
+Aug 2026,Phase 1: MVP,Defensible MVP demo,"Polish MVP, prepare demo data, validate the flow, and prepare CR/Masuda demo script","MVP demo proves PrimeOS is more than CRM, OMS, agency, or single SaaS tool"
+Sep 2026,Phase 2: CR Internal Use,CR internal pilot starts,"Onboard CR internal users, test real workflows, collect feedback, and check role-based views","CR can use PrimeOS internally and identify what must be improved"
+Oct 2026,Phase 2: CR Internal Use,Feature testing and improvement,"Improve AI operator, CR workflow integration, reporting, CRM/RFQ, customer/order visibility, and usability","Product changes based on real internal usage, not assumptions"
+Nov 2026,Phase 2: CR Internal Use,Launch preparation,"Finalize packages, pricing direction, onboarding, support process, SLA assumptions, launch material, and pilot case study","PrimeOS is ready to be offered to selected market customers"
+Dec 2026,Market Launch,Market launch,"Launch to selected customers, onboard sellers, start commercial pilots, and track pipeline/usage evidence","PrimeOS begins external market validation with CR-backed pilot pipeline"

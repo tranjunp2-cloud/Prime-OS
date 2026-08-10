@@ -52,7 +52,7 @@ export function AdjustmentsTable({ adjustments, isLoading }: AdjustmentsTablePro
 
   if (isLoading) {
     return (
-      <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+      <div className="surface-solid overflow-hidden rounded-lg">
         <Table wrapperClassName="max-h-[calc(100vh-260px)]">
           <TableHeader>
             <TableRow>
@@ -83,7 +83,7 @@ export function AdjustmentsTable({ adjustments, isLoading }: AdjustmentsTablePro
 
   if (adjustments.length === 0) {
     return (
-      <div className="surface-solid rounded-[1.75rem] p-12 text-center">
+      <div className="surface-solid rounded-lg p-12 text-center">
         <ClipboardList className="size-10 mx-auto mb-3 text-muted-foreground/50" />
         <h3 className="text-sm font-medium text-muted-foreground">{t('inventory.noAdjustments')}</h3>
         <p className="text-xs text-muted-foreground mt-1">
@@ -94,7 +94,7 @@ export function AdjustmentsTable({ adjustments, isLoading }: AdjustmentsTablePro
   }
 
   return (
-    <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+    <div className="surface-solid overflow-hidden rounded-lg">
       <Table wrapperClassName="max-h-[calc(100vh-260px)]">
         <TableHeader>
           <TableRow>

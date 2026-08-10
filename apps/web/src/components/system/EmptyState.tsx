@@ -31,16 +31,16 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'surface-solid flex flex-col items-center justify-center rounded-3xl px-6 py-12 text-center text-card-foreground',
+        'flex flex-col items-center justify-center rounded-lg border bg-card px-6 py-12 text-center text-card-foreground shadow-sm',
         className,
       )}
     >
       {icon && (
-        <div className={cn('mb-4 flex size-12 items-center justify-center rounded-2xl [&>svg]:size-6', getSemanticSurfaceToneClassName(tone))}>
+        <div className={cn('mb-4 flex size-12 items-center justify-center rounded-md [&>svg]:size-6', getSemanticSurfaceToneClassName(tone))}>
           {icon}
         </div>
       )}
-      <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
+      <h3 className="font-display text-base font-semibold tracking-tight text-foreground">{title}</h3>
       {description && (
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
           {description}

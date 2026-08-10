@@ -4,17 +4,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getInventoryPositions } from '@/lib/inventory-store';
 import { getProducts } from '@/lib/product-store';
-import { computeATS, getATSHealth } from '@/lib/ats-calculations';
+import { computeATP, ATS_HEALTH_CONFIG } from '@/lib/ats-calculations';
 
 interface ATSHealthDonutProps {
   warehouseId?: string;
 }
 
-const HEALTH_CONFIG = {
-  healthy: { label: 'Healthy', color: '#22c55e', bgClass: 'bg-emerald-500/14 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
-  low: { label: 'Low Stock', color: '#f59e0b', bgClass: 'bg-amber-500/14 text-amber-800 dark:bg-amber-500/18 dark:text-amber-300' },
-  critical: { label: 'Out of Stock', color: '#ef4444', bgClass: 'bg-rose-500/14 text-rose-700 dark:bg-rose-500/18 dark:text-rose-300' },
-};
+const HEALTH_CONFIG = ATS_HEALTH_CONFIG;
 
 export function ATSHealthDonut({ warehouseId }: ATSHealthDonutProps) {
   const positions = getInventoryPositions();
@@ -27,22 +23,36 @@ export function ATSHealthDonut({ warehouseId }: ATSHealthDonutProps) {
     }
   }
 
-  // Count unique SKUs by health bucket
   const healthCounts = { healthy: 0, low: 0, critical: 0 };
 
   const skuAggregates = positions
     .filter(p => !warehouseId || p.warehouse_id === warehouseId)
-    .reduce<Record<string, { on_hand: number; reserved: number; inbound: number; unfulfillable: number }>>((acc, p) => {
-      if (!acc[p.sku_id]) acc[p.sku_id] = { on_hand: 0, reserved: 0, inbound: 0, unfulfillable: 0 };
+    .reduce<Record<string, {
+      on_hand: number; reserved_unpaid: number; reserved_paid: number;
+      allocated: number; inbound: number; unfulfillable: number;
+      safety_stock: number; campaign_lock: number;
+    }>>((acc, p) => {
+      if (!acc[p.sku_id]) acc[p.sku_id] = {
+        on_hand: 0, reserved_unpaid: 0, reserved_paid: 0,
+        allocated: 0, inbound: 0, unfulfillable: 0,
+        safety_stock: 0, campaign_lock: 0,
+      };
       acc[p.sku_id].on_hand += p.on_hand ?? 0;
-      acc[p.sku_id].reserved += p.reserved ?? 0;
+      acc[p.sku_id].reserved_unpaid += p.reserved_unpaid ?? 0;
+      acc[p.sku_id].reserved_paid += p.reserved_paid ?? 0;
+      acc[p.sku_id].allocated += p.allocated ?? 0;
       acc[p.sku_id].inbound += p.inbound ?? 0;
       acc[p.sku_id].unfulfillable += p.unfulfillable ?? 0;
+      acc[p.sku_id].safety_stock += p.safety_stock ?? 0;
+      acc[p.sku_id].campaign_lock += p.campaign_lock ?? 0;
       return acc;
     }, {});
 
   for (const [, agg] of Object.entries(skuAggregates)) {
-    const result = computeATS(agg.on_hand, agg.reserved, agg.inbound, agg.unfulfillable);
+    const result = computeATP(
+      agg.on_hand, agg.reserved_unpaid, agg.reserved_paid, agg.allocated,
+      agg.inbound, agg.unfulfillable, agg.safety_stock, agg.campaign_lock,
+    );
     healthCounts[result.health]++;
   }
 
@@ -57,7 +67,7 @@ export function ATSHealthDonut({ warehouseId }: ATSHealthDonutProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">ATS Health Distribution</CardTitle>
+        <CardTitle className="text-sm">ATP Health Distribution</CardTitle>
       </CardHeader>
       <CardContent>
         {total === 0 ? (
@@ -94,7 +104,6 @@ export function ATSHealthDonut({ warehouseId }: ATSHealthDonutProps) {
             </ResponsiveContainer>
             </div>
 
-            {/* Legend + summary */}
             <div className="flex flex-1 flex-col gap-3">
               {([
                 ['healthy', 'Healthy', healthCounts.healthy],

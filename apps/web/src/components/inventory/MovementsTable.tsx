@@ -145,7 +145,7 @@ export function MovementsTable({ movements, isLoading, onBatchClick }: Movements
 
   if (isLoading) {
     return (
-      <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+      <div className="surface-solid overflow-hidden rounded-lg">
         <Table wrapperClassName="max-h-[calc(100vh-260px)]">
           <TableHeader>
             <TableRow>
@@ -180,7 +180,7 @@ export function MovementsTable({ movements, isLoading, onBatchClick }: Movements
 
   if (movements.length === 0) {
     return (
-      <div className="surface-solid rounded-[1.75rem] p-12 text-center">
+      <div className="surface-solid rounded-lg p-12 text-center">
         <ArrowLeftRight className="size-10 mx-auto mb-3 text-muted-foreground/50" />
         <h3 className="text-sm font-medium text-muted-foreground">{t('inventory.noMovements')}</h3>
         <p className="text-xs text-muted-foreground mt-1">
@@ -191,7 +191,7 @@ export function MovementsTable({ movements, isLoading, onBatchClick }: Movements
   }
 
   return (
-    <div className="surface-solid overflow-hidden rounded-[1.75rem]">
+    <div className="surface-solid overflow-hidden rounded-lg">
       <Table wrapperClassName="max-h-[calc(100vh-260px)]">
         <TableHeader>
           <TableRow>

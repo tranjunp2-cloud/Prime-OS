@@ -17,7 +17,7 @@ const outputDir = path.resolve(process.cwd(), '../../research/screenshots/phase-
 
 const proofRoutes: ProofRoute[] = [
   { id: '01-intelligence-decision-hub', label: 'Intelligence decision hub', owner: 'Intelligence', route: '/intelligence/decision-hub' },
-  { id: '02-demand-leads-rfqs', label: 'Demand lead and RFQ context', owner: 'Demand', route: '/demand/leads-rfqs?lead=lead_1_1' },
+  { id: '02-demand-leads-rfqs', label: 'CRM lead and RFQ context', owner: 'CRM', route: '/crm/leads-rfqs?lead=lead_1_1' },
   { id: '03-customer-profile-overview', label: 'Customer profile overview', owner: 'Customer', route: '/customer/crm-compact?floor=overview' },
   { id: '04-customer-account-profile', label: 'Customer account profile', owner: 'Customer', route: '/customer/crm-compact?floor=account' },
   { id: '05-ecom-oms-detail', label: 'OMS order detail', owner: 'Ecom / COS', route: '/ecom/cos/oms', dynamic: 'first-oms-order' },

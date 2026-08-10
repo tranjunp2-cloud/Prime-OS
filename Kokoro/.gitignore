@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+*.py[cod]
+
+# Generated audio and local model/cache artifacts.
+output/
+outputs/
+*.wav
+*.flac
+*.ogg
+*.mp3
+*.m4a
+*.aac
+.cache/
+

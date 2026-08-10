@@ -41,8 +41,28 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        sidebar: {
+          DEFAULT: 'hsl(var(--sidebar-background))',
+          foreground: 'hsl(var(--sidebar-foreground))',
+          primary: 'hsl(var(--sidebar-primary))',
+          'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+          accent: 'hsl(var(--sidebar-accent))',
+          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+          border: 'hsl(var(--sidebar-border))',
+          ring: 'hsl(var(--sidebar-ring))',
+        },
       },
-      borderRadius: 'hsl(var(--radius))',
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+        xl: 'calc(var(--radius) + 4px)',
+      },
+      fontFamily: {
+        sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+        display: ['"General Sans"', '"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
@@ -57,16 +77,14 @@ export default {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
       },
-      // +2px typography scale — improves readability
-      // xs: 12→14, sm: 14→16, base: 16→18, lg: 18→20, xl: 20→22
       fontSize: {
-        xs:    ['14px', { lineHeight: '20px' }],
-        sm:    ['16px', { lineHeight: '24px' }],
-        base:  ['18px', { lineHeight: '28px' }],
-        lg:    ['20px', { lineHeight: '28px' }],
-        xl:    ['22px', { lineHeight: '32px' }],
-        '2xl': ['26px', { lineHeight: '36px' }],
-        '3xl': ['30px', { lineHeight: '38px' }],
+        xs: ['12px', { lineHeight: '16px' }],
+        sm: ['14px', { lineHeight: '20px' }],
+        base: ['16px', { lineHeight: '24px' }],
+        lg: ['18px', { lineHeight: '28px' }],
+        xl: ['20px', { lineHeight: '28px' }],
+        '2xl': ['24px', { lineHeight: '32px' }],
+        '3xl': ['30px', { lineHeight: '36px' }],
         '4xl': ['36px', { lineHeight: '40px' }],
       },
       opacity: {

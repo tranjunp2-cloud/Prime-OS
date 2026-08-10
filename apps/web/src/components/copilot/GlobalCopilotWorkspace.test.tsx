@@ -27,16 +27,6 @@ const mockEngine = {
 
 let desktopMode = true;
 
-function renderWorkspace() {
-  return render(
-    <MemoryRouter>
-      <GlobalCopilotWorkspace>
-        <div>main content</div>
-      </GlobalCopilotWorkspace>
-    </MemoryRouter>,
-  );
-}
-
 vi.mock('@/hooks/use-global-copilot-engine', () => ({
   useGlobalCopilotEngine: () => mockEngine,
 }));

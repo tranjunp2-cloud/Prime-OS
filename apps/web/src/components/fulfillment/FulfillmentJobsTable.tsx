@@ -22,7 +22,7 @@ export function FulfillmentJobsTable({ jobs, isLoading }: FulfillmentJobsTablePr
     return (
       <div className="flex flex-col gap-2">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-[72px] w-full rounded-[1.35rem]" />
+          <Skeleton key={i} className="h-[72px] w-full rounded-lg" />
         ))}
       </div>
     );
@@ -30,7 +30,7 @@ export function FulfillmentJobsTable({ jobs, isLoading }: FulfillmentJobsTablePr
 
   if (jobs.length === 0) {
     return (
-      <div className="surface-solid rounded-[1.75rem] py-12 text-center text-muted-foreground">
+      <div className="surface-solid rounded-lg py-12 text-center text-muted-foreground">
         <p>{t('fulfillment.jobsTable.emptyTitle')}</p>
         <p className="text-sm mt-1">{t('fulfillment.jobsTable.emptyDesc')}</p>
       </div>

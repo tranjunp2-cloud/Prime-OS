@@ -86,7 +86,7 @@ export interface MdecSeedData {
 
 const postStatuses: MdecScheduledPost['status'][] = ['Scheduled', 'Scheduled', 'Review', 'Blocked'];
 const channelSets = [['IG', 'FB', 'IN'], ['IN', 'FB', 'IG'], ['X', 'IG'], ['FB', 'WA']];
-const owners = ['Demand Ops', 'Creator Desk', 'Sales Ops', 'Service Recovery'];
+const owners = ['CRM Ops', 'Creator Desk', 'Sales Ops', 'Service Recovery'];
 
 function formatPostTitle(campaignName: string, index: number) {
   return [
@@ -127,7 +127,7 @@ export function buildMdecSeedData(snapshot: PrimeSnapshot): MdecSeedData {
   const approvals = scheduledPosts.slice(1, 4).map((post, index) => ({
     id: `mdec_approval_${index + 1}_${post.campaignId}`,
     title: post.title,
-    owner: owners[index + 1] || 'Demand Ops',
+    owner: owners[index + 1] || 'CRM Ops',
     risk: riskFromIndex(index),
     next: ['Approve before 16:00', 'Add legal note', 'Route to escalation'][index] || 'Review content',
     campaignId: post.campaignId,
@@ -143,7 +143,7 @@ export function buildMdecSeedData(snapshot: PrimeSnapshot): MdecSeedData {
       sentiment: 'Negative',
       title: alert.title,
       source: `${ticket?.linkedEntity || alert.linkedEntity} · “${ticket?.subject || alert.title}”`,
-      owner: ['Service Recovery', 'COS Ops', 'Finance Trust'][index] || 'Demand Ops',
+      owner: ['Service Recovery', 'COS Ops', 'Finance Trust'][index] || 'CRM Ops',
       campaignId: campaign?.id || 'missing-campaign',
       productId: campaign?.productId || 'missing-product',
       linkedEntityId: alert.linkedEntity,
@@ -172,7 +172,7 @@ export function buildMdecSeedData(snapshot: PrimeSnapshot): MdecSeedData {
     return {
       id: `mdec_cluster_${stream.id}`,
       title: [
-        `${campaign?.targetSegment || 'Demand'} reception`,
+        `${campaign?.targetSegment || 'CRM'} reception`,
         `${campaign?.name || 'Campaign'} transparency`,
         'Founder testimonials',
       ][index] || stream.source,

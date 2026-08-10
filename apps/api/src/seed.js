@@ -530,7 +530,7 @@ export const seedDatabase = {
         'creatorName': 'Linh Dao',
         'approvalStatus': 'approved',
         'confidence': 96,
-        'whyThisLaunch': 'Black Hardcover Notebook is a published product with active inventory and refill buyers returning through Demand campaigns.',
+        'whyThisLaunch': 'Black Hardcover Notebook is a published product with active inventory and refill buyers returning through CRM campaigns.',
         'blocker': 'Final bundle pricing lock still needs confirmation from Ecom before broader paid scale.',
         'owner': 'Growth lead · Mika Sato',
         'expectedResponse': 'Lift repeat conversion and win back refill demand inside 7 days with limited incentive support.',

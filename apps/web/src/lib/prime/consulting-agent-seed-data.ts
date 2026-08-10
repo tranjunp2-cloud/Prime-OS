@@ -22,7 +22,7 @@ export type ConsultingAgentSeedData = {
   launchPackages: DecisionPackage[];
   metrics: {
     packages: number;
-    readyForDemand: number;
+    readyForCrm: number;
     blocked: number;
     sourceOwners: number;
     averageConfidence: number;
@@ -54,7 +54,7 @@ export function buildConsultingAgentSeedData(snapshot: PrimeSnapshot): Consultin
       id: 'consulting-kpi-source-owners',
       title: 'Source owners',
       value: String(sourceOwners.length).padStart(2, '0'),
-      detail: 'Demand, Customer, COS, Finance boundaries protected.',
+      detail: 'CRM, Customer, COS, Finance boundaries protected.',
       tone: 'purple',
       laneId: 'monitor',
       sourcePackageIds: packageIds,
@@ -82,12 +82,12 @@ export function buildConsultingAgentSeedData(snapshot: PrimeSnapshot): Consultin
     },
     {
       id: 'consulting-kpi-ready-demand',
-      title: 'Ready for Demand',
-      value: String(workspace.stats.readyForDemand).padStart(2, '0'),
+      title: 'Ready for CRM',
+      value: String(workspace.stats.readyForCrm).padStart(2, '0'),
       detail: 'Evidence can be sent to owning tower.',
       tone: 'green',
       laneId: 'ready',
-      sourcePackageIds: workspace.packages.filter((item) => item.status === 'ready_for_demand').map((item) => item.id),
+      sourcePackageIds: workspace.packages.filter((item) => item.status === 'ready_for_crm').map((item) => item.id),
       sourceOwnerIds: sourceOwners,
     },
     {
@@ -109,7 +109,7 @@ export function buildConsultingAgentSeedData(snapshot: PrimeSnapshot): Consultin
     launchPackages: workspace.packages,
     metrics: {
       packages: workspace.packages.length,
-      readyForDemand: workspace.stats.readyForDemand,
+      readyForCrm: workspace.stats.readyForCrm,
       blocked: workspace.stats.blocked,
       sourceOwners: sourceOwners.length,
       averageConfidence,

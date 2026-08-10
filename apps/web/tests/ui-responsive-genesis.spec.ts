@@ -7,7 +7,7 @@ const priorityRoutes = [
   '/overview',
   '/intelligence/decision-hub',
   '/intelligence/launch-decisions',
-  '/demand/leads-rfqs?lead=lead_1_1',
+  '/crm/leads-rfqs?lead=lead_1_1',
   '/customer/crm-compact?floor=overview',
   '/customer/crm-compact?floor=account',
   '/finance/fin-support#documents',

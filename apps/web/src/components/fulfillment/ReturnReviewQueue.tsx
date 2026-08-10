@@ -36,7 +36,7 @@ export function ReturnReviewQueue({
   const { t } = useI18n();
 
   return (
-    <div className="surface-solid rounded-[1.8rem] border border-edge-divider/55 p-4 sm:p-5">
+    <div className="surface-solid rounded-lg border border-edge-divider/55 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -87,7 +87,7 @@ export function ReturnReviewQueue({
       </div>
 
       {items.length === 0 ? (
-        <div className="mt-5 rounded-[1.4rem] border border-dashed border-edge-divider/60 bg-background/20 px-4 py-10 text-center">
+        <div className="mt-5 rounded-lg border border-dashed border-edge-divider/60 bg-background/20 px-4 py-10 text-center">
           <ClipboardList className="mx-auto size-8 text-muted-foreground/70" />
           <p className="mt-3 text-sm font-medium text-foreground">{t('fulfillment.returnDetail.queueEmptyTitle')}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t('fulfillment.returnDetail.queueEmptyDesc')}</p>
@@ -103,7 +103,7 @@ export function ReturnReviewQueue({
                   type="button"
                   onClick={() => onSelect(item.id)}
                   className={cn(
-                    'w-full rounded-[1.4rem] border px-4 py-3 text-left transition-all duration-200',
+                    'w-full rounded-lg border px-4 py-3 text-left transition-all duration-200',
                     isSelected
                       ? 'border-primary/30 bg-primary/10 shadow-[0_0_0_1px_rgba(99,102,241,0.15)]'
                       : 'border-edge-divider/55 bg-background/25 hover:border-edge-highlight/20 hover:bg-surface-hover/40'

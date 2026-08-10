@@ -118,7 +118,7 @@ export type CustomerRecentEvent = {
   createdAt: string;
 };
 
-export type CustomerSourceOwner = 'Customer' | 'Customer Service' | 'Demand' | 'Ecom/COS' | 'Finance' | 'Intelligence';
+export type CustomerSourceOwner = 'Customer' | 'Customer Service' | 'CRM' | 'Ecom/COS' | 'Finance' | 'Intelligence';
 
 export type CustomerTimelineEventType =
   | 'customer_memory'
@@ -188,7 +188,7 @@ export type CustomerRFQQuoteLink = {
   status: 'new' | 'qualified' | 'rfq_sent' | 'draft' | 'quoted' | 'converted';
   quantity: number | null;
   value: number | null;
-  sourceOfTruthOwner: 'Demand';
+  sourceOfTruthOwner: 'CRM';
   readModelOwner: 'Customer';
   handoff: string;
   href: string;
@@ -236,7 +236,7 @@ export type IdentityMatch = {
 export type FutureModulePlaceholder = {
   id: string;
   label: string;
-  owner: 'Demand' | 'CRM' | 'Ecom/COS' | 'Intelligence' | 'Finance';
+  owner: 'CRM' | 'Ecom/COS' | 'Intelligence' | 'Finance';
   status: 'not_connected' | 'read_only_later';
   detail: string;
 };
@@ -276,7 +276,7 @@ export const customerTags: CustomerTag[] = [
 ];
 
 const futureModules: FutureModulePlaceholder[] = [
-  { id: 'lead-inquiry-rfq', label: 'Lead / Inquiry / RFQ', owner: 'Demand', status: 'not_connected', detail: 'Will attach qualified intent after Demand capture is ready.' },
+  { id: 'lead-inquiry-rfq', label: 'Lead / Inquiry / RFQ', owner: 'CRM', status: 'not_connected', detail: 'Will attach qualified intent after CRM capture is ready.' },
   { id: 'deal-pipeline', label: 'Deal Pipeline', owner: 'CRM', status: 'not_connected', detail: 'Reserved for later opportunity workflow.' },
   { id: 'quote', label: 'Quote', owner: 'CRM', status: 'not_connected', detail: 'Reserved for quote creation and revision history.' },
   { id: 'order-history', label: 'Order History', owner: 'Ecom/COS', status: 'read_only_later', detail: 'Will read OMS order history without owning order state.' },
@@ -462,7 +462,7 @@ function buildLifecycleStage({
       stage: lifecycle,
       ownerId,
       nextAction: 'Qualify the lead and assign the first account follow-up.',
-      reason: 'Demand intent exists but no COS order has been linked yet.',
+      reason: 'CRM intent exists but no COS order has been linked yet.',
       updatedAt: phase2Date(index, 2),
       sourceOfTruthOwner: 'Customer',
       readModelOwner: 'Customer',
@@ -486,7 +486,7 @@ function buildLifecycleStage({
     customerId: customer.id,
     stage: lifecycle,
     ownerId,
-    nextAction: 'Confirm the next account touch and keep Demand/COS context attached.',
+    nextAction: 'Confirm the next account touch and keep CRM/COS context attached.',
     reason: 'Customer has enough identity, owner, and commerce context for an operator decision.',
     updatedAt: phase2Date(index, 2),
     sourceOfTruthOwner: 'Customer',
@@ -540,12 +540,12 @@ function buildRfqQuoteLinks({
     status: rfq?.status ?? lead?.status ?? 'new',
     quantity: rfq?.quantity ?? null,
     value: rfq?.value ?? null,
-    sourceOfTruthOwner: 'Demand',
+    sourceOfTruthOwner: 'CRM',
     readModelOwner: 'Customer',
     handoff: rfq?.orderId
       ? 'RFQ converted; Customer reads the OMS order link without owning order state.'
-      : 'Demand owns lead/RFQ state; Customer keeps the continuity preview for operator context.',
-    href: '/demand/leads-rfqs',
+      : 'CRM owns lead/RFQ state; Customer keeps the continuity preview for operator context.',
+    href: '/crm/leads-rfqs',
   }];
 }
 
@@ -583,7 +583,7 @@ function buildFollowUps({
       allowedAction: 'Create a service recovery follow-up after the case owner confirms the blocker.',
       humanApprovalBoundary: 'Operator must approve customer-facing recovery copy.',
       nextAction: serviceCase.pendingAction,
-      businessImpact: 'Prevents a service issue from becoming a failed Demand or Finance proof point.',
+      businessImpact: 'Prevents a service issue from becoming a failed CRM or Finance proof point.',
       href: serviceCase.href,
     }];
   }
@@ -598,12 +598,12 @@ function buildFollowUps({
       dueAt,
       sourceOfTruthOwner: 'Customer',
       readModelOwner: 'Customer',
-      source: 'Demand',
+      source: 'CRM',
       sourceEntityId: rfqLink.rfqId ?? rfqLink.leadId ?? customer.id,
       allowedAction: 'Ask the buyer to confirm quantity, quote expectation, and order timing.',
       humanApprovalBoundary: 'Operator must approve quote language; Customer does not edit RFQ terms.',
       nextAction: lifecycleStage.nextAction,
-      businessImpact: 'Keeps Demand intent connected to the account before Commerce execution starts.',
+      businessImpact: 'Keeps CRM intent connected to the account before Commerce execution starts.',
       href: rfqLink.href,
     }];
   }
@@ -620,7 +620,7 @@ function buildFollowUps({
     source: 'Customer',
     sourceEntityId: customer.id,
     allowedAction: customerOrders.length ? 'Send the next-touch note with latest OMS context attached.' : 'Qualify the account before any COS handoff.',
-    humanApprovalBoundary: 'Operator approves timing and message before Demand or Intelligence receives feedback.',
+    humanApprovalBoundary: 'Operator approves timing and message before CRM or Intelligence receives feedback.',
     nextAction: lifecycleStage.nextAction,
     businessImpact: lifecycleStage.reason,
     href: '/customer/crm-compact?floor=account',
@@ -679,7 +679,7 @@ function buildTimelineEvents({
     events.push({
       id: `timeline-lead-${lead.id}`,
       customerId: customer.id,
-      sourceOfTruthOwner: 'Demand',
+      sourceOfTruthOwner: 'CRM',
       readModelOwner: 'Customer',
       sourceEntityType: 'lead',
       sourceEntityId: lead.id,
@@ -687,9 +687,9 @@ function buildTimelineEvents({
       eventType: 'lead',
       summary: `${lead.source} lead is ${lead.status} with score ${lead.score}.`,
       ownerId,
-      nextAction: 'Confirm account context before Demand follow-up.',
-      businessImpact: 'Demand intent now has a customer owner and account memory.',
-      href: '/demand/leads-rfqs',
+      nextAction: 'Confirm account context before CRM follow-up.',
+      businessImpact: 'CRM intent now has a customer owner and account memory.',
+      href: '/crm/leads-rfqs',
     });
   }
 
@@ -697,7 +697,7 @@ function buildTimelineEvents({
     events.push({
       id: `timeline-rfq-${rfq.id}`,
       customerId: customer.id,
-      sourceOfTruthOwner: 'Demand',
+      sourceOfTruthOwner: 'CRM',
       readModelOwner: 'Customer',
       sourceEntityType: 'rfq',
       sourceEntityId: rfq.id,
@@ -705,9 +705,9 @@ function buildTimelineEvents({
       eventType: 'rfq',
       summary: `RFQ ${rfq.status} for ${rfq.quantity} units and ${rfq.value.toLocaleString('ja-JP')} JPY.`,
       ownerId,
-      nextAction: rfq.orderId ? 'Open converted OMS order context.' : 'Confirm quote expectation with Demand owner.',
+      nextAction: rfq.orderId ? 'Open converted OMS order context.' : 'Confirm quote expectation with CRM owner.',
       businessImpact: 'Keeps quote continuity visible without moving quote ownership into Customer.',
-      href: '/demand/leads-rfqs',
+      href: '/crm/leads-rfqs',
     });
   }
 
@@ -898,7 +898,7 @@ function buildCustomerAccountProfile({
     segmentLabel,
     profileSummary: customerType === 'marketplace'
       ? `${customer.name} is an individual COS customer from ${primaryEcomChannel}. Profile is built from OMS identity, shipping, order, item, event, and service signals.`
-      : `${customer.company} is tracked as an account with COS order evidence, contact ownership, and future Demand/Finance handoff room.`,
+      : `${customer.company} is tracked as an account with COS order evidence, contact ownership, and future CRM/Finance handoff room.`,
     buyingIntent: customerType === 'marketplace'
       ? 'Marketplace purchase profile, retention, replenishment, and support readiness.'
       : customer.segment,

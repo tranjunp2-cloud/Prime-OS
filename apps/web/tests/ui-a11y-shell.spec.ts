@@ -9,7 +9,7 @@ const a11yRoutes = [
   '/overview',
   '/intelligence/decision-hub',
   '/intelligence/launch-decisions',
-  '/demand/leads-rfqs?lead=lead_1_1',
+  '/crm/leads-rfqs?lead=lead_1_1',
   '/customer/crm-compact?floor=overview',
   '/customer/crm-compact?floor=account',
   '/finance/fin-support#documents',
@@ -90,7 +90,7 @@ test('command palette traps keyboard context and closes with Escape', async ({ p
   await page.getByRole('button', { name: 'Open command palette' }).click();
   const dialog = page.getByRole('dialog', { name: 'Command palette' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByPlaceholder('Jump to a workspace, customer, demand module, or COS...')).toBeFocused();
+  await expect(dialog.getByPlaceholder('Jump to a workspace, customer, CRM module, or COS...')).toBeFocused();
 
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();

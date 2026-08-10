@@ -59,7 +59,7 @@ export function PageDataState<T>({
   if (error && !data) {
     return (
       <div className={cn(
-        'surface-solid flex min-h-[200px] flex-col items-center justify-center rounded-3xl px-6 py-12 text-center',
+        'surface-solid flex min-h-[200px] flex-col items-center justify-center rounded-lg px-6 py-12 text-center',
         className,
       )}>
         <AlertCircle className="mb-4 size-10 text-destructive" />
@@ -85,10 +85,10 @@ export function PageDataState<T>({
           mode === 'page' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2',
         )}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-[1.5rem]" />
+            <Skeleton key={i} className="h-28 rounded-lg" />
           ))}
         </div>
-        <Skeleton className="h-64 rounded-[1.5rem]" />
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   }

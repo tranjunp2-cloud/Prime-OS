@@ -20,7 +20,7 @@ describe('Consulting Agent seed data', () => {
     const averageConfidence = Math.round(seed.workspace.packages.reduce((sum, item) => sum + item.confidence, 0) / seed.workspace.packages.length);
 
     expect(seed.metrics.packages).toBe(seed.workspace.packages.length);
-    expect(seed.metrics.readyForDemand).toBe(seed.workspace.stats.readyForDemand);
+    expect(seed.metrics.readyForCrm).toBe(seed.workspace.stats.readyForCrm);
     expect(seed.metrics.blocked).toBe(seed.workspace.stats.blocked);
     expect(seed.metrics.sourceOwners).toBe(sourceOwners.size);
     expect(seed.metrics.averageConfidence).toBe(averageConfidence);

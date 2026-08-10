@@ -137,13 +137,13 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
   };
 
   return (
-    <section className={cn('rounded-3xl border bg-card/80 p-4 shadow-sm', className)} aria-label="Intelligence Area board" data-testid="intelligence-drag-board">
+    <section className={cn('rounded-lg border bg-card/80 p-4 shadow-sm', className)} aria-label="Intelligence Area board" data-testid="intelligence-drag-board">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Intelligence projection</div>
           <div className="mt-1 flex items-center gap-2">
             <h2 className="text-2xl font-semibold tracking-tight">Signal → decision board</h2>
-            <InfoHint label="Signal decision board info">Drag cards across Intelligence lanes to update triage state only. Source truth remains owned by Demand, Customer, Ecom / COS, and Finance.</InfoHint>
+            <InfoHint label="Signal decision board info">Drag cards across Intelligence lanes to update triage state only. Source truth remains owned by CRM, Customer, Ecom / COS, and Finance.</InfoHint>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -169,7 +169,7 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
             return (
               <div
                 key={lane.id}
-                className={cn('min-h-[360px] rounded-2xl border p-3 transition-colors', laneToneClasses[lane.id], activeLaneId === lane.id ? 'ring-2 ring-primary/70' : '', draggedLaneId === lane.id ? 'opacity-70 ring-2 ring-primary' : '')}
+                className={cn('min-h-[360px] rounded-lg border p-3 transition-colors', laneToneClasses[lane.id], activeLaneId === lane.id ? 'ring-2 ring-primary/70' : '', draggedLaneId === lane.id ? 'opacity-70 ring-2 ring-primary' : '')}
                 data-testid={`intelligence-board-lane-${lane.id}`}
                 onDragOver={(event) => {
                   event.preventDefault();
@@ -180,7 +180,7 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
                 role="region"
                 aria-label={`${lane.label}, ${cardCountLabel(laneCards.length)}, ${exceptionCount} exceptions`}
               >
-                <div className="sticky top-0 z-10 rounded-xl border bg-background/90 p-3 backdrop-blur">
+                <div className="sticky top-0 z-10 rounded-lg border bg-background/90 p-3 backdrop-blur">
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-1.5">
@@ -207,7 +207,7 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
 
                 <div className="mt-3 space-y-3" role={laneCards.length > 0 ? 'list' : undefined} aria-label={laneCards.length > 0 ? `${lane.label} cards` : undefined}>
                   {laneCards.length === 0 ? (
-                    <div className="rounded-xl border border-dashed bg-background/60 p-4 text-sm text-muted-foreground" role="presentation">Drop Intelligence work here.</div>
+                    <div className="rounded-lg border border-dashed bg-background/60 p-4 text-sm text-muted-foreground" role="presentation">Drop Intelligence work here.</div>
                   ) : null}
                   {laneCards.map((card) => {
                     const currentIndex = board.lanes.findIndex((item) => item.id === card.laneId);
@@ -244,7 +244,7 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
                             <Badge variant="secondary" className="capitalize">{formatStatus(card.displayStatus)}</Badge>
                           </div>
 
-                          <div className="rounded-xl border bg-muted/20 p-3">
+                          <div className="rounded-lg border bg-muted/20 p-3">
                             <div className="flex items-center gap-2 font-medium text-foreground">
                               <Bot className="size-3.5" />
                               {card.floor}
@@ -304,7 +304,7 @@ export function IntelligenceDragBoard({ board, onMoveCard, onSelectCard, classNa
 
 function BoardSummaryMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-2xl border bg-muted/20 p-4">
+    <div className="rounded-lg border bg-muted/20 p-4">
       <div className="flex items-center gap-1.5">
         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
         <InfoHint label={`${label} info`}>{detail}</InfoHint>
@@ -328,7 +328,7 @@ function IntelligenceBoardDetail({ card, boardRevision, auditEvents }: { card: I
         <Badge variant="outline">Confidence {card.confidence}%</Badge>
       </div>
 
-      <div className="rounded-2xl border bg-muted/20 p-4">
+      <div className="rounded-lg border bg-muted/20 p-4">
         <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Next operator action</div>
         <p className="mt-2 text-sm font-medium">{card.nextAction}</p>
         <p className="mt-2 text-xs text-muted-foreground">Board lane is Intelligence triage only. Source truth remains with {card.sourceOfTruthOwner}.</p>
@@ -345,7 +345,7 @@ function IntelligenceBoardDetail({ card, boardRevision, auditEvents }: { card: I
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">Business impact</h3>
-        <div className="rounded-2xl border p-4">
+        <div className="rounded-lg border p-4">
           <div className="text-lg font-semibold">{card.businessImpact.value}</div>
           <div className="mt-1 text-sm text-muted-foreground">{card.businessImpact.label}</div>
           <p className="mt-2 text-xs text-muted-foreground">{card.businessImpact.rationale}</p>
@@ -356,10 +356,10 @@ function IntelligenceBoardDetail({ card, boardRevision, auditEvents }: { card: I
         <h3 className="text-sm font-semibold">Evidence and guardrails</h3>
         <div className="space-y-2">
           {card.evidenceIds.map((evidenceId) => (
-            <div key={evidenceId} className="rounded-xl border bg-muted/20 px-3 py-2 text-sm">Evidence: {evidenceId}</div>
+            <div key={evidenceId} className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">Evidence: {evidenceId}</div>
           ))}
           {card.guardrails.map((guardrail) => (
-            <div key={`${guardrail.owner}-${guardrail.message}`} className="rounded-xl border bg-background px-3 py-2 text-sm">
+            <div key={`${guardrail.owner}-${guardrail.message}`} className="rounded-lg border bg-background px-3 py-2 text-sm">
               <div className="font-medium">{guardrail.owner}</div>
               <p className="text-muted-foreground">{guardrail.message}</p>
             </div>
@@ -371,7 +371,7 @@ function IntelligenceBoardDetail({ card, boardRevision, auditEvents }: { card: I
         <h3 className="text-sm font-semibold">Linked source entities</h3>
         <div className="space-y-2">
           {card.linkedEntities.map((entity) => (
-            <div key={`${entity.owner}-${entity.type}-${entity.id}`} className="rounded-xl border px-3 py-2 text-xs">
+            <div key={`${entity.owner}-${entity.type}-${entity.id}`} className="rounded-lg border px-3 py-2 text-xs">
               <div className="font-medium text-foreground">{entity.owner}</div>
               <div className="mt-1 text-muted-foreground">{entity.type}: {entity.id}</div>
             </div>
@@ -384,14 +384,14 @@ function IntelligenceBoardDetail({ card, boardRevision, auditEvents }: { card: I
         {auditEvents.length > 0 ? (
           <div className="space-y-2">
             {auditEvents.map((event) => (
-              <div key={event.id} className="rounded-xl border bg-muted/20 px-3 py-2 text-xs">
+              <div key={event.id} className="rounded-lg border bg-muted/20 px-3 py-2 text-xs">
                 <div className="font-medium text-foreground">{event.actorRole}</div>
                 <div className="mt-1 text-muted-foreground">Moved {formatStatus(event.fromLaneId)} → {formatStatus(event.toLaneId)} · {event.auditId}</div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed px-3 py-2 text-xs text-muted-foreground">No local move events yet. First drag/drop will create a preview audit record.</div>
+          <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">No local move events yet. First drag/drop will create a preview audit record.</div>
         )}
       </section>
     </div>
@@ -400,7 +400,7 @@ function IntelligenceBoardDetail({ card, boardRevision, auditEvents }: { card: I
 
 function DetailMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-background p-3">
+    <div className="rounded-lg border bg-background p-3">
       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-semibold">{value}</div>
     </div>

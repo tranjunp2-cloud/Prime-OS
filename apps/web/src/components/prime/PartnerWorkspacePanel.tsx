@@ -6,7 +6,7 @@ import { PRIME_ROLE_LABELS, type PartnerWorkspaceSummary } from '@/lib/prime/par
 
 export function PartnerWorkspacePanel({ summary }: { summary: PartnerWorkspaceSummary }) {
   return (
-    <section data-testid={`partner-workspace-${summary.role}`} className="rounded-xl border bg-card shadow-sm">
+    <section data-testid={`partner-workspace-${summary.role}`} className="rounded-lg border bg-card shadow-sm">
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

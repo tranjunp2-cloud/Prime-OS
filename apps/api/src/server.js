@@ -20,6 +20,49 @@ import {
   resetDatabase,
   updateResourceItem
 } from './store.js';
+import {
+  approveGrowthAiAction,
+  connectGrowthConnector,
+  createConnectorSampleWebhook,
+  createGrowthLead,
+  deadLetterConnectorDomainEvent,
+  disconnectGrowthConnector,
+  findRawConnector,
+  completeConnectorOAuthSetup,
+  getConnectorAccessToken,
+  getConnectorDomainEventSummary,
+  getConnectorDomainEvents,
+  getConnectorDomainRecordSummary,
+  getConnectorDomainRecords,
+  getConnectorWebhookEvents,
+  getConnectorOAuthSetupSession,
+  getGrowthOsSnapshot,
+  ingestConnectorWebhook,
+  logGrowthLeadFollowUp,
+  probeGrowthConnector,
+  refreshConnectorOAuthToken,
+  requeueConnectorDomainEvent,
+  retryConnectorDomainEvent,
+  revokeConnectorOAuthToken,
+  startConnectorOAuthSetup,
+  testGrowthConnector,
+  updateGrowthLeadStage,
+  verifyConnectorWebhook
+} from './growth-os.js';
+import {
+  getTelegramMessages,
+  sendTelegramMessage,
+  startTelegramPolling,
+  stopTelegramPolling,
+  addOutboundMessage,
+} from './telegram-gateway.js';
+import {
+  getConversations,
+  getConversation,
+  sendConversationMessage,
+} from './crm-chat.js';
+import { start as startWorkerQueue, stop as stopWorkerQueue, getStats as getWorkerQueueStats, getDeadLetters, requeueDeadLetter, drainDeadLetters } from './worker-queue.js';
+import { startCredentialHealthMonitor, stopCredentialHealthMonitor, getAllConnectorHealth, getCredentialHealthStats } from './credential-health-monitor.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
@@ -37,7 +80,13 @@ const localDevOrigins = [
   'http://127.0.0.1:5174',
   'http://localhost:5174',
   'http://127.0.0.1:5177',
-  'http://localhost:5177'
+  'http://localhost:5177',
+  'http://127.0.0.1:5178',
+  'http://localhost:5178',
+  'http://127.0.0.1:5188',
+  'http://localhost:5188',
+  'http://127.0.0.1:3007',
+  'http://localhost:3007'
 ];
 const allowedOrigins = new Set(
   demoCredentialsEnabled
@@ -50,7 +99,7 @@ const loginAttempts = new Map();
 const accessModel = {
   admin: {
     roleLabel: 'Admin control room',
-    description: 'Full CRUD across PrimeOS intelligence, ecom/COS, demand, finance, customer, and identity surfaces.',
+    description: 'Full CRUD across PrimeOS intelligence, ecom/COS, crm, finance, customer, and identity surfaces.',
     visibleResources: resourceKeys,
     writableResources: resourceKeys,
     canReset: true
@@ -81,10 +130,33 @@ app.use(cors({
     callback(new Error('Origin is not allowed by PrimeOS CORS policy.'));
   },
   credentials: false,
-  allowedHeaders: ['Authorization', 'Content-Type'],
+  allowedHeaders: [
+    'Authorization',
+    'Content-Type',
+    'Stripe-Signature',
+    'X-Hub-Signature-256',
+    'X-Shopify-Hmac-Sha256',
+    'X-PrimeOS-Signature',
+    'X-Shopee-Signature',
+    'X-Lazada-Signature',
+    'X-TTS-Signature',
+    'X-Zalo-Signature',
+    'X-TikTok-Signature',
+    'X-Line-Signature',
+    'X-Slack-Signature',
+    'X-Slack-Request-Timestamp',
+    'X-Telegram-Bot-Api-Secret-Token',
+    'X-MoMo-Signature',
+    'X-WC-Webhook-Signature'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
-app.use(express.json({ limit: process.env.PRIME_JSON_LIMIT || '1mb' }));
+app.use(express.json({
+  limit: process.env.PRIME_JSON_LIMIT || '1mb',
+  verify(request, _response, buffer) {
+    request.rawBody = buffer.toString('utf8');
+  }
+}));
 
 app.use((request, response, next) => {
   const requestId = request.header('x-request-id') || `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -342,8 +414,40 @@ app.get('/health', async (_request, response) => {
   response.json({
     ok: true,
     service: 'prime-os-backend',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    workerQueue: getWorkerQueueStats(),
   });
+});
+
+app.get('/api/public/growth-os', async (_request, response) => {
+  response.json(getGrowthOsSnapshot());
+});
+
+app.get('/webhooks/connectors/:connectorId', async (request, response, next) => {
+  try {
+    const result = verifyConnectorWebhook(request.params.connectorId, request.query ?? {});
+    response.type('text/plain').send(result.challenge);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/webhooks/connectors/:connectorId', async (request, response, next) => {
+  try {
+    const event = ingestConnectorWebhook(request.params.connectorId, request.body ?? {}, request.headers ?? {}, request.rawBody || '');
+    response.status(202).json({ ok: true, event });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/oauth/connectors/:connectorId/callback', async (request, response, next) => {
+  try {
+    const result = await completeConnectorOAuthSetup(request.params.connectorId, request.query ?? {});
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use(rejectRemoteDemoTraffic);
@@ -576,6 +680,345 @@ app.get('/api/v1/audit-events', async (request, response) => {
   response.json({ data: accountAuditEvents.slice(0, 25), meta: { request_id: request.primeRequestId } });
 });
 
+app.get('/api/growth-os', async (_request, response) => {
+  response.json(getGrowthOsSnapshot());
+});
+
+app.post('/api/growth-os/leads', async (request, response, next) => {
+  try {
+    const lead = createGrowthLead(request.body ?? {});
+    response.status(201).json(lead);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/leads/:leadId/stage', async (request, response, next) => {
+  try {
+    response.json(updateGrowthLeadStage(request.params.leadId, request.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/leads/:leadId/follow-up', async (request, response, next) => {
+  try {
+    response.json(logGrowthLeadFollowUp(request.params.leadId, request.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/test', async (request, response, next) => {
+  try {
+    response.json(await testGrowthConnector(request.params.connectorId, request.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/probe', async (request, response, next) => {
+  try {
+    response.json(await probeGrowthConnector(request.params.connectorId, request.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/oauth/start', async (request, response, next) => {
+  try {
+    response.json(startConnectorOAuthSetup(request.params.connectorId, request.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/growth-os/connectors/:connectorId/oauth/sessions/:state', async (request, response, next) => {
+  try {
+    response.json(getConnectorOAuthSetupSession(request.params.connectorId, request.params.state));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/oauth/sessions/:state/refresh', async (request, response, next) => {
+  try {
+    response.json(await refreshConnectorOAuthToken(request.params.connectorId, request.params.state));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/oauth/sessions/:state/revoke', async (request, response, next) => {
+  try {
+    response.json(await revokeConnectorOAuthToken(request.params.connectorId, request.params.state));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/connect', async (request, response, next) => {
+  try {
+    const connector = await connectGrowthConnector(request.params.connectorId, request.body ?? {});
+    if (connector.provider === 'telegram' && connector.status === 'connected') {
+      try {
+        const rawConnector = findRawConnector(request.params.connectorId);
+        if (rawConnector) {
+          await startTelegramPolling(rawConnector);
+        }
+      } catch (err) {
+        console.error(`[telegram-gateway] Failed to start polling: ${err.message}`);
+      }
+    }
+    response.json(connector);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/disconnect', async (request, response, next) => {
+  try {
+    const connectorId = request.params.connectorId;
+    const connector = disconnectGrowthConnector(connectorId);
+    stopTelegramPolling(connectorId);
+    response.json(connector);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/growth-os/connectors/:connectorId/messages', async (request, response) => {
+  response.json(getTelegramMessages(request.params.connectorId));
+});
+
+app.get('/api/growth-os/connectors/:connectorId/events', async (request, response, next) => {
+  try {
+    response.json({ events: getConnectorWebhookEvents(request.params.connectorId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/sample-webhook', async (request, response, next) => {
+  try {
+    response.status(201).json(createConnectorSampleWebhook(request.params.connectorId, request.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/growth-os/connectors/:connectorId/domain-events', async (request, response, next) => {
+  try {
+    const filters = {
+      domain: request.query?.domain,
+      status: request.query?.status,
+    };
+    response.json({
+      events: getConnectorDomainEvents(request.params.connectorId, filters),
+      summary: getConnectorDomainEventSummary(request.params.connectorId),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/growth-os/connectors/:connectorId/domain-records', async (request, response, next) => {
+  try {
+    const domain = request.query?.domain || 'all';
+    response.json({
+      records: getConnectorDomainRecords(request.params.connectorId, domain),
+      summary: getConnectorDomainRecordSummary(request.params.connectorId),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/domain-events/:eventId/retry', async (request, response, next) => {
+  try {
+    response.json({ event: retryConnectorDomainEvent(request.params.connectorId, request.params.eventId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/domain-events/:eventId/dead-letter', async (request, response, next) => {
+  try {
+    response.json({ event: deadLetterConnectorDomainEvent(request.params.connectorId, request.params.eventId, request.body ?? {}) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/domain-events/:eventId/requeue', async (request, response, next) => {
+  try {
+    response.json({ event: requeueConnectorDomainEvent(request.params.connectorId, request.params.eventId, request.body ?? {}) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/growth-os/connectors/:connectorId/send', async (request, response, next) => {
+  try {
+    const connector = findRawConnector(request.params.connectorId);
+    if (!connector) {
+      response.status(404).json({ message: 'Connector not found' });
+      return;
+    }
+    if (connector.provider !== 'telegram') {
+      response.status(400).json({ message: 'Send is only supported for Telegram connectors' });
+      return;
+    }
+    const { chatId, text } = request.body ?? {};
+    if (!chatId || !text) {
+      response.status(400).json({ message: 'chatId and text are required' });
+      return;
+    }
+    const token = getConnectorAccessToken(connector);
+    if (!token) {
+      response.status(400).json({ message: 'No valid access token found' });
+      return;
+    }
+    const result = await sendTelegramMessage(token, chatId, text);
+    addOutboundMessage(connector.id, { chatId, text });
+    response.json({ ok: true, messageId: result.message_id, chatId, text });
+  } catch (error) {
+    if (error.message) {
+      response.status(400).json({ message: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+app.get('/api/crm/conversations', async (_request, response) => {
+  response.json(getConversations());
+});
+
+app.get('/api/crm/conversations/:conversationId', async (request, response) => {
+  const connectorId = request.query.connectorId;
+  const conv = getConversation(request.params.conversationId, connectorId);
+  if (!conv) {
+    response.status(404).json({ message: 'Conversation not found' });
+    return;
+  }
+  response.json(conv);
+});
+
+app.post('/api/crm/conversations/:conversationId/send', async (request, response, next) => {
+  try {
+    const { connectorId, text } = request.body ?? {};
+    if (!connectorId) {
+      response.status(400).json({ message: 'connectorId is required' });
+      return;
+    }
+    const result = await sendConversationMessage(request.params.conversationId, connectorId, text);
+    response.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      response.status(error.statusCode).json({ message: error.message });
+      return;
+    }
+    if (error.message) {
+      response.status(400).json({ message: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+app.get('/api/crm/queue', async (_request, response) => {
+  const { getCrmQueue, getCrmQueueStats } = await import('./crm-chat.js');
+  response.json({ items: getCrmQueue(), stats: getCrmQueueStats() });
+});
+
+app.post('/api/crm/queue', async (request, response) => {
+  const { createCrmQueueItem } = await import('./crm-chat.js');
+  const { platform, customerName, customerId, messageText, conversationId } = request.body ?? {};
+  if (!platform || !customerName || !messageText) {
+    response.status(400).json({ message: 'platform, customerName, and messageText are required' });
+    return;
+  }
+  const item = createCrmQueueItem({ platform, customerName, customerId, messageText, conversationId });
+  response.status(201).json(item);
+});
+
+app.post('/api/crm/queue/:crmId/assign', async (request, response) => {
+  const { assignCrmItem } = await import('./crm-chat.js');
+  const { operatorId } = request.body ?? {};
+  if (!operatorId) {
+    response.status(400).json({ message: 'operatorId is required' });
+    return;
+  }
+  const item = assignCrmItem(request.params.crmId, operatorId);
+  if (!item) {
+    response.status(404).json({ message: 'CRM item not found' });
+    return;
+  }
+  response.json(item);
+});
+
+app.get('/api/crm/bookings', async (_request, response) => {
+  const { getBookings } = await import('./crm-chat.js');
+  response.json(getBookings());
+});
+
+app.post('/api/crm/bookings', async (request, response) => {
+  const { createBooking } = await import('./crm-chat.js');
+  const { customerId, customerName, packageId, staffId, startTime } = request.body ?? {};
+  if (!customerName || !packageId || !staffId || !startTime) {
+    response.status(400).json({ message: 'customerName, packageId, staffId, and startTime are required' });
+    return;
+  }
+  const booking = createBooking({ customerId, customerName, packageId, staffId, startTime });
+  response.status(201).json(booking);
+});
+
+app.post('/api/growth-os/ai-actions/:actionId/approve', async (request, response) => {
+  const action = approveGrowthAiAction(request.params.actionId);
+  if (!action) {
+    response.status(404).json({ message: `AI action not found: ${request.params.actionId}` });
+    return;
+  }
+
+  response.json(action);
+});
+
+app.get('/api/growth-os/connectors/health', async (_request, response) => {
+  response.json({
+    connectors: getAllConnectorHealth(),
+    stats: getCredentialHealthStats(),
+  });
+});
+
+app.get('/api/admin/worker-queue', async (request, response) => {
+  const session = buildSession(request.primeAccount);
+  if (!session.canReset) {
+    response.status(403).json({ message: 'Admin access required.' });
+    return;
+  }
+  response.json({
+    stats: getWorkerQueueStats(),
+    deadLetters: getDeadLetters(),
+  });
+});
+
+app.post('/api/admin/worker-queue/dead-letters/requeue', async (request, response) => {
+  const session = buildSession(request.primeAccount);
+  if (!session.canReset) {
+    response.status(403).json({ message: 'Admin access required.' });
+    return;
+  }
+  const { jobId } = request.body || {};
+  if (jobId) {
+    const job = requeueDeadLetter(jobId);
+    response.json({ ok: !!job, job });
+  } else {
+    const count = drainDeadLetters();
+    response.json({ ok: true, requeued: count });
+  }
+});
+
 app.get('/api/:resource', async (request, response, next) => {
   try {
     const session = checkResourcePermission(request, response, 'read');
@@ -675,6 +1118,26 @@ app.use((error, _request, response, _next) => {
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, host, () => {
     console.log(`Prime OS backend listening on http://${host}:${port}`);
+
+    startWorkerQueue();
+    startCredentialHealthMonitor();
+
+    // Auto-start Telegram polling for any persisted connected connectors
+    try {
+      const snapshot = getGrowthOsSnapshot();
+      for (const connector of snapshot.connectors) {
+        if (connector.provider === 'telegram' && connector.status === 'connected') {
+          const raw = findRawConnector(connector.id);
+          if (raw) {
+            startTelegramPolling(raw).catch((err) => {
+              console.error(`[telegram-gateway] Auto-start failed for ${connector.id}: ${err.message}`);
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[telegram-gateway] Auto-start scan failed: ${err.message}`);
+    }
   });
 }
 

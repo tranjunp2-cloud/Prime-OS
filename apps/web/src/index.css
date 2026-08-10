@@ -16,10 +16,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 4%;
 
-    --primary: 243 75% 59%;
+    --primary: 243 58% 55%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 245 58% 51%;
-    --primary-soft: 239 84% 96%;
+    --primary-hover: 243 48% 48%;
+    --primary-soft: 243 76% 96%;
     --brand-secondary: 112 86% 32%;
 
     --secondary: 0 0% 96%;
@@ -49,7 +49,7 @@
     --ring: 243 75% 59%;
     --ring-accent: 243 75% 59%;
 
-    --radius: 0.375rem;
+    --radius: 0.5rem;
     --radius-sm: 0.25rem;
     --radius-md: 0.375rem;
     --radius-lg: 0.5rem;
@@ -68,8 +68,8 @@
     --focus-ring-size: 3px;
     --focus-ring-offset: 2px;
     --focus-ring-color: hsl(var(--ring) / 0.28);
-    --shadow-surface: 0 1px 2px hsl(var(--overlay-scrim) / 0.05);
-    --shadow-panel: 0 16px 44px hsl(var(--overlay-scrim) / 0.1);
+    --shadow-surface: 0 1px 2px hsl(var(--overlay-scrim) / 0.06);
+    --shadow-panel: 0 12px 34px hsl(var(--overlay-scrim) / 0.1);
     --shadow-command: 0 18px 48px hsl(var(--overlay-scrim) / 0.12);
 
     --surface-stage: 0 0% 98%;
@@ -93,14 +93,14 @@
     --border-highlight: 0 0% 100%;
     --border-active: 243 75% 59%;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 20%;
-    --sidebar-primary: 243 75% 59%;
+    --sidebar-background: 240 10% 6%;
+    --sidebar-foreground: 240 12% 94%;
+    --sidebar-primary: 243 58% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 12% 96%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 240 12% 92%;
-    --sidebar-ring: 243 75% 59%;
+    --sidebar-accent: 240 8% 13%;
+    --sidebar-accent-foreground: 240 12% 96%;
+    --sidebar-border: 240 8% 17%;
+    --sidebar-ring: 243 58% 60%;
 
     --chart-1: 243 75% 59%;
     --chart-2: 160 84% 39%;
@@ -136,7 +136,7 @@
     --status-suppressed: 0 0% 42%;
 
     --area-intelligence: 243 75% 59%;
-    --area-demand: 38 92% 50%;
+    --area-crm: 38 92% 50%;
     --area-customer: 160 84% 39%;
     --area-ecom: 209 85% 52%;
     --area-finance: 158 64% 39%;
@@ -152,10 +152,10 @@
     --popover: 240 20% 15%;
     --popover-foreground: 240 12% 95%;
 
-    --primary: 236 57% 60%;
+    --primary: 243 58% 64%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 233 48% 53%;
-    --primary-soft: 236 57% 18%;
+    --primary-hover: 243 45% 56%;
+    --primary-soft: 243 42% 18%;
 
     --secondary: 240 16% 13%;
     --secondary-foreground: 240 12% 95%;
@@ -210,14 +210,14 @@
     --border-highlight: 0 0% 100%;
     --border-active: 236 57% 60%;
 
-    --sidebar-background: 240 16% 13%;
-    --sidebar-foreground: 219 7% 64%;
-    --sidebar-primary: 236 57% 60%;
+    --sidebar-background: 240 10% 6%;
+    --sidebar-foreground: 240 12% 94%;
+    --sidebar-primary: 243 58% 64%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 20% 15%;
+    --sidebar-accent: 240 8% 13%;
     --sidebar-accent-foreground: 240 12% 95%;
-    --sidebar-border: 240 14% 20%;
-    --sidebar-ring: 236 57% 60%;
+    --sidebar-border: 240 8% 17%;
+    --sidebar-ring: 243 58% 64%;
 
     --chart-1: 236 57% 60%;
     --chart-2: 148 65% 54%;
@@ -253,7 +253,7 @@
     --status-suppressed: 219 7% 57%;
 
     --area-intelligence: 236 57% 60%;
-    --area-demand: 48 100% 47%;
+    --area-crm: 48 100% 47%;
     --area-customer: 148 65% 54%;
     --area-ecom: 200 84% 60%;
     --area-finance: 158 64% 52%;
@@ -288,7 +288,7 @@
   h3,
   .font-display {
     font-family: "General Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
   }
 
   ::selection {
@@ -384,29 +384,63 @@
 }
 
 @layer components {
+  .prime-stage {
+    background-color: hsl(var(--surface-stage));
+    background-image:
+      linear-gradient(180deg, hsl(var(--surface-stage)) 0%, hsl(var(--background)) 42rem),
+      linear-gradient(hsl(var(--border-divider) / 0.22) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border-divider) / 0.18) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+    background-position: 0 0, -1px -1px, -1px -1px;
+  }
+
+  .prime-dashboard-surface {
+    border-color: hsl(var(--border-divider));
+    background: linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--surface-data) / 0.94));
+    box-shadow: var(--shadow-surface);
+  }
+
+  .prime-command-surface {
+    border-color: hsl(var(--sidebar-border));
+    background:
+      linear-gradient(135deg, hsl(var(--sidebar-background)) 0%, hsl(222 34% 10%) 58%, hsl(204 40% 12%) 100%);
+    color: hsl(var(--sidebar-foreground));
+    box-shadow: var(--shadow-panel);
+  }
+
+  .prime-command-muted {
+    color: hsl(var(--sidebar-foreground) / 0.68);
+  }
+
+  .prime-command-chip {
+    border-color: hsl(var(--sidebar-border));
+    background: hsl(var(--sidebar-accent) / 0.82);
+    color: hsl(var(--sidebar-foreground) / 0.78);
+  }
+
   .surface-glass {
     @apply border;
     border-color: hsl(var(--border-divider));
-    background-color: hsl(var(--surface-glass) / 0.82);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
-    box-shadow: none;
+    background-color: hsl(var(--surface-glass) / 0.92);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-surface);
   }
 
   .surface-toolbar {
     @apply border;
     border-color: hsl(var(--border-divider));
-    background-color: hsl(var(--surface-toolbar) / 0.88);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
-    box-shadow: none;
+    background-color: hsl(var(--surface-toolbar) / 0.94);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-surface);
   }
 
   .surface-solid {
     @apply border;
     border-color: hsl(var(--border-divider));
     background-color: hsl(var(--surface-data));
-    box-shadow: none;
+    box-shadow: var(--shadow-surface);
   }
 
   .surface-workspace {
@@ -427,7 +461,7 @@
   }
 
   .hairline-highlight {
-    box-shadow: none;
+    box-shadow: inset 0 1px 0 hsl(var(--border-highlight) / 0.45), var(--shadow-surface);
   }
 
   .surface-command {

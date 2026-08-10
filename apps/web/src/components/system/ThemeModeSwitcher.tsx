@@ -54,7 +54,7 @@ export function ThemeModeSwitcher({ compact = false, className }: ThemeModeSwitc
         variant="outline"
         size={compact ? 'sm' : 'default'}
         className={cn(
-          'w-full rounded-xl border border-border/70 bg-background/80 p-1',
+          'w-full rounded-lg border border-border/70 bg-background/80 p-1',
           compact ? 'justify-start' : 'justify-between',
         )}
         aria-label={t('settings.appearanceTitle')}

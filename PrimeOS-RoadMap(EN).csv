@@ -1,0 +1,55 @@
+﻿Project Name,PrimeOS,,,,,,,,,,,,,
+Document Name,PrimeOS Roadmap,,,,,,,,,,,,,
+Project Term,Prime Commerce,,,,,,,,,,,,,
+Date,May-25,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+Month,Phase,Main Focus,What We Do,Output,Why It Matters,May 2026,Jun 2026,Jul 2026,Aug 2026,Sep 2026,Oct 2026,Nov 2026,Dec 2026,Jan 2027
+May 2026,Preparation,Lock story and demo scope,"_Finalize PrimeOS positioning
+_User story
+_Competitor angle
+_MVP scope
+_Roadmap
+_Demo flow",Clear story: PrimeOS is a commerce operating system plus intelligence layer,Makes the product simple to understand before discussing features,Prepare,,,,,,,,
+Jun 2026,Align between PC & CR,Align scope and operating direction,"_Discuss PrimeOS direction
+_Align scope and priorities
+_Define MVP boundary
+_Discuss features and workflows
+_Align resource and team plan
+_Discuss operation model between PC & CR",Shared understanding between PC and CR on PrimeOS direction and MVP scope,Reduces misunderstanding before development and ensures both sides move with the same roadmap,,Alignment / Planning,,,,,,,
+Jul 2026,Phase 1: MVP,Build the product foundation,"_Set up Intelligence hub
+_Basic COS structure (already 80% in progress)
+_CRM/RFQ flow
+_Customer timeline
+_Finance readiness concept",Foundation of the operating loop is visible,"Shows PrimeOS has the core pieces needed to connect insight, commerce, customer, and evidence",,,MVP Build,,,,,,
+Aug 2026,Phase 1: MVP,Connect the operating loop,"_Connect market signal to product setup
+_Lead/RFQ
+_Customer context
+_Order flow
+_Evidence pack",One end-to-end journey can be demonstrated,Proves PrimeOS is not a disconnected dashboard or single-function tool,,,,Loop Build,,,,,
+Sep 2026,Phase 1: MVP,Complete MVP demo,"_Polish the MVP
+_Prepare demo data
+_Validate the flow
+_Create demo script","Defensible MVP demo: 
+signal -> demand -> customer -> order -> finance readiness","Gives CR a concrete product to react to, not only a concept",,,,,MVP Demo,,,,
+Oct 2026,Phase 2: CR Internal Use,Start CR internal pilot,"_Give CR internal team access
+_Internal test with human in loop
+_Collect usage feedback
+_Identify missing workflows
+_Test role-based views",CR team starts using PrimeOS internally,Moves PrimeOS from demo to real internal workflow validation,,,,,,Internal Use,,,
+Nov 2026,Phase 2: CR Internal Use,Test and improve features,"_Improve AI operator draft/recommendation flow, 
+_CR workflow integration, reporting, 
+_CRM/RFQ process, _Customer/order visibility based on internal feedback",Product improves through real CR usage,Reduces risk before external market launch,,,,,,,Test + Improve,,
+Dec 2026,Phase 2: CR Internal Use,Stabilize for launch,"_Finalize Standard/Pro/_Enterprise packages, support process, 
+_Onboarding flow, 
+_SLA assumptions,
+_Pilot case study
+_launch material",Launch-ready product and commercial package,Turns internal validation into a market-ready offering,,,,,,,,Launch Prep,
+Jan 2027,Market Launch,Launch to market,"_Open PrimeOS to selected market customers, 
+_Start seller onboarding, 
+_Run commercial pilots, 
+_Collect first pipeline and usage evidence",PrimeOS market launch with CR-backed pilot pipeline,"Begins external validation of subscription, service, GMV, and future finance upside",,,,,,,,,Official Launch
+,,,,,,,,,,,,,,
+Summary,May 2026,Preparation,"We use May to lock the story, scope, demo journey, and CR/Masuda pitch angle.",,,,,,,,,,,
+Summary,Jun-Aug 2026,Phase 1 MVP,"In the first 3 months, PrimeOS builds a defensible MVP that proves the full operating loop works.",,,,,,,,,,,
+Summary,Sep-Nov 2026,Phase 2 CR Internal Use,"In the next 3 months, CR uses PrimeOS internally, tests real workflows, gives feedback, and the product is adjusted before public launch.",,,,,,,,,,,
+Summary,Dec 2026,Market Launch,"In December, PrimeOS launches to selected market customers with packages, onboarding, support, and pilot pipeline ready.",,,,,,,,,,,

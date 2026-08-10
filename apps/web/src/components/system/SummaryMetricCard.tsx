@@ -36,12 +36,12 @@ export function SummaryMetricCard({
   loading = false,
 }: SummaryMetricCardProps) {
   return (
-    <Card className={cn('relative overflow-hidden border', getSemanticBorderToneClassName(tone), className)} aria-busy={loading}>
-      <CardContent className="p-5">
+    <Card className={cn('relative overflow-hidden', getSemanticBorderToneClassName(tone), className)} aria-busy={loading}>
+      <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="text-xs font-medium text-muted-foreground">
                 {loading ? <Skeleton className="h-3 w-24 rounded-full" /> : label}
               </p>
               {!loading && metaTooltip ? (
@@ -62,7 +62,7 @@ export function SummaryMetricCard({
                 </TooltipProvider>
               ) : null}
             </div>
-            <div className={cn('font-display data-number mt-2 min-h-[2rem] text-2xl font-semibold text-foreground', valueClassName)}>
+            <div className={cn('font-display data-number mt-2 min-h-8 text-2xl font-semibold text-foreground', valueClassName)}>
               {loading ? <Skeleton className="h-8 w-20 rounded-md" /> : value}
             </div>
             {status ? (
@@ -75,13 +75,13 @@ export function SummaryMetricCard({
             )}
           </div>
           {icon && (
-            <div className={cn('rounded-xl p-2.5', loading ? 'bg-muted/70' : getSemanticSurfaceToneClassName(tone))}>
+            <div className={cn('rounded-md p-2.5', loading ? 'bg-muted/70' : getSemanticSurfaceToneClassName(tone))}>
               {loading ? <Skeleton className="size-5 rounded-md" /> : icon}
             </div>
           )}
         </div>
       </CardContent>
-      <div className={cn('pointer-events-none absolute inset-x-5 bottom-0 h-px', getSemanticSurfaceToneClassName(tone))} />
+      <div className={cn('pointer-events-none absolute inset-x-4 bottom-0 h-px', getSemanticSurfaceToneClassName(tone))} />
     </Card>
   );
 }

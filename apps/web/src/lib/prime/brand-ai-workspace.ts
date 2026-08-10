@@ -106,7 +106,7 @@ const packages: BrandAiPackage[] = [
     confidence: 82,
     freshness: '2h ago',
     primaryGoal: 'Create a reusable brand intelligence foundation for launch, demand planning, and operator decisions.',
-    recommendedAction: 'Review claim evidence before sending the package to Demand Campaigns.',
+    recommendedAction: 'Review claim evidence before sending the package to CRM Campaigns.',
     route: '/intelligence/branding-agent/venus-beauty',
     reviewRoute: '/intelligence/branding-agent/venus-beauty/review',
     shareRoute: '/intelligence/branding-agent/venus-beauty/share',
@@ -116,7 +116,7 @@ const packages: BrandAiPackage[] = [
       { id: 'positioning', label: 'Positioning wedge', score: 88, state: 'approved', insight: 'Differentiation is strongest around speed-to-launch and evidence reuse.' },
       { id: 'messaging', label: 'Messaging brief', score: 76, state: 'needs_review', insight: 'Primary promise needs evidence-backed claim language.' },
       { id: 'signals', label: 'Signal map', score: 81, state: 'needs_review', insight: 'Marketplace trend and creator signal align, but CRM coverage is thin.' },
-      { id: 'agent-json', label: 'Agent context JSON', score: 90, state: 'approved', insight: 'Ready for Consulting Agent and Demand handoff.' },
+      { id: 'agent-json', label: 'Agent context JSON', score: 90, state: 'approved', insight: 'Ready for Consulting Agent and CRM handoff.' },
     ],
     icp: [
       { segment: 'Founder-led beauty SMB', urgency: 86, fit: 91, demandSignal: 'Needs launch narrative before paid acquisition.' },
@@ -140,7 +140,7 @@ const packages: BrandAiPackage[] = [
     name: 'Atelier Coffee',
     market: 'Vietnam',
     category: 'Premium packaged beverage',
-    owner: 'Demand strategist',
+    owner: 'CRM strategist',
     status: 'approved',
     readiness: 91,
     evidenceCoverage: 88,
@@ -171,7 +171,7 @@ const packages: BrandAiPackage[] = [
       { axis: 'Reuse', score: 88 },
     ],
     risks: [
-      { label: 'Seasonality assumption should be rechecked before Q4 scale.', severity: 'low', owner: 'Demand strategist' },
+      { label: 'Seasonality assumption should be rechecked before Q4 scale.', severity: 'low', owner: 'CRM strategist' },
     ],
   },
   {
@@ -215,8 +215,8 @@ const packages: BrandAiPackage[] = [
 
 const sources: BrandAiEvidenceSource[] = [
   { id: 'product-master', label: 'Product Master', type: 'product', status: 'connected', coverage: 92, lastSync: '8m ago', route: '/ecom/cos/product-master' },
-  { id: 'campaigns', label: 'Campaigns', type: 'campaign', status: 'connected', coverage: 84, lastSync: '12m ago', route: '/demand/campaigns' },
-  { id: 'marketplace', label: 'Marketplace Source', type: 'marketplace', status: 'connected', coverage: 78, lastSync: '20m ago', route: '/demand/sources?function=marketplace' },
+  { id: 'campaigns', label: 'Campaigns', type: 'campaign', status: 'connected', coverage: 84, lastSync: '12m ago', route: '/crm/campaigns' },
+  { id: 'marketplace', label: 'Marketplace Source', type: 'marketplace', status: 'connected', coverage: 78, lastSync: '20m ago', route: '/crm/sources?function=marketplace' },
   { id: 'crm', label: 'Customer / CRM', type: 'crm', status: 'warning', coverage: 58, lastSync: 'Yesterday', route: '/customer/crm-compact' },
   { id: 'finance', label: 'Finance guardrails', type: 'finance', status: 'connected', coverage: 73, lastSync: '1h ago', route: '/finance/fin-support' },
   { id: 'manual', label: 'Manual answers', type: 'manual', status: 'connected', coverage: 69, lastSync: 'Draft', route: '/intelligence/branding-agent/create' },

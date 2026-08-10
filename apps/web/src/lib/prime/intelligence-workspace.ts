@@ -8,12 +8,12 @@ import {
 } from './prime-data';
 
 export type SignalCardSourceType = 'market' | 'creator' | 'voc' | 'campaign' | 'customer' | 'cos' | 'finance';
-export type IntelligencePackageStatus = 'running' | 'review_needed' | 'ready_for_demand' | 'sent_to_demand' | 'blocked' | 'outcome_learned';
+export type IntelligencePackageStatus = 'running' | 'review_needed' | 'ready_for_crm' | 'sent_to_crm' | 'blocked' | 'outcome_learned';
 export type IntelligenceRiskLevel = 'low' | 'medium' | 'high';
 export type IntelligenceAgentStatus = 'running' | 'needs_review' | 'ready' | 'blocked';
 export type IntelligenceBoardLaneId = 'collect' | 'understand' | 'predict' | 'recommend' | 'act_automate';
-export type PrimeArea = 'Intelligence' | 'Demand' | 'Customer' | 'Ecom/COS' | 'Finance';
-export type SourceOwner = 'Intelligence' | 'Demand' | 'Customer' | 'Product Master' | 'OMS' | 'Inventory' | 'Fulfillment/Shipment' | 'Finance' | 'Event & Audit';
+export type PrimeArea = 'Intelligence' | 'CRM' | 'Customer' | 'Ecom/COS' | 'Finance';
+export type SourceOwner = 'Intelligence' | 'CRM' | 'Customer' | 'Product Master' | 'OMS' | 'Inventory' | 'Fulfillment/Shipment' | 'Finance' | 'Event & Audit';
 export type LinkedEntityType = 'recommendation' | 'signal' | 'campaign' | 'lead' | 'rfq' | 'customer' | 'product' | 'sku' | 'listing' | 'order' | 'reservation' | 'shipment' | 'return' | 'ticket' | 'finance_profile' | 'domain_event' | 'audit_id';
 export type EvidenceQuality = 'verified' | 'derived' | 'stale' | 'missing' | 'conflicting';
 
@@ -163,10 +163,10 @@ export type RecommendationFeedback = {
   recommendationId: string;
   actorId: string;
   actorRole: string;
-  decision: 'approved' | 'rejected' | 'needs_more_evidence' | 'sent_to_demand' | 'suppressed';
+  decision: 'approved' | 'rejected' | 'needs_more_evidence' | 'sent_to_crm' | 'suppressed';
   reason?: string;
   evidenceIds: string[];
-  demandHandoffId?: string;
+  crmHandoffId?: string;
   createdAt: string;
   auditId: string;
 };
@@ -224,7 +224,7 @@ export type AgentEvidenceReport = {
   generatedAt: string;
 };
 
-export type DemandHandoffPayload = {
+export type CrmHandoffPayload = {
   targetRoute: string;
   objective: string;
   audience: string;
@@ -244,15 +244,15 @@ export type DecisionPackage = {
   status: IntelligencePackageStatus;
   priority: 'P0' | 'P1' | 'P2';
   owner: string;
-  nextOwner: 'Demand' | 'Customer' | 'Ecom/COS' | 'Finance';
+  nextOwner: 'CRM' | 'Customer' | 'Ecom/COS' | 'Finance';
   finding: string;
   confidence: number;
   expectedImpact: { label: string; value: string; rationale: string };
   riskLevel: IntelligenceRiskLevel;
-  recommendedDemandAction: 'campaign' | 'content' | 'creator' | 'lead_response' | 'retargeting' | 'suppress' | 'request_more_data';
+  recommendedCrmAction: 'campaign' | 'content' | 'creator' | 'lead_response' | 'retargeting' | 'suppress' | 'request_more_data';
   evidenceReport: AgentEvidenceReport;
   linkedSignals: SignalCard[];
-  handoffPayload: DemandHandoffPayload;
+  handoffPayload: CrmHandoffPayload;
   recommendationEvidence: RecommendationEvidence;
   feedback?: RecommendationFeedback;
   actionOutcome?: ActionOutcome;
@@ -274,7 +274,7 @@ export type IntelligenceWorkspaceSnapshot = {
   stats: {
     running: number;
     needsReview: number;
-    readyForDemand: number;
+    readyForCrm: number;
     blocked: number;
     learned: number;
   };
@@ -284,7 +284,7 @@ const freshnessLabel = (minutes: number) => minutes < 60 ? `${minutes}m` : `${Ma
 const riskFromForecast = (forecast?: PrimeForecast): IntelligenceRiskLevel => forecast?.risk === 'high' ? 'high' : forecast?.risk === 'medium' ? 'medium' : 'low';
 const statusFromRisk = (risk: IntelligenceRiskLevel, confidence: number): IntelligencePackageStatus => {
   if (risk === 'high') return 'blocked';
-  if (confidence >= 84) return 'ready_for_demand';
+  if (confidence >= 84) return 'ready_for_crm';
   return 'review_needed';
 };
 
@@ -298,8 +298,8 @@ export const INTELLIGENCE_BOARD_LANES: IntelligenceBoardSnapshot['lanes'] = [
 
 const laneFromPackageStatus = (status: IntelligencePackageStatus): IntelligenceBoardLaneId => {
   if (status === 'blocked') return 'predict';
-  if (status === 'ready_for_demand') return 'recommend';
-  if (status === 'sent_to_demand' || status === 'outcome_learned') return 'act_automate';
+  if (status === 'ready_for_crm') return 'recommend';
+  if (status === 'sent_to_crm' || status === 'outcome_learned') return 'act_automate';
   if (status === 'review_needed') return 'understand';
   return 'collect';
 };
@@ -307,7 +307,7 @@ const laneFromPackageStatus = (status: IntelligencePackageStatus): IntelligenceB
 const towerFromPackage = (item: DecisionPackage): IntelligenceBoardCard['tower'] => {
   if (item.status === 'blocked' || item.recommendationEvidence.guardrails.some((guardrail) => guardrail.blocking)) return 'Automation & Alerts Tower';
   if (item.linkedSignals.some((signal) => signal.sourceType === 'voc' || signal.sourceType === 'creator')) return 'Social Listening & VOC Tower';
-  if (item.recommendedDemandAction === 'request_more_data') return 'Forecasting & Optimization Tower';
+  if (item.recommendedCrmAction === 'request_more_data') return 'Forecasting & Optimization Tower';
   if (item.confidence >= 86) return 'AI Operator Tower';
   if (item.linkedSignals.some((signal) => signal.sourceType === 'campaign')) return 'Attribution Tower';
   return 'Analytics Tower';
@@ -361,7 +361,7 @@ export function buildIntelligenceBoard(workspace: IntelligenceWorkspaceSnapshot)
       rank: index,
       title: item.title,
       tower: towerFromPackage(item),
-      floor: item.status === 'blocked' ? 'Guardrail proof' : item.status === 'ready_for_demand' ? 'Convert to decision' : 'Evidence stack',
+      floor: item.status === 'blocked' ? 'Guardrail proof' : item.status === 'ready_for_crm' ? 'Convert to decision' : 'Evidence stack',
       displayStatus: item.status,
       owner: item.owner,
       nextOwner: item.nextOwner,
@@ -475,14 +475,14 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
     evidenceItems: [
       { id: signal.id, label: 'Market signal', summary: signal.summary, supportsRecommendation: true, weight: 35, owner: signal.sourceOfTruthOwner, entityType: 'signal', entityId: signal.id, sourceRoute: '/intelligence/signals', freshnessAt: signal.freshness, quality: 'derived' },
       { id: voc?.id ?? `voc-${recommendation.id}`, label: 'VOC', summary: voc?.summary ?? 'VOC source missing; keep recommendation in review mode.', supportsRecommendation: Boolean(voc), weight: 25, owner: 'Customer', entityType: 'customer', entityId: voc?.customerId ?? voc?.id ?? 'missing-voc', sourceRoute: '/customer/service', freshnessAt: 'today', quality: voc ? 'verified' : 'missing' },
-      { id: forecast?.id ?? `forecast-${recommendation.id}`, label: 'COS guardrail', summary: forecast ? `${forecast.ats} ATS / ${forecast.demand7d} forecast` : 'Inventory guardrail missing.', supportsRecommendation: Boolean(forecast && riskLevel !== 'high'), weight: 40, owner: 'Inventory', entityType: 'sku', entityId: forecast?.skuId ?? campaign?.skuId ?? recommendation.id, sourceRoute: '/ecom/cos/inventory-brain', freshnessAt: 'live', quality: forecast ? 'verified' : 'missing' },
+      { id: forecast?.id ?? `forecast-${recommendation.id}`, label: 'COS guardrail', summary: forecast ? `${forecast.ats} ATS / ${forecast.crm7d} forecast` : 'Inventory guardrail missing.', supportsRecommendation: Boolean(forecast && riskLevel !== 'high'), weight: 40, owner: 'Inventory', entityType: 'sku', entityId: forecast?.skuId ?? campaign?.skuId ?? recommendation.id, sourceRoute: '/ecom/cos/inventory-brain', freshnessAt: 'live', quality: forecast ? 'verified' : 'missing' },
     ],
     rejectedAlternatives: [
       { option: 'Scale paid spend immediately', reason: riskLevel === 'high' ? 'Stock guardrail must clear first.' : 'Operator should approve message and CTA first.', evidenceIds: signalEvidenceIds },
     ],
     guardrails: [
-      { owner: 'Inventory', message: forecast ? `${forecast.ats} ATS / ${forecast.demand7d} forecast` : 'Inventory proof missing.', blocking: riskLevel === 'high', entityId: forecast?.skuId },
-      { owner: 'Demand', message: 'Human owner approval required before campaign execution.', blocking: false, entityId: campaign?.id },
+      { owner: 'Inventory', message: forecast ? `${forecast.ats} ATS / ${forecast.crm7d} forecast` : 'Inventory proof missing.', blocking: riskLevel === 'high', entityId: forecast?.skuId },
+      { owner: 'CRM', message: 'Human owner approval required before campaign execution.', blocking: false, entityId: campaign?.id },
     ],
     confidence,
     confidenceReason: `${confidence}% confidence from signal strength, VOC support, and COS guardrail freshness. Prime AI is not the source of truth.`,
@@ -491,12 +491,12 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
   const feedback: RecommendationFeedback | undefined = hasOutcomeReadback ? {
     id: `feedback-${recommendation.id}`,
     recommendationId: recommendation.id,
-    actorId: 'demand-owner-01',
-    actorRole: 'Demand operator',
-    decision: 'sent_to_demand',
+    actorId: 'crm-owner-01',
+    actorRole: 'CRM operator',
+    decision: 'sent_to_crm',
     reason: 'Evidence package accepted after operator review.',
     evidenceIds: signalEvidenceIds,
-    demandHandoffId: `handoff-${recommendation.id}`,
+    crmHandoffId: `handoff-${recommendation.id}`,
     createdAt: '8m ago',
     auditId: `audit-feedback-${recommendation.id}`,
   } : undefined;
@@ -504,17 +504,17 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
     id: `outcome-${recommendation.id}`,
     recommendationId: recommendation.id,
     handoffId: `handoff-${recommendation.id}`,
-    sourceOfTruthOwner: 'Demand',
+    sourceOfTruthOwner: 'CRM',
     readModelOwner: 'Intelligence',
     actionEntityType: 'campaign',
     actionEntityId: campaign?.id ?? recommendation.id,
     outcomeType: 'campaign_created',
     metrics: [
-      { name: 'leads', value: campaign?.leads ?? 0, owner: 'Demand' },
-      { name: 'rfqs', value: campaign?.rfqs ?? 0, owner: 'Demand' },
+      { name: 'leads', value: campaign?.leads ?? 0, owner: 'CRM' },
+      { name: 'rfqs', value: campaign?.rfqs ?? 0, owner: 'CRM' },
       { name: 'orders', value: campaign?.orders ?? 0, owner: 'OMS' },
     ],
-    learningNote: campaign ? `${campaign.name} outcome is read back into Intelligence as learning evidence.` : 'Demand campaign outcome read back into Intelligence.',
+    learningNote: campaign ? `${campaign.name} outcome is read back into Intelligence as learning evidence.` : 'CRM campaign outcome read back into Intelligence.',
     occurredAt: '8m ago',
     observedAt: 'now',
     auditIds: [`audit-outcome-${recommendation.id}`],
@@ -525,7 +525,7 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
     status: hasOutcomeReadback ? 'outcome_learned' : statusFromRisk(riskLevel, confidence),
     priority: riskLevel === 'high' ? 'P0' : confidence >= 84 ? 'P1' : 'P2',
     owner: 'Intelligence Operator',
-    nextOwner: riskLevel === 'high' ? 'Ecom/COS' : 'Demand',
+    nextOwner: riskLevel === 'high' ? 'Ecom/COS' : 'CRM',
     finding: recommendation.reasoning,
     confidence,
     expectedImpact: {
@@ -534,25 +534,25 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
       rationale: campaign ? `${campaign.leads} leads, ${campaign.rfqs} RFQs, ${campaign.orders} orders already attached.` : recommendation.action,
     },
     riskLevel,
-    recommendedDemandAction: riskLevel === 'high' ? 'request_more_data' : 'campaign',
+    recommendedCrmAction: riskLevel === 'high' ? 'request_more_data' : 'campaign',
     evidenceReport: {
       id: `report-${recommendation.id}`,
       agentId: index % 2 ? 'persona-analyst' : 'market-scout',
       agentName: index % 2 ? 'Persona Analyst' : 'Market Scout',
       status: riskLevel === 'high' ? 'blocked' : confidence >= 84 ? 'ready' : 'needs_review',
       finding: recommendation.reasoning,
-      hypothesis: `Demand should test ${productRoute} with a reviewed campaign package before broader scale.`,
+      hypothesis: `CRM should test ${productRoute} with a reviewed campaign package before broader scale.`,
       confidence,
       evidence: [
         { label: 'Market signal', source: signal.source, freshness: signal.freshness, value: signal.summary, linkedEntityId: signal.linkedEntityId },
         { label: 'VOC', source: voc?.source ?? 'VOC mesh', freshness: 'today', value: voc?.summary ?? 'No VOC signal attached.' },
-        { label: 'COS guardrail', source: 'Inventory forecast', freshness: 'live', value: forecast ? `${forecast.ats} ATS / ${forecast.demand7d} forecast` : 'No forecast attached.' },
+        { label: 'COS guardrail', source: 'Inventory forecast', freshness: 'live', value: forecast ? `${forecast.ats} ATS / ${forecast.crm7d} forecast` : 'No forecast attached.' },
       ],
       rejectedAlternatives: [
         { option: 'Scale paid spend immediately', reason: riskLevel === 'high' ? 'Stock guardrail must clear first.' : 'Operator should approve message and CTA first.' },
       ],
       risks: [
-        { label: riskLevel === 'high' ? 'Stock risk' : 'Message fit risk', severity: riskLevel, mitigation: riskLevel === 'high' ? forecast?.suggestedAction ?? 'Check COS guardrail.' : 'Review audience, CTA, and Demand owner before send.' },
+        { label: riskLevel === 'high' ? 'Stock risk' : 'Message fit risk', severity: riskLevel, mitigation: riskLevel === 'high' ? forecast?.suggestedAction ?? 'Check COS guardrail.' : 'Review audience, CTA, and CRM owner before send.' },
       ],
       generatedAt: index === 0 ? '12m ago' : `${18 + index * 7}m ago`,
     },
@@ -561,7 +561,7 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
     actionOutcome,
     linkedSignals: [signal],
     handoffPayload: {
-      targetRoute: '/demand/campaigns',
+      targetRoute: '/crm/campaigns',
       objective: recommendation.action,
       audience: campaign?.targetSegment ?? 'Qualified demand segment',
       productRoute,
@@ -569,13 +569,13 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
       messageAngle: voc?.action ?? recommendation.reasoning,
       channel: campaign?.channel ?? 'Campaign Ops',
       cta: 'Request quote / review campaign setup',
-      ownerRecommendation: 'Demand Campaign Ops',
-      guardrails: [forecast ? `${forecast.ats} ATS / ${forecast.demand7d} forecast` : 'No COS forecast attached', riskLevel === 'high' ? 'Hold scale until COS clears.' : 'Human approval required before Demand execution.'],
+      ownerRecommendation: 'CRM Campaign Ops',
+      guardrails: [forecast ? `${forecast.ats} ATS / ${forecast.crm7d} forecast` : 'No COS forecast attached', riskLevel === 'high' ? 'Hold scale until COS clears.' : 'Human approval required before CRM execution.'],
       requiresApproval: true,
     },
     readback: hasOutcomeReadback ? {
       state: 'campaign_created',
-      note: campaign ? `Demand accepted the package and staged ${campaign.name} as a campaign route.` : 'Demand accepted the package and staged a campaign route.',
+      note: campaign ? `CRM accepted the package and staged ${campaign.name} as a campaign route.` : 'CRM accepted the package and staged a campaign route.',
       updatedAt: '8m ago',
     } : undefined,
   };
@@ -583,7 +583,7 @@ function buildRecommendationPackage(snapshot: PrimeSnapshot, recommendation: Pri
 
 function buildAlertPackage(snapshot: PrimeSnapshot, alert: PrimeAlert, index: number): DecisionPackage {
   const confidence = alert.severity === 'high' ? 68 : 76;
-  const sourceOwner: SourceOwner = alert.area === 'Ecom Area' ? 'Inventory' : 'Demand';
+  const sourceOwner: SourceOwner = alert.area === 'Ecom Area' ? 'Inventory' : 'CRM';
   const sourceType: SignalCardSourceType = alert.area === 'Ecom Area' ? 'cos' : 'market';
   const signalId = `signal-${alert.id}`;
   const signalLineage: SignalLineage = {
@@ -626,11 +626,11 @@ function buildAlertPackage(snapshot: PrimeSnapshot, alert: PrimeAlert, index: nu
       owner: sourceOwner,
       entityType: 'domain_event',
       entityId: alert.linkedEntity,
-      sourceRoute: alert.area === 'Ecom Area' ? '/ecom/cos/inventory-brain' : '/demand/campaigns',
+      sourceRoute: alert.area === 'Ecom Area' ? '/ecom/cos/inventory-brain' : '/crm/campaigns',
       freshnessAt: 'live',
       quality: 'verified',
     }],
-    rejectedAlternatives: [{ option: 'Send to Demand anyway', reason: 'Guardrail owner must clear blocker first.', evidenceIds: [alert.id] }],
+    rejectedAlternatives: [{ option: 'Send to CRM anyway', reason: 'Guardrail owner must clear blocker first.', evidenceIds: [alert.id] }],
     guardrails: [{ owner: sourceOwner, message: alert.title, blocking: alert.severity === 'high', entityId: alert.linkedEntity }],
     confidence,
     confidenceReason: 'Alert package confidence comes from source-domain guardrail state; Prime AI is not the source of truth.',
@@ -643,31 +643,31 @@ function buildAlertPackage(snapshot: PrimeSnapshot, alert: PrimeAlert, index: nu
     status: alert.severity === 'high' ? 'blocked' : 'review_needed',
     priority: alert.severity === 'high' ? 'P0' : 'P2',
     owner: 'Launch Risk Analyst',
-    nextOwner: alert.area === 'Ecom Area' ? 'Ecom/COS' : 'Demand',
+    nextOwner: alert.area === 'Ecom Area' ? 'Ecom/COS' : 'CRM',
     finding: `Guardrail detected for ${alert.linkedEntity}.`,
     confidence,
-    expectedImpact: { label: 'Risk avoided', value: alert.severity, rationale: 'Block or review before Demand receives campaign payload.' },
+    expectedImpact: { label: 'Risk avoided', value: alert.severity, rationale: 'Block or review before CRM receives campaign payload.' },
     riskLevel: alert.severity,
-    recommendedDemandAction: 'request_more_data',
+    recommendedCrmAction: 'request_more_data',
     evidenceReport: {
       id: `report-${alert.id}`,
       agentId: 'launch-risk-analyst',
       agentName: 'Launch Risk Analyst',
       status: alert.severity === 'high' ? 'blocked' : 'needs_review',
       finding: alert.title,
-      hypothesis: 'This package should not move to Demand until guardrail owner clears the blocker.',
+      hypothesis: 'This package should not move to CRM until guardrail owner clears the blocker.',
       confidence,
       evidence: [{ label: 'Alert', source: alert.area, freshness: 'live', value: alert.linkedEntity }],
-      rejectedAlternatives: [{ option: 'Send to Demand anyway', reason: 'Would duplicate operational risk inside Demand.' }],
+      rejectedAlternatives: [{ option: 'Send to CRM anyway', reason: 'Would duplicate operational risk inside CRM.' }],
       risks: [{ label: alert.title, severity: alert.severity, mitigation: 'Route to owning area before campaign scale.' }],
       generatedAt: `${10 + index * 5}m ago`,
     },
     recommendationEvidence,
     linkedSignals: [linkedSignal],
     handoffPayload: {
-      targetRoute: '/demand/campaigns',
-      objective: 'Hold Demand handoff until guardrail clears.',
-      audience: 'Demand Campaign Ops',
+      targetRoute: '/crm/campaigns',
+      objective: 'Hold CRM handoff until guardrail clears.',
+      audience: 'CRM Campaign Ops',
       ownerRecommendation: alert.area.replace(' Area', ''),
       guardrails: [alert.title, alert.linkedEntity],
       requiresApproval: true,
@@ -682,10 +682,10 @@ export function buildIntelligenceWorkspace(snapshot: PrimeSnapshot): Intelligenc
   ];
 
   const agents: AgentRunSummary[] = [
-    { id: 'market-scout', name: 'Market Scout', status: packages.some((item) => item.evidenceReport.agentId === 'market-scout' && item.status === 'ready_for_demand') ? 'ready' : 'running', activeFocus: 'Market demand + campaign route', outputCount: packages.filter((item) => item.evidenceReport.agentId === 'market-scout').length, lastRun: '12m ago' },
+    { id: 'market-scout', name: 'Market Scout', status: packages.some((item) => item.evidenceReport.agentId === 'market-scout' && item.status === 'ready_for_crm') ? 'ready' : 'running', activeFocus: 'Market demand + campaign route', outputCount: packages.filter((item) => item.evidenceReport.agentId === 'market-scout').length, lastRun: '12m ago' },
     { id: 'persona-analyst', name: 'Persona Analyst', status: 'needs_review', activeFocus: 'Buyer persona + message fit', outputCount: packages.filter((item) => item.evidenceReport.agentId === 'persona-analyst').length, lastRun: '19m ago' },
     { id: 'message-strategist', name: 'Message Strategist', status: 'running', activeFocus: 'Offer, CTA, channel angle', outputCount: snapshot.activationPlays.length, lastRun: 'live' },
-    { id: 'launch-risk-analyst', name: 'Launch Risk Analyst', status: packages.some((item) => item.status === 'blocked') ? 'blocked' : 'ready', activeFocus: 'COS + Demand guardrails', outputCount: packages.filter((item) => item.riskLevel === 'high').length, lastRun: '10m ago' },
+    { id: 'launch-risk-analyst', name: 'Launch Risk Analyst', status: packages.some((item) => item.status === 'blocked') ? 'blocked' : 'ready', activeFocus: 'COS + CRM guardrails', outputCount: packages.filter((item) => item.riskLevel === 'high').length, lastRun: '10m ago' },
   ];
 
   return {
@@ -694,7 +694,7 @@ export function buildIntelligenceWorkspace(snapshot: PrimeSnapshot): Intelligenc
     stats: {
       running: agents.filter((agent) => agent.status === 'running').length,
       needsReview: packages.filter((item) => item.status === 'review_needed').length,
-      readyForDemand: packages.filter((item) => item.status === 'ready_for_demand').length,
+      readyForCrm: packages.filter((item) => item.status === 'ready_for_crm').length,
       blocked: packages.filter((item) => item.status === 'blocked').length,
       learned: packages.filter((item) => item.status === 'outcome_learned').length,
     },

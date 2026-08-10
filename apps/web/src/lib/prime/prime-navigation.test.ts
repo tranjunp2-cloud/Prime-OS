@@ -34,20 +34,21 @@ describe('prime navigation utility routes', () => {
     expect(getPrimeNavPath('/intelligence/launch-decisions').map((item) => item.label)).toEqual(['Intelligence', 'Consulting Agent']);
   });
 
-  it('resolves Demand V1 hub, sources, and legacy route labels', () => {
-    expect(getPrimeNavPath('/demand').map((item) => item.label)).toEqual(['Demand', 'Demand Dashboard']);
-    expect(getPrimeNavPath('/demand/hub').map((item) => item.label)).toEqual(['Demand', 'Demand Dashboard']);
-    expect(getPrimeNavPath('/demand/mdec').map((item) => item.label)).toEqual(['Demand', 'MDEC']);
-    expect(getPrimeNavPath('/demand/mdec?view=escalations').map((item) => item.label)).toEqual(['Demand', 'MDEC', 'Workflow', 'Escalations']);
-    expect(getPrimeNavPath('/demand/sources').map((item) => item.label)).toEqual(['Demand', 'Sources']);
-    expect(getPrimeNavPath('/demand/acquisition').map((item) => item.label)).toEqual(['Demand', 'Sources']);
-    expect(getPrimeNavPath('/demand/campaign-ops').map((item) => item.label)).toEqual(['Demand', 'Campaigns']);
-    expect(getPrimeNavPath('/demand/campaigns?tab=overview').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Overview']);
-    expect(getPrimeNavPath('/demand/campaigns?tab=pipeline').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Pipeline']);
-    expect(getPrimeNavPath('/demand/campaigns?tab=planner').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Planner']);
-    expect(getPrimeNavPath('/demand/campaigns?tab=readiness').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Readiness']);
-    expect(getPrimeNavPath('/demand/campaigns?tab=execution-queue').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Execution Queue']);
-    expect(getPrimeNavPath('/demand/campaigns?tab=results').map((item) => item.label)).toEqual(['Demand', 'Campaigns', 'Results']);
-    expect(getPrimeNavPath('/demand/lead-response-capture').map((item) => item.label)).toEqual(['Demand', 'Leads & RFQs']);
+  it('resolves CRM V1 hub, sources, and legacy route labels', () => {
+    expect(getPrimeNavPath('/crm').map((item) => item.label)).toEqual(['CRM', 'Customer Inbox']);
+    expect(getPrimeNavPath('/crm/hub').map((item) => item.label)).toEqual(['CRM', 'Customer Inbox']);
+    expect(getPrimeNavPath('/crm/chat').map((item) => item.label)).toEqual(['CRM', 'Customer Inbox']);
+    expect(getPrimeNavPath('/crm/mdec').map((item) => item.label)).toEqual(['CRM', 'MDEC']);
+    expect(getPrimeNavPath('/crm/mdec?view=escalations').map((item) => item.label)).toEqual(['CRM', 'MDEC', 'Workflow', 'Escalations']);
+    expect(getPrimeNavPath('/crm/sources').map((item) => item.label)).toEqual(['CRM', 'Sources']);
+    expect(getPrimeNavPath('/crm/acquisition').map((item) => item.label)).toEqual(['CRM', 'Sources']);
+    expect(getPrimeNavPath('/crm/campaign-ops').map((item) => item.label)).toEqual(['CRM', 'Campaigns']);
+    expect(getPrimeNavPath('/crm/campaigns?tab=overview').map((item) => item.label)).toEqual(['CRM', 'Campaigns', 'Overview']);
+    expect(getPrimeNavPath('/crm/campaigns?tab=pipeline').map((item) => item.label)).toEqual(['CRM', 'Campaigns', 'Pipeline']);
+    expect(getPrimeNavPath('/crm/campaigns?tab=planner').map((item) => item.label)).toEqual(['CRM', 'Campaigns', 'Planner']);
+    expect(getPrimeNavPath('/crm/campaigns?tab=readiness').map((item) => item.label)).toEqual(['CRM', 'Campaigns', 'Readiness']);
+    expect(getPrimeNavPath('/crm/campaigns?tab=execution-queue').map((item) => item.label)).toEqual(['CRM', 'Campaigns', 'Execution Queue']);
+    expect(getPrimeNavPath('/crm/campaigns?tab=results').map((item) => item.label)).toEqual(['CRM', 'Campaigns', 'Results']);
+    expect(getPrimeNavPath('/crm/lead-response-capture').map((item) => item.label)).toEqual(['CRM', 'Leads & RFQs']);
   });
 });

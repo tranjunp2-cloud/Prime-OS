@@ -31,7 +31,7 @@ export function CosPolicyRulePage() {
       route: '/ecom/cos/policy-rule/routing',
     },
     {
-      floor: 'Demand guardrail',
+      floor: 'CRM guardrail',
       source: 'Prime wrapper from forecast and inventory context',
       target: 'Campaign + Retargeting',
       route: '/intelligence/forecasting',

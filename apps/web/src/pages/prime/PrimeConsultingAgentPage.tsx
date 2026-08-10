@@ -73,7 +73,7 @@ function statusLabel(status: DecisionPackage['status']) {
 function decisionLane(item: DecisionPackage) {
   if (item.status === 'blocked') return 'No-go';
   if (item.status === 'review_needed') return 'Review';
-  if (item.status === 'ready_for_demand' || item.status === 'sent_to_demand') return 'Go';
+  if (item.status === 'ready_for_crm' || item.status === 'sent_to_crm') return 'Go';
   return 'Hold';
 }
 
@@ -88,18 +88,18 @@ function ConsultingHeader({ activeTab, onChangeTab }: { activeTab: ConsultingAge
             <InfoHint label="Consulting Agent info">One product for KPI dashboarding, signal intelligence, and launch decisions. Reads evidence across PrimeOS; source systems keep ownership.</InfoHint>
           </div>
         </div>
-        <div className="rounded-2xl border bg-card p-4 text-sm">
+        <div className="rounded-lg border bg-card p-4 text-sm">
           <div className="flex items-center gap-2 font-semibold text-foreground">
             Boundary protected
-            <InfoHint label="Boundary protected info">Board moves create triage/audit state only — no Demand/COS/Finance mutation.</InfoHint>
+            <InfoHint label="Boundary protected info">Board moves create triage/audit state only — no CRM/COS/Finance mutation.</InfoHint>
           </div>
         </div>
       </div>
-      <div className="flex max-w-full gap-2 overflow-x-auto rounded-2xl bg-muted p-1">
+      <div className="flex max-w-full gap-2 overflow-x-auto rounded-lg bg-muted p-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
-            <button key={tab.id} type="button" title={tab.copy} onClick={() => onChangeTab(tab.id)} className={cn('min-w-56 rounded-xl px-4 py-3 text-left transition-colors', activeTab === tab.id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:bg-card/60')}>
+            <button key={tab.id} type="button" title={tab.copy} onClick={() => onChangeTab(tab.id)} className={cn('min-w-56 rounded-lg px-4 py-3 text-left transition-colors', activeTab === tab.id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:bg-card/60')}>
               <div className="flex items-center gap-2 font-semibold"><Icon className="size-4" />{tab.label}<InfoHint label={`${tab.label} info`}>{tab.copy}</InfoHint></div>
             </button>
           );
@@ -128,12 +128,12 @@ function KpiCardDetails({ card, packages }: { card: ConsultingKpiCard; packages:
         </div>
         <Badge variant="outline">{lane?.label || card.laneId}</Badge>
       </div>
-        <div className={cn('inline-flex rounded-2xl border px-4 py-2 text-3xl font-bold', toneClass(card.tone))}>{card.value}</div>
-        <div className="rounded-xl border bg-muted/30 p-3">
+        <div className={cn('inline-flex rounded-lg border px-4 py-2 text-3xl font-bold', toneClass(card.tone))}>{card.value}</div>
+        <div className="rounded-lg border bg-muted/30 p-3">
           <div className="font-semibold">Source owners</div>
           <div className="mt-2 flex flex-wrap gap-2">{card.sourceOwnerIds.length ? card.sourceOwnerIds.map((owner) => <Badge key={owner} variant="secondary">{owner}</Badge>) : <span className="text-muted-foreground">No owner linked</span>}</div>
         </div>
-        <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="rounded-lg border bg-muted/30 p-3">
           <div className="font-semibold">Linked consulting packages</div>
           <div className="mt-3 space-y-3">
             {fallbackPackages.map((item) => (
@@ -145,7 +145,7 @@ function KpiCardDetails({ card, packages }: { card: ConsultingKpiCard; packages:
             ))}
           </div>
         </div>
-        <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="rounded-lg border bg-muted/30 p-3">
           <div className="font-semibold">Recommended operator action</div>
           <p className="mt-2 text-muted-foreground">Review evidence, move card to the correct KPI lane, then open linked package before handoff.</p>
         </div>
@@ -171,7 +171,7 @@ function KpiDashboard({ seed }: { seed: typeof consultingAgentSeedData }) {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
         <SummaryMetricCard label="Packages" value={metrics.packages} meta="Consulting decision packages." metaTooltip="Consulting decision packages." icon={<Bot className="size-5" />} tone="purple" />
-        <SummaryMetricCard label="Ready" value={metrics.readyForDemand} meta="Ready for owner handoff." metaTooltip="Ready for owner handoff." icon={<CheckCircle2 className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Ready" value={metrics.readyForCrm} meta="Ready for owner handoff." metaTooltip="Ready for owner handoff." icon={<CheckCircle2 className="size-5" />} tone="success" />
         <SummaryMetricCard label="Blocked" value={metrics.blocked} meta="Guardrail protected." metaTooltip="Guardrail protected." icon={<ShieldCheck className="size-5" />} tone="orange" />
         <SummaryMetricCard label="Moves" value={audit.length} meta="Local KPI board audit." metaTooltip="Local KPI board audit." icon={<Layers3 className="size-5" />} tone="info" />
       </div>
@@ -180,13 +180,13 @@ function KpiDashboard({ seed }: { seed: typeof consultingAgentSeedData }) {
           {kpiLanes.map((lane) => {
             const laneCards = cardsByLane(lane.id);
             return (
-              <div key={lane.id} className="min-h-[420px] rounded-2xl border bg-card/80 p-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => moveCard(event.dataTransfer.getData('text/plain'), lane.id)}>
-                <div className="rounded-xl border bg-background/90 p-3">
+              <div key={lane.id} className="min-h-[420px] rounded-lg border bg-card/80 p-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => moveCard(event.dataTransfer.getData('text/plain'), lane.id)}>
+                <div className="rounded-lg border bg-background/90 p-3">
                   <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-1.5"><h3 className="font-semibold">{lane.label}</h3><InfoHint label={`${lane.label} info`}>{lane.detail}</InfoHint></div><Badge variant="outline">{laneCards.length}</Badge></div>
                 </div>
                 <div className="mt-3 space-y-3">
-                  {laneCards.map((card) => <div key={card.id} draggable onClick={() => setSelectedCardId(card.id)} onDragStart={(event) => event.dataTransfer.setData('text/plain', card.id)} className={cn('cursor-pointer rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50', selectedCardId === card.id && 'border-primary ring-1 ring-primary/30')}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-1.5"><div className="truncate font-semibold">{card.title}</div><InfoHint label={`${card.title} info`}>{card.detail}</InfoHint></div><div className={cn('mt-3 inline-flex rounded-xl border px-3 py-1 text-2xl font-bold', toneClass(card.tone))}>{card.value}</div></div><GripVertical className="size-4 shrink-0 text-muted-foreground" /></div><Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={(event) => { event.stopPropagation(); setSelectedCardId(card.id); setDetailCardId(card.id); }}>Open details</Button></div>)}
-                  {!laneCards.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Drop KPI card here.</div> : null}
+                  {laneCards.map((card) => <div key={card.id} draggable onClick={() => setSelectedCardId(card.id)} onDragStart={(event) => event.dataTransfer.setData('text/plain', card.id)} className={cn('cursor-pointer rounded-lg border bg-background p-4 text-left shadow-sm transition hover:border-primary/50', selectedCardId === card.id && 'border-primary ring-1 ring-primary/30')}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-1.5"><div className="truncate font-semibold">{card.title}</div><InfoHint label={`${card.title} info`}>{card.detail}</InfoHint></div><div className={cn('mt-3 inline-flex rounded-lg border px-3 py-1 text-2xl font-bold', toneClass(card.tone))}>{card.value}</div></div><GripVertical className="size-4 shrink-0 text-muted-foreground" /></div><Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={(event) => { event.stopPropagation(); setSelectedCardId(card.id); setDetailCardId(card.id); }}>Open details</Button></div>)}
+                  {!laneCards.length ? <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Drop KPI card here.</div> : null}
                 </div>
               </div>
             );
@@ -194,11 +194,11 @@ function KpiDashboard({ seed }: { seed: typeof consultingAgentSeedData }) {
         </div>
       </div>
       <Dialog open={Boolean(detailCard)} onOpenChange={(open) => !open && setDetailCardId(null)}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-2xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-lg">
           {detailCard ? <KpiCardDetails card={detailCard} packages={workspace.packages} /> : null}
         </DialogContent>
       </Dialog>
-      {audit.length ? <Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Move audit preview</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground">{audit.map((item) => <div key={item}>{item}</div>)}</CardContent></Card> : null}
+      {audit.length ? <Card className="rounded-lg"><CardHeader><CardTitle className="text-base">Move audit preview</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground">{audit.map((item) => <div key={item}>{item}</div>)}</CardContent></Card> : null}
     </div>
   );
 }
@@ -215,16 +215,16 @@ function LaunchDecisions({ packages }: { packages: DecisionPackage[] }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {grouped.map((group) => <Card key={group.lane} className="rounded-2xl"><CardHeader><div className="flex items-center justify-between gap-2"><CardTitle className="text-base">{group.lane}</CardTitle><Badge variant={group.lane === 'No-go' ? 'destructive' : 'outline'}>{group.items.length}</Badge></div></CardHeader><CardContent className="space-y-3">{group.items.map((item) => <button key={item.id} type="button" onClick={() => setSelectedId(item.id)} className={cn('w-full rounded-xl border p-3 text-left hover:bg-muted/50', selected?.id === item.id && 'border-primary bg-primary/10')}><div className="font-semibold line-clamp-2">{item.title}</div><div className="mt-2 flex items-center gap-2"><Progress value={item.confidence} className="h-1.5" /><span className="text-xs font-semibold">{item.confidence}%</span></div><div className="mt-2 text-xs text-muted-foreground">{item.nextOwner} · {statusLabel(item.status)}</div></button>)}{!group.items.length ? <div className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">No packages.</div> : null}</CardContent></Card>)}
+        {grouped.map((group) => <Card key={group.lane} className="rounded-lg"><CardHeader><div className="flex items-center justify-between gap-2"><CardTitle className="text-base">{group.lane}</CardTitle><Badge variant={group.lane === 'No-go' ? 'destructive' : 'outline'}>{group.items.length}</Badge></div></CardHeader><CardContent className="space-y-3">{group.items.map((item) => <button key={item.id} type="button" onClick={() => setSelectedId(item.id)} className={cn('w-full rounded-lg border p-3 text-left hover:bg-muted/50', selected?.id === item.id && 'border-primary bg-primary/10')}><div className="font-semibold line-clamp-2">{item.title}</div><div className="mt-2 flex items-center gap-2"><Progress value={item.confidence} className="h-1.5" /><span className="text-xs font-semibold">{item.confidence}%</span></div><div className="mt-2 text-xs text-muted-foreground">{item.nextOwner} · {statusLabel(item.status)}</div></button>)}{!group.items.length ? <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No packages.</div> : null}</CardContent></Card>)}
       </div>
-      <Card className="rounded-2xl">
+      <Card className="rounded-lg">
         <CardHeader>
           <div className="flex items-center gap-1.5">
             <CardTitle>{selected?.title || 'Select a decision'}</CardTitle>
             {selected ? <InfoHint label={`${selected.title} info`}>{selected.finding}</InfoHint> : null}
           </div>
         </CardHeader>
-        {selected ? <CardContent className="space-y-4 text-sm"><div className="flex flex-wrap gap-2"><Badge>{decisionLane(selected)}</Badge><Badge variant="outline">{selected.nextOwner}</Badge><Badge variant={selected.riskLevel === 'high' ? 'destructive' : 'secondary'}>{selected.riskLevel}</Badge></div><div className="rounded-xl border bg-muted/30 p-3"><div className="font-semibold">Evidence</div><div className="mt-2 text-muted-foreground">{selected.recommendationEvidence.confidenceReason}</div></div><div className="rounded-xl border bg-muted/30 p-3"><div className="font-semibold">Handoff</div><div className="mt-2 text-muted-foreground">{selected.handoffPayload.objective}</div></div><Button asChild className="w-full"><Link to={selected.handoffPayload.targetRoute}>Open owner route <ArrowRight className="size-4" /></Link></Button></CardContent> : null}
+        {selected ? <CardContent className="space-y-4 text-sm"><div className="flex flex-wrap gap-2"><Badge>{decisionLane(selected)}</Badge><Badge variant="outline">{selected.nextOwner}</Badge><Badge variant={selected.riskLevel === 'high' ? 'destructive' : 'secondary'}>{selected.riskLevel}</Badge></div><div className="rounded-lg border bg-muted/30 p-3"><div className="font-semibold">Evidence</div><div className="mt-2 text-muted-foreground">{selected.recommendationEvidence.confidenceReason}</div></div><div className="rounded-lg border bg-muted/30 p-3"><div className="font-semibold">Handoff</div><div className="mt-2 text-muted-foreground">{selected.handoffPayload.objective}</div></div><Button asChild className="w-full"><Link to={selected.handoffPayload.targetRoute}>Open owner route <ArrowRight className="size-4" /></Link></Button></CardContent> : null}
       </Card>
     </div>
   );

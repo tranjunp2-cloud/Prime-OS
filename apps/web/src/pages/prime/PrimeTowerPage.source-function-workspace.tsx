@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getSkuLabel, getSkuProductName } from '@/lib/prime/prime-data';
-import { buildDemandSourcesOverview, getDemandSourceTypeLabel, type DemandSource, type DemandSourceFunction, type DemandSourceType } from '@/lib/prime/demand-sources';
+import { buildCrmSourcesOverview, getCrmSourceTypeLabel, type CrmSource, type CrmSourceFunction, type CrmSourceType } from '@/lib/prime/crm-sources';
 import { MARKETPLACE_SOURCE_PAGES, getMarketplaceSourcePage, getMarketplaceSourcePageMeta, type MarketplaceSourcePage } from '@/lib/prime/marketplace-source';
 import { cn } from '@/lib/utils';
 import { EvidenceCard, RuntimeContextCard, SourceOperatingLoopGraphic, SourceQualityBar, SummaryMetricCard, formatCompactCount, marketplacePageIcon, marketplaceStatusVariant, prettyMarketplaceLabel, sourceChildIcon, sourceGraphicToneClassName, sourceRiskBadgeVariant, sourceStatusVariant } from './PrimeTowerPage.marketplace-workspace';
@@ -21,13 +21,13 @@ export function getSourceFunctionPage(value: string | null): SourceWorkspacePage
   return getMarketplaceSourcePage(value);
 }
 
-export function getSourceFunctionPageHref(type: DemandSourceType, page: SourceWorkspacePage, sourceId?: string) {
+export function getSourceFunctionPageHref(type: CrmSourceType, page: SourceWorkspacePage, sourceId?: string) {
   const params = new URLSearchParams({ function: type, page });
   if (sourceId) params.set('sourceId', sourceId);
-  return `/demand/sources?${params.toString()}`;
+  return `/crm/sources?${params.toString()}`;
 }
 
-function sourceFunctionIcon(type: DemandSourceType) {
+function sourceFunctionIcon(type: CrmSourceType) {
   if (type === 'social') return MessageCircle;
   if (type === 'ads') return Megaphone;
   if (type === 'partner') return HeartHandshake;
@@ -35,7 +35,7 @@ function sourceFunctionIcon(type: DemandSourceType) {
   return Globe;
 }
 
-function sourceFunctionUnitLabel(type: DemandSourceType) {
+function sourceFunctionUnitLabel(type: CrmSourceType) {
   if (type === 'social') return 'channel';
   if (type === 'ads') return 'ad source';
   if (type === 'partner') return 'partner';
@@ -43,7 +43,7 @@ function sourceFunctionUnitLabel(type: DemandSourceType) {
   return 'source';
 }
 
-function sourceFunctionPageLabel(page: SourceWorkspacePage, type: DemandSourceType) {
+function sourceFunctionPageLabel(page: SourceWorkspacePage, type: CrmSourceType) {
   if (page === 'overview') return 'Overview';
   if (page === 'accounts') {
     if (type === 'social') return 'Social Channels';
@@ -52,7 +52,7 @@ function sourceFunctionPageLabel(page: SourceWorkspacePage, type: DemandSourceTy
     if (type === 'manual') return 'Import Batches';
     return 'Connections';
   }
-  if (page === 'demand-signals') return 'Demand Signals';
+  if (page === 'crm-signals') return 'CRM Signals';
   if (page === 'product-sku-signals') return 'Product / SKU Signals';
   if (page === 'inquiry-lead-intake') return 'Lead Intake';
   if (page === 'campaign-attribution') return 'Campaign Attribution';
@@ -61,11 +61,11 @@ function sourceFunctionPageLabel(page: SourceWorkspacePage, type: DemandSourceTy
   return 'Source Detail';
 }
 
-function sourceFunctionPageDescription(page: SourceWorkspacePage, meta: DemandSourceFunction) {
+function sourceFunctionPageDescription(page: SourceWorkspacePage, meta: CrmSourceFunction) {
   const unit = sourceFunctionUnitLabel(meta.id);
   if (page === 'overview') return `${meta.label} health, top action, and source quality.`;
   if (page === 'accounts') return `Connection, owner, status, freshness, and blocker view for every ${unit}.`;
-  if (page === 'demand-signals') return `Normalized ${meta.label.toLowerCase()} signals before they become lead or RFQ work.`;
+  if (page === 'crm-signals') return `Normalized ${meta.label.toLowerCase()} CRM signals before they become lead or RFQ work.`;
   if (page === 'product-sku-signals') return 'SKU/category demand, stock risk, listing or content fit, and recommended route.';
   if (page === 'inquiry-lead-intake') return 'Source-linked leads and RFQs with owner, intent, duplicate, and SLA context.';
   if (page === 'campaign-attribution') return 'Campaign/source readback preview with first-touch and last-touch confidence.';
@@ -74,13 +74,13 @@ function sourceFunctionPageDescription(page: SourceWorkspacePage, meta: DemandSo
   return 'Full drill-down for one selected source, including lineage, quality, blockers, and handoff routes.';
 }
 
-function childForSource(source: DemandSource, meta: DemandSourceFunction, index = 0) {
+function childForSource(source: CrmSource, meta: CrmSourceFunction, index = 0) {
   const normalized = `${source.name} ${source.connectedChannel} ${source.sourceSignal}`.toLowerCase();
   const matched = meta.children.find((child) => normalized.includes(child.toLowerCase().split(' ')[0]));
   return matched || meta.children[index % meta.children.length] || meta.label;
 }
 
-function buildSourceConnectionRows(sources: DemandSource[], meta: DemandSourceFunction) {
+function buildSourceConnectionRows(sources: CrmSource[], meta: CrmSourceFunction) {
   return meta.children.map((child, index) => {
     const matches = sources.filter((source, sourceIndex) => childForSource(source, meta, sourceIndex) === child);
     const primary = matches[0];
@@ -107,7 +107,7 @@ function buildSourceConnectionRows(sources: DemandSource[], meta: DemandSourceFu
   });
 }
 
-function buildSourceDataHealthRows(sources: DemandSource[], meta: DemandSourceFunction) {
+function buildSourceDataHealthRows(sources: CrmSource[], meta: CrmSourceFunction) {
   return buildSourceConnectionRows(sources, meta).map((row) => {
     const duplicateRate = row.primary?.duplicateRate || 0;
     const status = !row.primary
@@ -131,11 +131,11 @@ function buildSourceDataHealthRows(sources: DemandSource[], meta: DemandSourceFu
   });
 }
 
-function SourceFunctionVisualRouteMap({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionVisualRouteMap({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   const rows = buildSourceConnectionRows(sources, meta);
   const HeaderIcon = sourceFunctionIcon(meta.id);
   return (
-    <Card className="rounded-2xl border">
+    <Card className="rounded-lg border">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -155,10 +155,10 @@ function SourceFunctionVisualRouteMap({ meta, sources }: { meta: DemandSourceFun
             <Link
               key={row.id}
               to={row.primary ? getSourceFunctionPageHref(meta.id, 'detail', row.primary.id) : getSourceFunctionPageHref(meta.id, 'accounts')}
-              className="rounded-2xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5"
+              className="rounded-lg border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className={`flex size-11 items-center justify-center rounded-xl border ${sourceGraphicToneClassName(index)}`}>
+                <div className={`flex size-11 items-center justify-center rounded-lg border ${sourceGraphicToneClassName(index)}`}>
                   <Icon className="size-5" />
                 </div>
                 <Badge variant={marketplaceStatusVariant(row.status)}>{prettyMarketplaceLabel(row.status)}</Badge>
@@ -184,19 +184,19 @@ export function SourceFunctionWorkspace({
   sources,
   selectedSourceId,
 }: {
-  meta: DemandSourceFunction;
+  meta: CrmSourceFunction;
   page: SourceWorkspacePage;
-  sources: DemandSource[];
+  sources: CrmSource[];
   selectedSourceId: string | null;
 }) {
-  const overview = buildDemandSourcesOverview(sources);
+  const overview = buildCrmSourcesOverview(sources);
   const PageIcon = marketplacePageIcon(page);
   const pageLabel = sourceFunctionPageLabel(page, meta.id);
 
   return (
     <div className="min-h-full bg-background">
       <div className="space-y-5 p-4 md:p-6">
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardContent className="p-2">
             <div className="flex gap-2 overflow-x-auto">
               {MARKETPLACE_SOURCE_PAGES.filter((item) => item.id !== 'detail').map((item) => {
@@ -206,7 +206,7 @@ export function SourceFunctionWorkspace({
                   <Link
                     key={item.id}
                     to={getSourceFunctionPageHref(meta.id, item.id)}
-                    className={`inline-flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                    className={`inline-flex min-w-fit items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                   >
                     <ItemIcon className="size-4" />
                     {sourceFunctionPageLabel(item.id, meta.id)}
@@ -217,7 +217,7 @@ export function SourceFunctionWorkspace({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border bg-muted/10">
+        <Card className="rounded-lg border bg-muted/10">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <PageIcon className="size-5" />
@@ -229,7 +229,7 @@ export function SourceFunctionWorkspace({
 
         {page === 'overview' ? <SourceFunctionOverviewView meta={meta} sources={sources} overview={overview} /> : null}
         {page === 'accounts' ? <SourceFunctionConnectionsView meta={meta} sources={sources} /> : null}
-        {page === 'demand-signals' ? <SourceFunctionSignalsView meta={meta} sources={sources} /> : null}
+        {page === 'crm-signals' ? <SourceFunctionSignalsView meta={meta} sources={sources} /> : null}
         {page === 'product-sku-signals' ? <SourceFunctionSkuView meta={meta} sources={sources} overview={overview} /> : null}
         {page === 'inquiry-lead-intake' ? <SourceFunctionIntakeView meta={meta} sources={sources} /> : null}
         {page === 'campaign-attribution' ? <SourceFunctionAttributionView meta={meta} sources={sources} /> : null}
@@ -237,14 +237,14 @@ export function SourceFunctionWorkspace({
         {page === 'data-health' ? <SourceFunctionDataHealthView meta={meta} sources={sources} /> : null}
         {page === 'detail' ? <SourceFunctionDetailView meta={meta} sources={sources} selectedSourceId={selectedSourceId} /> : null}
         {!sources.length ? (
-          <Card className="rounded-2xl border border-dashed">
+          <Card className="rounded-lg border border-dashed">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
               <div>
                 <div className="font-semibold">No {meta.label.toLowerCase()} records yet</div>
                 <p className="mt-1 text-sm text-muted-foreground">Connect or import a {sourceFunctionUnitLabel(meta.id)} before scaling this function.</p>
               </div>
               <Button asChild variant="outline">
-                <Link to="/demand/sources">Back to all Sources</Link>
+                <Link to="/crm/sources">Back to all Sources</Link>
               </Button>
             </CardContent>
           </Card>
@@ -254,12 +254,12 @@ export function SourceFunctionWorkspace({
   );
 }
 
-function SourceFunctionKpiStrip({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+function SourceFunctionKpiStrip({ meta, sources, overview }: { meta: CrmSourceFunction; sources: CrmSource[]; overview: ReturnType<typeof buildCrmSourcesOverview> }) {
   const connections = buildSourceConnectionRows(sources, meta);
   const Icon = sourceFunctionIcon(meta.id);
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-      <SummaryMetricCard label="Source rows" value={sources.length} metaTooltip={`Total ${meta.label} DemandSource rows.`} icon={<Icon className="size-5" />} tone="info" />
+      <SummaryMetricCard label="Source rows" value={sources.length} metaTooltip={`Total ${meta.label} CrmSource rows.`} icon={<Icon className="size-5" />} tone="info" />
       <SummaryMetricCard label="Active routes" value={connections.filter((row) => row.status !== 'inactive').length} metaTooltip={`Connected ${sourceFunctionUnitLabel(meta.id)} routes.`} icon={<CircleUserRound className="size-5" />} tone="success" />
       <SummaryMetricCard label="Leads" value={overview.totalLeads} metaTooltip="Leads traced to this source function." icon={<UserRoundCheck className="size-5" />} tone="teal" />
       <SummaryMetricCard label="RFQs" value={overview.totalRfqs} metaTooltip="RFQs traced to this source function." icon={<ClipboardList className="size-5" />} tone="warning" />
@@ -269,7 +269,7 @@ function SourceFunctionKpiStrip({ meta, sources, overview }: { meta: DemandSourc
   );
 }
 
-function SourceFunctionQualityChart({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionQualityChart({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   const rows = buildSourceConnectionRows(sources, meta);
   const config = {
     quality: {
@@ -293,13 +293,13 @@ function SourceFunctionQualityChart({ meta, sources }: { meta: DemandSourceFunct
   );
 }
 
-function SourceFunctionFunnel({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionFunnel({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   const signalVolume = sources.reduce((sum, source) => sum + source.signalVolume, 0);
   const leads = sources.reduce((sum, source) => sum + source.leadCount, 0);
   const rfqs = sources.reduce((sum, source) => sum + source.rfqCount, 0);
   const traffic = sources.reduce((sum, source) => sum + source.campaignTraffic, 0);
   const stages = [
-    { label: 'Signals', value: signalVolume, href: getSourceFunctionPageHref(meta.id, 'demand-signals') },
+    { label: 'Signals', value: signalVolume, href: getSourceFunctionPageHref(meta.id, 'crm-signals') },
     { label: 'Traffic', value: traffic, href: getSourceFunctionPageHref(meta.id, 'campaign-attribution') },
     { label: 'Leads', value: leads, href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake') },
     { label: 'RFQs', value: rfqs, href: getSourceFunctionPageHref(meta.id, 'inquiry-lead-intake') },
@@ -308,7 +308,7 @@ function SourceFunctionFunnel({ meta, sources }: { meta: DemandSourceFunction; s
   return (
     <div className="space-y-3">
       {stages.map((stage, index) => (
-        <Link key={stage.label} to={stage.href} className="block rounded-xl border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
+        <Link key={stage.label} to={stage.href} className="block rounded-lg border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-primary/5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="flex size-6 items-center justify-center rounded-md border bg-muted text-xs font-semibold">{index + 1}</span>
@@ -325,7 +325,7 @@ function SourceFunctionFunnel({ meta, sources }: { meta: DemandSourceFunction; s
   );
 }
 
-function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+function SourceFunctionOverviewView({ meta, sources, overview }: { meta: CrmSourceFunction; sources: CrmSource[]; overview: ReturnType<typeof buildCrmSourcesOverview> }) {
   const topSource = overview.topSource;
   const reviewSources = sources.filter((source) => source.status === 'needs_review' || source.blockers.length > 0).slice(0, 4);
   return (
@@ -339,20 +339,20 @@ function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandS
         />
       </section>
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader>
             <CardTitle>First-screen answer</CardTitle>
             <p className="text-sm text-muted-foreground">Which {meta.label.toLowerCase()} route deserves action now?</p>
           </CardHeader>
           <CardContent>
             {topSource ? (
-              <div className="rounded-2xl border bg-primary/5 p-5">
+              <div className="rounded-lg border bg-primary/5 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-2xl font-semibold tracking-tight">{topSource.name}</div>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{topSource.actionReason}</p>
                   </div>
-                  <div className="min-w-24 rounded-xl bg-background p-3 text-center shadow-sm">
+                  <div className="min-w-24 rounded-lg bg-background p-3 text-center shadow-sm">
                     <div className="text-xs text-muted-foreground">Quality</div>
                     <div className="text-2xl font-semibold">{topSource.qualityScore}</div>
                   </div>
@@ -369,11 +369,11 @@ function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandS
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">No {meta.label.toLowerCase()} records yet.</div>
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">No {meta.label.toLowerCase()} records yet.</div>
             )}
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader>
             <CardTitle>{meta.label} quality</CardTitle>
             <p className="text-sm text-muted-foreground">Quality score by {sourceFunctionUnitLabel(meta.id)} class.</p>
@@ -384,11 +384,11 @@ function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandS
         </Card>
       </section>
       <section className="grid gap-4 xl:grid-cols-[minmax(340px,0.75fr)_minmax(0,1.25fr)]">
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader><CardTitle>Signal to RFQ funnel</CardTitle></CardHeader>
           <CardContent><SourceFunctionFunnel meta={meta} sources={sources} /></CardContent>
         </Card>
-        <Card className="rounded-2xl border border-warning/30 bg-warning/5">
+        <Card className="rounded-lg border border-warning/30 bg-warning/5">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <CardTitle>Needs-review lane</CardTitle>
@@ -397,12 +397,12 @@ function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandS
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {reviewSources.length ? reviewSources.map((source) => (
-              <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="rounded-xl border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+              <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="rounded-lg border bg-background p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
                 <div className="font-semibold">{source.name}</div>
                 <p className="mt-2 text-sm text-muted-foreground">{source.blockers[0] || source.actionReason}</p>
               </Link>
             )) : (
-              <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">No review blockers are visible.</div>
+              <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">No review blockers are visible.</div>
             )}
           </CardContent>
         </Card>
@@ -411,7 +411,7 @@ function SourceFunctionOverviewView({ meta, sources, overview }: { meta: DemandS
   );
 }
 
-function SourceFunctionConnectionsView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionConnectionsView({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   const rows = buildSourceConnectionRows(sources, meta);
   return (
     <div className="space-y-4">
@@ -421,7 +421,7 @@ function SourceFunctionConnectionsView({ meta, sources }: { meta: DemandSourceFu
         <SummaryMetricCard label="Pending review" value={rows.filter((row) => row.status === 'needs_review').length} metaTooltip="Routes blocked by quality or data issues." icon={<BellRing className="size-5" />} tone="warning" />
         <SummaryMetricCard label="Not connected" value={rows.filter((row) => row.status === 'inactive').length} metaTooltip="Expected function children without a connected row." icon={<SlidersHorizontal className="size-5" />} tone="purple" />
       </div>
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader>
           <CardTitle>{sourceFunctionPageLabel('accounts', meta.id)} registry</CardTitle>
           <p className="text-sm text-muted-foreground">Owner, status, ingestion, freshness, leads, RFQs, and blocker state.</p>
@@ -461,7 +461,7 @@ function SourceFunctionConnectionsView({ meta, sources }: { meta: DemandSourceFu
   );
 }
 
-function SourceFunctionSignalsView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionSignalsView({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -470,11 +470,11 @@ function SourceFunctionSignalsView({ meta, sources }: { meta: DemandSourceFuncti
         <SummaryMetricCard label="Watch signals" value={sources.filter((source) => source.status === 'needs_review').length} metaTooltip="Signals needing operator review." icon={<BellRing className="size-5" />} tone="warning" />
         <SummaryMetricCard label="Avg conversion" value={`${sources.length ? Math.round(sources.reduce((sum, source) => sum + source.conversionRate, 0) / sources.length) : 0}%`} metaTooltip="Average signal-to-lead conversion." icon={<TrendingUp className="size-5" />} tone="purple" />
       </div>
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader><CardTitle>Normalized signal queue</CardTitle><p className="text-sm text-muted-foreground">Every signal keeps source, owner, SKU, freshness, and action context.</p></CardHeader>
         <CardContent className="space-y-3">
           {sources.map((source, index) => (
-            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="grid gap-3 rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_120px_120px_auto] md:items-center">
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="grid gap-3 rounded-lg border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_120px_120px_auto] md:items-center">
               <div><div className="font-semibold">{source.sourceSignal}</div><p className="mt-1 text-sm text-muted-foreground">{childForSource(source, meta, index)} / {source.name}</p></div>
               <div><div className="text-xs text-muted-foreground">Volume</div><div className="font-semibold">{formatCompactCount(source.signalVolume)}</div></div>
               <div><div className="text-xs text-muted-foreground">Freshness</div><div className="font-semibold">{source.freshnessMinutes}m</div></div>
@@ -488,7 +488,7 @@ function SourceFunctionSignalsView({ meta, sources }: { meta: DemandSourceFuncti
   );
 }
 
-function SourceFunctionSkuView({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+function SourceFunctionSkuView({ meta, sources, overview }: { meta: CrmSourceFunction; sources: CrmSource[]; overview: ReturnType<typeof buildCrmSourcesOverview> }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -497,11 +497,11 @@ function SourceFunctionSkuView({ meta, sources, overview }: { meta: DemandSource
         <SummaryMetricCard label="Finance watch" value={sources.filter((source) => source.financeRisk === 'high').length} metaTooltip="Sources blocked by finance review." icon={<CircleDollarSign className="size-5" />} tone="purple" />
         <SummaryMetricCard label="Mapped campaigns" value={sources.filter((source) => source.linkedCampaignIds.length > 0).length} metaTooltip="Sources linked to campaign work." icon={<Megaphone className="size-5" />} tone="success" />
       </div>
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader><CardTitle>Product / SKU signal matrix</CardTitle><p className="text-sm text-muted-foreground">SKU demand and guardrails across {meta.label.toLowerCase()}.</p></CardHeader>
         <CardContent className="space-y-3">
           {sources.map((source, index) => (
-            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="grid gap-3 rounded-xl border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_110px_110px_110px_auto] md:items-center">
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="grid gap-3 rounded-lg border p-3 transition-colors hover:border-primary/35 hover:bg-primary/5 md:grid-cols-[1fr_120px_110px_110px_110px_auto] md:items-center">
               <div><div className="font-semibold">{source.skuCode}</div><p className="mt-1 text-xs text-muted-foreground">{source.productName} / {childForSource(source, meta, index)}</p></div>
               <div><div className="text-xs text-muted-foreground">Demand</div><div className="font-semibold">{formatCompactCount(source.signalVolume)}</div></div>
               <div><div className="text-xs text-muted-foreground">Leads</div><div className="font-semibold">{source.leadCount}</div></div>
@@ -516,7 +516,7 @@ function SourceFunctionSkuView({ meta, sources, overview }: { meta: DemandSource
   );
 }
 
-function SourceFunctionIntakeView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionIntakeView({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -525,11 +525,11 @@ function SourceFunctionIntakeView({ meta, sources }: { meta: DemandSourceFunctio
         <SummaryMetricCard label="Route leads" value={sources.filter((source) => source.nextAction === 'Route leads').length} metaTooltip="Sources ready for lead routing." icon={<ArrowRight className="size-5" />} tone="teal" />
         <SummaryMetricCard label="Duplicate watch" value={sources.filter((source) => source.duplicateRate >= 14).length} metaTooltip="Rows that should not auto-route." icon={<Trash2 className="size-5" />} tone="warning" />
       </div>
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader><CardTitle>Lead and RFQ intake queue</CardTitle><p className="text-sm text-muted-foreground">Operator-owned handoff queue with source lineage preserved.</p></CardHeader>
         <CardContent className="space-y-3">
           {sources.map((source) => (
-            <div key={source.id} className="grid gap-3 rounded-xl border bg-background p-4 md:grid-cols-[1fr_110px_110px_110px_auto] md:items-center">
+            <div key={source.id} className="grid gap-3 rounded-lg border bg-background p-4 md:grid-cols-[1fr_110px_110px_110px_auto] md:items-center">
               <div><div className="font-semibold">{source.name}</div><p className="mt-1 text-sm text-muted-foreground">{source.sourceSignal}</p></div>
               <div><div className="text-xs text-muted-foreground">Owner</div><div className="font-semibold">{source.ownerLabel}</div></div>
               <div><div className="text-xs text-muted-foreground">Leads</div><div className="font-semibold">{source.leadCount}</div></div>
@@ -546,7 +546,7 @@ function SourceFunctionIntakeView({ meta, sources }: { meta: DemandSourceFunctio
   );
 }
 
-function SourceFunctionAttributionView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionAttributionView({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -555,11 +555,11 @@ function SourceFunctionAttributionView({ meta, sources }: { meta: DemandSourceFu
         <SummaryMetricCard label="Low confidence" value={sources.filter((source) => source.attribution.some((touchpoint) => touchpoint.confidence < 70)).length} metaTooltip="Attribution rows needing review." icon={<BellRing className="size-5" />} tone="warning" />
         <SummaryMetricCard label="Preview only" value="Readback" metaTooltip="Attribution here is a readback preview, not final truth." icon={<ScanSearch className="size-5" />} tone="purple" />
       </div>
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader><CardTitle>Attribution readback preview</CardTitle><p className="text-sm text-muted-foreground">First-touch, last-touch, campaign, and RFQ readback context.</p></CardHeader>
         <CardContent className="space-y-3">
           {sources.map((source) => (
-            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="block rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="block rounded-lg border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
               <div className="grid gap-3 md:grid-cols-[1fr_260px_120px_120px_auto] md:items-center">
                 <div><div className="font-semibold">{source.name}</div><p className="mt-1 text-xs text-muted-foreground">{source.sourceSignal}</p></div>
                 <div className="flex flex-wrap gap-1.5">{source.attribution.map((touchpoint) => <Badge key={`${source.id}-${touchpoint.label}`} variant="outline">{touchpoint.label} {touchpoint.confidence}%</Badge>)}</div>
@@ -575,15 +575,15 @@ function SourceFunctionAttributionView({ meta, sources }: { meta: DemandSourceFu
   );
 }
 
-function SourceFunctionQualityView({ meta, sources, overview }: { meta: DemandSourceFunction; sources: DemandSource[]; overview: ReturnType<typeof buildDemandSourcesOverview> }) {
+function SourceFunctionQualityView({ meta, sources, overview }: { meta: CrmSourceFunction; sources: CrmSource[]; overview: ReturnType<typeof buildCrmSourcesOverview> }) {
   return (
     <div className="space-y-4">
       <SourceFunctionKpiStrip meta={meta} sources={sources} overview={overview} />
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader><CardTitle>{meta.label} quality ranking</CardTitle><p className="text-sm text-muted-foreground">Numeric score is paired with reason trail, blocker, and action route.</p></CardHeader>
         <CardContent className="space-y-3">
           {sources.map((source) => (
-            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="block rounded-xl border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
+            <Link key={source.id} to={getSourceFunctionPageHref(meta.id, 'detail', source.id)} className="block rounded-lg border p-4 transition-colors hover:border-primary/35 hover:bg-primary/5">
               <div className="grid gap-3 md:grid-cols-[1fr_240px_140px_auto] md:items-center">
                 <div><div className="font-semibold">{source.name}</div><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{source.scoreReasons.join(' / ')}</p></div>
                 <SourceQualityBar value={source.qualityScore} />
@@ -598,7 +598,7 @@ function SourceFunctionQualityView({ meta, sources, overview }: { meta: DemandSo
   );
 }
 
-function SourceFunctionDataHealthView({ meta, sources }: { meta: DemandSourceFunction; sources: DemandSource[] }) {
+function SourceFunctionDataHealthView({ meta, sources }: { meta: CrmSourceFunction; sources: CrmSource[] }) {
   const rows = buildSourceDataHealthRows(sources, meta);
   return (
     <div className="space-y-4">
@@ -609,11 +609,11 @@ function SourceFunctionDataHealthView({ meta, sources }: { meta: DemandSourceFun
         <SummaryMetricCard label="Unmapped" value={rows.reduce((sum, row) => sum + row.unmappedCount, 0)} metaTooltip="Rows without mapped SKU/campaign context." icon={<SlidersHorizontal className="size-5" />} tone="info" />
         <SummaryMetricCard label="Errors" value={rows.reduce((sum, row) => sum + row.errorCount, 0)} metaTooltip="Data-health issues blocking scale recommendations." icon={<ScanSearch className="size-5" />} tone="warning" />
       </div>
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardHeader><CardTitle>{meta.label} data health</CardTitle><p className="text-sm text-muted-foreground">Freshness, ingestion, duplicate rate, missing mapping, and reconciliation action.</p></CardHeader>
         <CardContent className="space-y-3">
           {rows.map((row) => (
-            <div key={row.id} className="grid gap-3 rounded-xl border bg-background p-4 md:grid-cols-[1fr_120px_120px_120px_120px_auto] md:items-center">
+            <div key={row.id} className="grid gap-3 rounded-lg border bg-background p-4 md:grid-cols-[1fr_120px_120px_120px_120px_auto] md:items-center">
               <div><div className="font-semibold">{row.child}</div><p className="mt-1 text-xs text-muted-foreground">{row.ingestionMode} / owner {row.owner}</p></div>
               <Badge variant={marketplaceStatusVariant(row.status)}>{prettyMarketplaceLabel(row.status)}</Badge>
               <div><div className="text-xs text-muted-foreground">Last sync</div><div className="font-semibold">{row.lastSyncAt}</div></div>
@@ -628,14 +628,14 @@ function SourceFunctionDataHealthView({ meta, sources }: { meta: DemandSourceFun
   );
 }
 
-function SourceFunctionDetailView({ meta, sources, selectedSourceId }: { meta: DemandSourceFunction; sources: DemandSource[]; selectedSourceId: string | null }) {
+function SourceFunctionDetailView({ meta, sources, selectedSourceId }: { meta: CrmSourceFunction; sources: CrmSource[]; selectedSourceId: string | null }) {
   const source = sources.find((item) => item.id === selectedSourceId) || sources[0] || null;
   if (!source) {
-    return <Card className="rounded-2xl border border-dashed"><CardContent className="p-6 text-sm text-muted-foreground">No source is selected for detail.</CardContent></Card>;
+    return <Card className="rounded-lg border border-dashed"><CardContent className="p-6 text-sm text-muted-foreground">No source is selected for detail.</CardContent></Card>;
   }
   return (
     <div className="space-y-4">
-      <Card className="rounded-2xl border">
+      <Card className="rounded-lg border">
         <CardContent className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -647,7 +647,7 @@ function SourceFunctionDetailView({ meta, sources, selectedSourceId }: { meta: D
               <h2 className="mt-3 text-2xl font-semibold tracking-tight">{source.name}</h2>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{source.sourceSignal}</p>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-4 text-center">
+            <div className="rounded-lg border bg-muted/20 p-4 text-center">
               <div className="text-xs text-muted-foreground">Quality</div>
               <div className="text-3xl font-semibold">{source.qualityScore}</div>
             </div>
@@ -661,15 +661,15 @@ function SourceFunctionDetailView({ meta, sources, selectedSourceId }: { meta: D
         </CardContent>
       </Card>
       <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader><CardTitle>Quality engine</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <SourceQualityBar value={source.qualityScore} />
-            {source.scoreReasons.map((reason) => <div key={reason} className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">{reason}</div>)}
-            {source.blockers.map((blocker) => <div key={blocker} className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{blocker}</div>)}
+            {source.scoreReasons.map((reason) => <div key={reason} className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{reason}</div>)}
+            {source.blockers.map((blocker) => <div key={blocker} className="rounded-lg border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{blocker}</div>)}
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border">
+        <Card className="rounded-lg border">
           <CardHeader><CardTitle>Lineage and readback</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <EvidenceCard label="Signal volume" value={formatCompactCount(source.signalVolume)} meta={source.sourceSignal} />
@@ -681,8 +681,8 @@ function SourceFunctionDetailView({ meta, sources, selectedSourceId }: { meta: D
       </section>
       <div className="flex flex-wrap gap-2">
         <Button asChild><Link to={source.nextActionRoute}>{source.nextAction}<ArrowRight className="size-4" /></Link></Button>
-        <Button asChild variant="outline"><Link to="/demand/campaigns">Open campaigns</Link></Button>
-        <Button asChild variant="outline"><Link to="/demand/leads-rfqs">Open leads/RFQs</Link></Button>
+        <Button asChild variant="outline"><Link to="/crm/campaigns">Open campaigns</Link></Button>
+        <Button asChild variant="outline"><Link to="/crm/leads-rfqs">Open leads/RFQs</Link></Button>
         <Button asChild variant="outline"><Link to={getSourceFunctionPageHref(meta.id, 'data-health')}>Review data health</Link></Button>
       </div>
     </div>

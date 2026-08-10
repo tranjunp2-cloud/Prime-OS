@@ -782,9 +782,9 @@ function FoundationShell({ activeView, children }: { activeView: FoundationView;
   return (
     <div className="-m-4 min-h-[calc(100vh-70px)] bg-background px-4 py-5 md:-m-6 md:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="surface-toolbar flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/70 px-4 py-3 shadow-sm">
+        <div className="surface-toolbar flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/70 px-4 py-3 shadow-sm">
           <div className="flex items-center gap-3">
-            <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Sparkles className="size-5" />
             </span>
             <div>
@@ -792,7 +792,7 @@ function FoundationShell({ activeView, children }: { activeView: FoundationView;
               <div className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{uiCopy.shell.workflow}</div>
             </div>
           </div>
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-muted/50 p-1">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted/50 p-1">
             {copy.nav.map((item) => (
               <Link
                 key={item.label}
@@ -823,7 +823,7 @@ function DashboardScreen() {
 
   return (
     <div className="space-y-6">
-      <section className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
+      <section className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{uiCopy.dashboard.badge}</Badge>
@@ -839,7 +839,7 @@ function DashboardScreen() {
           {assetTemplates.map((asset) => {
             const Icon = asset.icon;
             return (
-              <div key={asset.label} className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div key={asset.label} className="rounded-lg border border-border/70 bg-muted/20 p-4">
                 <Icon className="size-5 text-primary" />
                 <div className="mt-3 font-semibold text-foreground">{asset.label}</div>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{asset.detail}</p>
@@ -850,14 +850,14 @@ function DashboardScreen() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <Card className="surface-solid rounded-2xl border-border/70 shadow-sm">
+        <Card className="surface-solid rounded-lg border-border/70 shadow-sm">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-foreground">Recent brand foundations <InfoHint>These are generated brand asset workspaces, not product or campaign records.</InfoHint></CardTitle>
             <Button asChild variant="outline"><Link to={assetsHref}>View assets</Link></Button>
           </CardHeader>
           <CardContent className="space-y-3">
             {projects.map((project) => (
-              <Link key={project.id} to={`/intelligence/branding-agent/${project.id}`} className="grid gap-4 rounded-xl border bg-muted/20 p-4 transition-colors hover:border-primary/30 hover:bg-muted/30 md:grid-cols-[1fr_120px_160px_auto] md:items-center">
+              <Link key={project.id} to={`/intelligence/branding-agent/${project.id}`} className="grid gap-4 rounded-lg border bg-muted/20 p-4 transition-colors hover:border-primary/30 hover:bg-muted/30 md:grid-cols-[1fr_120px_160px_auto] md:items-center">
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="font-semibold text-foreground">{project.name}</div>
@@ -876,14 +876,14 @@ function DashboardScreen() {
           </CardContent>
         </Card>
 
-        <Card className="surface-solid rounded-2xl border-border/70 shadow-sm">
+        <Card className="surface-solid rounded-lg border-border/70 shadow-sm">
           <CardHeader>
             <CardTitle>Question flow</CardTitle>
             <p className="text-sm text-muted-foreground">The system builds assets from answers, not from linked PrimeOS modules.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {fullFlow.sections.map((section, index) => (
-              <div key={section.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
+              <div key={section.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
                 <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">{index + 1}</span>
                 <div>
                   <div className="font-medium">{section.title}</div>
@@ -900,7 +900,7 @@ function DashboardScreen() {
 
 function ReferenceContextStrip({ profile, copy }: { profile: BrandReferenceProfile; copy: BrandingAgentCopy }) {
   return (
-    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-sm">
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{copy.library.referenceContext}</Badge>
@@ -924,7 +924,7 @@ function BrandReferenceLogo({ profile, size = 'md' }: { profile: BrandReferenceP
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-white shadow-sm',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-white shadow-sm',
         size === 'lg' ? 'h-20 w-28 p-3' : 'h-14 w-20 p-2',
       )}
     >
@@ -971,14 +971,14 @@ function CreateFoundationScreen() {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
         {referenceProfile ? <ReferenceContextStrip profile={referenceProfile} copy={copy} /> : null}
-        <div className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
+        <div className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm md:p-6">
           <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{copy.create.badge}</Badge>
           <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">{copy.create.chooseTitle}</h1>
               <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">{copy.create.chooseDescription}</p>
             </div>
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+            <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{copy.create.outputPackageLabel}</div>
               <div className="mt-2 text-sm font-medium text-foreground">{copy.create.outputPackage}</div>
             </div>
@@ -994,11 +994,11 @@ function CreateFoundationScreen() {
                 type="button"
                 onClick={() => selectFlow(flow.id)}
                 className={cn(
-                  'group rounded-2xl border border-border/70 bg-card p-5 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'group rounded-lg border border-border/70 bg-card p-5 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 )}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <span className="inline-flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <span className="inline-flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Icon className="size-6" />
                   </span>
                   <Badge variant="outline">{flow.duration}</Badge>
@@ -1021,7 +1021,7 @@ function CreateFoundationScreen() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {referenceProfile ? <ReferenceContextStrip profile={referenceProfile} copy={copy} /> : null}
-      <div className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm">
+      <div className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <button type="button" onClick={() => setSelectedFlowId(null)} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -1032,7 +1032,7 @@ function CreateFoundationScreen() {
           <Badge className="rounded-full border-primary/20 bg-primary/10 px-4 py-1 text-primary" variant="outline">{selectedFlow.duration}</Badge>
         </div>
 
-        <div className="mt-5 flex gap-1 overflow-x-auto rounded-xl bg-muted/50 p-1">
+        <div className="mt-5 flex gap-1 overflow-x-auto rounded-lg bg-muted/50 p-1">
           {sections.map((section, index) => {
             const Icon = section.icon ?? Sparkles;
             const active = index === activeSectionIndex;
@@ -1059,11 +1059,11 @@ function CreateFoundationScreen() {
       </div>
 
       <div>
-        <Card className="surface-solid rounded-2xl border-border/70 shadow-sm">
+        <Card className="surface-solid rounded-lg border-border/70 shadow-sm">
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-3 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                <div className="inline-flex items-center gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
                   <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <ActiveIcon className="size-5" />
                   </span>
@@ -1137,7 +1137,7 @@ function BrandLibraryScreen() {
 
   return (
     <div className="space-y-6">
-      <section className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
+      <section className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{copy.library.badge}</Badge>
@@ -1157,14 +1157,14 @@ function BrandLibraryScreen() {
           { label: copy.library.archetypes, value: archetypeCount },
           { label: copy.library.ready, value: <CheckCircle2 className="size-5 text-success" /> },
         ].map((metric) => (
-          <div key={metric.label} className="surface-solid rounded-xl border border-border/70 p-4 shadow-sm">
+          <div key={metric.label} className="surface-solid rounded-lg border border-border/70 p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{metric.label}</div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</div>
           </div>
         ))}
       </div>
 
-      <Card className="surface-solid rounded-2xl border-border/70 shadow-sm">
+      <Card className="surface-solid rounded-lg border-border/70 shadow-sm">
         <CardHeader className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-xl text-foreground">
@@ -1238,7 +1238,7 @@ function BrandLibraryScreen() {
         </CardHeader>
         <CardContent>
           {filteredProfiles.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center">
+            <div className="rounded-lg border border-dashed border-border p-8 text-center">
               <Library className="mx-auto size-8 text-muted-foreground" />
               <div className="mt-3 font-semibold text-foreground">No reference profiles match this filter</div>
               <p className="mt-1 text-sm text-muted-foreground">Clear search or category filters to return to the full library.</p>
@@ -1263,7 +1263,7 @@ function BrandLibraryScreen() {
                 key={profile.id}
                 type="button"
                 onClick={() => setProfileDetailId(profile.id)}
-                className="group flex min-h-[220px] w-full flex-col rounded-xl border border-border/70 bg-muted/10 p-4 text-left transition-colors hover:border-primary/30 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex min-h-[220px] w-full flex-col rounded-lg border border-border/70 bg-muted/10 p-4 text-left transition-colors hover:border-primary/30 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 gap-3">
@@ -1333,7 +1333,7 @@ function BrandLibraryScreen() {
                   { label: copy.library.positioning, body: detailProfile.positioning },
                   { label: copy.library.audience, body: detailProfile.audience },
                 ].map((section) => (
-                  <div key={section.label} className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                  <div key={section.label} className="rounded-lg border border-border/70 bg-muted/10 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{section.label}</div>
                     <p className="mt-2 text-sm leading-6 text-foreground">{section.body}</p>
                   </div>
@@ -1346,7 +1346,7 @@ function BrandLibraryScreen() {
                   { label: copy.library.visualDirection, values: detailProfile.visualDirection },
                   { label: copy.library.contentPillars, values: detailProfile.contentPillars },
                 ].map((section) => (
-                  <div key={section.label} className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                  <div key={section.label} className="rounded-lg border border-border/70 bg-muted/10 p-4">
                     <div className="text-sm font-semibold text-foreground">{section.label}</div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {section.values.map((value) => (
@@ -1358,13 +1358,13 @@ function BrandLibraryScreen() {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-success/20 bg-success/5 p-4">
+                <div className="rounded-lg border border-success/20 bg-success/5 p-4">
                   <div className="text-sm font-semibold text-foreground">{copy.library.strengths}</div>
                   <ul className="mt-2 space-y-2 text-sm leading-6 text-muted-foreground">
                     {detailProfile.strengths.map((strength) => <li key={strength}>- {strength}</li>)}
                   </ul>
                 </div>
-                <div className="rounded-xl border border-warning/20 bg-warning/5 p-4">
+                <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
                   <div className="text-sm font-semibold text-foreground">{copy.library.watchouts}</div>
                   <ul className="mt-2 space-y-2 text-sm leading-6 text-muted-foreground">
                     {detailProfile.watchouts.map((watchout) => <li key={watchout}>- {watchout}</li>)}
@@ -1410,7 +1410,7 @@ function MyAssetsScreen() {
 
   return (
     <div className="space-y-6">
-      <section className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
+      <section className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm md:p-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-end">
           <div>
             <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{uiCopy.assets.badge}</Badge>
@@ -1435,7 +1435,7 @@ function MyAssetsScreen() {
         ].map((metric) => {
           const Icon = metric.icon;
           return (
-            <div key={metric.label} className="surface-solid rounded-xl border border-border/70 p-4 shadow-sm">
+            <div key={metric.label} className="surface-solid rounded-lg border border-border/70 p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -1444,7 +1444,7 @@ function MyAssetsScreen() {
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</div>
                 </div>
-                <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="size-5" />
                 </span>
               </div>
@@ -1453,7 +1453,7 @@ function MyAssetsScreen() {
         })}
       </div>
 
-      <Card className="surface-solid rounded-2xl border-border/70 shadow-sm">
+      <Card className="surface-solid rounded-lg border-border/70 shadow-sm">
         <CardHeader className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1486,7 +1486,7 @@ function MyAssetsScreen() {
         </CardHeader>
         <CardContent>
           {filteredPackages.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center">
+            <div className="rounded-lg border border-dashed border-border p-8 text-center">
               <Library className="mx-auto size-8 text-muted-foreground" />
               <div className="mt-3 font-semibold text-foreground">{uiCopy.assets.emptyTitle}</div>
               <p className="mt-1 text-sm text-muted-foreground">{uiCopy.assets.emptyBody}</p>
@@ -1500,10 +1500,10 @@ function MyAssetsScreen() {
                   key={pkg.id}
                   type="button"
                   onClick={() => setDetailId(pkg.id)}
-                  className="group flex min-h-[320px] w-full flex-col rounded-2xl border border-border/70 bg-muted/10 p-4 text-left transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group flex min-h-[320px] w-full flex-col rounded-lg border border-border/70 bg-muted/10 p-4 text-left transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <span className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className="inline-flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <FileText className="size-5" />
                     </span>
                     <Badge variant="outline" className={getStatusBadgeClass(pkg.status)}>{getStatusLabel(pkg.status)}</Badge>
@@ -1518,7 +1518,7 @@ function MyAssetsScreen() {
                       <Badge variant="outline">{pkg.market}</Badge>
                     </div>
                   </div>
-                  <div className="mt-4 grid gap-3 rounded-xl border border-border/70 bg-background/70 p-3">
+                  <div className="mt-4 grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3">
                     <div>
                       <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
@@ -1587,7 +1587,7 @@ function MyAssetsScreen() {
                   { label: uiCopy.assets.confidence, value: `${detailPackage.confidence}%` },
                   { label: uiCopy.assets.updated, value: detailPackage.freshness },
                 ].map((item) => (
-                  <div key={item.label} className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                  <div key={item.label} className="rounded-lg border border-border/70 bg-muted/20 p-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{item.label}</div>
                     <div className="mt-2 text-lg font-semibold text-foreground">{item.value}</div>
                   </div>
@@ -1596,13 +1596,13 @@ function MyAssetsScreen() {
 
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/10 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{uiCopy.assets.preview}</div>
                     <p className="mt-3 whitespace-pre-line text-sm leading-6 text-foreground">{buildAssetBody(detailPackage)}</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {detailPackage.sections.map((section) => (
-                      <div key={section.id} className="rounded-xl border border-border/70 bg-background p-4">
+                      <div key={section.id} className="rounded-lg border border-border/70 bg-background p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="font-semibold text-foreground">{section.label}</div>
                           <Badge variant="outline">{section.score}</Badge>
@@ -1614,11 +1614,11 @@ function MyAssetsScreen() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/10 p-4">
                     <div className="text-sm font-semibold text-foreground">{uiCopy.assets.nextAction}</div>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{detailPackage.recommendedAction}</p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/10 p-4">
                     <div className="text-sm font-semibold text-foreground">{uiCopy.assets.risks}</div>
                     <div className="mt-3 space-y-2">
                       {detailPackage.risks.map((risk) => (
@@ -1660,7 +1660,7 @@ function BrandAssetScreen() {
 
   return (
     <div className="space-y-6">
-      <section className="surface-solid rounded-2xl border border-border/70 p-5 shadow-sm md:p-6">
+      <section className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link to={assetsHref} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
@@ -1681,7 +1681,7 @@ function BrandAssetScreen() {
         {assetCards.map((asset) => {
           const Icon = asset.icon;
           return (
-            <Card key={asset.label} className="surface-solid rounded-2xl border-border/70 shadow-sm">
+            <Card key={asset.label} className="surface-solid rounded-lg border-border/70 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground"><Icon className="size-5 text-primary" />{asset.label}</CardTitle>
               </CardHeader>

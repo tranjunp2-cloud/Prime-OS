@@ -23,7 +23,7 @@ function readDesktopPreference() {
 export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps) {
   const isDesktopAssistant = useMediaQuery('(min-width: 1280px)');
   const location = useLocation();
-  const hideFloatingAssistant = location.pathname === '/demand/mdec';
+  const hideFloatingAssistant = location.pathname === '/overview' || location.pathname === '/crm/mdec';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(readDesktopPreference);
   const {
@@ -102,7 +102,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
       {hideFloatingAssistant ? null : <GlobalCopilotFAB onClick={() => setIsAssistantOpen((value) => !value)} isOpen={isAssistantOpen} label={fabLabel} />}
 
       {isAssistantOpen && !hideFloatingAssistant ? (
-        <div className="fixed bottom-24 right-6 z-[65] hidden h-[min(78vh,760px)] w-[440px] overflow-hidden rounded-[32px] border border-border/70 bg-card/95 shadow-2xl xl:block">
+        <div className="fixed bottom-24 right-6 z-[65] hidden h-[min(78vh,760px)] w-[440px] overflow-hidden rounded-lg border bg-card shadow-lg xl:block">
           <GlobalCopilotSurface
             context={currentContext}
             messages={messages}

@@ -42,9 +42,9 @@ export function AlertsFeed({ alerts, maxItems, loading = false }: Props) {
                 {loading ? (
                     <div className="space-y-3">
                         {Array.from({ length: 4 }).map((_, index) => (
-                            <div key={index} className="rounded-[1.25rem] border border-border/60 bg-muted/20 p-4">
+                            <div key={index} className="rounded-lg border border-border/60 bg-muted/20 p-4">
                                 <div className="flex items-start gap-3">
-                                    <Skeleton className="size-10 rounded-2xl" />
+                                    <Skeleton className="size-10 rounded-lg" />
                                     <div className="min-w-0 flex-1 space-y-2">
                                         <div className="flex items-center justify-between gap-3">
                                             <Skeleton className="h-5 w-28 rounded-full" />
@@ -62,7 +62,7 @@ export function AlertsFeed({ alerts, maxItems, loading = false }: Props) {
                         ))}
                     </div>
                 ) : displayAlerts.length === 0 ? (
-                    <div className="rounded-[1.5rem] border border-emerald-500/20 bg-emerald-500/6 px-6 py-10 text-center">
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/6 px-6 py-10 text-center">
                         <CheckCircle2 className="size-8 mx-auto mb-3 text-emerald-600 dark:text-emerald-300" />
                         <p className="text-sm font-medium text-foreground">{t('controlTower.noPriorityAlerts')}</p>
                         <p className="mt-2 text-xs text-muted-foreground">
@@ -78,14 +78,14 @@ export function AlertsFeed({ alerts, maxItems, loading = false }: Props) {
                                     key={alert.id}
                                     to={alert.actionLink}
                                     className={cn(
-                                        "group block rounded-[1.25rem] border p-4 transition-all duration-200 hover:border-primary/45 hover:bg-muted/18",
+                                        "group block rounded-lg border p-4 transition-all duration-200 hover:border-primary/45 hover:bg-muted/18",
                                         meta.borderClassName,
                                         meta.surfaceClassName,
                                     )}
                                 >
                                     <div className="flex items-start gap-3">
                                         <div className={cn(
-                                            "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl",
+                                            "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg",
                                             getSemanticSurfaceToneClassName(meta.tone ?? 'muted'),
                                             meta.textClassName,
                                         )}>

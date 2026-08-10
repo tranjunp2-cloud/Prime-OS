@@ -220,7 +220,7 @@ const overviewCopy = {
     openCrm: 'Open CRM',
     reviewRisk: 'Review risk',
     revenueAtRisk: 'Revenue at risk',
-    demandReadiness: 'Demand readiness',
+    crmReadiness: 'CRM readiness',
     inventoryPressure: 'Inventory pressure',
     ordersAtRisk: 'Orders at risk',
     customerIssues: 'Customer issues',
@@ -245,7 +245,7 @@ const overviewCopy = {
     readinessBelowScaleThreshold: 'Readiness below scale threshold',
     noActiveBlocker: 'No active blocker',
     inventory: 'Inventory',
-    demand: 'Demand',
+    crm: 'CRM',
     ecomCos: 'Ecom / COS',
     finance: 'Finance',
     customer: 'Customer',
@@ -348,7 +348,7 @@ const overviewCopy = {
     openCrm: 'CRMを開く',
     reviewRisk: 'リスクを確認',
     revenueAtRisk: 'リスク収益',
-    demandReadiness: '需要準備度',
+    crmReadiness: '需要準備度',
     inventoryPressure: '在庫圧力',
     ordersAtRisk: 'リスク注文',
     customerIssues: '顧客課題',
@@ -373,7 +373,7 @@ const overviewCopy = {
     readinessBelowScaleThreshold: '拡大基準を下回る準備度',
     noActiveBlocker: 'アクティブなブロッカーなし',
     inventory: '在庫',
-    demand: '需要',
+    crm: 'CRM',
     ecomCos: 'Ecom / COS',
     finance: '財務',
     customer: '顧客',
@@ -476,7 +476,7 @@ const overviewCopy = {
     openCrm: 'Mở CRM',
     reviewRisk: 'Xem rủi ro',
     revenueAtRisk: 'Doanh thu rủi ro',
-    demandReadiness: 'Mức sẵn sàng demand',
+    crmReadiness: 'Mức sẵn sàng CRM',
     inventoryPressure: 'Áp lực tồn kho',
     ordersAtRisk: 'Đơn hàng rủi ro',
     customerIssues: 'Vấn đề khách hàng',
@@ -501,7 +501,7 @@ const overviewCopy = {
     readinessBelowScaleThreshold: 'Mức sẵn sàng dưới ngưỡng scale',
     noActiveBlocker: 'Không có điểm chặn hoạt động',
     inventory: 'Tồn kho',
-    demand: 'Demand',
+    crm: 'CRM',
     ecomCos: 'Ecom / COS',
     finance: 'Tài chính',
     customer: 'Khách hàng',
@@ -666,7 +666,7 @@ export function PrimeOverview() {
       due: topForecast.risk === 'high' ? 'Today' : 'Next 24h',
       risk: topForecast.risk === 'high' ? 'Critical' : 'Watch',
       impact: currency.format(Math.max(0, topForecast.demand7d - topForecast.ats) * 22000),
-      href: '/ecom/cos/inventory-brain',
+      href: '/overview?module=cos&view=pim',
       cta: 'Check inventory',
       evidence: topForecast.suggestedAction,
       blocker: topForecast.risk === 'high' ? 'ATS mismatch' : 'Coverage watch',
@@ -708,16 +708,16 @@ export function PrimeOverview() {
     topPlay ? {
       id: topPlay.id,
       title: 'Run next demand play against reachable audience',
-      owner: copy.demand,
+      owner: copy.crm,
       object: topPlay.audience,
       reason: topPlay.trigger,
       due: copy.nextRun,
       risk: demandScore >= 80 ? 'Ready' : 'Watch',
       impact: `+${topPlay.projectedLift}% lift`,
-      href: '/demand/campaigns',
+      href: '/crm/campaigns',
       cta: copy.openQueue,
       evidence: topPlay.nextBestAction,
-      blocker: demandScore >= 80 ? copy.noBlocker : 'Demand proof incomplete',
+      blocker: demandScore >= 80 ? copy.noBlocker : 'CRM proof incomplete',
       sla: 'Queue before next run',
       whyNow: `${topPlay.projectedLift}% projected lift depends on reachable audience timing.`,
     } : null,
@@ -756,12 +756,12 @@ export function PrimeOverview() {
       icon: CircleDollarSign,
     },
     {
-      label: copy.demandReadiness,
+      label: copy.crmReadiness,
       value: `${demandScore}%`,
       status: scoreStatus(demandScore),
       context: `${compactNumber.format(totalTraffic)} ${copy.reach}, ${totalLeads} ${copy.leads}`,
       cause: `${leadToOrderRate}% lead-to-order with ${totalRfqs} RFQs attached.`,
-      href: '/demand/campaigns',
+      href: '/crm/campaigns',
       icon: TrendingUp,
     },
     {
@@ -770,7 +770,7 @@ export function PrimeOverview() {
       status: highRiskForecasts.length ? 'Critical' as const : watchForecasts.length ? 'Watch' as const : 'Ready' as const,
       context: highRiskForecasts.length ? `${highRiskForecasts.length} ${copy.critical}` : copy.noCriticalSku,
       cause: topForecast ? `${topForecast.skuCode}: ${topForecast.ats} ATS vs ${topForecast.demand7d} demand.` : 'Inventory coverage is clear.',
-      href: '/ecom/cos/inventory-brain',
+      href: '/overview?module=cos&view=pim',
       icon: Boxes,
     },
     {
@@ -779,7 +779,7 @@ export function PrimeOverview() {
       status: ordersAtRisk.length > 3 ? 'Critical' as const : ordersAtRisk.length ? 'Watch' as const : 'Ready' as const,
       context: `${totalOrders} ${copy.totalOrders}`,
       cause: ordersAtRisk.length ? 'Open lifecycle or risk flags need COS review.' : 'No order blocker in the queue.',
-      href: '/ecom/cos/oms',
+      href: '/overview?module=cos&view=oms',
       icon: PackageCheck,
     },
     {
@@ -803,18 +803,18 @@ export function PrimeOverview() {
       entity: topForecast?.skuCode || 'Inventory Brain',
       dependency: 'Inventory → Campaign readiness',
       signal: topForecast ? `${topForecast.ats} ATS vs ${topForecast.demand7d} demand` : 'Coverage clear',
-      href: '/ecom/cos/inventory-brain',
+      href: '/overview?module=cos&view=pim',
     },
     {
-      area: 'Demand',
+      area: 'CRM',
       stage: 'Campaign Readiness',
-      title: demandScore >= 80 ? 'Demand engine ready' : 'Demand proof needs operator review',
+      title: demandScore >= 80 ? 'CRM engine ready' : 'CRM proof needs operator review',
       status: scoreStatus(demandScore),
-      owner: 'Demand',
+      owner: 'CRM',
       entity: topCampaign?.name || 'Campaign queue',
       dependency: 'Campaign readiness → Order fulfillment',
       signal: `${totalLeads} leads, ${totalRfqs} RFQs`,
-      href: '/demand/campaigns',
+      href: '/crm/campaigns',
     },
     {
       area: 'Ecom / COS',
@@ -825,7 +825,7 @@ export function PrimeOverview() {
       entity: `${snapshot.products.length} products`,
       dependency: 'Order fulfillment → Revenue exposure',
       signal: `${ordersAtRisk.length} orders need watch`,
-      href: '/ecom/cos/product-master',
+      href: '/overview?module=cos&view=pim',
     },
     {
       area: 'Finance',
@@ -868,13 +868,13 @@ export function PrimeOverview() {
       risks: snapshot.alerts.filter((alert) => alert.area === 'Intelligence Area').length,
     },
     {
-      area: copy.demand,
+      area: copy.crm,
       status: scoreStatus(demandScore),
       summary: 'Campaigns, leads, RFQs and activation plays are connected.',
       metric: `${snapshot.campaigns.length} ${copy.campaigns}`,
       blocker: demandScore < 80 ? `${leadToOrderRate}% lead to order` : copy.noBlocker,
       readiness: demandScore,
-      href: '/demand/campaigns',
+      href: '/crm/campaigns',
       action: copy.openCampaigns,
       icon: Megaphone,
       risks: demandScore < 80 ? 1 : 0,
@@ -886,7 +886,7 @@ export function PrimeOverview() {
       metric: `${snapshot.inventoryPositions.length} ${copy.inventoryRows}`,
       blocker: highRiskForecasts.length ? `${highRiskForecasts.length} ${copy.critical} SKU` : copy.noBlocker,
       readiness: ecomScore,
-      href: '/ecom/cos/product-master',
+      href: '/overview?module=cos&view=pim',
       action: copy.checkCos,
       icon: Store,
       risks: highRiskForecasts.length,
@@ -934,21 +934,21 @@ export function PrimeOverview() {
       summary: `${ordersAtRisk.length} ${copy.ordersNeedWatch}`,
       icon: Store,
       links: [
-        { label: copy.products, href: '/ecom/cos/product-master', count: `${snapshot.products.length}` },
-        { label: copy.inventoryBrain, href: '/ecom/cos/inventory-brain', count: `${watchForecasts.length}`, status: highRiskForecasts.length ? 'Critical' : watchForecasts.length ? 'Watch' : 'Ready' },
-        { label: copy.orders, href: '/ecom/cos/oms', count: `${ordersAtRisk.length}` },
-        { label: copy.fulfillment, href: '/ecom/cos/fulfillment' },
+        { label: copy.products, href: '/overview?module=cos&view=pim', count: `${snapshot.products.length}` },
+        { label: copy.inventoryBrain, href: '/overview?module=cos&view=pim', count: `${watchForecasts.length}`, status: highRiskForecasts.length ? 'Critical' : watchForecasts.length ? 'Watch' : 'Ready' },
+        { label: copy.orders, href: '/overview?module=cos&view=oms', count: `${ordersAtRisk.length}` },
+        { label: copy.fulfillment, href: '/overview?module=cos&view=ship' },
       ],
     },
     {
-      suite: copy.demand,
+      suite: copy.crm,
       summary: `${totalLeads} ${copy.leads}, ${totalRfqs} ${copy.rfqs}`,
       icon: Megaphone,
       links: [
-        { label: copy.campaigns, href: '/demand/campaigns', count: `${snapshot.campaigns.length}`, status: scoreStatus(demandScore) },
-        { label: copy.composer, href: '/demand/mdec?view=composer' },
-        { label: copy.calendar, href: '/demand/mdec?view=calendar' },
-        { label: copy.activationPlays, href: '/demand/campaigns', count: `${snapshot.activationPlays.length}` },
+        { label: copy.campaigns, href: '/crm/campaigns', count: `${snapshot.campaigns.length}`, status: scoreStatus(demandScore) },
+        { label: copy.composer, href: '/crm/mdec?view=composer' },
+        { label: copy.calendar, href: '/crm/mdec?view=calendar' },
+        { label: copy.activationPlays, href: '/crm/campaigns', count: `${snapshot.activationPlays.length}` },
       ],
     },
     {
@@ -982,8 +982,8 @@ export function PrimeOverview() {
       status: topForecast?.risk === 'high' ? 'Critical' as const : topForecast ? 'Watch' as const : 'Ready' as const,
     },
     {
-      label: 'Demand evidence',
-      value: topCampaign?.name || 'Demand route',
+      label: 'CRM evidence',
+      value: topCampaign?.name || 'CRM route',
       detail: `${compactNumber.format(totalTraffic)} reach, ${totalLeads} leads, ${totalRfqs} RFQs, ${totalOrders} orders.`,
       status: scoreStatus(demandScore),
     },
@@ -1011,7 +1011,7 @@ export function PrimeOverview() {
     })),
     ...snapshot.activationPlays.slice(0, 2).map((play) => ({
       id: play.id,
-      source: 'Demand',
+      source: 'CRM',
       object: play.audience,
       detail: play.nextBestAction,
       time: copy.nextRun,
@@ -1092,7 +1092,7 @@ export function PrimeOverview() {
   };
 
   return (
-    <div className="min-h-full overflow-x-hidden bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.08),transparent_26rem),hsl(var(--background))]">
+    <div className="min-h-full overflow-x-hidden bg-background">
       <div className="space-y-4 p-4 pt-0 md:p-6 md:pt-0">
         <MissionBrief
           primaryAction={primaryAction}
@@ -1166,7 +1166,7 @@ function MissionBrief({
     : 'All operating areas are ready for monitor mode.';
 
   return (
-    <section data-testid="overview-command-bar" className="-mt-1 overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <section data-testid="overview-command-bar" className="-mt-1 overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <div className="grid gap-px bg-border/70 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.72fr)] xl:items-stretch">
         <div className="flex min-w-0 flex-col justify-between gap-3 bg-card p-4">
           <div className="min-w-0">
@@ -1289,7 +1289,7 @@ function SuiteReadinessPanel({ suites }: { suites: AreaStatusItem[] }) {
   );
 
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <CardHeader className="border-b pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1385,7 +1385,7 @@ function CrossSuiteFlowSummary({ items }: { items: RiskFlowItem[] }) {
   const copy = overviewCopy[locale];
 
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <CardHeader className="border-b pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1399,7 +1399,7 @@ function CrossSuiteFlowSummary({ items }: { items: RiskFlowItem[] }) {
         </div>
       </CardHeader>
       <CardContent className="p-3">
-        <div className="grid gap-px overflow-hidden rounded-xl border bg-border/70">
+        <div className="grid gap-px overflow-hidden rounded-lg border bg-border/70">
           {items.map((item, index) => (
             <Link key={item.stage} to={item.href} className="group grid gap-2 bg-card p-3 transition-colors hover:bg-muted/20 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="min-w-0">
@@ -1425,7 +1425,7 @@ function QuickAccessHub({ groups }: { groups: QuickLinkGroup[] }) {
   const copy = overviewCopy[locale];
 
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <CardHeader className="border-b pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1485,14 +1485,14 @@ function OperatorModeSwitch({
   const modeCopy = copy.operatorModeInfo;
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border bg-card/95 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border bg-card/95 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-1.5 text-sm font-semibold">
             {copy.operatorMode}
             <InfoHint label={`${copy.operatorMode} info`}>{modeCopy[mode]}</InfoHint>
           </div>
         </div>
-      <div className="grid w-full grid-cols-3 gap-1 rounded-xl border bg-muted p-1 sm:w-auto" role="group" aria-label={copy.operatorMode}>
+      <div className="grid w-full grid-cols-3 gap-1 rounded-lg border bg-muted p-1 sm:w-auto" role="group" aria-label={copy.operatorMode}>
         {(['command', 'investigate', 'audit'] as OperatingMode[]).map((option) => (
           <Button
             key={option}
@@ -1516,7 +1516,7 @@ function SystemHealthStrip({ metrics }: { metrics: HealthMetric[] }) {
   const copy = overviewCopy[locale];
 
   return (
-    <section className="overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <section className="overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-1.5 text-sm font-semibold">
@@ -1573,7 +1573,7 @@ function PriorityMissionList({
   const copy = overviewCopy[locale];
 
   return (
-    <Card id="priority-action-queue" className="overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <Card id="priority-action-queue" className="overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <CardHeader className="border-b pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1634,7 +1634,7 @@ function PriorityMissionCard({
   const emphasized = rank === 1;
 
   return (
-    <div className="rounded-xl border bg-background p-3 transition-colors hover:bg-muted/20 data-[emphasis=true]:border-primary/30 data-[emphasis=true]:bg-primary/5" data-emphasis={emphasized}>
+    <div className="rounded-lg border bg-background p-3 transition-colors hover:bg-muted/20 data-[emphasis=true]:border-primary/30 data-[emphasis=true]:bg-primary/5" data-emphasis={emphasized}>
       <div className="grid gap-3 lg:grid-cols-[48px_minmax(0,1fr)_auto] lg:items-start">
         <div className="flex size-10 items-center justify-center rounded-lg border bg-card font-mono text-sm font-semibold">
           {String(rank).padStart(2, '0')}
@@ -1719,7 +1719,7 @@ function DependencyRiskFlow({
   const copy = overviewCopy[locale];
 
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card/95 shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card/95 shadow-sm">
       <CardHeader className="border-b pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1733,7 +1733,7 @@ function DependencyRiskFlow({
         </div>
       </CardHeader>
       <CardContent className="p-3">
-        <div className="grid gap-px overflow-hidden rounded-xl border bg-border/70">
+        <div className="grid gap-px overflow-hidden rounded-lg border bg-border/70">
           {items.map((item, index) => (
             <RiskFlowNode key={item.stage} item={item} isLast={index === items.length - 1} />
           ))}

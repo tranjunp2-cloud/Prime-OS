@@ -6,12 +6,12 @@ const coreRoutes = [
   '/intelligence/decision-hub',
   '/intelligence/signals',
   '/intelligence/launch-decisions',
-  '/demand/hub',
-  '/demand/sources',
-  '/demand/campaigns',
-  '/demand/content-social',
-  '/demand/leads-rfqs',
-  '/demand/re-engage',
+  '/crm/hub',
+  '/crm/sources',
+  '/crm/campaigns',
+  '/crm/content-social',
+  '/crm/leads-rfqs',
+  '/crm/re-engage',
   '/customer/crm-compact',
   '/customer/service',
   '/finance/fin-support',
@@ -27,14 +27,14 @@ const legacyRedirects = [
   ['/intelligence/trends', /\/intelligence\/signals\?view=customer-trends$/],
   ['/intelligence/analytics', /\/intelligence\/decision-hub\?capability=analytics$/],
   ['/intelligence/alerts', /\/intelligence\/decision-hub\?view=alerts$/],
-  ['/demand/campaign-ops', /\/demand\/campaigns$/],
-  ['/demand/content-creator-ops', /\/demand\/content-social\?view=creator-proof$/],
-  ['/demand/lead-response-capture', /\/demand\/leads-rfqs$/],
-  ['/demand/retargeting-outreach', /\/demand\/re-engage$/],
-  ['/demand/acquisition', /\/demand\/sources$/],
-  ['/demand/campaign', /\/demand\/campaigns$/],
-  ['/demand/lead-capture', /\/demand\/leads-rfqs$/],
-  ['/demand/retargeting', /\/demand\/re-engage$/],
+  ['/crm/campaign-ops', /\/crm\/campaigns$/],
+  ['/crm/content-creator-ops', /\/crm\/content-social\?view=creator-proof$/],
+  ['/crm/lead-response-capture', /\/crm\/leads-rfqs$/],
+  ['/crm/retargeting-outreach', /\/crm\/re-engage$/],
+  ['/crm/acquisition', /\/crm\/sources$/],
+  ['/crm/campaign', /\/crm\/campaigns$/],
+  ['/crm/lead-capture', /\/crm\/leads-rfqs$/],
+  ['/crm/retargeting', /\/crm\/re-engage$/],
   ['/finance', /\/finance\/fin-support$/],
   ['/finance/health', /\/finance\/fin-support#status$/],
   ['/finance/capital-offers', /\/finance\/fin-support#lenders$/],
@@ -95,19 +95,19 @@ test.describe('authenticated route shell', () => {
     });
   }
 
-  test('shows the overview-style Demand command room', async ({ page }) => {
-    await page.goto('/demand/hub', routeReady);
+  test('shows the overview-style CRM command room', async ({ page }) => {
+    await page.goto('/crm/hub', routeReady);
     await expectPrimeShellReady(page);
 
-    await expect(page.getByTestId('demand-command-bar')).toBeVisible();
-    await expect(page.getByText('Priority Demand Queue')).toBeVisible();
-    await expect(page.getByText('Demand Pipeline')).toBeVisible();
+    await expect(page.getByTestId('crm-command-bar')).toBeVisible();
+    await expect(page.getByText('Priority CRM Queue')).toBeVisible();
+    await expect(page.getByText('CRM Pipeline')).toBeVisible();
     await expect(page.getByText('Guardrail Rail')).toBeVisible();
     await expect(page.getByText('Evidence Stack')).toBeVisible();
   });
 
   test('shows the Campaigns workspace tabs and readback', async ({ page }) => {
-    await page.goto('/demand/campaigns', routeReady);
+    await page.goto('/crm/campaigns', routeReady);
     await expectPrimeShellReady(page);
 
     await expect(page.getByText('Campaigns workspace')).toBeVisible();
@@ -116,14 +116,14 @@ test.describe('authenticated route shell', () => {
     await expect(page.getByText('Recommended next action')).toBeVisible();
     await expect(page.getByText('Campaign operating loop')).toBeVisible();
 
-    await page.goto('/demand/campaigns?tab=results', routeReady);
+    await page.goto('/crm/campaigns?tab=results', routeReady);
     await expect(primaryNav.getByRole('link', { name: 'Results' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { name: 'Outcome readback' })).toBeVisible();
   });
 
-  test('preserves Demand query context across legacy redirects', async ({ page }) => {
-    await page.goto('/demand/lead-response-capture?lead=lead_1_1', routeReady);
-    await expect(page).toHaveURL(/\/demand\/leads-rfqs\?lead=lead_1_1$/);
+  test('preserves CRM query context across legacy redirects', async ({ page }) => {
+    await page.goto('/crm/lead-response-capture?lead=lead_1_1', routeReady);
+    await expect(page).toHaveURL(/\/crm\/leads-rfqs\?lead=lead_1_1$/);
     await expectPrimeShellReady(page);
 
     await expect(page.getByText('Lead focus')).toBeVisible();
@@ -283,10 +283,10 @@ test.describe('authenticated route shell', () => {
     await expectPrimeShellReady(page);
     await expect(page.getByTestId('intelligence-drag-board')).toBeVisible();
     await expect(page.getByText('Signal → decision board')).toBeVisible();
-    await expect(page.getByText(/Source truth remains owned by Demand, Customer, Ecom \/ COS, and Finance/)).toBeVisible();
+    await expect(page.getByText(/Source truth remains owned by CRM, Customer, Ecom \/ COS, and Finance/)).toBeVisible();
     await expect(page.getByTestId('launch-decision-state-board')).toBeVisible();
     await expect(page.getByText('Outcome feedback')).toBeVisible();
-    await expect(page.getByText(/Demand owns execution, OMS owns order truth/)).toBeVisible();
+    await expect(page.getByText(/CRM owns execution, OMS owns order truth/)).toBeVisible();
   });
 
   test('shows Phase 4 partner workspaces with view and action boundaries', async ({ page }) => {
@@ -294,7 +294,7 @@ test.describe('authenticated route shell', () => {
       { url: '/overview?role=factory', testId: 'partner-workspace-factory', heading: 'Factory owner operating view', boundary: /cannot edit OMS, Inventory, Finance, or Customer source truth/ },
       { url: '/overview?role=agency', testId: 'partner-workspace-agency', heading: 'Agency operator delegated workspace', boundary: /cannot change product truth, order state, finance readiness/ },
       { url: '/finance/fin-support?role=bank', testId: 'partner-workspace-bank', heading: 'Bank reviewer evidence workspace', boundary: /does not approve credit, underwrite, commit terms, or disburse funds/ },
-      { url: '/demand/leads-rfqs?role=lead-provider', testId: 'partner-workspace-lead-provider', heading: 'Lead provider contribution view', boundary: /cannot access full CRM, Finance, OMS, or customer private records/ },
+      { url: '/crm/leads-rfqs?role=lead-provider', testId: 'partner-workspace-lead-provider', heading: 'Lead provider contribution view', boundary: /cannot access full CRM, Finance, OMS, or customer private records/ },
       { url: '/intelligence/signals?view=creators&role=creator-agency', testId: 'partner-workspace-creator-agency', heading: 'Creator agency performance view', boundary: /cannot change SKU truth, pricing, order state, or finance readiness/ },
     ];
 
@@ -310,11 +310,11 @@ test.describe('authenticated route shell', () => {
     }
   });
 
-  test('opens canonical Demand focused context directly', async ({ page }) => {
-    await page.goto('/demand/leads-rfqs?lead=lead_1_1', routeReady);
+  test('opens canonical CRM focused context directly', async ({ page }) => {
+    await page.goto('/crm/leads-rfqs?lead=lead_1_1', routeReady);
     await expectPrimeShellReady(page);
 
-    await expect(page).toHaveURL(/\/demand\/leads-rfqs\?lead=lead_1_1$/);
+    await expect(page).toHaveURL(/\/crm\/leads-rfqs\?lead=lead_1_1$/);
     await expect(page.getByText('Lead focus')).toBeVisible();
   });
 
@@ -343,8 +343,8 @@ test.describe('authenticated route shell', () => {
     await expect(tablist.getByRole('tab', { name: /Products/ })).toHaveCount(0);
     await expect(page.locator('[role="tabpanel"]')).toHaveCount(2);
 
-    await page.goto('/demand/mdec?view=composer', routeReady);
-    await expect(page).toHaveURL(/\/demand\/mdec\?view=composer$/);
+    await page.goto('/crm/mdec?view=composer', routeReady);
+    await expect(page).toHaveURL(/\/crm\/mdec\?view=composer$/);
     await expect(tablist.getByRole('tab', { name: /Composer/ })).toBeVisible();
     await expect(page.locator('[role="tabpanel"]')).toHaveCount(3);
 
@@ -364,7 +364,7 @@ test.describe('authenticated route shell', () => {
     await page.goto('/ecom/cos/inventory-brain', routeReady);
     const tablist = page.getByRole('tablist', { name: 'Open product tabs' });
     await expect(tablist.getByRole('tab', { name: /Inventory Brain/ })).toBeVisible();
-    await page.goto('/demand/mdec?view=composer', routeReady);
+    await page.goto('/crm/mdec?view=composer', routeReady);
 
     await expect(tablist.getByRole('tab', { name: /Composer/ })).toBeVisible();
 
@@ -388,7 +388,7 @@ test.describe('authenticated route shell', () => {
     await page.keyboard.press('Control+K');
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByPlaceholder('Jump to a workspace, customer, demand module, or COS...').fill('Launch Decisions');
+    await dialog.getByPlaceholder('Jump to a workspace, customer, CRM module, or COS...').fill('Launch Decisions');
     await dialog.getByText('Launch Decisions').click();
 
     await expect(page).toHaveURL(/\/intelligence\/consulting-agent\?tab=launch$/);

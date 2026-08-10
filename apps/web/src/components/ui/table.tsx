@@ -20,23 +20,23 @@ const variantClassMap: Record<TableVariant, {
   index: {
     wrapper: "",
     table: "text-sm",
-    head: "h-9 px-4 py-2 text-[11px]",
-    row: "hover:bg-[hsl(var(--surface-row-hover))]",
-    cell: "h-11 px-4 py-2 text-[15px]",
+    head: "h-10 px-4 align-middle",
+    row: "hover:bg-muted/50",
+    cell: "p-4 align-middle",
   },
   embedded: {
     wrapper: "",
     table: "text-sm",
-    head: "h-9 px-4 py-2 text-[11px]",
-    row: "hover:bg-[hsl(var(--surface-row-hover))]",
-    cell: "h-11 px-4 py-2 text-[15px]",
+    head: "h-10 px-4 align-middle",
+    row: "hover:bg-muted/50",
+    cell: "p-4 align-middle",
   },
   compact: {
     wrapper: "",
     table: "text-xs",
-    head: "h-8 px-3 py-1.5 text-[10px]",
-    row: "hover:bg-[hsl(var(--surface-row-hover))]",
-    cell: "h-9 px-3 py-1.5 text-xs",
+    head: "h-8 px-3 align-middle",
+    row: "hover:bg-muted/50",
+    cell: "px-3 py-2 align-middle",
   },
 };
 
@@ -89,7 +89,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
       <tr
         ref={ref}
         className={cn(
-          "prime-transition-fast border-b border-border/45 transition-colors data-[state=selected]:bg-[hsl(var(--surface-row-selected))]",
+          "border-b transition-colors data-[state=selected]:bg-muted",
           variantClassMap[variant].row,
           className,
         )}
@@ -107,7 +107,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
       <th
         ref={ref}
         className={cn(
-          "sticky top-0 z-30 bg-[hsl(var(--surface-toolbar))] text-left align-middle font-semibold uppercase tracking-[0.08em] text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--border-divider))] [&:has([role=checkbox])]:pr-0",
+          "sticky top-0 z-30 bg-muted/70 text-left align-middle font-medium text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-muted/60 [&:has([role=checkbox])]:pr-0",
           variantClassMap[variant].head,
           className,
         )}
@@ -124,7 +124,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
     return (
       <td
         ref={ref}
-        className={cn(variantClassMap[variant].cell, "align-middle [&:has([role=checkbox])]:pr-0", className)}
+        className={cn(variantClassMap[variant].cell, "[&:has([role=checkbox])]:pr-0", className)}
         {...props}
       />
     );

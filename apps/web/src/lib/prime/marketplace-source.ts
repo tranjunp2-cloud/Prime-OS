@@ -1,8 +1,8 @@
 import {
   SOURCE_FUNCTION_CATALOG,
-  buildDemandSources,
-  type DemandSource,
-} from './demand-sources';
+  buildCrmSources,
+  type CrmSource,
+} from './crm-sources';
 import type {
   PrimeCampaign,
   PrimeLead,
@@ -65,7 +65,7 @@ export interface MarketplaceAccount {
   market: string;
   ownerLabel: string;
   status: 'active' | 'needs_review' | 'inactive' | 'stale';
-  ingestionMode: DemandSource['ingestionMode'];
+  ingestionMode: CrmSource['ingestionMode'];
   lastSyncAt: string;
   freshnessMinutes: number;
   linkedSkuCount: number;
@@ -76,7 +76,7 @@ export interface MarketplaceAccount {
   blockers: string[];
 }
 
-export interface MarketplaceDemandSignal {
+export interface MarketplaceCrmSignal {
   id: string;
   signalType: MarketplaceSignalType;
   marketplace: MarketplaceName;
@@ -88,7 +88,7 @@ export interface MarketplaceDemandSignal {
   confidence: number;
   freshnessMinutes: number;
   linkedCampaignId?: string;
-  recommendedAction: DemandSource['nextAction'];
+  recommendedAction: CrmSource['nextAction'];
 }
 
 export interface MarketplaceSkuSignal {
@@ -100,8 +100,8 @@ export interface MarketplaceSkuSignal {
   listingPerformance: number;
   demandSignal: number;
   priceCompetitiveness: number;
-  inventoryRisk: DemandSource['inventoryRisk'];
-  financeRisk: DemandSource['financeRisk'];
+  inventoryRisk: CrmSource['inventoryRisk'];
+  financeRisk: CrmSource['financeRisk'];
   linkedSourceIds: string[];
   isMapped: boolean;
 }
@@ -140,7 +140,7 @@ export interface MarketplaceDataHealthItem {
   id: string;
   accountId: string;
   marketplace: MarketplaceName;
-  ingestionMode: DemandSource['ingestionMode'];
+  ingestionMode: CrmSource['ingestionMode'];
   status: 'healthy' | 'stale' | 'failed' | 'mapping_issue' | 'duplicate_risk';
   lastSyncAt: string;
   freshnessMinutes: number;
@@ -155,14 +155,14 @@ export interface MarketplaceDataHealthItem {
 
 export interface MarketplaceSourceSnapshot {
   page: MarketplaceSourcePage;
-  sources: DemandSource[];
+  sources: CrmSource[];
   accounts: MarketplaceAccount[];
-  demandSignals: MarketplaceDemandSignal[];
+  demandSignals: MarketplaceCrmSignal[];
   skuSignals: MarketplaceSkuSignal[];
   inquiries: MarketplaceInquiry[];
   attribution: MarketplaceCampaignAttribution[];
   dataHealth: MarketplaceDataHealthItem[];
-  selectedSource: DemandSource | null;
+  selectedSource: CrmSource | null;
   overview: {
     totalMarketplaceSources: number;
     activeMarketplaces: number;
@@ -205,14 +205,14 @@ export function getMarketplaceSourcePage(value: string | null): MarketplaceSourc
 export function getMarketplaceSourcePageHref(page: MarketplaceSourcePage, sourceId?: string) {
   const params = new URLSearchParams({ function: 'marketplace', page });
   if (sourceId) params.set('sourceId', sourceId);
-  return `/demand/sources?${params.toString()}`;
+  return `/crm/sources?${params.toString()}`;
 }
 
 export function getMarketplaceSourcePageMeta(page: MarketplaceSourcePage) {
   return MARKETPLACE_SOURCE_PAGES.find((item) => item.id === page) || MARKETPLACE_SOURCE_PAGES[0];
 }
 
-function marketplaceForSource(source: DemandSource, index = 0): MarketplaceName {
+function marketplaceForSource(source: CrmSource, index = 0): MarketplaceName {
   const normalized = `${source.name} ${source.connectedChannel}`.toLowerCase();
   if (normalized.includes('amazon')) return 'Amazon';
   if (normalized.includes('rakuten')) return 'Rakuten';
@@ -236,14 +236,14 @@ function sourceAccountName(marketplace: MarketplaceName) {
   return labels[marketplace];
 }
 
-function accountStatus(source: DemandSource | undefined): MarketplaceAccount['status'] {
+function accountStatus(source: CrmSource | undefined): MarketplaceAccount['status'] {
   if (!source) return 'inactive';
   if (source.freshnessMinutes > 60) return 'stale';
   if (source.status === 'needs_review' || source.blockers.length > 0) return 'needs_review';
   return source.status === 'active' ? 'active' : 'inactive';
 }
 
-function buildAccounts(sources: DemandSource[]): MarketplaceAccount[] {
+function buildAccounts(sources: CrmSource[]): MarketplaceAccount[] {
   return MARKETPLACES.map((marketplace) => {
     const sourceMatches = sources.filter((source, index) => marketplaceForSource(source, index) === marketplace);
     const primarySource = sourceMatches[0];
@@ -272,14 +272,14 @@ function buildAccounts(sources: DemandSource[]): MarketplaceAccount[] {
   });
 }
 
-function signalTypesForSource(source: DemandSource): MarketplaceSignalType[] {
+function signalTypesForSource(source: CrmSource): MarketplaceSignalType[] {
   const base: MarketplaceSignalType[] = ['search_trend', 'product_view', 'inquiry', 'buyer_behavior'];
   if (source.campaignTraffic > 0) base.push('campaign_click');
   if (source.rfqCount > 0) base.push('order_readback');
   return base.slice(0, 5);
 }
 
-function buildDemandSignals(sources: DemandSource[]): MarketplaceDemandSignal[] {
+function buildDemandSignals(sources: CrmSource[]): MarketplaceCrmSignal[] {
   return sources.flatMap((source, sourceIndex) => {
     const marketplace = marketplaceForSource(source, sourceIndex);
     const baseVolume = Math.max(1, Math.round(source.signalVolume / 5));
@@ -300,8 +300,8 @@ function buildDemandSignals(sources: DemandSource[]): MarketplaceDemandSignal[] 
   });
 }
 
-function buildSkuSignals(sources: DemandSource[]): MarketplaceSkuSignal[] {
-  const grouped = new Map<string, DemandSource[]>();
+function buildSkuSignals(sources: CrmSource[]): MarketplaceSkuSignal[] {
+  const grouped = new Map<string, CrmSource[]>();
   for (const source of sources) {
     const key = source.skuCode === 'Mixed' ? `unmapped_${source.id}` : source.skuCode;
     grouped.set(key, [...(grouped.get(key) || []), source]);
@@ -329,24 +329,24 @@ function buildSkuSignals(sources: DemandSource[]): MarketplaceSkuSignal[] {
   });
 }
 
-function linkedLeadRecords(source: DemandSource, leads: PrimeLead[]) {
+function linkedLeadRecords(source: CrmSource, leads: PrimeLead[]) {
   const campaignIds = new Set(source.linkedCampaignIds);
   return leads.filter((lead) => campaignIds.has(lead.campaignId));
 }
 
-function linkedRfqRecords(source: DemandSource, leads: PrimeLead[], rfqs: PrimeRfq[]) {
+function linkedRfqRecords(source: CrmSource, leads: PrimeLead[], rfqs: PrimeRfq[]) {
   const leadIds = new Set(linkedLeadRecords(source, leads).map((lead) => lead.id));
   return rfqs.filter((rfq) => leadIds.has(rfq.leadId));
 }
 
-function inquiryStatus(source: DemandSource, index: number): MarketplaceInquiry['status'] {
+function inquiryStatus(source: CrmSource, index: number): MarketplaceInquiry['status'] {
   if (source.duplicateRate >= 14) return 'duplicate';
   if (source.rfqCount > 0) return 'converted_to_rfq';
   if (source.leadCount > 0) return index % 2 === 0 ? 'routed' : 'needs_qualification';
   return 'new';
 }
 
-function buildInquiries(sources: DemandSource[], leads: PrimeLead[], rfqs: PrimeRfq[]): MarketplaceInquiry[] {
+function buildInquiries(sources: CrmSource[], leads: PrimeLead[], rfqs: PrimeRfq[]): MarketplaceInquiry[] {
   return sources.flatMap((source, sourceIndex) => {
     const marketplace = marketplaceForSource(source, sourceIndex);
     const linkedLeads = linkedLeadRecords(source, leads);
@@ -375,11 +375,11 @@ function buildInquiries(sources: DemandSource[], leads: PrimeLead[], rfqs: Prime
   });
 }
 
-function campaignForSource(source: DemandSource, campaigns: PrimeCampaign[]) {
+function campaignForSource(source: CrmSource, campaigns: PrimeCampaign[]) {
   return campaigns.find((campaign) => source.linkedCampaignIds.includes(campaign.id));
 }
 
-function buildAttribution(sources: DemandSource[], campaigns: PrimeCampaign[]): MarketplaceCampaignAttribution[] {
+function buildAttribution(sources: CrmSource[], campaigns: PrimeCampaign[]): MarketplaceCampaignAttribution[] {
   return sources.map((source, index) => {
     const campaign = campaignForSource(source, campaigns);
     const marketplace = marketplaceForSource(source, index);
@@ -459,7 +459,7 @@ export function buildMarketplaceSourceSnapshot(
   page: MarketplaceSourcePage = 'overview',
   sourceId?: string | null,
 ): MarketplaceSourceSnapshot {
-  const sources = buildDemandSources(snapshot).filter((source) => source.type === 'marketplace');
+  const sources = buildCrmSources(snapshot).filter((source) => source.type === 'marketplace');
   const accounts = buildAccounts(sources);
   const demandSignals = buildDemandSignals(sources);
   const skuSignals = buildSkuSignals(sources);

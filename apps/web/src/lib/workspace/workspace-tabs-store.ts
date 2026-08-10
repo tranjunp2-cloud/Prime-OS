@@ -38,7 +38,7 @@ function readPersistedState(): WorkspaceTabsState {
 
     const parsed = JSON.parse(raw) as WorkspaceTabsState;
     const tabs = Array.isArray(parsed.tabs)
-      ? parsed.tabs.map((tab) => ({ ...tab, rootProductId: tab.rootProductId || tab.productId, dirty: false })).slice(-MAX_WORKSPACE_TABS)
+      ? dedupePersistedTabs(parsed.tabs.map((tab) => ({ ...tab, rootProductId: tab.rootProductId || tab.productId, dirty: false }))).slice(-MAX_WORKSPACE_TABS)
       : [];
 
     const activeId = tabs.some((tab) => tab.id === parsed.activeId) ? parsed.activeId : tabs.at(-1)?.id ?? null;
@@ -51,6 +51,22 @@ function readPersistedState(): WorkspaceTabsState {
   } catch {
     return initialState;
   }
+}
+
+function dedupePersistedTabs(tabs: WorkspaceTabsState['tabs']) {
+  const seenUrls = new Set<string>();
+  const deduped = [] as WorkspaceTabsState['tabs'];
+
+  for (let index = tabs.length - 1; index >= 0; index -= 1) {
+    const tab = tabs[index];
+    const key = tab.url || tab.productId;
+
+    if (seenUrls.has(key)) continue;
+    seenUrls.add(key);
+    deduped.unshift(tab);
+  }
+
+  return deduped;
 }
 
 function persistState(nextState: WorkspaceTabsState) {

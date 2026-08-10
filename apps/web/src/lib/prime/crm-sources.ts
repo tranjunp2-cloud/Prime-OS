@@ -6,18 +6,18 @@ import type {
   PrimeSocialStream,
 } from './prime-data';
 
-export type DemandSourceType = 'marketplace' | 'social' | 'ads' | 'partner' | 'manual';
-export type DemandSourceStatus = 'active' | 'inactive' | 'needs_review' | 'suppressed';
+export type CrmSourceType = 'marketplace' | 'social' | 'ads' | 'partner' | 'manual';
+export type CrmSourceStatus = 'active' | 'inactive' | 'needs_review' | 'suppressed';
 export type SourceActionLabel = 'Scale' | 'Test' | 'Fix' | 'Pause' | 'Review' | 'Route leads';
 
-export interface DemandSourceFunction {
-  id: DemandSourceType;
+export interface CrmSourceFunction {
+  id: CrmSourceType;
   label: string;
   description: string;
   children: string[];
 }
 
-export const SOURCE_FUNCTION_CATALOG: DemandSourceFunction[] = [
+export const SOURCE_FUNCTION_CATALOG: CrmSourceFunction[] = [
   {
     id: 'marketplace',
     label: 'Marketplace Source',
@@ -57,11 +57,11 @@ export interface SourceTouchpoint {
   confidence: number;
 }
 
-export interface DemandSource {
+export interface CrmSource {
   id: string;
   name: string;
-  type: DemandSourceType;
-  status: DemandSourceStatus;
+  type: CrmSourceType;
+  status: CrmSourceStatus;
   ownerLabel: string;
   market: string;
   connectedChannel: string;
@@ -99,15 +99,15 @@ export interface DemandSource {
   };
 }
 
-export interface DemandSourcesOverview {
+export interface CrmSourcesOverview {
   totalActiveSources: number;
   totalLeads: number;
   totalRfqs: number;
   averageQualityScore: number;
   sourcesNeedingReview: number;
-  topSource: DemandSource | null;
-  weakestSource: DemandSource | null;
-  typeMix: Array<{ type: DemandSourceType; count: number; quality: number }>;
+  topSource: CrmSource | null;
+  weakestSource: CrmSource | null;
+  typeMix: Array<{ type: CrmSourceType; count: number; quality: number }>;
   skuSignals: Array<{
     skuCode: string;
     productName: string;
@@ -115,7 +115,7 @@ export interface DemandSourcesOverview {
   }>;
 }
 
-const SOURCE_TYPE_LABELS: Record<DemandSourceType, string> = {
+const SOURCE_TYPE_LABELS: Record<CrmSourceType, string> = {
   marketplace: 'Marketplace',
   social: 'Social',
   ads: 'Ads',
@@ -123,7 +123,7 @@ const SOURCE_TYPE_LABELS: Record<DemandSourceType, string> = {
   manual: 'Manual',
 };
 
-export function getDemandSourceTypeLabel(type: DemandSourceType) {
+export function getCrmSourceTypeLabel(type: CrmSourceType) {
   return SOURCE_TYPE_LABELS[type];
 }
 
@@ -136,7 +136,7 @@ function percent(part: number, total: number) {
   return Math.round((part / total) * 100);
 }
 
-function classifySourceType(label: string, ingestionMode?: PrimeSocialStream['ingestionMode']): DemandSourceType {
+function classifySourceType(label: string, ingestionMode?: PrimeSocialStream['ingestionMode']): CrmSourceType {
   const normalized = label.toLowerCase();
   if (ingestionMode === 'partner-feed') return 'partner';
   if (normalized.includes('rakuten') || normalized.includes('amazon') || normalized.includes('shopee') || normalized.includes('marketplace')) {
@@ -154,10 +154,10 @@ function classifySourceType(label: string, ingestionMode?: PrimeSocialStream['in
   return 'social';
 }
 
-function getOwner(type: DemandSourceType, index: number) {
-  const owners: Record<DemandSourceType, string[]> = {
-    marketplace: ['Japan marketplace team', 'Demand marketplace owner'],
-    social: ['Demand social operator', 'Creator commerce owner'],
+function getOwner(type: CrmSourceType, index: number) {
+  const owners: Record<CrmSourceType, string[]> = {
+    marketplace: ['Japan marketplace team', 'CRM marketplace owner'],
+    social: ['CRM social operator', 'Creator commerce owner'],
     ads: ['Growth team', 'Paid acquisition owner'],
     partner: ['BD team', 'Partner source owner'],
     manual: ['Sales ops', 'Import owner'],
@@ -214,8 +214,8 @@ function scoreSource(input: {
   campaignTraffic: number;
   freshnessMinutes: number;
   duplicateRate: number;
-  inventoryRisk: DemandSource['inventoryRisk'];
-  financeRisk: DemandSource['financeRisk'];
+  inventoryRisk: CrmSource['inventoryRisk'];
+  financeRisk: CrmSource['financeRisk'];
 }) {
   const leadRate = input.campaignTraffic ? input.leadCount / input.campaignTraffic : input.signalVolume ? input.leadCount / input.signalVolume : 0;
   const rfqRate = input.leadCount ? input.rfqCount / input.leadCount : 0;
@@ -249,7 +249,7 @@ function actionForSource(input: {
   blockers: string[];
   leadCount: number;
   rfqCount: number;
-  type: DemandSourceType;
+  type: CrmSourceType;
   streamStatus?: PrimeSocialStream['status'];
 }) {
   if (input.blockers.length > 0 && input.blockers.some((blocker) => blocker.includes('inventory') || blocker.includes('Finance'))) {
@@ -262,38 +262,38 @@ function actionForSource(input: {
   if (input.streamStatus === 'lagging' || input.score < 58) {
     return {
       label: 'Fix' as const,
-      route: '/demand/content-social',
+      route: '/crm/content-social',
       reason: 'Fix creative, CTA, or source mapping before spending more effort.',
     };
   }
   if (input.rfqCount >= 8 && input.score >= 78) {
     return {
       label: 'Scale' as const,
-      route: '/demand/campaigns',
+      route: '/crm/campaigns',
       reason: 'RFQ quality and source score are high enough for controlled scale.',
     };
   }
   if (input.leadCount >= 40 && input.rfqCount < 8) {
     return {
       label: 'Route leads' as const,
-      route: '/demand/leads-rfqs',
+      route: '/crm/leads-rfqs',
       reason: 'Lead volume is present; route qualification before campaign scale.',
     };
   }
   return {
     label: input.type === 'partner' ? 'Review' : 'Test',
-    route: input.type === 'partner' ? '/demand/leads-rfqs' : '/demand/campaigns',
+    route: input.type === 'partner' ? '/crm/leads-rfqs' : '/crm/campaigns',
     reason: 'Run a controlled test and preserve source lineage.',
   } as const;
 }
 
-function statusForSource(score: number, blockers: string[], streamStatus?: PrimeSocialStream['status']): DemandSourceStatus {
+function statusForSource(score: number, blockers: string[], streamStatus?: PrimeSocialStream['status']): CrmSourceStatus {
   if (blockers.some((blocker) => blocker.includes('stale') || blocker.includes('Duplicate'))) return 'needs_review';
   if (streamStatus === 'lagging' || score < 52) return 'needs_review';
   return 'active';
 }
 
-function buildFromStream(snapshot: PrimeSnapshot, stream: PrimeSocialStream, index: number): DemandSource {
+function buildFromStream(snapshot: PrimeSnapshot, stream: PrimeSocialStream, index: number): CrmSource {
   const campaign = snapshot.campaigns[index % Math.max(snapshot.campaigns.length, 1)];
   const leads = linkedLeads(snapshot.leads, campaign?.id);
   const rfqs = linkedRfqs(snapshot.rfqs, leads);
@@ -362,7 +362,7 @@ function buildFromStream(snapshot: PrimeSnapshot, stream: PrimeSocialStream, ind
   };
 }
 
-function buildFromCampaign(snapshot: PrimeSnapshot, campaign: PrimeCampaign, index: number): DemandSource {
+function buildFromCampaign(snapshot: PrimeSnapshot, campaign: PrimeCampaign, index: number): CrmSource {
   const leads = linkedLeads(snapshot.leads, campaign.id);
   const rfqs = linkedRfqs(snapshot.rfqs, leads);
   const type = classifySourceType(campaign.channel);
@@ -428,7 +428,7 @@ function buildFromCampaign(snapshot: PrimeSnapshot, campaign: PrimeCampaign, ind
   };
 }
 
-function buildManualImportSource(snapshot: PrimeSnapshot): DemandSource {
+function buildManualImportSource(snapshot: PrimeSnapshot): CrmSource {
   const leads = snapshot.leads.slice(0, 6);
   const rfqs = linkedRfqs(snapshot.rfqs, leads);
   const duplicateRate = 16;
@@ -495,13 +495,13 @@ function buildManualImportSource(snapshot: PrimeSnapshot): DemandSource {
   };
 }
 
-export function buildDemandSources(snapshot: PrimeSnapshot): DemandSource[] {
+export function buildCrmSources(snapshot: PrimeSnapshot): CrmSource[] {
   const streamSources = snapshot.socialStreams.map((stream, index) => buildFromStream(snapshot, stream, index));
   const campaignSources = snapshot.campaigns.map((campaign, index) => buildFromCampaign(snapshot, campaign, index));
   return [...streamSources, ...campaignSources, buildManualImportSource(snapshot)].sort((a, b) => b.qualityScore - a.qualityScore);
 }
 
-export function buildDemandSourcesOverview(sources: DemandSource[]): DemandSourcesOverview {
+export function buildCrmSourcesOverview(sources: CrmSource[]): CrmSourcesOverview {
   const activeSources = sources.filter((source) => source.status === 'active');
   const totalLeads = sources.reduce((sum, source) => sum + source.leadCount, 0);
   const totalRfqs = sources.reduce((sum, source) => sum + source.rfqCount, 0);
@@ -511,7 +511,7 @@ export function buildDemandSourcesOverview(sources: DemandSource[]): DemandSourc
   const sourcesNeedingReview = sources.filter((source) => source.status === 'needs_review' || source.blockers.length > 0).length;
   const topSource = sources[0] || null;
   const weakestSource = [...sources].sort((a, b) => a.qualityScore - b.qualityScore)[0] || null;
-  const typeMix = (['marketplace', 'social', 'ads', 'partner', 'manual'] as DemandSourceType[]).map((type) => {
+  const typeMix = (['marketplace', 'social', 'ads', 'partner', 'manual'] as CrmSourceType[]).map((type) => {
     const typedSources = sources.filter((source) => source.type === type);
     return {
       type,

@@ -11,7 +11,7 @@ describe('marketplace source read model', () => {
     expect(getMarketplaceSourcePage(null)).toBe('overview');
     expect(getMarketplaceSourcePage('unknown')).toBe('overview');
     expect(getMarketplaceSourcePage('accounts')).toBe('accounts');
-    expect(getMarketplaceSourcePageHref('detail', 'source_1')).toBe('/demand/sources?function=marketplace&page=detail&sourceId=source_1');
+    expect(getMarketplaceSourcePageHref('detail', 'source_1')).toBe('/crm/sources?function=marketplace&page=detail&sourceId=source_1');
   });
 
   it('filters to marketplace sources and aggregates overview metrics', () => {

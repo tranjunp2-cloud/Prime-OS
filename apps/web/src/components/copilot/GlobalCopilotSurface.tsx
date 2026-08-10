@@ -42,11 +42,11 @@ export function GlobalCopilotSurface({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-[30px] bg-card/95 backdrop-blur-xl">
+    <div className="flex h-full min-h-0 flex-col bg-card">
       <div className="border-b border-border/60 px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 flex size-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+            <div className="mt-0.5 flex size-10 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary shadow-sm">
               <Bot className="size-5" />
             </div>
             <div className="min-w-0 space-y-1">
@@ -66,7 +66,7 @@ export function GlobalCopilotSurface({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-xl border border-transparent hover:border-border/60 hover:bg-muted/70"
+              className="size-9"
               onClick={onClear}
               aria-label="Clear Prime AI conversation"
               title="Clear Prime AI conversation"
@@ -77,7 +77,7 @@ export function GlobalCopilotSurface({
         </div>
 
         {showDebug && telemetry ? (
-          <div className="mt-2 rounded-xl border border-dashed border-primary/25 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground">
+          <div className="mt-2 rounded-md border border-dashed border-primary/25 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground">
             Debug: {telemetry.lastStrategy ?? 'welcome'} · {telemetry.lastConfidenceBucket ?? 'high'} · clarify {telemetry.clarifyCount} · fallback {telemetry.fallbackCount}
           </div>
         ) : null}

@@ -3,7 +3,7 @@ import { buildMdecSeedData } from './mdec-seed-data';
 import { getPrimeSnapshot } from './prime-data';
 
 describe('MDEC seed data linkage', () => {
-  it('derives MDEC posts and queues from PrimeOS COS/Demand snapshot entities', () => {
+  it('derives MDEC posts and queues from PrimeOS COS/CRM snapshot entities', () => {
     const snapshot = getPrimeSnapshot();
     const seed = buildMdecSeedData(snapshot);
     const campaignIds = new Set(snapshot.campaigns.map((campaign) => campaign.id));

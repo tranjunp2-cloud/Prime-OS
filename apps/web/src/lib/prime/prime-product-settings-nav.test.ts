@@ -6,7 +6,7 @@ describe('primeProductSettingsGroups', () => {
     expect(primeProductSettingsGroups.map((group) => group.id)).toEqual([
       'intelligence',
       'ecom',
-      'demand',
+      'crm',
       'finance',
       'customer',
     ]);

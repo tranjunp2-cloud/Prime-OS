@@ -21,7 +21,7 @@ export function PartnersTable({ partners, isLoading }: PartnersTableProps) {
     return (
       <div className="flex flex-col gap-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[68px] w-full rounded-[1.35rem]" />
+          <Skeleton key={i} className="h-[68px] w-full rounded-lg" />
         ))}
       </div>
     );
@@ -29,7 +29,7 @@ export function PartnersTable({ partners, isLoading }: PartnersTableProps) {
 
   if (partners.length === 0) {
     return (
-      <div className="surface-solid rounded-[1.75rem] py-12 text-center text-muted-foreground">
+      <div className="surface-solid rounded-lg py-12 text-center text-muted-foreground">
         <Globe className="size-12 mx-auto mb-4 opacity-50" />
         <p>{t('fulfillment.partnersTable.emptyTitle')}</p>
         <p className="text-sm mt-1">{t('fulfillment.partnersTable.emptyDesc')}</p>

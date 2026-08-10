@@ -11,6 +11,22 @@ test-results/
 !.env.example
 .primeos-dev.log
 
+# Generated local outputs and scratch files
+outputs/
+tmp/
+.cache/
+
+# Local secrets and credentials
+.secrets/
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+
 # Local QA evidence can be regenerated; keep markdown/json reports only.
 .gstack/qa-reports/screenshots/
 **/.gstack/qa-reports/screenshots/

@@ -59,7 +59,10 @@ export default function Auth() {
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      const message = error.message || authCopy.unableToSignIn;
+      const rawMessage = error.message || authCopy.unableToSignIn;
+      const message = rawMessage === 'Failed to fetch' || rawMessage === 'NetworkError when attempting to fetch resource.'
+        ? authCopy.backendUnavailable
+        : rawMessage;
       setFormError(message);
       toast({
         variant: 'destructive',
@@ -78,7 +81,9 @@ export default function Auth() {
         <section className="hidden border-r border-border bg-muted/35 p-8 lg:flex lg:flex-col lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <img src="/brand-logo.svg" alt="Prime OS" className="h-9 w-auto" />
+              <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-white p-1 shadow-sm">
+                <img src="/primeos-mark.png" alt="Prime OS" className="h-full w-full object-contain" />
+              </span>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
                   {authCopy.eyebrow}
@@ -111,7 +116,9 @@ export default function Auth() {
         <section className="px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10" aria-labelledby="primeos-auth-title">
           <div className="mb-10 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 lg:hidden">
-              <img src="/brand-logo.svg" alt="Prime OS" className="h-8 w-auto" />
+              <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-white p-1 shadow-sm">
+                <img src="/primeos-mark.png" alt="Prime OS" className="h-full w-full object-contain" />
+              </span>
               <span className="font-display text-lg font-semibold text-foreground">{authCopy.brandTitle}</span>
             </div>
             <div className="ml-auto flex items-center gap-3">
@@ -123,7 +130,7 @@ export default function Auth() {
           </div>
 
           <div className="mx-auto max-w-md">
-            <div className="mb-6 grid gap-2 rounded-2xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground lg:hidden">
+            <div className="mb-6 grid gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground lg:hidden">
               <div className="flex items-center justify-between gap-3">
                 <span>{authCopy.workspaceLabel}</span>
                 <span className="font-semibold text-foreground">{authCopy.workspaceValue}</span>

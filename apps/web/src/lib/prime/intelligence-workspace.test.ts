@@ -18,9 +18,9 @@ describe('intelligence workspace Phase 5 contracts', () => {
     const learned = workspace.packages.find((item) => item.actionOutcome);
 
     expect(learned).toBeTruthy();
-    expect(learned?.feedback).toMatchObject({ actorRole: 'Demand operator', decision: 'sent_to_demand' });
-    expect(learned?.actionOutcome).toMatchObject({ sourceOfTruthOwner: 'Demand', readModelOwner: 'Intelligence', outcomeType: 'campaign_created' });
-    expect(learned?.actionOutcome?.metrics.map((metric) => metric.owner)).toEqual(expect.arrayContaining(['Demand', 'OMS']));
+    expect(learned?.feedback).toMatchObject({ actorRole: 'CRM operator', decision: 'sent_to_crm' });
+    expect(learned?.actionOutcome).toMatchObject({ sourceOfTruthOwner: 'CRM', readModelOwner: 'Intelligence', outcomeType: 'campaign_created' });
+    expect(learned?.actionOutcome?.metrics.map((metric) => metric.owner)).toEqual(expect.arrayContaining(['CRM', 'OMS']));
   });
 
   it('attaches signal lineage with source owner and audit ids to every signal', () => {

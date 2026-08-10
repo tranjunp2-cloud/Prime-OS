@@ -11,13 +11,13 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
   return (
-    <ToolbarSurface className={cn('relative overflow-hidden px-4 py-4 sm:px-5 sm:py-4', className)}>
+    <ToolbarSurface className={cn('relative overflow-hidden rounded-lg px-4 py-4 sm:px-5', className)}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 max-w-3xl">
           {typeof title === 'string' ? (
-            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</h1>
+            <h1 className="font-display text-xl font-semibold text-foreground sm:text-2xl">{title}</h1>
           ) : (
-            <div className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</div>
+            <div className="font-display text-xl font-semibold text-foreground sm:text-2xl">{title}</div>
           )}
           {description && (
             typeof description === 'string' ? (
@@ -28,7 +28,7 @@ export function PageHeader({ title, description, actions, className }: PageHeade
           )}
         </div>
         {actions && (
-          <div className="flex w-full flex-wrap items-center gap-2 self-start lg:w-auto lg:flex-shrink-0 lg:justify-end">
+          <div className="flex w-full flex-wrap items-center gap-2 self-start lg:w-auto lg:flex-shrink-0 lg:justify-end [&_.rounded-lg]:rounded-md [&_.rounded-lg]:rounded-md">
             {actions}
           </div>
         )}

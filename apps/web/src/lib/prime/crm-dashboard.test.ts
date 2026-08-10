@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildDemandDashboardSnapshot } from './demand-dashboard';
+import { buildCrmDashboardSnapshot } from './crm-dashboard';
 import { getPrimeSnapshot, type PrimeSnapshot } from './prime-data';
 
-describe('demand dashboard read model', () => {
-  it('summarizes all major Demand functions for the dashboard entry point', () => {
-    const dashboard = buildDemandDashboardSnapshot(getPrimeSnapshot());
+describe('crm dashboard read model', () => {
+  it('summarizes all major CRM functions for the dashboard entry point', () => {
+    const dashboard = buildCrmDashboardSnapshot(getPrimeSnapshot());
 
-    expect(dashboard.title).toBe('Demand Dashboard');
+    expect(dashboard.title).toBe('CRM Dashboard');
     expect(dashboard.functions.map((item) => item.id)).toEqual([
       'mdec',
       'sources',
@@ -15,12 +15,12 @@ describe('demand dashboard read model', () => {
       'leads-rfqs',
       're-engage',
     ]);
-    expect(dashboard.functions.every((item) => item.href.startsWith('/demand'))).toBe(true);
+    expect(dashboard.functions.every((item) => item.href.startsWith('/crm'))).toBe(true);
     expect(dashboard.chartData).toHaveLength(dashboard.functions.length);
   });
 
   it('ranks an inventory guardrail as the first move when high risk stock exists', () => {
-    const dashboard = buildDemandDashboardSnapshot(getPrimeSnapshot());
+    const dashboard = buildCrmDashboardSnapshot(getPrimeSnapshot());
 
     expect(dashboard.nextMoves[0].severity).toBe('critical');
     expect(dashboard.nextMoves[0].href).toBe('/ecom/cos/inventory-brain');
@@ -40,7 +40,7 @@ describe('demand dashboard read model', () => {
       tickets: [],
     } satisfies PrimeSnapshot;
 
-    const dashboard = buildDemandDashboardSnapshot(snapshot);
+    const dashboard = buildCrmDashboardSnapshot(snapshot);
 
     expect(dashboard.readiness).toBeGreaterThanOrEqual(35);
     expect(dashboard.nextMoves).toEqual([]);

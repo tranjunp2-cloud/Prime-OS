@@ -22,7 +22,7 @@ export interface PrimeProductSettingsGroup {
   items: PrimeProductSettingsItem[];
 }
 
-const PRODUCT_SETTINGS_AREA_IDS = new Set(['demand', 'customer', 'ecom', 'intelligence', 'finance']);
+const PRODUCT_SETTINGS_AREA_IDS = new Set(['crm', 'customer', 'ecom', 'intelligence', 'finance']);
 
 function toSettingsItem(node: PrimeNavNode, rootNode = node): PrimeProductSettingsItem {
   const href = getPrimeNodeHref(node);

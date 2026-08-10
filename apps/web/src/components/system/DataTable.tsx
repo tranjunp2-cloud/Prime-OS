@@ -118,7 +118,7 @@ export function DataTable<T>({
                     />
                 )
             ) : (
-                <div className="surface-solid overflow-hidden rounded-xl">
+                <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
                     <Table variant={variant} wrapperClassName={resolvedWrapperClassName}>
                         <TableHeader>
                             <TableRow className="hover:bg-transparent">

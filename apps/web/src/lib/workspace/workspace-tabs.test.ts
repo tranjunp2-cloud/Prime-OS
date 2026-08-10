@@ -7,21 +7,21 @@ describe('workspace tabs', () => {
   it('opens a product tab and marks it active', () => {
     const state = openWorkspaceTab(emptyState, {
       productId: 'mdec',
-      url: '/demand/mdec',
+      url: '/crm/mdec',
       title: 'MDEC',
     }, 1000);
 
     expect(state.tabs).toHaveLength(1);
     expect(state.activeId).toBe(state.tabs[0].id);
-    expect(state.tabs[0]).toMatchObject({ productId: 'mdec', url: '/demand/mdec', title: 'MDEC' });
+    expect(state.tabs[0]).toMatchObject({ productId: 'mdec', url: '/crm/mdec', title: 'MDEC' });
   });
 
   it('reuses an existing product tab by default', () => {
-    const first = openWorkspaceTab(emptyState, { productId: 'mdec', url: '/demand/mdec', title: 'MDEC' }, 1000);
-    const second = openWorkspaceTab(first, { productId: 'mdec', url: '/demand/mdec?view=composer', title: 'MDEC' }, 2000);
+    const first = openWorkspaceTab(emptyState, { productId: 'mdec', url: '/crm/mdec', title: 'MDEC' }, 1000);
+    const second = openWorkspaceTab(first, { productId: 'mdec', url: '/crm/mdec?view=composer', title: 'MDEC' }, 2000);
 
     expect(second.tabs).toHaveLength(1);
-    expect(second.tabs[0].url).toBe('/demand/mdec?view=composer');
+    expect(second.tabs[0].url).toBe('/crm/mdec?view=composer');
     expect(second.tabs[0].lastActiveAt).toBe(2000);
   });
 
@@ -74,7 +74,7 @@ describe('workspace tabs', () => {
 
   it('opens a new tab for a different root product scope', () => {
     const state = openWorkspaceTab(emptyState, { productId: 'products', rootProductId: 'cos', url: '/ecom/cos/product-master', title: 'Products', reuseScope: 'product' }, 1000);
-    const updated = openWorkspaceTab(state, { productId: 'mdec', rootProductId: 'mdec', url: '/demand/mdec', title: 'MDEC', reuseScope: 'product' }, 2000);
+    const updated = openWorkspaceTab(state, { productId: 'mdec', rootProductId: 'mdec', url: '/crm/mdec', title: 'MDEC', reuseScope: 'product' }, 2000);
 
     expect(updated.tabs).toHaveLength(2);
     expect(updated.tabs.map((tab) => tab.rootProductId)).toEqual(['cos', 'mdec']);

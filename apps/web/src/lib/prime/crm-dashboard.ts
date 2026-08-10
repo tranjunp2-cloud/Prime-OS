@@ -1,4 +1,4 @@
-import { buildDemandSources, buildDemandSourcesOverview } from './demand-sources';
+import { buildCrmSources, buildCrmSourcesOverview } from './crm-sources';
 import type {
   PrimeActivationPlay,
   PrimeCampaign,
@@ -8,7 +8,7 @@ import type {
   PrimeTicket,
 } from './prime-data';
 
-export type DemandDashboardFunctionId =
+export type CrmDashboardFunctionId =
   | 'mdec'
   | 'sources'
   | 'campaigns'
@@ -16,20 +16,20 @@ export type DemandDashboardFunctionId =
   | 'leads-rfqs'
   | 're-engage';
 
-export type DemandDashboardSeverity = 'critical' | 'watch' | 'ready';
+export type CrmDashboardSeverity = 'critical' | 'watch' | 'ready';
 
-export interface DemandFunctionSummary {
-  id: DemandDashboardFunctionId;
+export interface CrmFunctionSummary {
+  id: CrmDashboardFunctionId;
   label: string;
   href: string;
   metric: string;
   detail: string;
   readiness: number;
-  status: DemandDashboardSeverity;
+  status: CrmDashboardSeverity;
   nextAction: string;
 }
 
-export interface DemandDashboardKpi {
+export interface CrmDashboardKpi {
   id: string;
   label: string;
   value: string;
@@ -37,7 +37,7 @@ export interface DemandDashboardKpi {
   tone: 'info' | 'purple' | 'success' | 'warning' | 'danger';
 }
 
-export interface DemandDashboardNextMove {
+export interface CrmDashboardNextMove {
   id: string;
   rank: number;
   title: string;
@@ -46,19 +46,19 @@ export interface DemandDashboardNextMove {
   evidence: string;
   href: string;
   cta: string;
-  severity: DemandDashboardSeverity;
+  severity: CrmDashboardSeverity;
 }
 
-export interface DemandDashboardGuardrail {
+export interface CrmDashboardGuardrail {
   id: string;
   label: string;
   value: string;
   detail: string;
-  severity: DemandDashboardSeverity;
+  severity: CrmDashboardSeverity;
   href: string;
 }
 
-export interface DemandFunnelStage {
+export interface CrmFunnelStage {
   id: string;
   label: string;
   value: number;
@@ -67,7 +67,7 @@ export interface DemandFunnelStage {
   detail: string;
 }
 
-export interface DemandOutcomeRow {
+export interface CrmOutcomeRow {
   id: string;
   label: string;
   leads: number;
@@ -77,11 +77,11 @@ export interface DemandOutcomeRow {
   href: string;
 }
 
-export interface DemandDashboardSnapshot {
+export interface CrmDashboardSnapshot {
   title: string;
   route: string;
   readiness: number;
-  status: DemandDashboardSeverity;
+  status: CrmDashboardSeverity;
   operatingAnswer: string;
   operatingDetail: string;
   totalLeads: number;
@@ -90,23 +90,23 @@ export interface DemandDashboardSnapshot {
   totalRevenue: number;
   totalSourceSignals: number;
   guardrailCount: number;
-  functions: DemandFunctionSummary[];
-  kpis: DemandDashboardKpi[];
-  nextMoves: DemandDashboardNextMove[];
-  guardrails: DemandDashboardGuardrail[];
-  funnel: DemandFunnelStage[];
-  outcomes: DemandOutcomeRow[];
-  chartData: Array<{ function: string; readiness: number; status: DemandDashboardSeverity }>;
+  functions: CrmFunctionSummary[];
+  kpis: CrmDashboardKpi[];
+  nextMoves: CrmDashboardNextMove[];
+  guardrails: CrmDashboardGuardrail[];
+  funnel: CrmFunnelStage[];
+  outcomes: CrmOutcomeRow[];
+  chartData: Array<{ function: string; readiness: number; status: CrmDashboardSeverity }>;
 }
 
-const DEMAND_ROUTES = {
-  dashboard: '/demand/hub',
-  mdec: '/demand/mdec',
-  sources: '/demand/sources',
-  campaigns: '/demand/campaigns',
-  contentSocial: '/demand/content-social',
-  leadsRfqs: '/demand/leads-rfqs',
-  reEngage: '/demand/re-engage',
+const CRM_ROUTES = {
+  dashboard: '/crm/hub',
+  mdec: '/crm/mdec',
+  sources: '/crm/sources',
+  campaigns: '/crm/campaigns',
+  contentSocial: '/crm/content-social',
+  leadsRfqs: '/crm/leads-rfqs',
+  reEngage: '/crm/re-engage',
   inventory: '/ecom/cos/inventory-brain',
   service: '/customer/service',
 } as const;
@@ -134,29 +134,29 @@ function money(value: number) {
   }).format(value);
 }
 
-function severityFromReadiness(readiness: number): DemandDashboardSeverity {
+function severityFromReadiness(readiness: number): CrmDashboardSeverity {
   if (readiness < 55) return 'critical';
   if (readiness < 78) return 'watch';
   return 'ready';
 }
 
-function buildInventoryMove(forecast?: PrimeForecast): DemandDashboardNextMove | null {
+function buildInventoryMove(forecast?: PrimeForecast): CrmDashboardNextMove | null {
   if (!forecast || forecast.risk !== 'high') return null;
 
   return {
     id: `inventory-${forecast.id}`,
     rank: 1,
     title: `Resolve inventory pressure before scaling ${forecast.skuCode}`,
-    detail: `${forecast.ats} ATS vs ${forecast.demand7d} projected demand. ${forecast.suggestedAction}`,
-    owner: 'Demand + Ecom',
+    detail: `${forecast.ats} ATS vs ${forecast.crm7d} projected demand. ${forecast.suggestedAction}`,
+    owner: 'CRM + Ecom',
     evidence: 'Inventory guardrail',
-    href: DEMAND_ROUTES.inventory,
+    href: CRM_ROUTES.inventory,
     cta: 'Check inventory',
     severity: 'critical',
   };
 }
 
-function buildCampaignMove(campaign?: PrimeCampaign, rank = 2): DemandDashboardNextMove | null {
+function buildCampaignMove(campaign?: PrimeCampaign, rank = 2): CrmDashboardNextMove | null {
   if (!campaign) return null;
   const conversion = percent(campaign.orders, campaign.leads || campaign.traffic);
 
@@ -167,13 +167,13 @@ function buildCampaignMove(campaign?: PrimeCampaign, rank = 2): DemandDashboardN
     detail: `${campaign.channel} has ${campaign.leads} leads, ${campaign.rfqs} RFQs, ${campaign.orders} orders, and ${conversion}% lead/order readback.`,
     owner: 'Campaigns',
     evidence: `${compact(campaign.traffic)} traffic`,
-    href: DEMAND_ROUTES.campaigns,
+    href: CRM_ROUTES.campaigns,
     cta: 'Open campaign',
     severity: campaign.status === 'active' ? 'ready' : 'watch',
   };
 }
 
-function buildRfqMove(rfq?: PrimeRfq, rank = 3): DemandDashboardNextMove | null {
+function buildRfqMove(rfq?: PrimeRfq, rank = 3): CrmDashboardNextMove | null {
   if (!rfq) return null;
 
   return {
@@ -183,13 +183,13 @@ function buildRfqMove(rfq?: PrimeRfq, rank = 3): DemandDashboardNextMove | null 
     detail: `${rfq.quantity} units, ${money(rfq.value)}, status ${rfq.status}.`,
     owner: 'Leads & RFQs',
     evidence: 'Buyer intent',
-    href: `${DEMAND_ROUTES.leadsRfqs}?rfq=${encodeURIComponent(rfq.id)}`,
+    href: `${CRM_ROUTES.leadsRfqs}?rfq=${encodeURIComponent(rfq.id)}`,
     cta: 'Open RFQ',
     severity: rfq.status === 'converted' ? 'ready' : 'watch',
   };
 }
 
-function buildReEngageMove(play?: PrimeActivationPlay, rank = 4): DemandDashboardNextMove | null {
+function buildReEngageMove(play?: PrimeActivationPlay, rank = 4): CrmDashboardNextMove | null {
   if (!play) return null;
 
   return {
@@ -199,21 +199,21 @@ function buildReEngageMove(play?: PrimeActivationPlay, rank = 4): DemandDashboar
     detail: `${play.nextBestAction} Projected lift ${play.projectedLift}%.`,
     owner: 'Re-engage',
     evidence: play.trigger,
-    href: DEMAND_ROUTES.reEngage,
+    href: CRM_ROUTES.reEngage,
     cta: 'Open play',
     severity: 'ready',
   };
 }
 
-function buildServiceGuardrail(ticket?: PrimeTicket): DemandDashboardGuardrail {
+function buildServiceGuardrail(ticket?: PrimeTicket): CrmDashboardGuardrail {
   if (!ticket) {
     return {
       id: 'service-clear',
       label: 'Service',
       value: 'Clear',
-      detail: 'No open service issue blocks Demand outreach.',
+      detail: 'No open service issue blocks CRM outreach.',
       severity: 'ready',
-      href: DEMAND_ROUTES.service,
+      href: CRM_ROUTES.service,
     };
   }
 
@@ -223,13 +223,13 @@ function buildServiceGuardrail(ticket?: PrimeTicket): DemandDashboardGuardrail {
     value: ticket.priority === 'high' ? 'High' : 'Open',
     detail: ticket.subject,
     severity: ticket.priority === 'high' ? 'critical' : 'watch',
-    href: DEMAND_ROUTES.service,
+    href: CRM_ROUTES.service,
   };
 }
 
-export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDashboardSnapshot {
-  const sources = buildDemandSources(snapshot);
-  const sourcesOverview = buildDemandSourcesOverview(sources);
+export function buildCrmDashboardSnapshot(snapshot: PrimeSnapshot): CrmDashboardSnapshot {
+  const sources = buildCrmSources(snapshot);
+  const sourcesOverview = buildCrmSourcesOverview(sources);
   const activeCampaigns = snapshot.campaigns.filter((campaign) => campaign.status === 'active');
   const totalLeads = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
   const totalRfqs = snapshot.campaigns.reduce((sum, campaign) => sum + campaign.rfqs, 0);
@@ -262,11 +262,11 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
   );
   const status = severityFromReadiness(readiness);
 
-  const functions: DemandFunctionSummary[] = [
+  const functions: CrmFunctionSummary[] = [
     {
       id: 'mdec',
       label: 'MDEC',
-      href: DEMAND_ROUTES.mdec,
+      href: CRM_ROUTES.mdec,
       metric: `${snapshot.socialStreams.length} channels`,
       detail: 'Composer, calendar, engagement, and escalation surface.',
       readiness: mdecReadiness,
@@ -276,7 +276,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     {
       id: 'sources',
       label: 'Sources',
-      href: DEMAND_ROUTES.sources,
+      href: CRM_ROUTES.sources,
       metric: `${sourcesOverview.totalActiveSources}/${sources.length} active`,
       detail: `${sourcesOverview.sourcesNeedingReview} source(s) need owner review.`,
       readiness: sourceQuality,
@@ -286,7 +286,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     {
       id: 'campaigns',
       label: 'Campaigns',
-      href: DEMAND_ROUTES.campaigns,
+      href: CRM_ROUTES.campaigns,
       metric: `${activeCampaigns.length}/${snapshot.campaigns.length} active`,
       detail: primaryCampaign ? `${primaryCampaign.name} is the primary route.` : 'No campaign route.',
       readiness: campaignReadiness,
@@ -296,7 +296,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     {
       id: 'content-social',
       label: 'Content & Social',
-      href: DEMAND_ROUTES.contentSocial,
+      href: CRM_ROUTES.contentSocial,
       metric: `${compact(sourceSignals)} signals`,
       detail: 'Convert channel proof into assets and CTAs.',
       readiness: contentReadiness,
@@ -306,7 +306,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     {
       id: 'leads-rfqs',
       label: 'Leads & RFQs',
-      href: DEMAND_ROUTES.leadsRfqs,
+      href: CRM_ROUTES.leadsRfqs,
       metric: `${responseBacklog} open`,
       detail: `${openLeads} leads and ${openRfqs} RFQs require SLA ownership.`,
       readiness: responseReadiness,
@@ -316,7 +316,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     {
       id: 're-engage',
       label: 'Re-engage',
-      href: DEMAND_ROUTES.reEngage,
+      href: CRM_ROUTES.reEngage,
       metric: `${snapshot.activationPlays.length} plays`,
       detail: 'Recover warm buyers with suppression and cooldown rules.',
       readiness: reEngageReadiness,
@@ -325,7 +325,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     },
   ];
 
-  const kpis: DemandDashboardKpi[] = [
+  const kpis: CrmDashboardKpi[] = [
     {
       id: 'readiness',
       label: 'Readiness',
@@ -351,7 +351,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
       id: 'outcome',
       label: 'Outcome readback',
       value: `${totalOrders} orders`,
-      detail: `${money(totalRevenue)} revenue attached to Demand.`,
+      detail: `${money(totalRevenue)} revenue attached to CRM.`,
       tone: 'purple',
     },
   ];
@@ -363,16 +363,16 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     buildReEngageMove(primaryPlay, highRiskForecasts.length ? 4 : 3),
   ]
     .filter(Boolean)
-    .map((move, index) => ({ ...move, rank: index + 1 })) as DemandDashboardNextMove[];
+    .map((move, index) => ({ ...move, rank: index + 1 })) as CrmDashboardNextMove[];
 
-  const guardrails: DemandDashboardGuardrail[] = [
+  const guardrails: CrmDashboardGuardrail[] = [
     {
       id: topForecast ? `stock-${topForecast.id}` : 'stock-clear',
       label: 'Stock',
-      value: topForecast ? `${topForecast.ats}/${topForecast.demand7d}` : 'Clear',
+      value: topForecast ? `${topForecast.ats}/${topForecast.crm7d}` : 'Clear',
       detail: topForecast ? `${topForecast.skuCode} is ${topForecast.risk} risk. ${topForecast.suggestedAction}` : 'No inventory risk detected.',
       severity: topForecast ? topForecast.risk === 'high' ? 'critical' : topForecast.risk === 'medium' ? 'watch' : 'ready' : 'ready',
-      href: DEMAND_ROUTES.inventory,
+      href: CRM_ROUTES.inventory,
     },
     buildServiceGuardrail(openTickets[0]),
     {
@@ -381,17 +381,17 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
       value: snapshot.activationPlays.length ? 'On' : 'Pending',
       detail: 'Converted buyers, open tickets, and assigned RFQs stay excluded from re-entry.',
       severity: snapshot.activationPlays.length ? 'ready' : 'watch',
-      href: DEMAND_ROUTES.reEngage,
+      href: CRM_ROUTES.reEngage,
     },
   ];
 
-  const funnel: DemandFunnelStage[] = [
+  const funnel: CrmFunnelStage[] = [
     {
       id: 'sources',
       label: 'Sources',
       value: sourceSignals,
       displayValue: compact(sourceSignals),
-      href: DEMAND_ROUTES.sources,
+      href: CRM_ROUTES.sources,
       detail: 'Origin signal volume and source quality.',
     },
     {
@@ -399,7 +399,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
       label: 'Campaigns',
       value: totalTraffic,
       displayValue: compact(totalTraffic),
-      href: DEMAND_ROUTES.campaigns,
+      href: CRM_ROUTES.campaigns,
       detail: 'Campaign traffic and market packaging.',
     },
     {
@@ -407,7 +407,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
       label: 'Leads',
       value: totalLeads,
       displayValue: String(totalLeads),
-      href: DEMAND_ROUTES.leadsRfqs,
+      href: CRM_ROUTES.leadsRfqs,
       detail: 'Qualified buyer intent entering response.',
     },
     {
@@ -415,7 +415,7 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
       label: 'RFQs',
       value: totalRfqs,
       displayValue: String(totalRfqs),
-      href: DEMAND_ROUTES.leadsRfqs,
+      href: CRM_ROUTES.leadsRfqs,
       detail: 'Commercial requests ready for owner routing.',
     },
     {
@@ -428,24 +428,24 @@ export function buildDemandDashboardSnapshot(snapshot: PrimeSnapshot): DemandDas
     },
   ];
 
-  const outcomes: DemandOutcomeRow[] = snapshot.campaigns.slice(0, 5).map((campaign) => ({
+  const outcomes: CrmOutcomeRow[] = snapshot.campaigns.slice(0, 5).map((campaign) => ({
     id: campaign.id,
     label: campaign.name,
     leads: campaign.leads,
     rfqs: campaign.rfqs,
     orders: campaign.orders,
     revenue: campaign.revenue,
-    href: DEMAND_ROUTES.campaigns,
+    href: CRM_ROUTES.campaigns,
   }));
 
   return {
-    title: 'Demand Dashboard',
-    route: DEMAND_ROUTES.dashboard,
+    title: 'CRM Dashboard',
+    route: CRM_ROUTES.dashboard,
     readiness,
     status,
     operatingAnswer: blockedGuardrails
-      ? 'Fix guardrails before scaling Demand.'
-      : 'Demand is ready for controlled growth.',
+      ? 'Fix guardrails before scaling CRM.'
+      : 'CRM is ready for controlled growth.',
     operatingDetail: `${functions.filter((item) => item.status === 'ready').length}/${functions.length} functions are ready. ${totalLeads} leads, ${totalRfqs} RFQs, and ${totalOrders} orders are visible from one dashboard.`,
     totalLeads,
     totalRfqs,

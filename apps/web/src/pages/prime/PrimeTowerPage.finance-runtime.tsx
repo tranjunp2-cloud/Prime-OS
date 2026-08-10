@@ -128,7 +128,7 @@ function FinanceScoreRing({
   const dash = (score / 100) * circumference;
 
   return (
-    <div className="rounded-3xl border bg-background/80 p-4 shadow-sm">
+    <div className="rounded-lg border bg-background/80 p-4 shadow-sm">
       <div className="flex items-center gap-4">
         <div className="relative size-28 shrink-0">
           <svg viewBox="0 0 112 112" className="size-28 -rotate-90">
@@ -210,9 +210,9 @@ function FinanceMiniFlow({
       <CardContent>
         <div className="grid gap-3 md:grid-cols-4">
           {steps.map((step, index) => (
-            <div key={`${step.label}-${index}`} className="rounded-3xl border bg-muted/20 p-4">
+            <div key={`${step.label}-${index}`} className="rounded-lg border bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex size-10 items-center justify-center rounded-2xl border bg-background text-primary">
+                <div className="flex size-10 items-center justify-center rounded-lg border bg-background text-primary">
                   {step.icon ?? <CircleDollarSign className="size-5" />}
                 </div>
                 <Badge variant="outline" className="rounded-full">{index + 1}</Badge>
@@ -263,7 +263,7 @@ function FinanceRouteSelector<T extends { id: string }>({
               key={row.id}
               type="button"
               onClick={() => onSelect(row.id)}
-              className={`rounded-3xl border p-4 text-left transition hover:border-primary/40 ${isSelected ? 'bg-primary/10 ring-1 ring-primary/40' : 'bg-background'}`}
+              className={`rounded-lg border p-4 text-left transition hover:border-primary/40 ${isSelected ? 'bg-primary/10 ring-1 ring-primary/40' : 'bg-background'}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -357,7 +357,7 @@ function CompactCapitalReadinessRuntimePanel({
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border">
         <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
-          <div className="rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-emerald-500/10 p-5">
+          <div className="rounded-lg border bg-gradient-to-br from-primary/10 via-background to-emerald-500/10 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">PrimeOS recommends</Badge>
               <Badge variant={selectedRow.readinessScore >= 80 ? 'default' : 'outline'} className="capitalize">{humanizeIntelligenceValue(selectedRow.status)}</Badge>
@@ -390,7 +390,7 @@ function CompactCapitalReadinessRuntimePanel({
           title="Funding proof chart"
           subtitle="Simple enough for the seller: green means finance can trust the route, amber means fix before scaling."
           items={[
-            { label: 'Demand proof', value: demandScore, detail: matchingCampaign ? `${matchingCampaign.leads} leads, ${matchingCampaign.rfqs} RFQs, ${matchingCampaign.orders} orders attached.` : 'Demand proof still needs Campaign Ops data.', tone: 'success' },
+            { label: 'CRM proof', value: demandScore, detail: matchingCampaign ? `${matchingCampaign.leads} leads, ${matchingCampaign.rfqs} RFQs, ${matchingCampaign.orders} orders attached.` : 'CRM proof still needs Campaign Ops data.', tone: 'success' },
             { label: 'Inventory guardrail', value: inventoryScore, detail: matchingForecast ? `${matchingForecast.ats} ATS vs ${matchingForecast.demand7d} forecast demand.` : 'No inventory forecast is attached yet.', tone: inventoryScore < 55 ? 'warning' : 'success' },
             { label: 'CRM repayment quality', value: crmScore, detail: `${currency.format(snapshot.metrics.revenue)} revenue and ${snapshot.metrics.leadToOrderRate}% lead-to-order context.`, tone: 'primary' },
             { label: 'Risk trust', value: trustScore, detail: relatedRisk?.topRisk || 'Risk lane still needs clearer lender-facing proof.', tone: trustScore < 75 ? 'warning' : 'success' },
@@ -402,7 +402,7 @@ function CompactCapitalReadinessRuntimePanel({
         title="Why this can move"
         steps={[
           { label: 'Intelligence', value: selectedRow.linkedLaunch || 'Approved launch route', icon: <Sparkles className="size-5" /> },
-          { label: 'Demand', value: matchingCampaign ? `${matchingCampaign.name} is producing buyer proof` : 'Demand proof pending', icon: <Megaphone className="size-5" /> },
+          { label: 'CRM', value: matchingCampaign ? `${matchingCampaign.name} is producing buyer proof` : 'CRM proof pending', icon: <Megaphone className="size-5" /> },
           { label: 'Finance', value: `${formatFinanceCurrency(totalFundingNeed)} total need across ${readinessRows.length} routes`, icon: <CircleDollarSign className="size-5" /> },
           { label: 'Next', value: readyCount > 0 ? 'Price the cleanest offer' : 'Clear the biggest blocker first', icon: <ArrowRight className="size-5" /> },
         ]}
@@ -503,7 +503,7 @@ function CompactCapitalOffersRuntimePanel({
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border">
         <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
-          <div className="rounded-3xl border bg-gradient-to-br from-emerald-500/10 via-background to-primary/10 p-5">
+          <div className="rounded-lg border bg-gradient-to-br from-emerald-500/10 via-background to-primary/10 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">PrimeOS recommends</Badge>
               <Badge variant={selectedOffer.status === 'active' ? 'default' : 'outline'} className="capitalize">{humanizeIntelligenceValue(selectedOffer.status)}</Badge>
@@ -556,7 +556,7 @@ function CompactCapitalOffersRuntimePanel({
       </div>
 
       <Dialog open={Boolean(fundingRequest)} onOpenChange={(open) => !open && setFundingRequest(null)}>
-        <DialogContent className="max-w-2xl rounded-3xl">
+        <DialogContent className="max-w-2xl rounded-lg">
           <DialogHeader>
             <DialogTitle>{canRequestFunding ? 'Funding request draft' : 'Eligibility prep plan'}</DialogTitle>
             <DialogDescription>
@@ -568,7 +568,7 @@ function CompactCapitalOffersRuntimePanel({
             <RuntimeContextCard label="Repayment" value={humanizeIntelligenceValue(selectedOffer.repaymentModel)} detail={relatedSettlement?.facilityName || 'Settlement route pending'} />
             <RuntimeContextCard label="Readiness" value={`${offerFit}%`} detail={canRequestFunding ? 'Eligible now' : 'Needs prep first'} />
           </div>
-          <div className="rounded-2xl border bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-lg border bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
             {fundingRequest}
           </div>
           <div className="flex justify-end gap-2">
@@ -682,7 +682,7 @@ function CompactRiskTrustRuntimePanel({
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border">
         <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
-          <div className="rounded-3xl border bg-gradient-to-br from-amber-500/10 via-background to-rose-500/10 p-5">
+          <div className="rounded-lg border bg-gradient-to-br from-amber-500/10 via-background to-rose-500/10 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">Watch first</Badge>
               <Badge variant={selectedRisk.severity === 'high' ? 'destructive' : 'outline'} className="capitalize">{humanizeIntelligenceValue(selectedRisk.severity)}</Badge>
@@ -733,7 +733,7 @@ function CompactRiskTrustRuntimePanel({
       </div>
 
       <Dialog open={Boolean(avoidancePlan)} onOpenChange={(open) => !open && setAvoidancePlan(null)}>
-        <DialogContent className="max-w-3xl rounded-3xl">
+        <DialogContent className="max-w-3xl rounded-lg">
           <DialogHeader>
             <DialogTitle>What to avoid before funding</DialogTitle>
             <DialogDescription>
@@ -747,7 +747,7 @@ function CompactRiskTrustRuntimePanel({
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {(avoidancePlan ?? []).map((item, index) => (
-              <div key={item} className="rounded-2xl border bg-amber-500/10 p-4 text-sm leading-6">
+              <div key={item} className="rounded-lg border bg-amber-500/10 p-4 text-sm leading-6">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Avoid {index + 1}</div>
                 {item}
               </div>
@@ -849,7 +849,7 @@ function CompactSettlementRuntimePanel({
     <div className="space-y-4">
       <Card className="overflow-hidden rounded-lg border">
         <CardContent className="grid gap-4 p-4 xl:grid-cols-[1fr_0.42fr]">
-          <div className="rounded-3xl border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-5">
+          <div className="rounded-lg border bg-gradient-to-br from-sky-500/10 via-background to-emerald-500/10 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">Finance Health</Badge>
               <Badge variant={selectedFacility.status === 'overdue' ? 'destructive' : 'default'} className="capitalize">{humanizeIntelligenceValue(selectedFacility.status)}</Badge>
@@ -902,7 +902,7 @@ function CompactSettlementRuntimePanel({
       </div>
 
       <Dialog open={Boolean(healthPlan)} onOpenChange={(open) => !open && setHealthPlan(null)}>
-        <DialogContent className="max-w-3xl rounded-3xl">
+        <DialogContent className="max-w-3xl rounded-lg">
           <DialogHeader>
             <DialogTitle>Recommended finance health actions</DialogTitle>
             <DialogDescription>
@@ -916,7 +916,7 @@ function CompactSettlementRuntimePanel({
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {(healthPlan ?? []).map((item, index) => (
-              <div key={item} className="rounded-2xl border bg-emerald-500/10 p-4 text-sm leading-6">
+              <div key={item} className="rounded-lg border bg-emerald-500/10 p-4 text-sm leading-6">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Action {index + 1}</div>
                 {item}
               </div>

@@ -1,32 +1,25 @@
 import { Navigate, Route, useLocation } from "react-router-dom";
 import Account from "@/pages/Account";
-import Products from "@/pages/Products";
-import ProductDetail from "@/pages/ProductDetail";
-import ProductCreatePage from "@/pages/ProductCreatePage";
-import Listings from "@/pages/Listings";
-import Inventory from "@/pages/Inventory";
-import Warehouses from "@/pages/Warehouses";
-import Orders from "@/pages/Orders";
-import OrderDetail from "@/pages/OrderDetail";
-import Fulfillment from "@/pages/Fulfillment";
-import FulfillmentJobDetail from "@/pages/FulfillmentJobDetail";
-import Returns from "@/pages/Returns";
-import ReturnDetail from "@/pages/ReturnDetail";
-import SlaPolicies from "@/pages/SlaPolicies";
-import RoutingPlans from "@/pages/RoutingPlans";
-import { LegacyEntityRedirect, LegacyPathRedirect } from "@/components/routing/LegacyEntityRedirect";
-import { PrimeOverview } from "@/pages/prime/PrimeOverview";
+import Service from "@/pages/Service";
 import { PrimeFinSupportPage } from "@/pages/prime/PrimeFinSupportPage";
 import { PrimeMdecPage } from "@/pages/prime/PrimeMdecPage";
 import { PrimeConsultingAgentPage } from "@/pages/prime/PrimeConsultingAgentPage";
 import { PrimeProductOperationAgentPage } from "@/pages/prime/PrimeProductOperationAgentPage";
 import { PrimeBrandAiPage } from "@/pages/prime/PrimeBrandAiPage";
-import { PrimeDemandHubPage, PrimeDemandSourcesPage, PrimeTowerPage } from "@/pages/prime/PrimeTowerPage";
+import { PrimeCrmSourcesPage, PrimeTowerPage } from "@/pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "@/pages/prime/CommerceSurfacePage";
-import { CosPolicyRulePage } from "@/pages/prime/CosPolicyRulePage";
-import { CosEventAuditPage } from "@/pages/prime/CosEventAuditPage";
+import { PrimeGrowthOSPage } from "@/pages/prime/PrimeGrowthOSPage";
+import { PrimeClientReportsPage } from "@/pages/prime/PrimeClientReportsPage";
+import PrimeCrmOperatorDashboard from "@/pages/PrimeCrmOperatorDashboard";
 
-function LegacyDemandRedirect({ to, defaultSearch = "" }: { to: string; defaultSearch?: string }) {
+const cosOverviewHref = "/overview?module=cos";
+const cosCatalogHref = `${cosOverviewHref}&view=pim`;
+const cosInventoryHref = `${cosOverviewHref}&view=pim`;
+const cosOrdersHref = `${cosOverviewHref}&view=oms`;
+const cosFulfillmentHref = `${cosOverviewHref}&view=ship`;
+const cosChannelHref = `${cosOverviewHref}&view=pim`;
+
+function LegacyCrmRedirect({ to, defaultSearch = "" }: { to: string; defaultSearch?: string }) {
   const { search } = useLocation();
   const params = new URLSearchParams(defaultSearch);
   const incomingParams = new URLSearchParams(search);
@@ -43,28 +36,32 @@ function LegacyDemandRedirect({ to, defaultSearch = "" }: { to: string; defaultS
 export function PrimeRoutes() {
   return (
     <>
-    <Route path="/overview" element={<PrimeOverview />} />
+    <Route path="/overview" element={<PrimeGrowthOSPage />} />
+    <Route path="/client-reports" element={<PrimeClientReportsPage />} />
+    <Route path="/reports" element={<Navigate to="/client-reports" replace />} />
     <Route path="/account" element={<Account />} />
     
-    <Route path="/demand" element={<PrimeDemandHubPage />} />
-    <Route path="/demand/hub" element={<PrimeDemandHubPage />} />
-    <Route path="/demand/mdec" element={<PrimeMdecPage />} />
-    <Route path="/demand/sources" element={<PrimeDemandSourcesPage />} />
-    <Route path="/demand/campaigns" element={<PrimeTowerPage towerId="campaign-ops" />} />
-    <Route path="/demand/content-social" element={<PrimeTowerPage towerId="content-creator-ops" />} />
-    <Route path="/demand/leads-rfqs" element={<PrimeTowerPage towerId="lead-response-capture" />} />
-    <Route path="/demand/re-engage" element={<PrimeTowerPage towerId="retargeting-outreach" />} />
-    <Route path="/demand/campaign-ops" element={<LegacyDemandRedirect to="/demand/campaigns" />} />
-    <Route path="/demand/content-creator-ops" element={<LegacyDemandRedirect to="/demand/content-social" defaultSearch="view=creator-proof" />} />
-    <Route path="/demand/lead-response-capture" element={<LegacyDemandRedirect to="/demand/leads-rfqs" />} />
-    <Route path="/demand/retargeting-outreach" element={<LegacyDemandRedirect to="/demand/re-engage" />} />
-    <Route path="/demand/acquisition" element={<LegacyDemandRedirect to="/demand/sources" />} />
-    <Route path="/demand/campaign" element={<LegacyDemandRedirect to="/demand/campaigns" />} />
-    <Route path="/demand/lead-capture" element={<LegacyDemandRedirect to="/demand/leads-rfqs" />} />
-    <Route path="/demand/retargeting" element={<LegacyDemandRedirect to="/demand/re-engage" />} />
+    <Route path="/crm" element={<Navigate to="/customer/service" replace />} />
+    <Route path="/crm/hub" element={<Navigate to="/customer/service" replace />} />
+    <Route path="/crm/chat" element={<Navigate to="/customer/service" replace />} />
+    <Route path="/crm/operator" element={<PrimeCrmOperatorDashboard />} />
+    <Route path="/crm/mdec" element={<PrimeMdecPage />} />
+    <Route path="/crm/sources" element={<PrimeCrmSourcesPage />} />
+    <Route path="/crm/campaigns" element={<PrimeTowerPage towerId="campaign-ops" />} />
+    <Route path="/crm/content-social" element={<PrimeTowerPage towerId="content-creator-ops" />} />
+    <Route path="/crm/leads-rfqs" element={<PrimeTowerPage towerId="lead-response-capture" />} />
+    <Route path="/crm/re-engage" element={<PrimeTowerPage towerId="retargeting-outreach" />} />
+    <Route path="/crm/campaign-ops" element={<LegacyCrmRedirect to="/crm/campaigns" />} />
+    <Route path="/crm/content-creator-ops" element={<LegacyCrmRedirect to="/crm/content-social" defaultSearch="view=creator-proof" />} />
+    <Route path="/crm/lead-response-capture" element={<LegacyCrmRedirect to="/crm/leads-rfqs" />} />
+    <Route path="/crm/retargeting-outreach" element={<LegacyCrmRedirect to="/crm/re-engage" />} />
+    <Route path="/crm/acquisition" element={<LegacyCrmRedirect to="/crm/sources" />} />
+    <Route path="/crm/campaign" element={<LegacyCrmRedirect to="/crm/campaigns" />} />
+    <Route path="/crm/lead-capture" element={<LegacyCrmRedirect to="/crm/leads-rfqs" />} />
+    <Route path="/crm/retargeting" element={<LegacyCrmRedirect to="/crm/re-engage" />} />
     
     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
-    <Route path="/customer/service" element={<PrimeTowerPage towerId="service" />} />
+    <Route path="/customer/service" element={<Service />} />
     
     <Route path="/finance" element={<Navigate to="/finance/fin-support" replace />} />
     <Route path="/finance/fin-support" element={<PrimeFinSupportPage />} />
@@ -78,23 +75,16 @@ export function PrimeRoutes() {
     <Route path="/finance/risk" element={<Navigate to="/finance/fin-support#blockers" replace />} />
     
     <Route path="/ecom/commerce-surface" element={<CommerceSurfacePage />} />
-    <Route path="/ecom/cos/product-master" element={<Products />} />
-    <Route path="/ecom/cos/product-master/new" element={<ProductCreatePage />} />
-    <Route path="/ecom/cos/product-master/:id/edit" element={<ProductCreatePage />} />
-    <Route path="/ecom/cos/product-master/:id" element={<ProductDetail />} />
-    <Route path="/ecom/cos/listings" element={<Listings />} />
-    <Route path="/ecom/cos/inventory-brain" element={<Inventory />} />
-    <Route path="/ecom/cos/warehouses" element={<Warehouses />} />
-    <Route path="/ecom/cos/oms" element={<Orders />} />
-    <Route path="/ecom/cos/oms/:id" element={<OrderDetail />} />
-    <Route path="/ecom/cos/fulfillment" element={<Fulfillment />} />
-    <Route path="/ecom/cos/fulfillment/jobs/:id" element={<FulfillmentJobDetail />} />
-    <Route path="/ecom/cos/returns" element={<Returns />} />
-    <Route path="/ecom/cos/returns/:id" element={<ReturnDetail />} />
-    <Route path="/ecom/cos/policy-rule" element={<CosPolicyRulePage />} />
-    <Route path="/ecom/cos/policy-rule/sla" element={<SlaPolicies />} />
-    <Route path="/ecom/cos/policy-rule/routing" element={<RoutingPlans />} />
-    <Route path="/ecom/cos/event-audit" element={<CosEventAuditPage />} />
+    <Route path="/ecom/cos/product-master/*" element={<Navigate to={cosCatalogHref} replace />} />
+    <Route path="/ecom/cos/listings" element={<Navigate to={cosChannelHref} replace />} />
+    <Route path="/ecom/cos/inventory-brain/*" element={<Navigate to={cosInventoryHref} replace />} />
+    <Route path="/ecom/cos/warehouses/*" element={<Navigate to={cosInventoryHref} replace />} />
+    <Route path="/ecom/cos/oms/*" element={<Navigate to={cosOrdersHref} replace />} />
+    <Route path="/ecom/cos/fulfillment/*" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/ecom/cos/returns/*" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/ecom/cos/policy-rule/*" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/ecom/cos/event-audit" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/ecom/cos/*" element={<Navigate to={cosOverviewHref} replace />} />
     
     <Route path="/intelligence" element={<Navigate to="/intelligence/consulting-agent?tab=kpi" replace />} />
     <Route path="/intelligence/consulting-agent" element={<PrimeConsultingAgentPage />} />
@@ -130,20 +120,13 @@ export function PrimeRoutes() {
     <Route path="/intelligence/campaigns" element={<Navigate to="/intelligence/consulting-agent?tab=launch" replace />} />
     
     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-    <Route path="/products" element={<Navigate to="/ecom/cos/product-master" replace />} />
-    <Route path="/products/new" element={<LegacyPathRedirect to="/ecom/cos/product-master/new" />} />
-    <Route path="/products/:id/edit" element={<LegacyPathRedirect to="/ecom/cos/product-master/:id/edit" />} />
-    <Route path="/products/:id/variants/:sku" element={<LegacyPathRedirect to="/ecom/cos/product-master/:id?variant=:sku" />} />
-    <Route path="/products/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/product-master" />} />
-    <Route path="/inventory" element={<Navigate to="/ecom/cos/inventory-brain" replace />} />
-    <Route path="/orders" element={<Navigate to="/ecom/cos/oms" replace />} />
-    <Route path="/orders/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/oms" />} />
-    <Route path="/fulfillment" element={<Navigate to="/ecom/cos/fulfillment" replace />} />
-    <Route path="/fulfillment/jobs/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/fulfillment/jobs" />} />
-    <Route path="/returns" element={<Navigate to="/ecom/cos/returns" replace />} />
-    <Route path="/returns/:id" element={<LegacyEntityRedirect basePath="/ecom/cos/returns" />} />
-    <Route path="/sla-policies" element={<Navigate to="/ecom/cos/policy-rule/sla" replace />} />
-    <Route path="/routing-plans" element={<Navigate to="/ecom/cos/policy-rule/routing" replace />} />
+    <Route path="/products/*" element={<Navigate to={cosCatalogHref} replace />} />
+    <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />
+    <Route path="/orders/*" element={<Navigate to={cosOrdersHref} replace />} />
+    <Route path="/fulfillment/*" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/returns/*" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/sla-policies" element={<Navigate to={cosFulfillmentHref} replace />} />
+    <Route path="/routing-plans" element={<Navigate to={cosFulfillmentHref} replace />} />
     </>
   );
 }

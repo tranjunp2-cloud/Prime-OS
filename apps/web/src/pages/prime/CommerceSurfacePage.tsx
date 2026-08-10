@@ -40,7 +40,7 @@ export function CommerceSurfacePage() {
 
       <div className="space-y-6 p-4 md:p-6">
         <div className="grid gap-3 md:grid-cols-4">
-          <SummaryMetricCard label="Storefront signals" value={snapshot.campaigns.reduce((sum, item) => sum + item.traffic, 0).toLocaleString()} meta="Traffic inherited from Demand Area." icon={<MousePointerClick className="size-5" />} tone="info" />
+          <SummaryMetricCard label="Storefront signals" value={snapshot.campaigns.reduce((sum, item) => sum + item.traffic, 0).toLocaleString()} meta="Traffic inherited from CRM Area." icon={<MousePointerClick className="size-5" />} tone="info" />
           <SummaryMetricCard label="RFQ pipeline" value={snapshot.rfqs.length} meta={currency.format(quoteValue)} icon={<ClipboardList className="size-5" />} tone="warning" />
           <SummaryMetricCard label="Converted orders" value={convertedRfqs.length} meta="RFQs mapped to COS OMS orders." icon={<ShoppingCart className="size-5" />} tone="success" />
           <SummaryMetricCard label="Product source" value={snapshot.products.length} meta="Product Master remains SSOT." icon={<Store className="size-5" />} tone="teal" />

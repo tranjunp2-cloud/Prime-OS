@@ -44,7 +44,7 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] md:items-start">
           <ThemeModeSwitcher />
-          <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
+          <div className="rounded-lg border border-border/70 bg-muted/35 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Sparkles className="size-4 text-primary" />
               {t('settings.lightModeBadge')}

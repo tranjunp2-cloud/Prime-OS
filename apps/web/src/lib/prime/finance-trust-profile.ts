@@ -1,9 +1,10 @@
 import type { FinanceControlPlaneSnapshot, RiskTrustRecord, SettlementRepaymentRecord } from './finance-control-plane';
 import type { PrimeSnapshot } from './prime-data';
+import { buildMyInvoisEvidenceSummary } from './myinvois';
 
 export type FinanceEvidenceOwner =
   | 'Finance'
-  | 'Demand'
+  | 'CRM'
   | 'Customer'
   | 'OMS'
   | 'Inventory'
@@ -83,6 +84,11 @@ export interface CommerceEvidenceItem {
   records: number;
   linkedRoute: string;
   documentId?: string;
+  connectorEvidence?: {
+    label: string;
+    status: CommerceEvidenceStatus;
+    detail: string;
+  };
 }
 
 export interface CommerceEvidencePack {
@@ -207,6 +213,7 @@ export function buildFinanceTrustProfile(input: BuildFinanceTrustProfileInput) {
   const totalNextDue = controlPlane.settlementRepayment.reduce((sum, row) => sum + (row.nextDueAmount ?? 0), 0);
   const rfqReceivables = snapshot.rfqs.reduce((sum, rfq) => sum + rfq.value, 0);
   const averageCampaignRevenue = snapshot.campaigns.length ? snapshot.metrics.revenue / snapshot.campaigns.length : snapshot.metrics.revenue;
+  const myInvoisEvidence = buildMyInvoisEvidenceSummary(snapshot.orders, snapshot.orderItems, snapshot.orderEvents);
 
   const commerceActivityScore = clampScore(
     54 +
@@ -238,7 +245,7 @@ export function buildFinanceTrustProfile(input: BuildFinanceTrustProfileInput) {
     nextDueAmount: totalNextDue,
     nextDueDate: controlPlane.settlementRepayment.find((row) => row.nextDueDate)?.nextDueDate,
     payoutCadence: settlementSignals.length > 1 ? 'Multiple settlement lanes' : 'Single settlement lane',
-    sourceOwners: ['Demand', 'Finance', 'OMS'],
+    sourceOwners: ['CRM', 'Finance', 'OMS'],
     evidenceIds: ['settlements', 'invoices', 'orders'],
   };
 
@@ -267,7 +274,7 @@ export function buildFinanceTrustProfile(input: BuildFinanceTrustProfileInput) {
       value: yen.format(receivables.openReceivables + receivables.projectedPayout),
       score: clampScore(70 + Math.min(snapshot.rfqs.length * 4, 16) + Math.min(settlementSignals.length * 5, 12)),
       detail: `${yen.format(receivables.openReceivables)} RFQ receivables plus ${yen.format(receivables.projectedPayout)} projected payout context.`,
-      sourceOfTruthOwner: 'Demand',
+      sourceOfTruthOwner: 'CRM',
       evidenceIds: ['invoices', 'settlements'],
     },
     {
@@ -301,7 +308,7 @@ export function buildFinanceTrustProfile(input: BuildFinanceTrustProfileInput) {
 
   const evidencePack: CommerceEvidencePack = {
     id: 'commerce-evidence-pack',
-    summary: 'Bank-review preview assembled from commerce execution evidence; no accounting-only metric is required for this mock view.',
+    summary: 'Bank-review preview assembled from commerce execution evidence; MyInvois-valid invoice activity is surfaced as verified commerce evidence, not accounting truth.',
     items: [
       {
         id: 'orders',
@@ -327,14 +334,25 @@ export function buildFinanceTrustProfile(input: BuildFinanceTrustProfileInput) {
       },
       {
         id: 'invoices',
-        label: 'Invoices and RFQ receivables',
+        label: myInvoisEvidence.candidateCount > 0 ? 'MyInvois-valid invoices and RFQ receivables' : 'Invoices and MyInvois readiness',
         category: 'invoices',
-        status: evidenceStatus(documents, ['invoice-records'], snapshot.rfqs.length ? 'uploaded' : 'missing'),
-        sourceOfTruthOwner: 'Demand',
-        summary: 'B2B RFQs, invoice context, and receivable exposure before lender review.',
-        records: snapshot.rfqs.length,
-        linkedRoute: '/demand/leads-rfqs',
+        status: myInvoisEvidence.evidenceStatus === 'missing'
+          ? evidenceStatus(documents, ['invoice-records'], snapshot.rfqs.length ? 'uploaded' : 'missing')
+          : myInvoisEvidence.evidenceStatus,
+      sourceOfTruthOwner: 'CRM',
+        summary: myInvoisEvidence.candidateCount > 0
+          ? `MyInvois evidence: ${myInvoisEvidence.summaryLine}`
+          : 'Invoice context and receivable exposure before lender review.',
+        records: snapshot.rfqs.length + myInvoisEvidence.candidateCount,
+        linkedRoute: '/ecom/cos/oms',
         documentId: 'invoice-records',
+        connectorEvidence: myInvoisEvidence.candidateCount > 0
+          ? {
+              label: 'Malaysia MyInvois',
+              status: myInvoisEvidence.evidenceStatus === 'missing' ? 'uploaded' : myInvoisEvidence.evidenceStatus,
+              detail: myInvoisEvidence.summaryLine,
+            }
+          : undefined,
       },
       {
         id: 'logistics-export',
@@ -355,12 +373,13 @@ export function buildFinanceTrustProfile(input: BuildFinanceTrustProfileInput) {
         sourceOfTruthOwner: 'Marketplace',
         summary: 'Listing health, campaign proof, refund ratio, and account-quality signals.',
         records: snapshot.listingsCount + snapshot.campaigns.length,
-        linkedRoute: '/demand/campaigns',
+        linkedRoute: '/crm/campaigns',
         documentId: 'marketplace-reports',
       },
     ],
     reusableDocumentCount: documents.filter((document) => document.status === 'reusable').length,
-    openIssueCount: documents.filter((document) => document.status === 'missing' || document.status === 'rejected').length,
+    openIssueCount: documents.filter((document) => document.status === 'missing' || document.status === 'rejected').length
+      + (myInvoisEvidence.invalidCount > 0 || myInvoisEvidence.blockingFields.length > 0 ? 1 : 0),
   };
 
   const coveredEvidence = evidencePack.items.filter((item) => item.status !== 'missing' && item.status !== 'rejected');

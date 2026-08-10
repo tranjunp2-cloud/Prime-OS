@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import UIRegressionReview from "./pages/UIRegressionReview";
+import Auth from "./pages/Auth";
 import { AppLayout } from "./components/layout/AppLayout";
 import { PrimeRoutes } from "./routes/PrimeRoutes";
 
@@ -22,7 +23,7 @@ const queryClient = new QueryClient({
 });
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -30,6 +31,10 @@ function RequireAuth({ children }: { children: ReactNode }) {
         Loading PrimeOS...
       </div>
     );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
   }
 
   return <>{children}</>;
@@ -42,10 +47,10 @@ const App = () => {
         <I18nProvider>
           <AuthProvider>
             <TooltipProvider>
-              <Sonner />
+              <Sonner position="bottom-right" offset={{ right: 16, bottom: 16 }} mobileOffset={{ right: 12, bottom: 96 }} />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/auth" element={<Navigate to="/overview" replace />} />
+                  <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route

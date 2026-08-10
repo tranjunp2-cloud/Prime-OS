@@ -113,7 +113,7 @@ function ProductOperationHeader({
           <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight md:text-5xl">Operation Agent</h1>
         </div>
       </div>
-      <div className="flex max-w-full gap-2 overflow-x-auto rounded-2xl bg-muted p-1">
+      <div className="flex max-w-full gap-2 overflow-x-auto rounded-lg bg-muted p-1">
         {views.map((view) => {
           const Icon = view.icon;
           return (
@@ -123,7 +123,7 @@ function ProductOperationHeader({
               title={view.copy}
               onClick={() => onChangeView(view.id)}
               className={cn(
-                'min-w-56 rounded-xl px-4 py-3 text-left transition-colors',
+                'min-w-56 rounded-lg px-4 py-3 text-left transition-colors',
                 activeView === view.id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:bg-card/60',
               )}
             >
@@ -143,7 +143,7 @@ function ProductOperationHeader({
 function CardDetailDialog({ card, onClose }: { card: OperatingCard | null; onClose: () => void }) {
   return (
     <Dialog open={Boolean(card)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-2xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-lg">
         {card ? (
           <div className="space-y-5">
             <DialogHeader>
@@ -156,18 +156,18 @@ function CardDetailDialog({ card, onClose }: { card: OperatingCard | null; onClo
               <DialogDescription>{card.businessImpact}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="rounded-lg border bg-muted/30 p-4">
                 <div className="font-semibold">Recommended action</div>
                 <p className="mt-2 text-sm text-muted-foreground">{card.recommendedAction}</p>
               </div>
-              <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="rounded-lg border bg-muted/30 p-4">
                 <div className="font-semibold">Operating owner</div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {card.owner} via {card.sourceOwner}
                 </p>
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
+            <div className="rounded-lg border bg-muted/30 p-4">
               <div className="font-semibold">Evidence</div>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                 {card.evidence.map((item) => (
@@ -178,7 +178,7 @@ function CardDetailDialog({ card, onClose }: { card: OperatingCard | null; onClo
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
+            <div className="rounded-lg border bg-muted/30 p-4">
               <div className="font-semibold">Policy checks</div>
               <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 {card.policyChecklist.map((check) => (
@@ -189,7 +189,7 @@ function CardDetailDialog({ card, onClose }: { card: OperatingCard | null; onClo
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
+            <div className="rounded-lg border bg-muted/30 p-4">
               <div className="font-semibold">Audit trail</div>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                 {card.auditTrail.map((item) => (
@@ -331,7 +331,7 @@ function AgentResolutionCard({
         }
       }}
       className={cn(
-        'group relative overflow-hidden rounded-[1.75rem] border bg-card text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        'group relative overflow-hidden rounded-lg border bg-card text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
         resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-50/70' : 'border-border/70',
         selected && 'border-primary/45 shadow-md ring-4 ring-primary/10',
       )}
@@ -340,7 +340,7 @@ function AgentResolutionCard({
       <div className="relative p-5 md:p-6">
         <div className="flex items-start gap-3">
           <div className={cn(
-            'grid size-10 shrink-0 place-items-center rounded-2xl border shadow-sm',
+            'grid size-10 shrink-0 place-items-center rounded-lg border shadow-sm',
             resolution.intent === 'unsafe_mutation' ? 'border-amber-300 bg-amber-100 text-amber-700' : 'border-primary/20 bg-primary/10 text-primary',
           )}>
             {resolution.intent === 'unsafe_mutation' ? <AlertTriangle className="size-5" /> : <Bot className="size-5" />}
@@ -358,15 +358,15 @@ function AgentResolutionCard({
         </div>
       {response ? (
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+          <div className="rounded-lg border border-border/70 bg-background/80 p-4">
             <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Owner</div>
             <div className="mt-1.5 font-semibold">{response.owner ?? 'Product operations'}</div>
           </div>
-          <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+          <div className="rounded-lg border border-border/70 bg-background/80 p-4">
             <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Source</div>
             <div className="mt-1.5 font-semibold">{response.sourceSuite ?? 'PrimeOS'}</div>
           </div>
-          <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+          <div className="rounded-lg border border-border/70 bg-background/80 p-4">
             <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Approval</div>
             <div className="mt-1.5 font-semibold">{response.approvalState ? approvalLabel[response.approvalState] : 'Audit-only'}</div>
           </div>
@@ -377,7 +377,7 @@ function AgentResolutionCard({
           const key = `${message.id}-${action.intent}-${action.label}`;
           if (action.intent === 'queue' && response) {
             return (
-              <Button key={key} type="button" size="sm" className="rounded-xl" disabled={actionLocked} onClick={() => onQueueApproval(message.id, resolution)}>
+              <Button key={key} type="button" size="sm" className="rounded-lg" disabled={actionLocked} onClick={() => onQueueApproval(message.id, resolution)}>
                 {message.actionState === 'queued' ? 'Queued for approval' : action.label} <ArrowRight className="size-4" />
               </Button>
             );
@@ -385,14 +385,14 @@ function AgentResolutionCard({
 
           if (action.intent === 'prepare') {
             return (
-              <Button key={key} type="button" size="sm" className="rounded-xl" variant={actionLocked ? 'secondary' : 'default'} disabled={actionLocked} onClick={() => onPreparePacket(message.id, resolution)}>
+              <Button key={key} type="button" size="sm" className="rounded-lg" variant={actionLocked ? 'secondary' : 'default'} disabled={actionLocked} onClick={() => onPreparePacket(message.id, resolution)}>
                 {message.actionState === 'prepared' ? 'Packet prepared' : action.label} <ArrowRight className="size-4" />
               </Button>
             );
           }
 
           return (
-            <Button key={key} asChild size="sm" variant="outline" className="rounded-xl">
+            <Button key={key} asChild size="sm" variant="outline" className="rounded-lg">
               <Link to={action.route}>
                 {action.label} <ArrowRight className="size-4" />
               </Link>
@@ -426,9 +426,9 @@ function AgentResolutionCard({
 
 function CommandEmptyState({ onSendPrompt }: { onSendPrompt: (prompt: string) => void }) {
   return (
-    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed bg-background/60 p-5">
+    <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed bg-background/60 p-5">
       <div className="max-w-3xl text-center">
-        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+        <div className="mx-auto grid size-12 place-items-center rounded-lg bg-primary/10 text-primary">
           <Bot className="size-6" />
         </div>
         <h3 className="mt-4 text-2xl font-semibold">Start an operating chat</h3>
@@ -441,7 +441,7 @@ function CommandEmptyState({ onSendPrompt }: { onSendPrompt: (prompt: string) =>
               key={starter.title}
               type="button"
               onClick={() => onSendPrompt(starter.prompt)}
-              className="rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              className="rounded-lg border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             >
               <div className="font-semibold">{starter.title}</div>
               <div className="mt-2 text-sm text-muted-foreground">{starter.detail}</div>
@@ -595,7 +595,7 @@ function CommandCenter({
 
   const inspectorContent = (
     <div className="space-y-4">
-      <div className="rounded-2xl border bg-card p-4">
+      <div className="rounded-lg border bg-card p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Operating pulse</div>
@@ -604,26 +604,26 @@ function CommandCenter({
           <Badge variant="outline">{suites.length} suites</Badge>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-xl border bg-muted/30 p-3">
+          <div className="rounded-lg border bg-muted/30 p-3">
             <div className="text-2xl font-semibold">{cards.length}</div>
             <div className="text-xs text-muted-foreground">Cards</div>
           </div>
-          <div className="rounded-xl border bg-primary/5 p-3">
+          <div className="rounded-lg border bg-primary/5 p-3">
             <div className="text-2xl font-semibold">{pendingApprovals}</div>
             <div className="text-xs text-muted-foreground">Approvals</div>
           </div>
-          <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3">
+          <div className="rounded-lg border border-rose-200 bg-rose-50/70 p-3">
             <div className="text-2xl font-semibold text-rose-700">{highRisk}</div>
             <div className="text-xs text-muted-foreground">High risk</div>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3">
             <div className="text-2xl font-semibold text-amber-700">{waiting}</div>
             <div className="text-xs text-muted-foreground">Waiting</div>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-card p-4">
+      <div className="rounded-lg border bg-card p-4">
         {hasActionPreview ? (
           <>
             <div>
@@ -632,7 +632,7 @@ function CommandCenter({
               <p className="mt-2 text-sm text-muted-foreground">{activeResolution.auditImplication}</p>
             </div>
             <div className="mt-4 space-y-4">
-              <div className="rounded-xl bg-muted/30 p-4">
+              <div className="rounded-lg bg-muted/30 p-4">
                 <div className="font-semibold">Evidence</div>
                 <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                   {activeResolution.evidence.slice(0, 3).map((item) => (
@@ -643,7 +643,7 @@ function CommandCenter({
                   ))}
                 </div>
               </div>
-              <div className="rounded-xl bg-muted/30 p-4">
+              <div className="rounded-lg bg-muted/30 p-4">
                 <div className="font-semibold">Policy checks</div>
                 <div className="mt-3 space-y-2 text-sm">
                   {activeResolution.policyChecks.slice(0, 2).map((check) => (
@@ -668,7 +668,7 @@ function CommandCenter({
         )}
       </div>
 
-      <div className="rounded-2xl border bg-card p-4">
+      <div className="rounded-lg border bg-card p-4">
         <div className="font-semibold">Urgent cards</div>
         <div className="mt-3 space-y-2">
           {urgentCards.map((card) => (
@@ -700,7 +700,7 @@ function CommandCenter({
               <h2 className="mt-2 text-2xl font-semibold">Operation Agent</h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => setInspectorOpen(true)}>
+              <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => setInspectorOpen(true)}>
                 Context
               </Button>
               <Badge variant="secondary">
@@ -738,7 +738,7 @@ function CommandCenter({
               )}
             >
               {message.role === 'operator' ? (
-                <div className="w-fit max-w-full rounded-[1.35rem] rounded-tr-md bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
+                <div className="w-fit max-w-full rounded-lg rounded-tr-md bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
                   <div className="flex items-center gap-6 text-xs opacity-75">
                     <span>Operator</span>
                     <span>{message.createdAt}</span>
@@ -748,7 +748,7 @@ function CommandCenter({
               ) : null}
 
               {message.role === 'system' ? (
-                <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border bg-background px-4 py-3 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2 font-medium text-foreground">
                     <ShieldCheck className="size-4 text-primary" />
                     Chat action
@@ -759,7 +759,7 @@ function CommandCenter({
               ) : null}
 
               {message.role === 'agent' && message.status === 'thinking' ? (
-                <div className="rounded-2xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2 font-medium text-foreground">
                     <Bot className="size-4 animate-pulse text-primary" />
                     Operation Agent
@@ -790,14 +790,14 @@ function CommandCenter({
           <label className="sr-only" htmlFor="product-operation-command">
             Command composer
           </label>
-          <div className="flex items-end gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm transition-colors focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
+          <div className="flex items-end gap-2 rounded-lg border bg-background px-3 py-2 shadow-sm transition-colors focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
             <Bot className="mb-2.5 size-4 shrink-0 text-primary" />
             <input ref={attachmentInputRef} className="sr-only" type="file" aria-label="Attach file" multiple />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="mb-0.5 h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="mb-0.5 h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Attach file"
               title="Attach file"
               onClick={() => attachmentInputRef.current?.click()}
@@ -823,7 +823,7 @@ function CommandCenter({
             <Button
               type="button"
               size="sm"
-              className="mb-0.5 h-9 shrink-0 rounded-xl px-3"
+              className="mb-0.5 h-9 shrink-0 rounded-lg px-3"
               disabled={!composerValue.trim() || isThinking}
               onClick={handleSubmitCommand}
             >
@@ -868,11 +868,11 @@ function OperatingKanban({
           return (
             <div
               key={lane.id}
-              className={cn('min-h-[540px] rounded-2xl border bg-card/80 p-3', limitReached && 'border-amber-500/70')}
+              className={cn('min-h-[540px] rounded-lg border bg-card/80 p-3', limitReached && 'border-amber-500/70')}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => onMoveCard(event.dataTransfer.getData('text/plain'), lane.id)}
             >
-              <div className="rounded-xl border bg-background/90 p-3">
+              <div className="rounded-lg border bg-background/90 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-1.5">
@@ -891,7 +891,7 @@ function OperatingKanban({
                     draggable
                     onClick={() => onOpenCard(card.id)}
                     onDragStart={(event) => event.dataTransfer.setData('text/plain', card.id)}
-                    className="w-full cursor-pointer rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50"
+                    className="w-full cursor-pointer rounded-lg border bg-background p-4 text-left shadow-sm transition hover:border-primary/50"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -918,7 +918,7 @@ function OperatingKanban({
                     </div>
                   </button>
                 ))}
-                {!laneCards.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Drop operating card here.</div> : null}
+                {!laneCards.length ? <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Drop operating card here.</div> : null}
               </div>
             </div>
           );
@@ -987,7 +987,7 @@ function AgentQueue({
 
   return (
     <>
-      <Card className="overflow-hidden rounded-2xl">
+      <Card className="overflow-hidden rounded-lg">
         <CardHeader className="border-b">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1057,7 +1057,7 @@ function AgentQueue({
       </Card>
 
       <Dialog open={Boolean(selectedProposal)} onOpenChange={(open) => !open && setSelectedProposalId(null)}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-2xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-lg">
           {selectedProposal ? (
             <div className="space-y-5">
               <DialogHeader>
@@ -1073,15 +1073,15 @@ function AgentQueue({
               </DialogHeader>
 
               <div className="grid gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-xl border bg-muted/30 p-3">
+                <div className="rounded-lg border bg-muted/30 p-3">
                   <div className="text-xs text-muted-foreground">Agent</div>
                   <div className="mt-1 font-medium">{selectedProposal.agentName}</div>
                 </div>
-                <div className="rounded-xl border bg-muted/30 p-3">
+                <div className="rounded-lg border bg-muted/30 p-3">
                   <div className="text-xs text-muted-foreground">Route</div>
                   <div className="mt-1 truncate font-medium">{selectedProposal.route}</div>
                 </div>
-                <div className="rounded-xl border bg-muted/30 p-3">
+                <div className="rounded-lg border bg-muted/30 p-3">
                   <div className="text-xs text-muted-foreground">Approval</div>
                   <div className="mt-1 font-medium">{selectedProposal.requiresApproval ? 'Operator required' : 'Not required'}</div>
                 </div>
@@ -1089,7 +1089,7 @@ function AgentQueue({
 
               {selectedCard ? (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <section className="rounded-xl border p-4">
+                  <section className="rounded-lg border p-4">
                     <h3 className="font-semibold">Evidence</h3>
                     <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                       {selectedCard.evidence.map((item) => (
@@ -1097,7 +1097,7 @@ function AgentQueue({
                       ))}
                     </div>
                   </section>
-                  <section className="rounded-xl border p-4">
+                  <section className="rounded-lg border p-4">
                     <h3 className="font-semibold">Policy checks</h3>
                     <div className="mt-3 space-y-2 text-sm">
                       {selectedCard.policyChecklist.map((check) => (
@@ -1108,7 +1108,7 @@ function AgentQueue({
                       ))}
                     </div>
                   </section>
-                  <section className="rounded-xl border p-4 md:col-span-2">
+                  <section className="rounded-lg border p-4 md:col-span-2">
                     <h3 className="font-semibold">Audit context</h3>
                     <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
                       {selectedCard.auditTrail.map((item) => (
@@ -1159,13 +1159,13 @@ function AuditView({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <Card className="rounded-2xl">
+      <Card className="rounded-lg">
         <CardHeader>
           <CardTitle>Audit stream</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {[...proposalEvents, ...cardAuditEvents].slice(0, 24).map((event) => (
-            <div key={event.id} className="flex items-start gap-3 rounded-xl border bg-muted/30 p-3 text-sm">
+            <div key={event.id} className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
               <div className="min-w-0">
                 <div className="font-medium">{event.label}</div>
@@ -1177,7 +1177,7 @@ function AuditView({
           ))}
         </CardContent>
       </Card>
-      <Card className="rounded-2xl">
+      <Card className="rounded-lg">
         <CardHeader>
           <CardTitle>Policy posture</CardTitle>
         </CardHeader>
@@ -1185,7 +1185,7 @@ function AuditView({
           {cards.map((card) => {
             const failed = card.policyChecklist.filter((check) => !check.passed).length;
             return (
-              <div key={card.id} className="rounded-xl border bg-muted/30 p-3 text-sm">
+              <div key={card.id} className="rounded-lg border bg-muted/30 p-3 text-sm">
                 <div className="font-medium line-clamp-2">{card.title}</div>
                 <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                   <span>{card.policyChecklist.length - failed}/{card.policyChecklist.length} checks</span>

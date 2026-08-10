@@ -1,0 +1,4 @@
+Package,Target,Included,Limit,Service,Directional Price
+Standard,SME / factory / single brand,"Intelligence Lite, Ecom/COS core, CRM lead/RFQ, CRM Compact, basic Finance docs","3-5 users, 2 channels, 500 SKUs","Email support, monthly review",$1.5k-3k/mo
+Pro,agency / growth brand / CR operator team,"Standard + AI operator, advanced analytics, retention, finance trust profile, integrations","10-25 users, 5 channels, 5k SKUs","Priority support, weekly ops review",$4k-8k/mo
+Enterprise / CR Ecosystem,CR global / multi-entity / partners,"Pro + SSO, custom data, role workspaces, bank/partner views",Custom,"Dedicated PM, SLA, custom rollout",Custom

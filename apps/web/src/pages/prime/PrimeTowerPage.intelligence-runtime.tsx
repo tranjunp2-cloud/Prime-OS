@@ -18,9 +18,9 @@ import { getIntelligenceAssets, removeIntelligenceAsset, type IntelligenceAsset,
 import { cn } from '@/lib/utils';
 import { formatFileSize } from '@/lib/product-images';
 import {
-  DEMAND_CAMPAIGNS_HREF,
-  DEMAND_CONTENT_SOCIAL_HREF,
-  DEMAND_LEADS_RFQS_HREF,
+  CRM_CAMPAIGNS_HREF,
+  CRM_CONTENT_SOCIAL_HREF,
+  CRM_LEADS_RFQS_HREF,
   INTELLIGENCE_DECISIONS_HREF,
 } from './PrimeTowerPage.constants';
 
@@ -94,9 +94,7 @@ function RuntimeRecommendationVisual({
 
   if (variant === 'creator') {
     return (
-      <div className={`${className} relative min-h-[210px] overflow-hidden rounded-3xl border bg-gradient-to-br from-rose-500/10 via-background to-amber-500/10 p-4 shadow-sm`}>
-        <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-rose-300/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 left-8 size-28 rounded-full bg-amber-300/20 blur-3xl" />
+      <div className={`${className} relative min-h-[210px] overflow-hidden rounded-lg border bg-gradient-to-br from-rose-500/10 via-background to-amber-500/10 p-4 shadow-sm`}>
         <div className="relative flex items-start gap-3">
           {creator ? (
             <RuntimeCreatorAvatar creator={creator} size="xl" />
@@ -113,9 +111,9 @@ function RuntimeRecommendationVisual({
             <div className="text-xs text-muted-foreground">{channelLabel} proof source</div>
           </div>
         </div>
-        <div className="relative mt-4 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
+        <div className="relative mt-4 overflow-hidden rounded-lg border bg-background/80 shadow-sm">
           <div className="flex items-center gap-3 p-3">
-            <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl border bg-muted/30">
+            <div className="h-16 w-20 shrink-0 overflow-hidden rounded-lg border bg-muted/30">
               {productImage ? (
                 <img src={productImage} alt={displayProduct} className="h-full w-full object-cover" />
               ) : (
@@ -135,8 +133,7 @@ function RuntimeRecommendationVisual({
   }
 
   return (
-    <div className={`${className} relative min-h-[210px] overflow-hidden rounded-3xl border bg-gradient-to-br from-emerald-500/10 via-background to-primary/10 p-4 shadow-sm`}>
-      <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-emerald-300/20 blur-3xl" />
+    <div className={`${className} relative min-h-[210px] overflow-hidden rounded-lg border bg-gradient-to-br from-emerald-500/10 via-background to-primary/10 p-4 shadow-sm`}>
       <div className="flex items-center justify-between gap-3">
         <Badge variant="secondary" className="relative rounded-full bg-background/75">
           {eyebrow}
@@ -146,7 +143,7 @@ function RuntimeRecommendationVisual({
         </div>
       </div>
       <div className="relative mt-4 flex items-center gap-3">
-        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border bg-background/80 shadow-sm">
+        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border bg-background/80 shadow-sm">
           {productImage ? (
             <img src={productImage} alt={displayProduct} className="h-full w-full object-cover" />
           ) : (
@@ -160,7 +157,7 @@ function RuntimeRecommendationVisual({
           <div className="mt-2 line-clamp-3 text-base font-semibold">{displayProduct}</div>
         </div>
       </div>
-      <div className="relative mt-4 rounded-2xl border bg-background/80 p-3 shadow-sm">
+      <div className="relative mt-4 rounded-lg border bg-background/80 p-3 shadow-sm">
         <div className="flex items-center gap-2">
           {creator ? (
             <RuntimeCreatorAvatar creator={creator} />
@@ -208,7 +205,7 @@ function RuntimeTrendKpiCard({
           <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] opacity-80">{label}</div>
           <div className="mt-3 max-w-[15rem] text-xs font-medium opacity-85">{detail}</div>
         </div>
-        <div className="rounded-2xl bg-white/25 p-2">
+        <div className="rounded-lg bg-white/25 p-2">
           {icon}
         </div>
       </div>
@@ -266,7 +263,7 @@ function RuntimeTrendForecastChart({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
-        <div className="rounded-2xl border bg-muted/20 p-3">
+        <div className="rounded-lg border bg-muted/20 p-3">
           <svg viewBox="0 0 340 160" className="h-56 w-full">
             <line x1="24" y1="130" x2="324" y2="130" stroke="hsl(var(--border))" />
             <line x1="24" y1="84" x2="324" y2="84" stroke="hsl(var(--border))" strokeDasharray="4 6" opacity="0.7" />
@@ -375,7 +372,7 @@ function RuntimeTrendGeoMap({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
-        <div className="relative overflow-hidden rounded-2xl border bg-muted/20">
+        <div className="relative overflow-hidden rounded-lg border bg-muted/20">
           <div
             className="pointer-events-none absolute inset-0"
             style={{
@@ -429,7 +426,7 @@ function RuntimeTrendGeoMap({
                 key={region.market}
                 type="button"
                 onClick={() => onSelectCustomer(region.primaryCustomer.id)}
-                className={`w-full rounded-xl border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${selected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
+                className={`w-full rounded-lg border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${selected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -596,7 +593,7 @@ function RuntimeAudienceConnectionsCard({ creator }: { creator: IntelligenceCrea
     .join(', ');
 
   return (
-    <Card className="rounded-2xl border bg-muted/10 shadow-sm">
+    <Card className="rounded-lg border bg-muted/10 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Audience connections</CardTitle>
       </CardHeader>
@@ -635,7 +632,7 @@ function RuntimeGenderCard({ creator }: { creator: IntelligenceCreatorRecord }) 
   const split = runtimeCreatorGenderSplit(creator);
 
   return (
-    <Card className="rounded-2xl border shadow-sm">
+    <Card className="rounded-lg border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Gender
@@ -643,7 +640,7 @@ function RuntimeGenderCard({ creator }: { creator: IntelligenceCreatorRecord }) 
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 pt-4">
-        <div className="flex h-10 w-full overflow-hidden rounded-xl border bg-muted/20">
+        <div className="flex h-10 w-full overflow-hidden rounded-lg border bg-muted/20">
           <div className="flex items-center justify-center bg-sky-400 font-bold text-white" style={{ width: `${split.male}%` }}>
             {split.male > 20 && `${split.male}%`}
           </div>
@@ -672,7 +669,7 @@ function RuntimeAgeDistributionCard({ creator }: { creator: IntelligenceCreatorR
   const buckets = runtimeCreatorAgeBuckets(creator);
 
   return (
-    <Card className="rounded-2xl border shadow-sm">
+    <Card className="rounded-lg border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Age distribution</CardTitle>
       </CardHeader>
@@ -695,7 +692,7 @@ function RuntimeTopCountriesCard({ creator }: { creator: IntelligenceCreatorReco
   const countries = runtimeCreatorTopCountries(creator);
 
   return (
-    <Card className="rounded-2xl border shadow-sm">
+    <Card className="rounded-lg border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Top countries</CardTitle>
       </CardHeader>
@@ -749,7 +746,7 @@ function RuntimeCreatorProfileDialog({
           </DialogHeader>
           <div className="mt-5 space-y-5 sm:space-y-6">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)] xl:items-start">
-              <div className="rounded-3xl border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
+              <div className="rounded-lg border bg-gradient-to-br from-background via-background to-muted/30 p-5 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
                     <RuntimeCreatorAvatar creator={creator} size="lg" />
@@ -767,7 +764,7 @@ function RuntimeCreatorProfileDialog({
                         <Badge variant="outline">Audience quality {Math.max(76, creator.fitScore - 4)}%</Badge>
                         <Badge variant="outline">Authenticity {Math.max(72, creator.fitScore - 6)}%</Badge>
                       </div>
-                      <div className="rounded-2xl border bg-muted/20 p-3 text-sm">
+                      <div className="rounded-lg border bg-muted/20 p-3 text-sm">
                         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Best for products in cart</div>
                         <div className="mt-2 font-medium">PrimeOS thinks {creator.creatorName} is one of the clearest creator fits for {runtimeSkuName(creator.linkedSku).toLowerCase()}.</div>
                         <div className="mt-1 text-muted-foreground">This profile helps the seller see who can actually help sell the products already sitting in the cart or launch basket, not just who looks popular in isolation.</div>
@@ -779,7 +776,7 @@ function RuntimeCreatorProfileDialog({
                       <Link to={INTELLIGENCE_DECISIONS_HREF}>Add to launch</Link>
                     </Button>
                     <Button asChild variant="outline" className="w-full sm:w-auto">
-                      <Link to={DEMAND_CONTENT_SOCIAL_HREF}>Open Creator Ops</Link>
+                      <Link to={CRM_CONTENT_SOCIAL_HREF}>Open Creator Ops</Link>
                     </Button>
                   </div>
                 </div>
@@ -799,7 +796,7 @@ function RuntimeCreatorProfileDialog({
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
                 <div className="grid gap-3 sm:grid-cols-3">
                   {proofPosts.map((proof, index) => (
-                    <div key={`${creator.id}-${proof}`} className="overflow-hidden rounded-3xl border bg-background shadow-sm">
+                    <div key={`${creator.id}-${proof}`} className="overflow-hidden rounded-lg border bg-background shadow-sm">
                       <div className="h-40 overflow-hidden bg-muted/20">
                         {creator.imageUrl ? <img src={creator.imageUrl} alt={creator.creatorName} className="h-full w-full object-cover" /> : null}
                       </div>
@@ -819,15 +816,15 @@ function RuntimeCreatorProfileDialog({
                     <CardTitle className="text-base">Proof summary</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-xl border bg-muted/20 p-3">
+                    <div className="rounded-lg border bg-muted/20 p-3">
                       <div className="font-medium">Audience fit proof</div>
                       <div className="mt-1 text-muted-foreground">{creator.audienceFit || 'Audience fit proof has not been attached yet.'}</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-3">
+                    <div className="rounded-lg border bg-muted/20 p-3">
                       <div className="font-medium">Market fit proof</div>
                       <div className="mt-1 text-muted-foreground">{creator.marketFit || 'Market fit proof has not been attached yet.'}</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-3">
+                    <div className="rounded-lg border bg-muted/20 p-3">
                       <div className="font-medium">Commerce proof</div>
                       <div className="mt-1 text-muted-foreground">
                         {matchingCampaign
@@ -870,7 +867,7 @@ function RuntimeCreatorProfileDialog({
                   <RuntimeContextCard
                     label="Content & Creator Ops"
                     value={humanizeIntelligenceValue(creator.primaryChannel)}
-                    detail="Creator execution belongs in Demand once the seller confirms this fit is real enough to activate."
+                    detail="Creator execution belongs in CRM once the seller confirms this fit is real enough to activate."
                   />
                   <RuntimeContextCard
                     label="Ecom + Finance"
@@ -888,17 +885,17 @@ function RuntimeCreatorProfileDialog({
                     <CardTitle className="text-base">Next-best move</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-xl border bg-muted/20 p-3">
+                    <div className="rounded-lg border bg-muted/20 p-3">
                       <div className="font-medium">What the seller should do</div>
                       <div className="mt-1 text-muted-foreground">Use {creator.creatorName} as the proof layer for {runtimeSkuName(creator.linkedSku).toLowerCase()}, then route the launch through customer targeting before paid scale opens up.</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-3">
+                    <div className="rounded-lg border bg-muted/20 p-3">
                       <div className="font-medium">Why this is credible</div>
                       <div className="mt-1 text-muted-foreground">{creator.recentProof || creator.audienceFit || 'PrimeOS already has enough signal to explain why this creator surfaced.'}</div>
                     </div>
-                    <div className="rounded-xl border bg-muted/20 p-3">
+                    <div className="rounded-lg border bg-muted/20 p-3">
                       <div className="font-medium">What system connects next</div>
-                      <div className="mt-1 text-muted-foreground">Launch Decisions turns this creator fit into an explicit launch thesis, then Demand owns execution and Customer/Finance close the loop.</div>
+                      <div className="mt-1 text-muted-foreground">Launch Decisions turns this creator fit into an explicit launch thesis, then CRM owns execution and Customer/Finance close the loop.</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -914,7 +911,7 @@ function RuntimeCreatorProfileDialog({
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="w-full justify-between">
-                      <Link to={DEMAND_CONTENT_SOCIAL_HREF}>
+                      <Link to={CRM_CONTENT_SOCIAL_HREF}>
                         Open Content &amp; Creator Ops
                         <ArrowRight className="size-4" />
                       </Link>
@@ -940,16 +937,16 @@ function RuntimeCreatorProfileDialog({
 function getLaunchRuntimeCta(plan: IntelligenceLaunchDecisionRecord) {
   if (plan.approvalStatus === 'approved') {
     return {
-      href: DEMAND_CAMPAIGNS_HREF,
+      href: CRM_CAMPAIGNS_HREF,
       label: 'Send approved launch to Campaign Ops',
       shortLabel: 'Send',
-      detail: 'This launch is already approved and ready for demand execution.',
+      detail: 'This launch is already approved and ready for CRM execution.',
     };
   }
 
   if (plan.approvalStatus === 'review') {
     return {
-      href: DEMAND_CONTENT_SOCIAL_HREF,
+      href: CRM_CONTENT_SOCIAL_HREF,
       label: 'Open Content & Creator Ops',
       shortLabel: 'Review',
       detail: 'This launch still needs execution context before it can move live.',
@@ -1046,7 +1043,7 @@ function CompactCreatorsRuntimePanel({
               eyebrow="Creator pick"
               className="xl:order-1"
             />
-            <div className="rounded-2xl border bg-background/80 p-4 text-right shadow-sm xl:order-3">
+            <div className="rounded-lg border bg-background/80 p-4 text-right shadow-sm xl:order-3">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Creator fit</div>
               <div className="mt-1 text-3xl font-semibold">{selectedCreator.fitScore}%</div>
               <Badge variant={runtimeStatusVariant(selectedCreator.status)} className="mt-2 capitalize">
@@ -1078,7 +1075,7 @@ function CompactCreatorsRuntimePanel({
               detail={selectedCreator.recentProof || (matchingForecast ? `${matchingForecast.ats} ATS currently covers ${matchingForecast.demand7d} projected 7-day demand for this SKU.` : 'Recent proof has not been attached yet.')}
             />
           </div>
-          <div className="rounded-2xl border bg-muted/20 p-3">
+          <div className="rounded-lg border bg-muted/20 p-3">
             <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Next move</div>
             <div className="mt-2 text-sm font-medium">Review {selectedCreator.creatorName}'s proof, then send this creator route into Launch Decisions.</div>
           </div>
@@ -1093,7 +1090,7 @@ function CompactCreatorsRuntimePanel({
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link to={DEMAND_CONTENT_SOCIAL_HREF}>
+              <Link to={CRM_CONTENT_SOCIAL_HREF}>
                 Open Creator Ops
                 <ArrowRight className="size-4" />
               </Link>
@@ -1295,7 +1292,7 @@ function CompactCustomersRuntimePanel({
           <CardHeader className="border-b bg-gradient-to-br from-primary/10 via-background to-background">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 gap-4">
-                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
+                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm">
                   {selectedTrendProductImage ? (
                     <img src={selectedTrendProductImage} alt={selectedTrendProductName} className="h-full w-full object-cover" />
                   ) : (
@@ -1324,7 +1321,7 @@ function CompactCustomersRuntimePanel({
               <Badge variant="outline">{humanizeIntelligenceValue(selectedCustomer.lifecycle)}</Badge>
               <Badge variant="outline">Product {productRoute}</Badge>
             </div>
-            <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="rounded-lg border bg-muted/20 p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Intelligence readout</div>
               <p className="mt-3 text-lg font-semibold">
                 Activate {selectedCustomer.segmentName.toLowerCase()} around {selectedTrendProductName.toLowerCase()}.
@@ -1352,10 +1349,10 @@ function CompactCustomersRuntimePanel({
       </div>
 
       <Tabs defaultValue="signals" className="space-y-4">
-        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-3 rounded-2xl border bg-background p-1">
-          <TabsTrigger value="signals" className="rounded-xl">Market signals</TabsTrigger>
-          <TabsTrigger value="forecast" className="rounded-xl">Forecast</TabsTrigger>
-          <TabsTrigger value="activation" className="rounded-xl">Activation guidance</TabsTrigger>
+        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-3 rounded-lg border bg-background p-1">
+          <TabsTrigger value="signals" className="rounded-lg">Market signals</TabsTrigger>
+          <TabsTrigger value="forecast" className="rounded-lg">Forecast</TabsTrigger>
+          <TabsTrigger value="activation" className="rounded-lg">Activation guidance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="signals" className="mt-0">
@@ -1374,7 +1371,7 @@ function CompactCustomersRuntimePanel({
                       key={customer.id}
                       type="button"
                       onClick={() => setSelectedCustomerId(customer.id)}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
+                      className={`w-full rounded-lg border px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 ${isSelected ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1426,7 +1423,7 @@ function CompactCustomersRuntimePanel({
                   <RuntimeContextCard label="ATS available" value={matchingForecast ? formatCompactCount(matchingForecast.ats) : 'Pending'} detail={stockSignal} />
                   <RuntimeContextCard label="Coverage" value={`${stockCover}%`} detail={matchingForecast ? `${matchingForecast.risk} risk before broader scale.` : 'Attach inventory to confirm scale.'} />
                 </div>
-                <div className="rounded-2xl border bg-muted/20 p-4">
+                <div className="rounded-lg border bg-muted/20 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Stock cover</div>
@@ -1444,7 +1441,7 @@ function CompactCustomersRuntimePanel({
                 <CardTitle>Product route</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="h-36 overflow-hidden rounded-2xl border bg-muted/20">
+                <div className="h-36 overflow-hidden rounded-lg border bg-muted/20">
                   {selectedTrendProductImage ? (
                     <img src={selectedTrendProductImage} alt={selectedTrendProductName} className="h-full w-full object-cover" />
                   ) : (
@@ -1465,7 +1462,7 @@ function CompactCustomersRuntimePanel({
         <TabsContent value="activation" className="mt-0">
           <Card className="rounded-lg border">
             <CardContent className="grid gap-4 p-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="rounded-lg border bg-muted/20 p-4">
                 <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">PrimeOS recommendation</div>
                 <p className="mt-3 text-xl font-semibold">Move this trend into Launch Decisions.</p>
                 <p className="mt-2 text-sm text-muted-foreground">{selectedCustomer.nextMove || 'Push this trend into Launch Decisions before budget moves.'}</p>
@@ -1483,7 +1480,7 @@ function CompactCustomersRuntimePanel({
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                 <RuntimeContextCard label="Creator proof" value={selectedTrendCreator?.creatorName || 'Creator pending'} detail={selectedTrendCreator ? `${selectedTrendCreator.fitScore}% fit on ${humanizeIntelligenceValue(selectedTrendCreator.primaryChannel)}.` : 'Attach a creator before campaign execution.'} />
-                <RuntimeContextCard label="Demand handoff" value="Campaign Ops" detail="Campaign Ops receives the product route, buyer lane, forecast guardrail, and CRM audience memory." />
+                <RuntimeContextCard label="CRM handoff" value="Campaign Ops" detail="Campaign Ops receives the product route, buyer lane, forecast guardrail, and CRM audience memory." />
               </div>
             </CardContent>
           </Card>
@@ -1672,20 +1669,20 @@ function CompactLaunchDecisionsRuntimePanel({
             </p>
             <div className="mt-4 grid gap-2 md:grid-cols-3">
               {evidenceCards.map((evidence) => (
-                <div key={evidence.label} className="rounded-2xl border bg-muted/20 p-3">
+                <div key={evidence.label} className="rounded-lg border bg-muted/20 p-3">
                   <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{evidence.label}</div>
                   <div className="mt-1 line-clamp-1 text-xs font-semibold">{evidence.value}</div>
                   <div className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{evidence.detail}</div>
                 </div>
               ))}
             </div>
-            <div data-testid="launch-decision-state-board" className="mt-4 rounded-2xl border bg-muted/10 p-3">
+            <div data-testid="launch-decision-state-board" className="mt-4 rounded-lg border bg-muted/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Outcome feedback</div>
                 <Badge variant="outline">Learning loop</Badge>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Demand owns execution, OMS owns order truth, and Intelligence reads the outcome back as future signal evidence.
+                CRM owns execution, OMS owns order truth, and Intelligence reads the outcome back as future signal evidence.
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge variant="outline">Decision: {humanizeIntelligenceValue(selectedDecision.approvalStatus)}</Badge>
@@ -1695,7 +1692,7 @@ function CompactLaunchDecisionsRuntimePanel({
             </div>
           </div>
 
-          <div className="order-3 flex flex-col justify-between rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-background p-3 text-center shadow-sm">
+          <div className="order-3 flex flex-col justify-between rounded-lg border bg-gradient-to-br from-primary/10 via-background to-background p-3 text-center shadow-sm">
             <div>
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Decision</div>
               <div className="mt-2 text-4xl font-semibold leading-none">{selectedDecision.confidence}%</div>
@@ -1725,12 +1722,12 @@ function CompactLaunchDecisionsRuntimePanel({
             <CardTitle className="text-lg">What to do next</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-2xl border bg-primary/5 p-4">
+            <div className="rounded-lg border bg-primary/5 p-4">
               <div className="text-xs uppercase tracking-[0.14em] text-primary">Next action</div>
               <div className="mt-2 text-xl font-semibold">{decisionVerb}</div>
               <p className="mt-2 text-sm text-muted-foreground">{nextActionCopy}</p>
             </div>
-            <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="rounded-lg border bg-muted/20 p-4">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Owner</div>
               <div className="mt-2 text-base font-semibold">{selectedDecision.owner || 'Launch owner needed'}</div>
               <p className="mt-1 text-sm text-muted-foreground">This person owns the next move, not another round of analysis.</p>
@@ -1743,7 +1740,7 @@ function CompactLaunchDecisionsRuntimePanel({
             <CardTitle className="text-lg">Main risk</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-start justify-between gap-3 rounded-2xl border bg-muted/20 p-4">
+            <div className="flex items-start justify-between gap-3 rounded-lg border bg-muted/20 p-4">
               <div>
                 <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Watch first</div>
                 <div className="mt-2 text-xl font-semibold">{weakestSignal.label}</div>
@@ -1760,11 +1757,11 @@ function CompactLaunchDecisionsRuntimePanel({
             <CardTitle className="text-lg">Expected result</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="rounded-lg border bg-muted/20 p-4">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">If executed</div>
               <p className="mt-2 text-base font-semibold">{selectedDecision.expectedResponse || launchCta.detail}</p>
             </div>
-            <div className="rounded-2xl border bg-background p-4">
+            <div className="rounded-lg border bg-background p-4">
               <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Campaign route</div>
               <div className="mt-2 text-sm font-semibold">{matchingCampaign ? matchingCampaign.name : runtimeSkuLabel(selectedDecision.skuCode)}</div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -1793,7 +1790,7 @@ function CompactLaunchDecisionsRuntimePanel({
               onClick={() => setSelectedDecisionId(decision.id)}
               aria-label={`Select launch decision ${decision.decisionName}`}
               aria-pressed={selectedDecision.id === decision.id}
-              className={`w-full rounded-xl border border-l-4 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selectedDecision.id === decision.id ? 'border-primary/40 border-l-primary bg-primary/5' : 'border-l-transparent bg-muted/10'}`}
+              className={`w-full rounded-lg border border-l-4 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selectedDecision.id === decision.id ? 'border-primary/40 border-l-primary bg-primary/5' : 'border-l-transparent bg-muted/10'}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -2006,7 +2003,7 @@ export function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Demand {forecast.demand7d}</span>
+                    <span>CRM {forecast.crm7d}</span>
                     <span>ATS {forecast.ats}</span>
                   </div>
                   <Progress value={forecast.ats ? Math.min(100, Math.round((forecast.demand7d / Math.max(forecast.ats, 1)) * 100)) : 100} className="h-2" />
@@ -2142,7 +2139,7 @@ export function IntelligencePanel({ towerId }: { towerId: PrimeTowerId }) {
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
         <SummaryMetricCard label="Revenue context" value={currency.format(snapshot.metrics.revenue)} meta="From OMS." icon={<Megaphone className="size-5" />} tone="info" className="md:col-span-2" />
-        <SummaryMetricCard label="Lead to order" value={`${snapshot.metrics.leadToOrderRate}%`} meta="Demand proof." icon={<ArrowRight className="size-5" />} tone="success" />
+        <SummaryMetricCard label="Lead to order" value={`${snapshot.metrics.leadToOrderRate}%`} meta="CRM proof." icon={<ArrowRight className="size-5" />} tone="success" />
         <SummaryMetricCard label="Open alerts" value={snapshot.alerts.length} meta="Cross-area automation." icon={<BellRing className="size-5" />} tone="warning" />
       </div>
 
@@ -2190,18 +2187,18 @@ export const towerJobDescriptions: Partial<Record<PrimeTowerId, { decide: string
   signals: { decide: 'Which signals are real enough to become action?', handoff: 'Convert validated evidence into a launch, fix, follow-up, or suppression decision.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   creators: { decide: 'Which creator should help sell this product?', handoff: 'PrimeOS explains the fit and sends the best route into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   customers: { decide: 'Pick the customer trend to activate now.', handoff: 'Send the trend into Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
-  campaigns: { decide: 'Launch, review, hold, or no-go?', handoff: 'If Go, send it to Campaign Ops. If not, clear the one blocker.', handoffHref: DEMAND_CAMPAIGNS_HREF },
+  campaigns: { decide: 'Launch, review, hold, or no-go?', handoff: 'If Go, send it to Campaign Ops. If not, clear the one blocker.', handoffHref: CRM_CAMPAIGNS_HREF },
   analytics: { decide: 'Where is my funnel breaking and what is working?', handoff: 'Findings feed into Launch Decisions and AI Operator.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
   attribution: { decide: 'Which channel is actually driving orders, not just clicks?', handoff: 'Attribution data guides approval inside Launch Decisions.', handoffHref: INTELLIGENCE_DECISIONS_HREF },
-  forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: DEMAND_CAMPAIGNS_HREF },
-  voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: DEMAND_CAMPAIGNS_HREF },
+  forecasting: { decide: 'Will my inventory survive the next 7 days of demand?', handoff: 'High-risk SKUs trigger throttle flags in Campaign Ops.', handoffHref: CRM_CAMPAIGNS_HREF },
+  voc: { decide: 'What are customers saying and how does it affect my next move?', handoff: 'VOC flags go to Campaign Ops and Service for action.', handoffHref: CRM_CAMPAIGNS_HREF },
   alerts: { decide: 'What needs my attention right now across the entire system?', handoff: 'Each alert links to the responsible tower for resolution.', handoffHref: '/intelligence/ai-operator' },
   'ai-operator': { decide: 'What should the system do next based on everything it knows?', handoff: 'Recommendations route to the tower that owns the action.', handoffHref: '/overview' },
-  'campaign-ops': { decide: 'What should the seller execute now: message, ad, SEO content, or stock task?', handoff: 'Executed actions create leads, RFQs, creator work, and Ecom guardrails.', handoffHref: DEMAND_LEADS_RFQS_HREF },
-  'content-creator-ops': { decide: 'Which KOL, brief, live slot, or asset kit should be created now?', handoff: 'Approved proof feeds Campaign Ops, ads, SEO, and marketplace content.', handoffHref: DEMAND_CAMPAIGNS_HREF },
+  'campaign-ops': { decide: 'What should the seller execute now: message, ad, SEO content, or stock task?', handoff: 'Executed actions create leads, RFQs, creator work, and Ecom guardrails.', handoffHref: CRM_LEADS_RFQS_HREF },
+  'content-creator-ops': { decide: 'Which KOL, brief, live slot, or asset kit should be created now?', handoff: 'Approved proof feeds Campaign Ops, ads, SEO, and marketplace content.', handoffHref: CRM_CAMPAIGNS_HREF },
   'lead-response-capture': { decide: 'Which buyer needs a reply, owner, phone follow-up, or CRM sync now?', handoff: 'Qualified intent becomes CRM memory, quote work, and repeat outreach.', handoffHref: '/customer/crm-compact' },
   'retargeting-outreach': { decide: 'Which warm buyer should receive a sequence, retargeting ad, offer, or suppression?', handoff: 'Recovered buyers move into CRM Compact and order loops.', handoffHref: '/customer/crm-compact' },
-    'crm-compact': { decide: 'Which account identity needs owner, contact, tags, or duplicate review first?', handoff: 'Customer Profile becomes the identity foundation for future Demand, Intelligence, Finance, and COS context.', handoffHref: '/intelligence/trends' },
+    'crm-compact': { decide: 'Which account identity needs owner, contact, tags, or duplicate review first?', handoff: 'Customer Profile becomes the identity foundation for future CRM, Intelligence, Finance, and COS context.', handoffHref: '/intelligence/trends' },
   service: { decide: 'Is this issue resolved and did it affect customer trust?', handoff: 'Resolution updates the CRM Compact timeline.', handoffHref: '/customer/crm-compact' },
   capital: { decide: 'Is this route operationally strong enough to unlock funding support?', handoff: 'PrimeOS turns readiness proof into Fin Support lender routing.', handoffHref: '/finance/fin-support#funding-application-flow' },
   offers: { decide: 'Which partner lender is the best fit for this merchant?', handoff: 'Matched lenders, documents, and application status now live in Fin Support.', handoffHref: '/finance/fin-support#lenders' },

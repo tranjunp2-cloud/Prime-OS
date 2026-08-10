@@ -166,9 +166,9 @@ export function TrackingTimeline({
       </div>
 
       {sortedEvents.length === 0 ? (
-        <div className="rounded-[1.2rem] border border-edge-divider/55 bg-surface-hover/35 px-5 py-8">
+        <div className="rounded-lg border border-edge-divider/55 bg-surface-hover/35 px-5 py-8">
           <div className="mx-auto flex max-w-lg flex-col items-center text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl border border-edge-divider/65 bg-surface-hover/60 text-muted-foreground">
+            <div className="flex size-14 items-center justify-center rounded-lg border border-edge-divider/65 bg-surface-hover/60 text-muted-foreground">
               <EmptyStateIcon className="size-6" />
             </div>
             <h4 className="mt-4 text-base font-semibold text-foreground">{emptyState.title}</h4>
@@ -196,7 +196,7 @@ export function TrackingTimeline({
                 <div className="flex min-w-0 items-start gap-3">
                   <div
                     className={cn(
-                      'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-2xl border',
+                      'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border',
                       index === 0
                         ? 'border-primary/25 bg-primary/12 text-primary'
                         : 'border-edge-divider/60 bg-surface-hover/60 text-muted-foreground'

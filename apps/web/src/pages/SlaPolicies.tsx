@@ -412,7 +412,7 @@ export default function SlaPolicies() {
               )} />
 
               {/* Channel Overrides */}
-              <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/10 p-4">
+              <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
                 <div className="space-y-1">
                   <span className="text-sm font-medium">{copy.channelOverrides}</span>
                   <p className="text-xs text-muted-foreground">{copy.channelOverridesDesc}</p>
@@ -474,7 +474,7 @@ export default function SlaPolicies() {
               </div>
 
               {/* Priority Overrides */}
-              <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/10 p-4">
+              <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
                 <div className="space-y-1">
                   <span className="text-sm font-medium">{copy.priorityOverrides}</span>
                   <p className="text-xs text-muted-foreground">{copy.priorityOverridesDesc}</p>

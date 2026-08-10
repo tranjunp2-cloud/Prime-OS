@@ -181,7 +181,7 @@ const customerProfileCopy = {
     overview: {
       title: 'Customer Profile overview',
       body: 'This overview starts from relationship context. Open a sub-page to manage account records, contacts, duplicate review, or tags.',
-      empty: 'No customer account is available yet. Create an account before connecting Demand, COS, Service, Finance, or Intelligence context.',
+      empty: 'No customer account is available yet. Create an account before connecting CRM, COS, Service, Finance, or Intelligence context.',
     },
     account: {
       title: 'Account list',
@@ -235,7 +235,7 @@ const customerProfileCopy = {
     overview: {
       title: '顧客プロファイル概要',
       body: 'この概要は関係コンテキストから始まります。サブページでアカウント、連絡先、重複レビュー、タグを管理します。',
-      empty: '顧客アカウントはまだありません。Demand、COS、Service、Finance、Intelligenceに接続する前にアカウントを作成してください。',
+      empty: '顧客アカウントはまだありません。CRM、COS、Service、Finance、Intelligenceに接続する前にアカウントを作成してください。',
     },
     account: {
       title: 'アカウント一覧',
@@ -289,7 +289,7 @@ const customerProfileCopy = {
     overview: {
       title: 'Tổng quan hồ sơ khách hàng',
       body: 'Tổng quan bắt đầu từ ngữ cảnh quan hệ. Mở trang con để quản lý tài khoản, liên hệ, rà soát trùng hoặc tag.',
-      empty: 'Chưa có tài khoản khách hàng. Hãy tạo tài khoản trước khi nối Demand, COS, Service, Finance hoặc Intelligence.',
+      empty: 'Chưa có tài khoản khách hàng. Hãy tạo tài khoản trước khi nối CRM, COS, Service, Finance hoặc Intelligence.',
     },
     account: {
       title: 'Danh sách tài khoản',
@@ -433,7 +433,7 @@ function buildAccountFromForm(form: AccountFormState, tags: string[] = []): Cust
       customerId: `manual-${suffix}`,
       stage: form.lifecycle,
       ownerId: form.ownerId,
-      nextAction: 'Qualify the account and attach Demand or COS evidence before handoff.',
+      nextAction: 'Qualify the account and attach CRM or COS evidence before handoff.',
       reason: 'Manual mock account needs source evidence before it can support the V1 proof loop.',
       updatedAt: '2026-05-09T09:00:00.000Z',
       sourceOfTruthOwner: 'Customer',
@@ -1060,7 +1060,7 @@ function CustomerRelationshipOverview({
           <IdentityFact icon={<UserRoundCheck className="size-4" />} label="Owner" value={ownerName(owners, account.lifecycleStage.ownerId)} detail="Customer owns lifecycle and follow-up accountability" />
           <IdentityFact icon={<CircleUserRound className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.preferredChannel ?? 'Add contact before outreach'} />
           <IdentityFact icon={<ReceiptText className="size-4" />} label="Next action" value={account.lifecycleStage.nextAction} detail={account.lifecycleStage.reason} />
-          <IdentityFact icon={<ShieldCheck className="size-4" />} label="Why it matters" value={account.followUps[0]?.businessImpact ?? 'Relationship context is ready'} detail="Operator can see impact before Demand/COS handoff" />
+          <IdentityFact icon={<ShieldCheck className="size-4" />} label="Why it matters" value={account.followUps[0]?.businessImpact ?? 'Relationship context is ready'} detail="Operator can see impact before CRM/COS handoff" />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
@@ -1232,7 +1232,7 @@ function AccountProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!top-[calc(50%+2.5rem)] flex h-[min(760px,calc(100dvh-8rem))] w-[calc(100vw-2rem)] max-w-6xl flex-col overflow-hidden rounded-2xl p-0" data-testid="account-profile-dialog">
+      <DialogContent className="!top-[calc(50%+2.5rem)] flex h-[min(760px,calc(100dvh-8rem))] w-[calc(100vw-2rem)] max-w-6xl flex-col overflow-hidden rounded-lg p-0" data-testid="account-profile-dialog">
         <DialogHeader className="border-b bg-background/95 px-5 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
@@ -1280,7 +1280,7 @@ function AccountProfileDialog({
             <TabsContent value="overview" className="m-0 space-y-4">
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="space-y-4">
-                  <section className="rounded-xl border bg-primary/5 p-4">
+                  <section className="rounded-lg border bg-primary/5 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="text-xs font-medium uppercase tracking-[0.18em] text-primary">Next customer move</div>
@@ -1303,11 +1303,11 @@ function AccountProfileDialog({
                     <IdentityFact icon={<Mail className="size-4" />} label="Primary contact" value={primaryContact?.fullName ?? 'Missing'} detail={primaryContact?.email ?? 'Add a primary contact'} />
                   </div>
 
-                  <section className="rounded-xl border p-4">
+                  <section className="rounded-lg border p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <h3 className="text-base font-semibold">Account memory</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">High-signal context for Demand, Service, Finance, and COS handoffs.</p>
+                        <p className="mt-1 text-sm text-muted-foreground">High-signal context for CRM, Service, Finance, and COS handoffs.</p>
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -1342,7 +1342,7 @@ function AccountProfileDialog({
                   {contacts.map((contact) => (
                     <ContactCard key={contact.id} contact={contact} onEdit={() => onEditContact(contact)} onMakePrimary={() => onMakePrimaryContact(contact.id)} />
                   ))}
-                  {contacts.length === 0 ? <EmptyBlock text="No contacts yet. Add a primary buyer before connecting Demand or RFQ flows." /> : null}
+                  {contacts.length === 0 ? <EmptyBlock text="No contacts yet. Add a primary buyer before connecting CRM or RFQ flows." /> : null}
                 </div>
               </section>
             </TabsContent>
@@ -1382,7 +1382,7 @@ function AccountProfileDialog({
 
 function CompactStatus({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-muted/20 px-3 py-2">
+    <div className="rounded-lg border bg-muted/20 px-3 py-2">
       <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
       <div className="mt-1 truncate font-semibold">{value}</div>
     </div>
@@ -1393,7 +1393,7 @@ function ActionContextRail({ account, owners, recentTimelineEvents }: { account:
   const nextFollowUp = account.followUps[0];
 
   return (
-    <div className="rounded-xl border bg-card/80 p-3">
+    <div className="rounded-lg border bg-card/80 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold">Action context</div>
@@ -1660,7 +1660,7 @@ function CustomerTimelineEventList({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="text-sm font-medium">Unified customer timeline</div>
-          <p className="mt-1 text-xs text-muted-foreground">Read model only. Source truth remains in Demand, Ecom/COS, Service, Finance, or Intelligence.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Read model only. Source truth remains in CRM, Ecom/COS, Service, Finance, or Intelligence.</p>
         </div>
         <Badge variant="outline">{events.length} events</Badge>
       </div>
@@ -1683,7 +1683,7 @@ function CustomerTimelineEventList({
               <span>Impact: {event.businessImpact}</span>
             </div>
           </div>
-        )) : <EmptyBlock text="No timeline events yet. Attach a Demand lead, COS order, service case, or finance signal before using this account in the V1 proof loop." />}
+        )) : <EmptyBlock text="No timeline events yet. Attach a CRM lead, COS order, service case, or finance signal before using this account in the V1 proof loop." />}
       </div>
     </div>
   );
@@ -1727,7 +1727,7 @@ function ContinuityPreview({ account }: { account: CustomerAccount }) {
         {account.rfqQuoteLinks.length ? account.rfqQuoteLinks.map((link) => (
           <div key={link.id} className="rounded-md border bg-background p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-medium">{link.rfqId ?? link.leadId ?? 'Demand continuity'}</div>
+              <div className="text-sm font-medium">{link.rfqId ?? link.leadId ?? 'CRM continuity'}</div>
               <Badge variant={link.status === 'converted' ? 'default' : 'outline'} className="capitalize">{humanize(link.status)}</Badge>
             </div>
             <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
@@ -1999,7 +1999,7 @@ function AccountEditorDialog({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold">Segment tags</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Tags are account profile metadata. Use them for Demand, Intelligence, and service segmentation later.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Tags are account profile metadata. Use them for CRM, Intelligence, and service segmentation later.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{form.tags.length} assigned</Badge>

@@ -27,6 +27,9 @@ import {
   getOrderItems,
   getOrders,
 } from './order-store';
+import { createCrmItem, clearCrmQueue } from './crm-queue-store';
+import { createBooking, clearBookingStore } from './booking-store';
+import { createReservation, clearReservationStore } from './reservation-store';
 import type { FulfillmentJob } from './fulfillment-store';
 import type { Listing } from './listing-store';
 import type { Order } from './oms-types';
@@ -509,12 +512,17 @@ function seedInventory() {
 
       productSkus.forEach((sku, skuIndex) => {
         const onHand = perSkuOnHand[skuIndex] ?? 0;
-        const reserved = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.18 : 0.08)));
+        const reservedUnpaid = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.10 : 0.04)));
+        const reservedPaid = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.08 : 0.04)));
+        const allocated = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.05 : 0.02)));
+        const safetyStock = Math.max(1, Math.floor(onHand * 0.05));
         const inbound = warehouseId === 'wh_fbajp'
           ? Math.floor(onHand * 0.12)
           : Math.floor(onHand * (warehouseIndex === 0 ? 0.06 : 0.03));
-        const returns = sku.familyCode === 'CR-BSH-SET-12' ? Math.min(2, Math.floor(onHand * 0.03)) : Math.floor(onHand * 0.01);
-        const unfulfillable = sku.familyCode === 'CR-ART-MYTH-10' ? Math.min(3, Math.floor(onHand * 0.02)) : Math.floor(onHand * 0.01);
+        const isReturnHeavySku = sku.familyCode === 'CR-BSH-SET-12';
+        const isDamagedSku = sku.familyCode === 'CR-ART-MYTH-10';
+        const returnPending = isReturnHeavySku ? Math.min(2, Math.floor(onHand * 0.03)) : Math.floor(onHand * 0.01);
+        const unfulfillable = isDamagedSku ? Math.min(3, Math.floor(onHand * 0.02)) : Math.floor(onHand * 0.01);
 
         addInventoryPosition({
           id: genId('inv'),
@@ -522,11 +530,16 @@ function seedInventory() {
           product_id: sku.productId,
           warehouse_id: warehouseId,
           on_hand: onHand,
-          reserved,
+          reserved_unpaid: reservedUnpaid,
+          reserved_paid: reservedPaid,
+          allocated,
           inbound,
           outbound: 0,
           unfulfillable,
-          returns,
+          return_pending: returnPending,
+          safety_stock: safetyStock,
+          campaign_lock: 0,
+          version: 1,
           updated_at: daysAgo((warehouseIndex + skuIndex) % 6),
         });
       });
@@ -893,6 +906,86 @@ function seedListings() {
   });
 }
 
+// ─── CRM Queue ────────────────────────────────────────────────────────────
+
+function seedCrmQueue() {
+  const seedItems = [
+    { platform: 'telegram', text: 'Size XL màu đen còn không ạ?', customerName: 'Nguyen Van A', customerId: 'cust_a', intent: 'ask_stock' },
+    { platform: 'whatsapp', text: 'Cho mình đặt 2 cái sketchbook A5', customerName: 'Trang Nguyen', customerId: 'cust_b', intent: 'buy_now' },
+    { platform: 'facebook', text: 'Giá combo brush set bao nhiêu vậy shop?', customerName: 'Minh Pham', customerId: 'cust_c', intent: 'ask_price' },
+    { platform: 'tiktok', text: 'Order #1342 chưa thấy tracking, kiểm tra giúp mình', customerName: 'Lan Tran', customerId: 'cust_d', intent: 'support', orderId: 'PRIME-NB-1001' },
+    { platform: 'telegram', text: 'Bên mình có hỗ trợ ship Nhật không ạ?', customerName: 'Hieu Le', customerId: 'cust_e', intent: 'support' },
+    { platform: 'zalo', text: 'Cho em chốt art mythology set ạ!', customerName: 'Thao Vu', customerId: 'cust_f', intent: 'buy_now' },
+    { platform: 'instagram', text: 'Có giao hàng quốc tế ko shop? Ship Malay bao lâu?', customerName: 'Ahmad Razali', customerId: 'cust_g', intent: 'support' },
+    { platform: 'line', text: '前回注文したノートブックの色違いが欲しいです', customerName: 'Yuki Tanaka', customerId: 'cust_h', intent: 'buy_now' },
+  ];
+
+  for (const item of seedItems) {
+    createCrmItem({
+      platform: item.platform,
+      messageText: item.text,
+      customerName: item.customerName,
+      customerId: item.customerId,
+      conversationId: `conv_${item.customerId}`,
+      orderId: item.orderId,
+    });
+  }
+
+  // Assign some items to operators for realistic dashboard state
+  const items = [...(getOrders())]; // dummy ref
+  // Manually seed some bookings too
+  createBooking({
+    customerId: 'cust_a',
+    customerName: 'Nguyen Van A',
+    packageId: 'pkg_product_demo',
+    staffId: 'staff_sarah',
+    startTime: new Date(Date.now() + 3600_000).toISOString(),
+  });
+  createBooking({
+    customerId: 'cust_b',
+    customerName: 'Trang Nguyen',
+    packageId: 'pkg_growth_consult',
+    staffId: 'staff_sarah',
+    startTime: new Date(Date.now() + 7200_000).toISOString(),
+  });
+  createBooking({
+    customerId: 'cust_f',
+    customerName: 'Thao Vu',
+    packageId: 'pkg_impl_workshop',
+    staffId: 'staff_alex',
+    startTime: new Date(Date.now() + 86400_000).toISOString(),
+  });
+
+  // Seed some livestream reservations
+  createReservation({
+    order_ref: 'TIKTOK-LIVE-001',
+    sku_id: 'sku_cr_ntb_blk_a5',
+    warehouse_id: 'wh_crjp',
+    qty: 2,
+    source: 'LIVESTREAM_TIKTOK',
+    idempotency_key: 'seed_tiktok_001',
+    ttl_minutes: 30,
+  });
+  createReservation({
+    order_ref: 'FB-LIVE-002',
+    sku_id: 'sku_cr_skb_mdn_a5',
+    warehouse_id: 'wh_3plvn',
+    qty: 1,
+    source: 'LIVESTREAM_FB',
+    idempotency_key: 'seed_fb_001',
+    ttl_minutes: 10,
+  });
+  createReservation({
+    order_ref: 'LAZADA-ORDER-003',
+    sku_id: 'sku_cr_bsh_set_12',
+    warehouse_id: 'wh_fbsmy',
+    qty: 1,
+    source: 'LAZADA',
+    idempotency_key: 'seed_lazada_001',
+    ttl_minutes: 30,
+  });
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────────
 
 let _seeded = false;
@@ -908,6 +1001,9 @@ export async function seedDemoData(_userId?: string): Promise<{ success: boolean
     clearFulfillmentStore();
     clearReturnStore();
     clearListingStore();
+    clearCrmQueue();
+    clearReservationStore();
+    clearBookingStore();
 
     seedProducts();
     seedWarehouses();
@@ -916,6 +1012,7 @@ export async function seedDemoData(_userId?: string): Promise<{ success: boolean
     seedFulfillmentJobs();
     seedReturns();
     seedListings();
+    seedCrmQueue();
     return { success: true };
   } catch (e) {
     console.error('[seedDemoData]', e);

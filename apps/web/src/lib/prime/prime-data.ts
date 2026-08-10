@@ -1,5 +1,5 @@
 import { getFulfillmentJobs, getShipmentsByJobId, getTrackingEventsByShipmentId } from '@/lib/fulfillment-store';
-import { getInventoryPositions, getTotalATS } from '@/lib/inventory-store';
+import { getInventoryPositions, getLegacyTotalATS as getTotalATS } from '@/lib/inventory-store';
 import { getListings } from '@/lib/listing-store';
 import { getOrders, getOrderEvents, getOrderItems } from '@/lib/order-store';
 import { getProducts, getResolvedProductSkuById } from '@/lib/product-store';
@@ -9,7 +9,7 @@ import type { InventoryPosition } from '@/lib/inventory-store';
 import type { Order, OrderEvent, OrderItem } from '@/lib/oms-types';
 import type { Product, Sku } from '@/lib/product-store';
 
-export type PrimeArea = 'Demand Area' | 'Customer Area' | 'Ecom Area' | 'Intelligence Area' | 'Finance Area';
+export type PrimeArea = 'CRM Area' | 'Customer Area' | 'Ecom Area' | 'Intelligence Area' | 'Finance Area';
 
 export type PrimeTowerId =
   | 'capital'
@@ -147,7 +147,7 @@ export interface PrimeForecast {
   id: string;
   skuId: string;
   skuCode: string;
-  demand7d: number;
+  crm7d: number;
   ats: number;
   risk: 'low' | 'medium' | 'high';
   suggestedAction: string;
@@ -260,7 +260,7 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   },
   'campaign-ops': {
     id: 'campaign-ops',
-    area: 'Demand Area',
+    area: 'CRM Area',
     tower: 'Campaign Ops',
     promise: 'Run live campaigns with clear ownership, launch readiness, timeline, and channel deployment.',
     reuseSource: 'New Prime OS wrapper, linked to COS SKU, order, and listing data.',
@@ -268,7 +268,7 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   },
   'content-creator-ops': {
     id: 'content-creator-ops',
-    area: 'Demand Area',
+    area: 'CRM Area',
     tower: 'Content & Creator Ops',
     promise: 'Execute creator briefs, content schedules, approvals, and publishing without mixing in ranking logic.',
     reuseSource: 'New Prime OS wrapper, linked to campaign plans, creator ops, and publishing surfaces.',
@@ -276,7 +276,7 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   },
   'lead-response-capture': {
     id: 'lead-response-capture',
-    area: 'Demand Area',
+    area: 'CRM Area',
     tower: 'Lead & Response Capture',
     promise: 'Receive market responses, route inbound leads, and hand qualified intent into CRM Compact and RFQ flow.',
     reuseSource: 'New Prime OS wrapper, linked to campaign, customer, and RFQ objects.',
@@ -284,7 +284,7 @@ export const PRIME_TOWER_CONFIGS: Record<PrimeTowerId, PrimeTowerConfig> = {
   },
   'retargeting-outreach': {
     id: 'retargeting-outreach',
-    area: 'Demand Area',
+    area: 'CRM Area',
     tower: 'Retargeting & Outreach',
     promise: 'Execute follow-up sequences, retargeting audiences, and promo pushes across owned and paid channels.',
     reuseSource: 'New Prime OS wrapper, linked to audience lists, CRM handoff, and campaign deployment surfaces.',
@@ -705,14 +705,13 @@ function buildForecasts(products: Product[], campaigns: PrimeCampaign[]): PrimeF
     const sku = getPrimarySku(product);
     const ats = getTotalATS(sku.id);
     const campaign = campaigns.find((item) => item.productId === product.id);
-    const demand7d = Math.max(12, Math.round((campaign?.leads || 20) * 0.35 + (campaign?.orders || 2) * 2));
-    const risk = ats < demand7d ? 'high' : ats < demand7d * 2 ? 'medium' : 'low';
-
+    const crm7d = Math.max(12, Math.round((campaign?.leads || 20) * 0.35 + (campaign?.orders || 2) * 2));
+    const risk = ats < crm7d ? 'high' : ats < crm7d * 2 ? 'medium' : 'low';
     return {
       id: `forecast_${product.id}`,
       skuId: sku.id,
       skuCode: sku.sku_code,
-      demand7d,
+      crm7d,
       ats,
       risk,
       suggestedAction: risk === 'high'
@@ -846,7 +845,7 @@ function buildRecommendations(forecasts: PrimeForecast[], tickets: PrimeTicket[]
       operator: 'AI Operator',
       target: riskyForecast ? `SKU ${riskyForecast.skuCode}` : 'Inventory Brain',
       reasoning: riskyForecast
-        ? `7-day demand ${riskyForecast.demand7d} is close to ATS ${riskyForecast.ats}.`
+        ? `7-day demand ${riskyForecast.crm7d} is close to ATS ${riskyForecast.ats}.`
         : 'Inventory signal unavailable, keep COS as source of truth.',
       action: riskyForecast?.suggestedAction || 'Review inventory positions before campaign scale-up',
       confidence: riskyForecast?.risk === 'high' ? 86 : 72,
@@ -893,7 +892,7 @@ function buildAlerts(forecasts: PrimeForecast[], tickets: PrimeTicket[], recomme
     },
     {
       id: 'alert_campaign_001',
-      area: 'Demand Area',
+      area: 'CRM Area',
       severity: 'medium',
       title: 'Campaign should inherit inventory and VOC guardrails',
       linkedEntity: 'Campaign Tower',
@@ -909,7 +908,7 @@ function buildDemoFlows(): PrimeDemoFlow[] {
       name: 'Campaign to CRM Compact',
       path: ['Campaign', 'Traffic', 'Lead Capture', 'CRM Compact'],
       stateChange: 'Campaign click becomes qualified lead with customer identity.',
-      proofPoint: 'Demand creates opportunity and Customer retains context.',
+       proofPoint: 'CRM creates opportunity and Customer retains context.',
     },
     {
       id: 'flow_2',

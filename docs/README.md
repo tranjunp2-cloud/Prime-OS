@@ -13,6 +13,9 @@ Active PrimeOS project docs live here.
 - `06-bod-walkthrough.md` - board-ready storyline
 - `07-meeting-summary-masuda-pitch.md` - pitch summary notes
 - `08-competitor-research.md` - competitor research for commerce OS, OMS/WMS, fulfillment control tower, and AI operator positioning
+- `10-lark-seeding-readiness.md` - commercial demo readiness, live commerce scope, boundary, package/pricing, and BD update
+- `11-connector-readiness-roadmap.md` - connector priority waves, setup requirements, and rollout plan
+- `12-technical-design-livestream-demand-service.md` - technical design for livestream inventory, high-volume demand/chat, and multi-platform service booking
 
 ## Migration notes
 

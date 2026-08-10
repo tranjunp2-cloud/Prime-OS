@@ -41,3 +41,10 @@
 - Key state change: VOC, forecast, ticket, and campaign data produce AI recommendation and alert.
 - Continue to: `/intelligence/analytics`, `/intelligence/forecasting`, `/intelligence/product-operation-agent?view=command`, `/intelligence/product-operation-agent?view=queue`, `/intelligence/product-operation-agent?view=audit`
 - End proof point: Intelligence learns and optimizes around COS system context while Operation Agent prepares, routes, and audits work without silently mutating source suites.
+
+## Flow 7 - Product set -> live session allocation -> orders -> fulfillment
+
+- Start screen: `/overview?module=cos&view=live`
+- Key state change: Product set stock is allocated by TikTok Live, Shopee Live, KOL session, Brand.com campaign, and buffer stock before orders are released.
+- Continue to: `/overview?module=cos&view=oms`, then `/overview?module=cos&view=ship`
+- End proof point: PrimeOS supports live commerce operations by linking product sets, session/KOL allocation, reservation guardrails, order capture, and fulfillment in COS.

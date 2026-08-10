@@ -64,7 +64,7 @@ const mdecCopy = {
       subtitle: 'Six channels at a glance. Rebuilt with Prime OS design tokens, spacing, cards, buttons, and badges.',
       latest: 'Latest',
       composeNew: 'Compose new',
-      loaded: 'MDEC product loaded in Demand Suite',
+      loaded: 'MDEC product loaded in CRM Suite',
       composeOpened: 'Compose new opened',
       updated: 'Updated 13 MAY 2026',
     },
@@ -99,7 +99,7 @@ const mdecCopy = {
       subtitle: '6つのチャネルを一覧表示。Prime OSのデザイントークン、余白、カード、ボタン、バッジで再構築されています。',
       latest: '最新',
       composeNew: '新規作成',
-      loaded: 'MDECプロダクトをDemand Suiteで読み込みました',
+      loaded: 'MDECプロダクトをCRM Suiteで読み込みました',
       composeOpened: '新規作成を開きました',
       updated: '更新 2026年5月13日',
     },
@@ -134,7 +134,7 @@ const mdecCopy = {
       subtitle: 'Sáu kênh trong một màn hình. Đã dựng lại bằng design token, spacing, card, button và badge của Prime OS.',
       latest: 'Mới nhất',
       composeNew: 'Soạn mới',
-      loaded: 'MDEC đã tải trong Demand Suite',
+      loaded: 'MDEC đã tải trong CRM Suite',
       composeOpened: 'Đã mở soạn mới',
       updated: 'Cập nhật 13 MAY 2026',
     },
@@ -199,9 +199,9 @@ function ShellNavGroup({ label, items, activeView, copy }: { label: string; item
           return (
             <Link
               key={item.id}
-              to={`/demand/mdec?view=${item.id}`}
+              to={`/crm/mdec?view=${item.id}`}
               className={cn(
-                'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 active ? 'bg-primary/12 text-primary ring-1 ring-primary/20' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
@@ -225,7 +225,7 @@ function KpiStrip({ copy }: { copy: (typeof mdecCopy)[Locale] }) {
   ];
 
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card shadow-sm">
       <div className="grid divide-y divide-border/70 md:grid-cols-4 md:divide-x md:divide-y-0">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="p-5">
@@ -244,7 +244,7 @@ function KpiStrip({ copy }: { copy: (typeof mdecCopy)[Locale] }) {
 
 function Panel({ label, title, action, children, className }: { label: string; title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <Card className={cn('overflow-hidden rounded-2xl border bg-card shadow-sm', className)}>
+    <Card className={cn('overflow-hidden rounded-lg border bg-card shadow-sm', className)}>
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
         <div>
           <SectionLabel>{label}</SectionLabel>
@@ -267,7 +267,7 @@ function DashboardLayout({ onAction, copy }: { onAction: (message: string) => vo
     <div className="space-y-6">
       <KpiStrip copy={copy} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_352px]">
-        <Panel label="Today" title="Scheduled posts" action={<Button asChild variant="ghost" size="sm"><Link to="/demand/mdec?view=calendar">Calendar →</Link></Button>} className="min-h-[440px]">
+        <Panel label="Today" title="Scheduled posts" action={<Button asChild variant="ghost" size="sm"><Link to="/crm/mdec?view=calendar">Calendar →</Link></Button>} className="min-h-[440px]">
           <div className="divide-y">
             {scheduledPosts.map((post) => (
               <div key={post.id} className="grid gap-3 px-5 py-5 md:grid-cols-[minmax(136px,176px)_minmax(0,1fr)_auto] md:items-start">
@@ -288,7 +288,7 @@ function DashboardLayout({ onAction, copy }: { onAction: (message: string) => vo
           </div>
         </Panel>
 
-        <Panel label="Crisis" title="Severe items" action={<Button asChild variant="ghost" size="sm"><Link to="/demand/mdec?view=escalations">All →</Link></Button>}>
+        <Panel label="Crisis" title="Severe items" action={<Button asChild variant="ghost" size="sm"><Link to="/crm/mdec?view=escalations">All →</Link></Button>}>
           <div className="divide-y">
             {severeItems.map((item) => (
               <div key={item.title} className="space-y-2 px-5 py-4">
@@ -304,7 +304,7 @@ function DashboardLayout({ onAction, copy }: { onAction: (message: string) => vo
           </div>
         </Panel>
 
-        <Panel label="Engagement" title="Recent inbound" action={<Button asChild variant="ghost" size="sm"><Link to="/demand/mdec?view=engagement">Engagement →</Link></Button>}>
+        <Panel label="Engagement" title="Recent inbound" action={<Button asChild variant="ghost" size="sm"><Link to="/crm/mdec?view=engagement">Engagement →</Link></Button>}>
           <div className="divide-y">
             {inbound.map((item) => (
               <button key={`${item.channel}-${item.name}`} type="button" onClick={() => onAction(`${item.name} routed from ${item.channel}`)} className="grid w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-muted/50 md:grid-cols-[22px_1fr_auto] md:items-start">
@@ -319,7 +319,7 @@ function DashboardLayout({ onAction, copy }: { onAction: (message: string) => vo
           </div>
         </Panel>
 
-        <Panel label="Signals" title="Trend clusters" action={<Button asChild variant="ghost" size="sm"><Link to="/demand/mdec?view=listening">All →</Link></Button>}>
+        <Panel label="Signals" title="Trend clusters" action={<Button asChild variant="ghost" size="sm"><Link to="/crm/mdec?view=listening">All →</Link></Button>}>
           <div className="divide-y">
             {clusters.map((cluster) => (
               <div key={cluster.title} className="px-5 py-4">
@@ -342,7 +342,7 @@ function DashboardLayout({ onAction, copy }: { onAction: (message: string) => vo
 
 function StatStrip({ items }: { items: Array<{ label: string; value: string; detail?: string; tone?: 'default' | 'primary' | 'danger' | 'success' }> }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card shadow-sm">
       <div className="grid divide-y divide-border/70 md:grid-cols-4 md:divide-x md:divide-y-0">
         {items.map((item) => (
           <div key={item.label} className="p-5">
@@ -357,7 +357,7 @@ function StatStrip({ items }: { items: Array<{ label: string; value: string; det
 }
 
 function SegmentTabs({ items }: { items: string[] }) {
-  return <div className="inline-flex rounded-2xl bg-muted p-1">{items.map((item, index) => <button key={item} className={cn('rounded-xl px-5 py-2 text-sm font-medium text-muted-foreground', index === 0 && 'bg-card text-primary shadow-sm')}>{item}</button>)}</div>;
+  return <div className="inline-flex rounded-lg bg-muted p-1">{items.map((item, index) => <button key={item} className={cn('rounded-lg px-5 py-2 text-sm font-medium text-muted-foreground', index === 0 && 'bg-card text-primary shadow-sm')}>{item}</button>)}</div>;
 }
 
 
@@ -440,9 +440,9 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex rounded-2xl bg-muted p-1">{(['Month', 'Week', 'Agenda'] as const).map((item) => <button key={item} type="button" onClick={() => { setMode(item); onAction(`Calendar switched to ${item}`); }} className={cn('rounded-xl px-5 py-2 text-sm font-medium text-muted-foreground', mode === item && 'bg-card text-primary shadow-sm')}>{item}</button>)}</div>
+        <div className="inline-flex rounded-lg bg-muted p-1">{(['Month', 'Week', 'Agenda'] as const).map((item) => <button key={item} type="button" onClick={() => { setMode(item); onAction(`Calendar switched to ${item}`); }} className={cn('rounded-lg px-5 py-2 text-sm font-medium text-muted-foreground', mode === item && 'bg-card text-primary shadow-sm')}>{item}</button>)}</div>
         <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline"><Link to="/demand/mdec?view=composer">New post</Link></Button>
+          <Button asChild variant="outline"><Link to="/crm/mdec?view=composer">New post</Link></Button>
           <Button variant="outline" onClick={() => setQueueOpen(true)}>Open queue ({visiblePosts.length})</Button>
           <Button variant="outline" disabled={!selectedPost} onClick={() => setDetailsOpen(true)}>Post details</Button>
           <Button variant="outline" className="min-w-44 justify-between" onClick={cycleChannel}>{channel} <ArrowRight className="size-3 rotate-90" /></Button>
@@ -455,16 +455,16 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
       <div className="space-y-4">
           <div><SectionLabel>{mode} calendar</SectionLabel><h3 className="mt-2 text-4xl font-semibold tracking-tight">{monthLabel}</h3><p className="mt-2 text-sm text-muted-foreground">Click a calendar item or queue row to inspect status, campaign linkage, and next action.</p></div>
           {mode === 'Month' ? (
-            <div className="overflow-hidden rounded-2xl border bg-card">
+            <div className="overflow-hidden rounded-lg border bg-card">
               <div className="grid grid-cols-7 border-b text-center font-identifier text-xs uppercase tracking-[0.24em] text-muted-foreground">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day)=><div key={day} className="border-r py-3 last:border-r-0">{day}</div>)}</div>
               <div className="grid grid-cols-7">{days.map((day, index)=><div key={index} className={cn('min-h-32 border-r border-b p-3 last:border-r-0', day.muted && 'bg-muted/20 text-muted-foreground', day.key === '2026-05-13' && 'bg-primary/10')}><div className="text-xl font-semibold">{day.day}</div><div className="mt-3 space-y-2">{day.events.slice(0,2).map((post)=><button key={post.id} type="button" onClick={() => selectPost(post)} className={cn('block w-full border-l-2 border-primary bg-background px-2 py-1.5 text-left text-xs transition hover:bg-primary/10', selectedPost?.id === post.id && 'ring-1 ring-primary/40')}><div className="font-identifier text-primary">{postTime(post)}</div><div className="mt-1 line-clamp-2 font-medium leading-4">{post.title}</div>{post.channels.length > 1 ? <div className="mt-1 text-[10px] text-muted-foreground">+{post.channels.length - 1} channel</div> : null}</button>)}{day.events.length > 2 ? <div className="text-xs text-muted-foreground">+{day.events.length - 2} more</div> : null}</div></div>)}</div>
             </div>
           ) : null}
           {mode === 'Week' ? (
-            <div className="grid gap-3 md:grid-cols-7">{weekDays.map((date)=><div key={calendarKey(date)} className="min-h-72 rounded-2xl border bg-card p-3"><div className="font-identifier text-xs uppercase text-muted-foreground">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div><div className="mt-3 space-y-2">{(postsByDate[calendarKey(date)] || []).map((post)=><button key={post.id} onClick={() => selectPost(post)} className="w-full rounded-xl border bg-background p-3 text-left text-xs hover:border-primary/50"><div className="text-primary">{postTime(post)}</div><div className="mt-1 font-semibold">{post.title}</div><Badge className="mt-2" variant={tone(post.status)}>{post.status}</Badge></button>)}{!(postsByDate[calendarKey(date)] || []).length ? <div className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">No scheduled post.</div> : null}</div></div>)}</div>
+            <div className="grid gap-3 md:grid-cols-7">{weekDays.map((date)=><div key={calendarKey(date)} className="min-h-72 rounded-lg border bg-card p-3"><div className="font-identifier text-xs uppercase text-muted-foreground">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div><div className="mt-3 space-y-2">{(postsByDate[calendarKey(date)] || []).map((post)=><button key={post.id} onClick={() => selectPost(post)} className="w-full rounded-lg border bg-background p-3 text-left text-xs hover:border-primary/50"><div className="text-primary">{postTime(post)}</div><div className="mt-1 font-semibold">{post.title}</div><Badge className="mt-2" variant={tone(post.status)}>{post.status}</Badge></button>)}{!(postsByDate[calendarKey(date)] || []).length ? <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">No scheduled post.</div> : null}</div></div>)}</div>
           ) : null}
           {mode === 'Agenda' ? (
-            <div className="rounded-2xl border bg-card"><div className="divide-y">{visiblePosts.map((post)=><button key={post.id} type="button" onClick={() => selectPost(post)} className={cn('grid w-full gap-3 p-4 text-left hover:bg-primary/5 md:grid-cols-[120px_1fr_120px]', selectedPost?.id === post.id && 'bg-primary/10')}><div className="font-identifier text-sm text-primary">{post.when}</div><div><div className="font-semibold">{post.title}</div><p className="mt-1 text-sm text-muted-foreground">{post.campaign} · SKU {post.skuId}</p></div><Badge className="w-fit" variant={tone(post.status)}>{post.status}</Badge></button>)}</div></div>
+            <div className="rounded-lg border bg-card"><div className="divide-y">{visiblePosts.map((post)=><button key={post.id} type="button" onClick={() => selectPost(post)} className={cn('grid w-full gap-3 p-4 text-left hover:bg-primary/5 md:grid-cols-[120px_1fr_120px]', selectedPost?.id === post.id && 'bg-primary/10')}><div className="font-identifier text-sm text-primary">{post.when}</div><div><div className="font-semibold">{post.title}</div><p className="mt-1 text-sm text-muted-foreground">{post.campaign} · SKU {post.skuId}</p></div><Badge className="w-fit" variant={tone(post.status)}>{post.status}</Badge></button>)}</div></div>
           ) : null}
         </div>
 
@@ -505,7 +505,7 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
       </Sheet>
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto rounded-2xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto rounded-lg">
           <DialogHeader>
             <DialogTitle>{selectedPost?.title || 'Post details'}</DialogTitle>
             <DialogDescription>Campaign linkage, schedule state, and next action for the selected calendar post.</DialogDescription>
@@ -522,11 +522,11 @@ function CalendarLayout({ onAction }: { onAction: (message: string) => void }) {
                 <MiniRow label="Product" value={selectedPost.productId} />
                 <MiniRow label="SKU" value={selectedPost.skuId} />
               </div>
-              <div className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">
+              <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
                 Next: {selectedPost.status === 'Review' ? 'Request approval before publishing.' : selectedPost.status === 'Blocked' ? 'Resolve blocker or route to escalation.' : 'Keep schedule and monitor engagement window.'}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button asChild><Link to="/demand/mdec?view=composer">Open in composer</Link></Button>
+                <Button asChild><Link to="/crm/mdec?view=composer">Open in composer</Link></Button>
                 {selectedPost.status !== 'Approved' ? <Button variant="outline" onClick={() => setPostStatus(selectedPost.id, 'Approved')}>Mark approved</Button> : null}
                 {selectedPost.status !== 'Review' ? <Button variant="outline" onClick={() => setPostStatus(selectedPost.id, 'Review')}>Send to review</Button> : null}
               </div>
@@ -563,9 +563,9 @@ function ComposerLayout({ onAction }: { onAction: (message: string) => void }) {
   return (
     <div className="space-y-6">
       <StatStrip items={[{ label: 'Destinations', value: String(selectedDestinations.size).padStart(2, '0'), tone: 'primary' }, { label: 'Media', value: String(mediaCount).padStart(2, '0') }, { label: 'Stories', value: String(storyCount).padStart(2, '0') }, { label: 'Blocking', value: String(blockingCount).padStart(2, '0'), tone: blockingCount ? 'danger' : 'success' }]} />
-      <Panel label="01" title="Choose post destination"><div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-4">{destinations.map((dest)=><button key={dest} onClick={() => toggleDestination(dest)} className={cn('flex items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:border-primary/40', selectedDestinations.has(dest) ? 'border-primary/30 bg-primary/10' : 'bg-card')}><span className={cn('size-4 rounded border', selectedDestinations.has(dest) && 'bg-primary')} /><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">MD</span><span><span className="block font-semibold">MDEC {dest}</span><span className="block text-xs text-muted-foreground">@mdec_{dest.toLowerCase()}</span></span></button>)}</div></Panel>
-      <Panel label="02" title="Add post content"><div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_320px]"><div><textarea className="min-h-48 w-full rounded-xl border bg-card p-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" value={draftTitle === 'Untitled post' ? '' : draftTitle} onChange={(event) => setDraftTitle(event.target.value || 'Untitled post')} placeholder="Add your text or link here" /><div className="mt-4 grid gap-3 md:grid-cols-3"><Button variant="outline" onClick={() => { setMediaCount((value) => value + 1); onAction('Post media uploaded'); }}>Upload post</Button><Button variant="outline" onClick={() => { setStoryCount((value) => value + 1); onAction('Story media uploaded'); }}>Upload story</Button><Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder="Optional campaign or internal title" /></div></div><div className="space-y-3 border-l pl-5"><div className="flex gap-2">{(['AI','Snippets','Hashtags'] as const).map((mode) => <Button key={mode} size="sm" variant={assistMode === mode ? 'default' : 'ghost'} onClick={() => { setAssistMode(mode); onAction(`Composer assist mode: ${mode}`); }}>{mode === 'Hashtags' ? '# Hashtags' : mode}</Button>)}</div>{['Malaysia Digital launch','Event reminder'].map(x=><button type="button" key={x} onClick={() => { setDraftTitle(`${x}: Prime demand connects content, companies, and buyers across the digital economy.`); onAction(`Snippet inserted: ${x}`); }} className="w-full rounded-xl border p-3 text-left hover:border-primary/40"><div className="font-semibold">{x}</div><p className="mt-1 text-sm text-muted-foreground">Prime demand connects content, companies, and buyers across the digital economy.</p></button>)}<div className="rounded-xl border border-dashed p-3"><div className="font-semibold">Ideas</div><Button className="mt-2" variant="outline" onClick={() => { setDraftTitle((value) => `${value} Short version for X.`); onAction('Shorten for X applied'); }}>Shorten for X</Button></div></div></div></Panel>
-      <Panel label="03" title="Customize by network"><div className="grid gap-5 p-5 lg:grid-cols-[1fr_280px]"><div className="space-y-3"><Badge>{Array.from(selectedDestinations)[0] || 'No destination'}</Badge><Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} /><div className="min-h-28 rounded-xl border p-4 text-muted-foreground">Optional network override</div><Button variant="outline" onClick={() => onAction('Privacy menu opened')}>Privacy: Public</Button></div><div className="rounded-2xl bg-muted p-5"><div className="h-40 rounded-xl bg-background" /><div className="mt-4 flex items-center gap-3"><span className="grid size-8 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">MD</span><span className="h-3 flex-1 rounded bg-background" /></div></div></div></Panel>
+      <Panel label="01" title="Choose post destination"><div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-4">{destinations.map((dest)=><button key={dest} onClick={() => toggleDestination(dest)} className={cn('flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:border-primary/40', selectedDestinations.has(dest) ? 'border-primary/30 bg-primary/10' : 'bg-card')}><span className={cn('size-4 rounded border', selectedDestinations.has(dest) && 'bg-primary')} /><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">MD</span><span><span className="block font-semibold">MDEC {dest}</span><span className="block text-xs text-muted-foreground">@mdec_{dest.toLowerCase()}</span></span></button>)}</div></Panel>
+      <Panel label="02" title="Add post content"><div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_320px]"><div><textarea className="min-h-48 w-full rounded-lg border bg-card p-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" value={draftTitle === 'Untitled post' ? '' : draftTitle} onChange={(event) => setDraftTitle(event.target.value || 'Untitled post')} placeholder="Add your text or link here" /><div className="mt-4 grid gap-3 md:grid-cols-3"><Button variant="outline" onClick={() => { setMediaCount((value) => value + 1); onAction('Post media uploaded'); }}>Upload post</Button><Button variant="outline" onClick={() => { setStoryCount((value) => value + 1); onAction('Story media uploaded'); }}>Upload story</Button><Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder="Optional campaign or internal title" /></div></div><div className="space-y-3 border-l pl-5"><div className="flex gap-2">{(['AI','Snippets','Hashtags'] as const).map((mode) => <Button key={mode} size="sm" variant={assistMode === mode ? 'default' : 'ghost'} onClick={() => { setAssistMode(mode); onAction(`Composer assist mode: ${mode}`); }}>{mode === 'Hashtags' ? '# Hashtags' : mode}</Button>)}</div>{['Malaysia Digital launch','Event reminder'].map(x=><button type="button" key={x} onClick={() => { setDraftTitle(`${x}: Prime demand connects content, companies, and buyers across the digital economy.`); onAction(`Snippet inserted: ${x}`); }} className="w-full rounded-lg border p-3 text-left hover:border-primary/40"><div className="font-semibold">{x}</div><p className="mt-1 text-sm text-muted-foreground">Prime demand connects content, companies, and buyers across the digital economy.</p></button>)}<div className="rounded-lg border border-dashed p-3"><div className="font-semibold">Ideas</div><Button className="mt-2" variant="outline" onClick={() => { setDraftTitle((value) => `${value} Short version for X.`); onAction('Shorten for X applied'); }}>Shorten for X</Button></div></div></div></Panel>
+      <Panel label="03" title="Customize by network"><div className="grid gap-5 p-5 lg:grid-cols-[1fr_280px]"><div className="space-y-3"><Badge>{Array.from(selectedDestinations)[0] || 'No destination'}</Badge><Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} /><div className="min-h-28 rounded-lg border p-4 text-muted-foreground">Optional network override</div><Button variant="outline" onClick={() => onAction('Privacy menu opened')}>Privacy: Public</Button></div><div className="rounded-lg bg-muted p-5"><div className="h-40 rounded-lg bg-background" /><div className="mt-4 flex items-center gap-3"><span className="grid size-8 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">MD</span><span className="h-3 flex-1 rounded bg-background" /></div></div></div></Panel>
       <Panel label="04" title="Create post"><div className="flex flex-wrap items-center justify-between gap-3 p-5"><div className={cn('space-y-2 text-sm', blockingCount ? 'text-destructive' : 'text-emerald-600')}><div>{blockingCount ? '△ Missing content/media requirements' : '✓ Ready for approval'}</div><div>{selectedDestinations.size ? `${selectedDestinations.size} destinations selected` : '△ Select at least 1 destination'}</div></div><div className="flex gap-2"><Button variant="outline" onClick={() => onAction(`Draft saved: ${draftTitle}`)}>Save as draft</Button><Button variant="outline" onClick={() => onAction('Queued at bottom')}>Bottom of queue</Button><Button disabled={blockingCount > 0 || selectedDestinations.size === 0} onClick={()=>onAction('Composer submitted for approval')}>Submit for approval</Button></div></div></Panel>
     </div>
   );
@@ -591,7 +591,7 @@ function EngagementLayout({ onAction }: { onAction: (message: string) => void })
   const [threadStates, setThreadStates] = useState<Record<string, { private?: boolean; hidden?: boolean; liked?: boolean; replied?: boolean; escalated?: boolean; handoff?: string }>>({});
   const selected = inbound.find((item) => item.id === selectedId) || inbound[0];
   const selectedState = selected ? threadStates[selected.id] || {} : {};
-  const draftText = selected ? `Terima kasih ${selected.name}. We linked this conversation to ${selected.action === 'Create RFQ' ? 'an RFQ route' : 'a Demand follow-up'} and will respond with the next verified step.` : '';
+  const draftText = selected ? `Terima kasih ${selected.name}. We linked this conversation to ${selected.action === 'Create RFQ' ? 'an RFQ route' : 'a CRM follow-up'} and will respond with the next verified step.` : '';
   const visibleInbound = inbound.filter((item) => {
     if (channelFilter !== 'All' && item.channel !== channelFilter) return false;
     if (riskFilter === 'Negative' && item.tone !== 'Negative') return false;
@@ -626,18 +626,18 @@ function EngagementLayout({ onAction }: { onAction: (message: string) => void })
 
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border bg-muted/20 px-4 py-3">
+      <div className="rounded-lg border bg-muted/20 px-4 py-3">
         <div className="flex flex-wrap justify-between gap-3">
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-2xl bg-muted p-1">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1">
             {typeTabs.map(([label, count]) => (
-              <button key={label} type="button" onClick={() => setTypeFilter(label)} className={cn('shrink-0 rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground', typeFilter === label && 'bg-card text-primary shadow-sm')}>
+              <button key={label} type="button" onClick={() => setTypeFilter(label)} className={cn('shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground', typeFilter === label && 'bg-card text-primary shadow-sm')}>
                 {label} {count}
               </button>
             ))}
           </div>
-          <div className="inline-flex rounded-2xl bg-muted p-1">
+          <div className="inline-flex rounded-lg bg-muted p-1">
             {(['Open', 'Closed'] as const).map((label) => (
-              <button key={label} type="button" onClick={() => setStatusFilter(label)} className={cn('rounded-xl px-5 py-2 text-sm font-medium text-muted-foreground', statusFilter === label && 'bg-card text-primary shadow-sm')}>
+              <button key={label} type="button" onClick={() => setStatusFilter(label)} className={cn('rounded-lg px-5 py-2 text-sm font-medium text-muted-foreground', statusFilter === label && 'bg-card text-primary shadow-sm')}>
                 {label}{label === 'Closed' ? ` ${Object.values(threadStates).filter((state) => state.replied).length.toString().padStart(2, '0')}` : ''}
               </button>
             ))}
@@ -647,9 +647,9 @@ function EngagementLayout({ onAction }: { onAction: (message: string) => void })
           <div className="flex flex-wrap gap-2">
             {channels.map((channel) => <Button key={channel} size="sm" variant={channelFilter === channel ? 'default' : 'outline'} className="rounded-full" onClick={() => setChannelFilter(channel)}>{channel}</Button>)}
           </div>
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-2xl bg-muted p-1">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1">
             {riskTabs.map(([label, count]) => (
-              <button key={label} type="button" onClick={() => setRiskFilter(label)} className={cn('shrink-0 rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground', riskFilter === label && 'bg-card text-primary shadow-sm')}>
+              <button key={label} type="button" onClick={() => setRiskFilter(label)} className={cn('shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground', riskFilter === label && 'bg-card text-primary shadow-sm')}>
                 {label}{count ? ` ${count}` : ''}
               </button>
             ))}
@@ -657,7 +657,7 @@ function EngagementLayout({ onAction }: { onAction: (message: string) => void })
         </div>
       </div>
 
-      <div className="grid overflow-hidden rounded-2xl border bg-card xl:grid-cols-[320px_minmax(0,1fr)_280px]">
+      <div className="grid overflow-hidden rounded-lg border bg-card xl:grid-cols-[320px_minmax(0,1fr)_280px]">
         <div className="max-h-[560px] overflow-y-auto border-r bg-card">
           {visibleInbound.length ? visibleInbound.map((item) => {
             const active = item.id === selected?.id;
@@ -684,19 +684,19 @@ function EngagementLayout({ onAction }: { onAction: (message: string) => void })
               <div className="p-4">
                 <SectionLabel>comment</SectionLabel>
                 <p className="mt-3 max-w-xl text-sm leading-6">{selected.body}</p>
-                <div className="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-4">
+                <div className="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-4">
                   <div className="font-identifier text-xs uppercase tracking-[0.22em] text-muted-foreground">AI draft (not sent)</div>
                   <p className="mt-2 text-sm leading-6">{draftText}</p>
                   <Button className="mt-3" size="sm" variant="outline" onClick={() => { setReplyText(draftText); onAction(`Draft inserted for ${selected.name}`); }}>Use this draft →</Button>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <button type="button" onClick={() => updateThread(`Lead/RFQ handoff created for ${selected.name}`, { handoff: selected.action })} className="rounded-xl border bg-muted/20 p-3 text-left hover:border-primary/40"><div className="text-xs text-muted-foreground">Handoff</div><div className="mt-1 font-semibold">{selected.action}</div></button>
-                  <button type="button" onClick={() => updateThread(`Escalation created for ${selected.name}`, { escalated: true })} className="rounded-xl border bg-muted/20 p-3 text-left hover:border-primary/40"><div className="text-xs text-muted-foreground">Risk</div><div className="mt-1 font-semibold">Escalate</div></button>
-                  <button type="button" onClick={() => updateThread(`Owner assigned for ${selected.name}`, { handoff: 'Assigned to Demand Ops' })} className="rounded-xl border bg-muted/20 p-3 text-left hover:border-primary/40"><div className="text-xs text-muted-foreground">Owner</div><div className="mt-1 font-semibold">Assign</div></button>
+                  <button type="button" onClick={() => updateThread(`Lead/RFQ handoff created for ${selected.name}`, { handoff: selected.action })} className="rounded-lg border bg-muted/20 p-3 text-left hover:border-primary/40"><div className="text-xs text-muted-foreground">Handoff</div><div className="mt-1 font-semibold">{selected.action}</div></button>
+                  <button type="button" onClick={() => updateThread(`Escalation created for ${selected.name}`, { escalated: true })} className="rounded-lg border bg-muted/20 p-3 text-left hover:border-primary/40"><div className="text-xs text-muted-foreground">Risk</div><div className="mt-1 font-semibold">Escalate</div></button>
+                  <button type="button" onClick={() => updateThread(`Owner assigned for ${selected.name}`, { handoff: 'Assigned to CRM Ops' })} className="rounded-lg border bg-muted/20 p-3 text-left hover:border-primary/40"><div className="text-xs text-muted-foreground">Owner</div><div className="mt-1 font-semibold">Assign</div></button>
                 </div>
               </div>
               <div className="border-t p-4">
-                <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} className="min-h-20 w-full rounded-xl border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" placeholder={`Reply to ${selected.name}...`} />
+                <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} className="min-h-20 w-full rounded-lg border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" placeholder={`Reply to ${selected.name}...`} />
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button onClick={() => updateThread(`Reply sent to ${selected.name}`, { replied: true })}>Send</Button>
                   <Button variant={selectedState.private ? 'default' : 'outline'} onClick={() => updateThread(`Private reply ${selectedState.private ? 'disabled' : 'enabled'} for ${selected.name}`, { private: !selectedState.private })}>Private</Button>
@@ -760,7 +760,7 @@ function AnalyticsLayout() {
   const channels=['Instagram','Facebook','TikTok','LinkedIn','X','WhatsApp'];
   const [selectedChannel, setSelectedChannel] = useState('Instagram');
   const [range, setRange] = useState('Last 30 days');
-  return <div className="space-y-6"><div className="flex flex-wrap justify-between gap-3"><div className="flex flex-wrap gap-2">{channels.map(c=><Button key={c} size="sm" variant={selectedChannel === c ? 'default' : 'outline'} className="rounded-full" onClick={() => setSelectedChannel(c)}>{c}</Button>)}</div><Button variant="outline" onClick={() => setRange(range === 'Last 30 days' ? 'Last 7 days' : 'Last 30 days')}>{range}</Button></div><StatStrip items={[{label:'Reach', value:metrics.reach.toLocaleString(), detail:selectedChannel}, {label:'Impressions', value:metrics.impressions.toLocaleString()}, {label:'Engagement', value:`${metrics.engagementRate}%`, tone:'primary'}, {label:'Clicks', value:metrics.clicks.toLocaleString()}]} /><Panel label="Trend" title={`Engagement rate over time · ${selectedChannel}`}><div className="h-80 p-5"><div className="relative h-full overflow-hidden rounded-xl border bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:96px_56px]"><svg viewBox="0 0 900 260" className="absolute inset-0 h-full w-full p-6"><path d="M0 140 C80 20 130 240 220 100 S360 20 440 150 590 240 680 95 820 40 900 130" fill="none" stroke="#1d4ed8" strokeWidth="3"/><path d="M0 110 C100 230 150 40 250 110 S420 210 500 92 650 40 760 155 840 220 900 92" fill="none" stroke="#db2777" strokeWidth="3"/><path d="M0 95 C120 170 160 210 250 125 S400 70 480 135 640 190 730 110 830 55 900 120" fill="none" stroke="#16a34a" strokeWidth="3"/></svg></div></div></Panel><div className="grid gap-6 lg:grid-cols-2"><Panel label="Comparison" title="Impressions by channel"><div className="flex h-72 items-end gap-4 p-6">{channels.map((c,i)=><button key={c} onClick={() => setSelectedChannel(c)} className="flex flex-1 flex-col items-center gap-2"><div className={cn('w-full rounded-t', selectedChannel === c ? 'bg-primary' : 'bg-primary/50')} style={{height: `${150-i*4}px`}}/><span className="font-identifier text-xs text-muted-foreground">{c}</span></button>)}</div></Panel><Panel label="Format" title="Performance by format"><div className="divide-y p-5">{[['Video','12','6.4%'],['Image','22','4.1%'],['Carousel','7','2.9%'],['Document','3','1.7%']].map(r=><button key={r[0]} onClick={() => setSelectedChannel(r[0])} className="grid w-full grid-cols-[1fr_60px_80px] py-3 text-left hover:text-primary"><span>{r[0]}</span><span className="text-right text-muted-foreground">{r[1]}</span><span className="text-right text-2xl font-semibold text-primary">{r[2]}</span></button>)}</div></Panel></div></div>;
+  return <div className="space-y-6"><div className="flex flex-wrap justify-between gap-3"><div className="flex flex-wrap gap-2">{channels.map(c=><Button key={c} size="sm" variant={selectedChannel === c ? 'default' : 'outline'} className="rounded-full" onClick={() => setSelectedChannel(c)}>{c}</Button>)}</div><Button variant="outline" onClick={() => setRange(range === 'Last 30 days' ? 'Last 7 days' : 'Last 30 days')}>{range}</Button></div><StatStrip items={[{label:'Reach', value:metrics.reach.toLocaleString(), detail:selectedChannel}, {label:'Impressions', value:metrics.impressions.toLocaleString()}, {label:'Engagement', value:`${metrics.engagementRate}%`, tone:'primary'}, {label:'Clicks', value:metrics.clicks.toLocaleString()}]} /><Panel label="Trend" title={`Engagement rate over time · ${selectedChannel}`}><div className="h-80 p-5"><div className="relative h-full overflow-hidden rounded-lg border bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:96px_56px]"><svg viewBox="0 0 900 260" className="absolute inset-0 h-full w-full p-6"><path d="M0 140 C80 20 130 240 220 100 S360 20 440 150 590 240 680 95 820 40 900 130" fill="none" stroke="#1d4ed8" strokeWidth="3"/><path d="M0 110 C100 230 150 40 250 110 S420 210 500 92 650 40 760 155 840 220 900 92" fill="none" stroke="#db2777" strokeWidth="3"/><path d="M0 95 C120 170 160 210 250 125 S400 70 480 135 640 190 730 110 830 55 900 120" fill="none" stroke="#16a34a" strokeWidth="3"/></svg></div></div></Panel><div className="grid gap-6 lg:grid-cols-2"><Panel label="Comparison" title="Impressions by channel"><div className="flex h-72 items-end gap-4 p-6">{channels.map((c,i)=><button key={c} onClick={() => setSelectedChannel(c)} className="flex flex-1 flex-col items-center gap-2"><div className={cn('w-full rounded-t', selectedChannel === c ? 'bg-primary' : 'bg-primary/50')} style={{height: `${150-i*4}px`}}/><span className="font-identifier text-xs text-muted-foreground">{c}</span></button>)}</div></Panel><Panel label="Format" title="Performance by format"><div className="divide-y p-5">{[['Video','12','6.4%'],['Image','22','4.1%'],['Carousel','7','2.9%'],['Document','3','1.7%']].map(r=><button key={r[0]} onClick={() => setSelectedChannel(r[0])} className="grid w-full grid-cols-[1fr_60px_80px] py-3 text-left hover:text-primary"><span>{r[0]}</span><span className="text-right text-muted-foreground">{r[1]}</span><span className="text-right text-2xl font-semibold text-primary">{r[2]}</span></button>)}</div></Panel></div></div>;
 }
 
 function ListeningLayout({ onAction }: { onAction: (message: string) => void }) {
@@ -773,7 +773,7 @@ function ListeningLayout({ onAction }: { onAction: (message: string) => void }) 
   const feed = clusters.map((cluster, index) => ({
     ...cluster,
     source: ['X', 'reddit', 'news', 'blogs'][index] || 'social',
-    author: ['@prime_watch', 'u/demand_ops', 'The Star', 'Lowyat.NET'][index] || '@mdec',
+    author: ['@prime_watch', 'u/crm_ops', 'The Star', 'Lowyat.NET'][index] || '@mdec',
     sentiment: cluster.neg > 0 ? 'Negative' : cluster.pos >= cluster.neu ? 'Positive' : 'Neutral',
     risk: cluster.neg > 0 ? 'Medium' : 'Low',
   }));
@@ -790,8 +790,8 @@ function ListeningLayout({ onAction }: { onAction: (message: string) => void }) 
 
   return (
     <div className="space-y-6">
-      <div className="flex max-w-full gap-1 overflow-x-auto rounded-2xl bg-muted p-1">
-        {tabs.map((item) => <button key={item} type="button" onClick={() => activateTab(item)} className={cn('shrink-0 rounded-xl px-5 py-2 text-sm font-medium text-muted-foreground', tab === item && 'bg-card text-primary shadow-sm')}>{item}</button>)}
+      <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1">
+        {tabs.map((item) => <button key={item} type="button" onClick={() => activateTab(item)} className={cn('shrink-0 rounded-lg px-5 py-2 text-sm font-medium text-muted-foreground', tab === item && 'bg-card text-primary shadow-sm')}>{item}</button>)}
       </div>
       <StatStrip items={[{ label: 'Clusters', value: String(clusters.length).padStart(2, '0'), tone: 'primary' }, { label: 'Watched', value: String(Object.values(watching).filter(Boolean).length).padStart(2, '0') }, { label: 'Negative', value: String(clusters.reduce((sum, cluster) => sum + cluster.neg, 0)).padStart(2, '0'), tone: 'danger' }, { label: 'Digest', value: digestReady ? 'READY' : 'DRAFT', tone: digestReady ? 'success' : undefined }]} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -804,7 +804,7 @@ function ListeningLayout({ onAction }: { onAction: (message: string) => void }) 
           {selected ? <div className="space-y-4 p-5">
             <div className="grid grid-cols-3 gap-3 text-center"><KpiMini label="Positive" value={String(selected.pos)} /><KpiMini label="Neutral" value={String(selected.neu)} /><KpiMini label="Negative" value={String(selected.neg)} /></div>
             <p className="text-sm leading-6 text-muted-foreground">{selected.body}</p>
-            <div className="rounded-xl border bg-muted/20 p-3 font-identifier text-xs uppercase tracking-[0.2em] text-muted-foreground">Campaign link: {selected.campaignId}<br />Source link: {selected.sourceId}</div>
+            <div className="rounded-lg border bg-muted/20 p-3 font-identifier text-xs uppercase tracking-[0.2em] text-muted-foreground">Campaign link: {selected.campaignId}<br />Source link: {selected.sourceId}</div>
             <div className="grid gap-2">
               <Button onClick={() => { setWatching((current) => ({ ...current, [selected.id]: !current[selected.id] })); onAction(`${selected.title} ${watching[selected.id] ? 'removed from' : 'added to'} watchlist`); }}>{watching[selected.id] ? 'Remove watch' : 'Add to watchlist'}</Button>
               <Button variant="outline" onClick={() => { setDigestReady(true); onAction(`Digest generated for ${selected.title}`); }}>Generate digest</Button>
@@ -856,11 +856,11 @@ function WorkQueue({ activeView, onAction, copy }: { activeView: MdecView; onAct
 }
 
 function KpiMini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl border bg-muted/20 p-4"><div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</div><div className="mt-2 text-3xl font-semibold">{value}</div></div>;
+  return <div className="rounded-lg border bg-muted/20 p-4"><div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</div><div className="mt-2 text-3xl font-semibold">{value}</div></div>;
 }
 
 function SetupCard({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
-  return <div className="rounded-2xl border bg-muted/20 p-4"><Icon className="size-5 text-primary" /><div className="mt-3 font-semibold">{title}</div><p className="mt-1 text-sm text-muted-foreground">{body}</p></div>;
+  return <div className="rounded-lg border bg-muted/20 p-4"><Icon className="size-5 text-primary" /><div className="mt-3 font-semibold">{title}</div><p className="mt-1 text-sm text-muted-foreground">{body}</p></div>;
 }
 
 function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAction: (message: string) => void }) {
@@ -875,7 +875,7 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
   ] as const;
   const history = [
     ['TODAY', 'Current session', 'Active'],
-    ['YESTERDAY', 'Demand Dashboard launch plan', 'Drafted 3, scheduled 2'],
+    ['YESTERDAY', 'CRM Dashboard launch plan', 'Drafted 3, scheduled 2'],
     ['YESTERDAY', 'Inbox triage — Tue PM', '12 replies sent w/ approval'],
     ['LAST 7 DAYS', 'Listening: B2B chatter', 'Escalated 1, watch added'],
     ['LAST 7 DAYS', 'Q1 weekly report', 'Generated, delivered to leads'],
@@ -917,15 +917,15 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
         </div>
 
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_360px]">
-          <Card className="min-h-0 rounded-3xl border bg-card shadow-xl">
+          <Card className="min-h-0 rounded-lg border bg-card shadow-xl">
             <CardContent className="flex h-full flex-col gap-4 p-3">
-              <Button className="h-11 rounded-2xl" onClick={() => createProposal('Start a new MDEC orchestration chat')}>⊞ New chat</Button>
-              <Input className="rounded-2xl" placeholder="Search history" />
+              <Button className="h-11 rounded-lg" onClick={() => createProposal('Start a new MDEC orchestration chat')}>⊞ New chat</Button>
+              <Input className="rounded-lg" placeholder="Search history" />
               <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2">
                 {history.map(([section, title, detail], index) => (
                   <div key={`${section}-${title}`} className="space-y-1">
                     {(index === 0 || history[index - 1][0] !== section) ? <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{section}</div> : null}
-                    <button type="button" onClick={() => createProposal(title)} className="w-full rounded-xl p-2 text-left transition-colors hover:bg-muted">
+                    <button type="button" onClick={() => createProposal(title)} className="w-full rounded-lg p-2 text-left transition-colors hover:bg-muted">
                       <div className="text-sm font-semibold">{title}</div>
                       <div className="text-xs text-muted-foreground">{detail}</div>
                     </button>
@@ -936,17 +936,17 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
           </Card>
 
           <div className="flex min-h-0 flex-col gap-3">
-            <div className="flex gap-1 overflow-x-auto rounded-2xl border bg-card p-2 shadow-sm">
+            <div className="flex gap-1 overflow-x-auto rounded-lg border bg-card p-2 shadow-sm">
               {agents.map(([name, Icon]) => (
-                <button key={name} type="button" onClick={() => { setActiveAgent(name); createProposal(`${name} agent selected`); }} className={cn('flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted', activeAgent === name && 'bg-primary/10 text-primary')}>
+                <button key={name} type="button" onClick={() => { setActiveAgent(name); createProposal(`${name} agent selected`); }} className={cn('flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted', activeAgent === name && 'bg-primary/10 text-primary')}>
                   <Icon className="size-3.5" /> {name}
                 </button>
               ))}
             </div>
 
-            <Card className="min-h-0 flex-1 overflow-hidden rounded-3xl border bg-card/90 shadow-2xl">
+            <Card className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card/90 shadow-lg">
               <CardContent className="flex h-full flex-col p-5">
-                <div className="max-w-3xl rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-5 shadow-sm">
+                <div className="max-w-3xl rounded-lg border bg-gradient-to-br from-primary/10 via-background to-background p-5 shadow-sm">
                   <Badge variant="secondary" className="gap-1"><Sparkles className="size-3" />Agentic Mode</Badge>
                   <h3 className="mt-4 text-xl font-semibold">How can I help today?</h3>
                   <p className="mt-2 leading-7 text-muted-foreground">
@@ -958,7 +958,7 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
                   <div className="flex flex-wrap gap-2">
                     {chips.map((chip) => <Button key={chip} size="sm" variant="outline" className="rounded-full" onClick={() => createProposal(chip)}>{chip}</Button>)}
                   </div>
-                  <div className="flex gap-2 rounded-2xl border bg-background p-2 shadow-sm">
+                  <div className="flex gap-2 rounded-lg border bg-background p-2 shadow-sm">
                     <Input value={request} onChange={(event) => setRequest(event.target.value)} className="h-11 border-primary/40" placeholder="Type to delegate... (try: plan the week)" />
                     <Button size="icon" className="h-11 w-11 rounded-full" onClick={() => createProposal(request || 'Plan the week')}>↑</Button>
                   </div>
@@ -967,14 +967,14 @@ function AgenticModeWorkspace({ onClose, onAction }: { onClose: () => void; onAc
             </Card>
           </div>
 
-          <Card className="min-h-0 rounded-3xl border bg-card shadow-xl">
+          <Card className="min-h-0 rounded-lg border bg-card shadow-xl">
             <CardContent className="flex h-full flex-col p-6">
               {proposal ? (
-                <div className="my-auto rounded-3xl border bg-muted/20 p-5 text-left">
+                <div className="my-auto rounded-lg border bg-muted/20 p-5 text-left">
                   <Badge variant={proposal.status === 'confirmed' ? 'default' : 'warning'}>{proposal.status === 'confirmed' ? 'Confirmed' : 'Needs confirm'}</Badge>
                   <h3 className="mt-4 text-xl font-semibold">{proposal.title}</h3>
                   <p className="mt-3 text-sm leading-6 text-muted-foreground">{proposal.detail}</p>
-                  <div className="mt-4 rounded-xl border bg-background p-3 text-sm"><span className="text-muted-foreground">Owner</span><div className="font-semibold">{proposal.owner}</div></div>
+                  <div className="mt-4 rounded-lg border bg-background p-3 text-sm"><span className="text-muted-foreground">Owner</span><div className="font-semibold">{proposal.owner}</div></div>
                   <div className="mt-4 flex gap-2"><Button disabled={proposal.status === 'confirmed'} onClick={confirmProposal}>Confirm</Button><Button variant="outline" onClick={() => setProposal(null)}>Dismiss</Button></div>
                 </div>
               ) : (
@@ -1018,14 +1018,14 @@ export function PrimeMdecPage() {
               <div className="min-w-[260px] flex-[2]">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="h-11 rounded-xl pl-9" placeholder={copy.header.search} />
+                  <Input className="h-11 rounded-lg pl-9" placeholder={copy.header.search} />
                 </div>
               </div>
-              <Button variant="outline" className="h-11 rounded-xl">{dateLabel}</Button>
-              <Button size="icon" variant="outline" className="h-11 w-11 rounded-xl"><Moon className="size-4" /></Button>
-              <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl"><Bell className="size-4" /></Button>
-              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setAgentic(true)}><Sparkles className="size-4 text-primary" />{copy.header.agenticMode}</Button>
-              <Button variant="outline" className="h-11 rounded-xl"><span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">AR</span><span className="hidden text-left md:block"><span className="block text-sm font-semibold">Aisyah Rahman</span><span className="block text-xs text-primary">{copy.header.adminRole}</span></span></Button>
+              <Button variant="outline" className="h-11 rounded-lg">{dateLabel}</Button>
+              <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg"><Moon className="size-4" /></Button>
+              <Button size="icon" variant="ghost" className="h-11 w-11 rounded-lg"><Bell className="size-4" /></Button>
+              <Button variant="outline" className="h-11 rounded-lg" onClick={() => setAgentic(true)}><Sparkles className="size-4 text-primary" />{copy.header.agenticMode}</Button>
+              <Button variant="outline" className="h-11 rounded-lg"><span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">AR</span><span className="hidden text-left md:block"><span className="block text-sm font-semibold">Aisyah Rahman</span><span className="block text-xs text-primary">{copy.header.adminRole}</span></span></Button>
             </div>
           </header>
 
@@ -1037,16 +1037,16 @@ export function PrimeMdecPage() {
                 {activeView === 'engagement' ? null : <p className="mt-3 text-base text-muted-foreground">{copy.header.subtitle}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-xl border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
+                <div className="rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
                   {copy.header.latest}: <span className="font-medium text-foreground">{log[0]}</span>
                 </div>
-                <Button className="h-11 self-start rounded-xl xl:self-auto" onClick={() => record(copy.header.composeOpened)}><Rocket className="size-4" />{copy.header.composeNew}</Button>
+                <Button className="h-11 self-start rounded-lg xl:self-auto" onClick={() => record(copy.header.composeOpened)}><Rocket className="size-4" />{copy.header.composeNew}</Button>
               </div>
             </section>
 
             {activeView === 'dashboard' ? <DashboardLayout onAction={record} copy={copy} /> : <WorkQueue activeView={activeView} onAction={record} copy={copy} />}
 
-            <div aria-hidden="true" className="min-h-0 flex-1 rounded-2xl bg-card/20" />
+            <div aria-hidden="true" className="min-h-0 flex-1 rounded-lg bg-card/20" />
 
             {agentic ? <AgenticModeWorkspace onClose={() => setAgentic(false)} onAction={record} /> : null}
 

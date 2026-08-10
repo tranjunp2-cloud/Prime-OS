@@ -161,7 +161,7 @@ export function GlobalCopilotChatThread({
 
               <div
                 className={cn(
-                  'w-fit max-w-[88%] rounded-2xl px-4 py-3 shadow-sm',
+                  'w-fit max-w-[88%] rounded-lg px-4 py-3 shadow-sm',
                   message.role === 'user'
                     ? 'ml-auto bg-primary text-primary-foreground'
                     : 'border border-border/70 bg-muted/70',
@@ -239,7 +239,7 @@ export function GlobalCopilotChatThread({
           <div className="size-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
             <Bot className="size-4" />
           </div>
-          <div className="rounded-2xl border border-border/70 bg-muted/70 px-4 py-3">
+          <div className="rounded-lg border border-border/70 bg-muted/70 px-4 py-3">
             <div className="flex gap-1">
               <span className="size-2 bg-foreground/40 rounded-full animate-bounce [animation-delay:0ms]" />
               <span className="size-2 bg-foreground/40 rounded-full animate-bounce [animation-delay:150ms]" />

@@ -203,7 +203,7 @@ export default function ProductDetail() {
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Main image */}
-            <div className="relative aspect-square rounded-xl overflow-hidden bg-muted border">
+            <div className="relative aspect-square rounded-lg overflow-hidden bg-muted border">
               {activeImage && !imgError[selectedImageIndex] ? (
                 <img
                   src={activeImage}

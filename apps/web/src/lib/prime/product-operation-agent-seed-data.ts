@@ -11,7 +11,7 @@ export type OperatingLaneId =
   | 'done'
   | 'learning'
 
-export type OperatingSuite = 'Intelligence' | 'Ecom/COS' | 'Demand' | 'Finance' | 'Customer'
+export type OperatingSuite = 'Intelligence' | 'Ecom/COS' | 'CRM' | 'Finance' | 'Customer'
 export type OperatingSeverity = 'low' | 'medium' | 'high'
 export type OperatingApprovalState = 'not_required' | 'pending' | 'approved' | 'rejected'
 export type OperatingProposalStatus = 'ready' | 'needs_approval' | 'approved' | 'rejected' | 'executed'
@@ -268,7 +268,7 @@ export const buildProductOperationAgentSeedData = (snapshot: PrimeSnapshot): Pro
       dueLabel: 'Today',
       ageHours: 4,
       wipClass: 'expedite',
-      metricLabel: forecast ? `${forecast.ats} ATS / ${forecast.demand7d} 7d demand` : 'High risk alert',
+      metricLabel: forecast ? `${forecast.ats} ATS / ${forecast.crm7d} 7d demand` : 'High risk alert',
       businessImpact: 'Stock, listing, and fulfillment decisions can diverge if this is not resolved.',
       recommendedAction: forecast?.suggestedAction ?? 'Review alert and route the next action to the owner.',
       approvalRequired: true,
@@ -291,8 +291,8 @@ export const buildProductOperationAgentSeedData = (snapshot: PrimeSnapshot): Pro
       id: 'opa-demand-campaign',
       title: `${campaign.name} campaign scale review`,
       laneId: campaign.status === 'testing' ? 'in_progress' : 'triage',
-      sourceSuite: 'Demand',
-      sourceRoute: '/demand/mdec?view=composer',
+      sourceSuite: 'CRM',
+      sourceRoute: '/crm/mdec?view=composer',
       sourceEntityId: campaign.id,
       sourceOwner: 'MDEC',
       severity: campaign.status === 'paused' ? 'medium' : 'low',
@@ -311,7 +311,7 @@ export const buildProductOperationAgentSeedData = (snapshot: PrimeSnapshot): Pro
         `Orders: ${campaign.orders} from ${campaign.traffic} visits`,
       ],
       policyChecklist: basePolicy(['Campaign metrics linked', 'Audience segment present', 'Budget guard checked'], campaign.spend <= 1000),
-      auditTrail: ['Campaign status imported from Demand Suite.', 'Agent prepared campaign decision packet.'],
+      auditTrail: ['Campaign status imported from CRM Suite.', 'Agent prepared campaign decision packet.'],
     })
   }
 
