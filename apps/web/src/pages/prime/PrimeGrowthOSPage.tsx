@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
+  BadgePercent,
   BarChart3,
   Bell,
   Bot,
@@ -17,10 +18,13 @@ import {
   ClipboardList,
   Clock3,
   FileText,
+  ExternalLink,
+  Globe2,
   Loader2,
   MessageSquare,
   MoreVertical,
   PackageCheck,
+  Package,
   Pencil,
   PlugZap,
   Plus,
@@ -31,7 +35,9 @@ import {
   Send,
   ShieldCheck,
   ShoppingCart,
+  ShoppingBag,
   Sparkles,
+  Store,
   Target,
   Truck,
   Trash2,
@@ -91,6 +97,7 @@ import { getPrimeAuthToken, resolvePrimeBackendBase } from '@/lib/prime/backend-
 import { getPrimeSnapshot } from '@/lib/prime/prime-data';
 import { getFulfillmentJobs } from '@/lib/fulfillment-store';
 import { cn } from '@/lib/utils';
+import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 
 type PrimeModuleId = 'overview' | 'crm' | 'scheduled' | 'cos' | 'service' | 'connectors' | 'finance' | 'automation';
 type ConnectorStatusFilter = 'all' | 'connected' | 'needs_setup' | 'watch';
@@ -283,10 +290,10 @@ function saveCosProfileToStorage(profile: CosProfile) {
 const primeModules: ModuleDefinition[] = [
   {
     id: 'overview',
-    title: 'Performance',
-    subtitle: 'Complete system data, operating health, and next actions.',
+    title: 'Home: Omnichannel Overview',
+    subtitle: 'Revenue, orders, customers, and fulfillment across every commerce channel.',
     icon: Sparkles,
-    functions: ['System data', 'Operating health', 'Priority queue'],
+    functions: ['Commerce data', 'Channel performance', 'Fulfillment queue'],
   },
   {
     id: 'crm',
@@ -438,46 +445,15 @@ function StatusPill({ status }: { status: string }) {
 
 function ModuleHeader({
   module,
-  isLoading,
-  snapshot,
+  isLoading: _isLoading,
+  snapshot: _snapshot,
 }: {
   module: ModuleDefinition;
   isLoading: boolean;
   snapshot: GrowthOsSnapshot;
 }) {
-  const Icon = module.icon;
-  const syncTime = new Date(snapshot.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
   return (
-    <header className="flex flex-col gap-3 rounded-lg px-1 py-1 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-md border border-border bg-card text-primary shadow-sm">
-          {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Icon className="size-4" />}
-        </span>
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold leading-tight tracking-normal text-foreground sm:text-3xl">{module.title}</h1>
-          <p className="mt-1 max-w-3xl text-sm font-medium leading-5 text-muted-foreground">{module.subtitle}</p>
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold">
-        <span className="inline-flex h-8 items-center gap-2 rounded-md border border-emerald-100 bg-card px-3 text-emerald-600 shadow-sm">
-          <span className="size-2 rounded-full bg-emerald-500" />
-          Live
-        </span>
-        <span className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground shadow-sm">
-          <RefreshCcw className="size-3.5 text-foreground" />
-          Synced {syncTime}
-        </span>
-        <Button size="sm" className={cn('h-8 rounded-md px-3 text-xs font-semibold shadow-sm', primaryButtonClass)}>
-          <Bot className="size-3.5" />
-          Prime AI
-        </Button>
-        <Button type="button" size="icon" variant="outline" className="relative size-8 rounded-md bg-card shadow-sm" aria-label="Notifications">
-          <Bell className="size-3.5" />
-          <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-destructive text-[10px] font-bold leading-none text-destructive-foreground">3</span>
-        </Button>
-      </div>
-    </header>
+    <WorkspacePageHeader title={module.title} description={module.subtitle} icon={module.icon} />
   );
 }
 
@@ -770,7 +746,7 @@ function BreakdownDonut({ items }: { items: Array<{ label: string; value: number
   );
 }
 
-function OverviewView({
+function LegacyOverviewView({
   snapshot,
   onOpenModule,
 }: {
@@ -783,16 +759,8 @@ function OverviewView({
   const openPayments = snapshot.commerceOrders.filter((order) => order.paymentStatus !== 'paid').length;
   const activeFulfillment = snapshot.commerceOrders.filter((order) => order.status !== 'confirmed').length;
   const unassignedBookings = snapshot.serviceBookings.filter((booking) => booking.staff === 'Unassigned').length;
-  const connectedConnectors = snapshot.connectors.filter((connector) => connector.status === 'connected').length;
-  const watchedConnectors = snapshot.connectors.filter((connector) => connector.status === 'watch' || connector.status === 'tested').length;
-  const setupConnectors = snapshot.connectors.filter((connector) => connector.status === 'setup_required' || connector.status === 'disconnected').length;
   const openAiActions = snapshot.aiActions.filter((item) => item.status !== 'approved').length;
   const highScoreLeads = snapshot.leads.filter((lead) => lead.score >= 85).length;
-  const openRiskCount = snapshot.problemCards.length
-    + (openPayments > 0 ? 1 : 0)
-    + (setupConnectors > 0 ? 1 : 0)
-    + (unassignedBookings > 0 ? 1 : 0)
-    + (openAiActions > 0 ? 1 : 0);
   const systemRecordCount = Object.keys(snapshot.metrics).length
     + snapshot.modules.length
     + snapshot.problemCards.length
@@ -807,30 +775,6 @@ function OverviewView({
     + snapshot.packages.length
     + initialScheduledTasks.length
     + Object.keys(cosProfile).length;
-  const operatingModules = primeModules.filter((module) => module.id !== 'overview');
-  const moduleRows = operatingModules.map((module) => {
-    const snapshotModule = snapshot.modules.find((item) => {
-      if (module.id === 'crm') return item.id === 'lead-demand';
-      if (module.id === 'scheduled') return item.id === 'crm-follow-up';
-      if (module.id === 'cos') return item.id === 'commerce';
-      if (module.id === 'connectors') return item.id === 'integration';
-      return item.id === module.id;
-    });
-
-    return [
-      snapshotModule?.id || module.id,
-      snapshotModule?.label || module.title,
-      moduleOwners[module.id],
-      snapshotModule ? <StatusPill key={`${module.id}-status`} status={snapshotModule.status} /> : 'local',
-      module.id === 'scheduled' ? `${initialScheduledTasks.length} tasks` : snapshotModule?.kpi || `${module.functions.length} functions`,
-      snapshotModule?.promise || module.subtitle,
-      joinList(snapshotModule?.work || module.functions),
-      snapshotModule?.href || module.id,
-      <Button key={module.id} size="sm" variant="ghost" className="h-8 rounded-md px-2 text-foreground" onClick={() => onOpenModule(module.id)}>
-        Open
-      </Button>,
-    ];
-  });
   const dataCoverageRows = [
     ['Metrics', Object.keys(snapshot.metrics).length, 'System KPIs'],
     ['Modules', snapshot.modules.length, 'Registry'],
@@ -841,13 +785,11 @@ function OverviewView({
     ['Leads', snapshot.leads.length, 'CRM'],
     ['Orders', snapshot.commerceOrders.length, currency.format(orderValue)],
     ['Service bookings', snapshot.serviceBookings.length, currency.format(serviceValue)],
-    ['Connectors', snapshot.connectors.length, `${connectedConnectors} connected`],
     ['AI actions', snapshot.aiActions.length, `${openAiActions} open`],
     ['Packages', snapshot.packages.length, 'Plans'],
     ['Tasks', initialScheduledTasks.length, `${initialScheduledTasks.filter((task) => task.status === 'running').length} running`],
     ['COS profile', Object.keys(cosProfile).length, 'Local config'],
   ];
-  const connectorHealthPercent = snapshot.connectors.length ? Math.round((connectedConnectors / snapshot.connectors.length) * 100) : 0;
   const repeatRevenue = Math.round(snapshot.metrics.revenueMtd * (snapshot.metrics.repeatRevenueRate / 100));
   const otherRevenue = Math.max(0, snapshot.metrics.revenueMtd - orderValue - serviceValue - repeatRevenue);
   const runningSchedules = initialScheduledTasks.filter((task) => task.status === 'running').length;
@@ -861,59 +803,28 @@ function OverviewView({
   }> = [
     {
       priority: 'High',
-      icon: WalletCards,
-      title: `Review ${openPayments} unpaid orders`,
-      detail: 'Reduce revenue leakage and confirm payment before fulfillment.',
-      cta: 'Review payments',
+      icon: PackageCheck,
+      title: 'Fulfill 5 Shopee orders',
+      detail: 'Paid orders are ready to pick, pack, and hand off.',
+      cta: 'Fulfill orders',
       module: 'cos',
     },
     {
       priority: 'High',
-      icon: UsersRound,
-      title: `Contact ${Math.max(highScoreLeads, 1)} high-score leads`,
-      detail: 'Leads scored 85+ need same-day follow up.',
-      cta: 'Follow up leads',
-      module: 'crm',
-    },
-    {
-      priority: 'Medium',
-      icon: PlugZap,
-      title: 'Connect WhatsApp',
-      detail: `${setupConnectors} connectors still need setup to close channel gaps.`,
-      cta: 'Setup connector',
-      module: 'connectors',
-    },
-    {
-      priority: 'Medium',
-      icon: CalendarCheck,
-      title: `Assign staff to ${unassignedBookings} booking`,
-      detail: 'Booking tomorrow has no assigned service owner.',
-      cta: 'Assign staff',
+      icon: MessageSquare,
+      title: 'Respond to 3 CRM tickets',
+      detail: 'Customer conversations are waiting for a response.',
+      cta: 'Open tickets',
       module: 'service',
     },
     {
-      priority: 'Low',
-      icon: Bot,
-      title: `Review ${openAiActions} AI suggested actions`,
-      detail: 'Approve useful suggestions to improve automation coverage.',
-      cta: 'Review AI actions',
-      module: 'automation',
+      priority: 'Medium',
+      icon: BadgePercent,
+      title: 'Approve Webstore discount',
+      detail: 'Review the scheduled promotion before it goes live.',
+      cta: 'Review discount',
+      module: 'crm',
     },
-  ];
-  const operatingHealth = [
-    { area: 'CRM', status: highScoreLeads ? 'watch' : 'ready', summary: `${numberFormat.format(snapshot.metrics.qualifiedLeads)} qualified leads, ${Math.max(highScoreLeads, 1)} high-score` },
-    { area: 'COS', status: openPayments || activeFulfillment ? 'watch' : 'ready', summary: `${openPayments} payments open, ${activeFulfillment} fulfillment active` },
-    { area: 'Service', status: unassignedBookings ? 'watch' : 'ready', summary: `${snapshot.serviceBookings.length} bookings, ${unassignedBookings} unassigned` },
-    { area: 'Connectors', status: setupConnectors ? 'watch' : 'ready', summary: `${connectedConnectors}/${snapshot.connectors.length} connected, ${setupConnectors} setup needed` },
-    { area: 'Finance', status: snapshot.metrics.revenueGap > 0 ? 'watch' : 'ready', summary: `${currency.format(snapshot.metrics.revenueMtd)} MTD, ${currency.format(snapshot.metrics.revenueGap)} gap` },
-    { area: 'Automation', status: openAiActions ? 'review' : 'ready', summary: `${openAiActions} AI actions, ${runningSchedules} tasks running` },
-  ];
-  const exceptionItems = [
-    { issue: 'Confirm payment', impact: currency.format(snapshot.commerceOrders.filter((order) => order.paymentStatus !== 'paid').reduce((sum, order) => sum + order.value, 0)), priority: 'High' as const, cta: 'Review', module: 'cos' as PrimeModuleId },
-    { issue: 'Follow up leads', impact: `${Math.max(highScoreLeads, 1)} leads`, priority: 'High' as const, cta: 'Open', module: 'crm' as PrimeModuleId },
-    { issue: 'Finish connector setup', impact: `${setupConnectors} connectors`, priority: 'Medium' as const, cta: 'Setup', module: 'connectors' as PrimeModuleId },
-    { issue: 'Assign service staff', impact: `${unassignedBookings} booking`, priority: 'Medium' as const, cta: 'Assign', module: 'service' as PrimeModuleId },
-    { issue: 'Review AI actions', impact: `${openAiActions} actions`, priority: 'Low' as const, cta: 'Review', module: 'automation' as PrimeModuleId },
   ];
   const revenueBreakdown = [
     { label: 'Orders', value: orderValue, color: '#635bff' },
@@ -923,19 +834,59 @@ function OverviewView({
   ];
 
   return (
-    <div className="grid gap-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <PerformanceKpiCard label="Revenue MTD" value={currency.format(snapshot.metrics.revenueMtd)} detail="25% vs last month" icon={CircleDollarSign} visual={<MiniSparkline />} />
-        <PerformanceKpiCard label="Conversion" value={`${snapshot.metrics.conversionRate}%`} detail="8% vs last month" tone="emerald" icon={Target} visual={<MiniSparkline tone="emerald" />} />
-        <PerformanceKpiCard label="Open Risks" value={String(openRiskCount)} detail="2 vs yesterday" trend="down" tone="rose" icon={AlertTriangle} visual={<MiniSparkline tone="rose" />} />
-        <PerformanceKpiCard label="Connector Health" value={`${connectedConnectors}/${snapshot.connectors.length}`} detail={`${watchedConnectors} watch, ${setupConnectors} setup`} trend="flat" icon={PlugZap} visual={<MiniRing value={connectorHealthPercent} label="Connector health" />} />
-        <PerformanceKpiCard label="AI Actions" value={String(openAiActions)} detail="2 high impact" icon={Sparkles} visual={<span className="grid size-12 place-items-center rounded-full bg-violet-50 text-violet-600"><Zap className="size-5" /></span>} />
+    <div className="grid gap-6">
+      <section aria-labelledby="operations-pipeline-heading" className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Operations pipeline</div>
+            <h2 id="operations-pipeline-heading" className="mt-0.5 text-base font-semibold text-foreground">Today’s commerce flow</h2>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">Catalog → Channels → Orders → Fulfillment → Stock</p>
+        </div>
+        <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-5">
+          {[
+            { step: '01', label: 'Catalog', value: '1,240 products', detail: 'Master catalog ready', cta: 'Create product', href: '/overview?module=cos&view=pim&section=products', icon: PackageCheck, tone: 'text-primary bg-primary/10' },
+            { step: '02', label: 'Channels', value: '5 connected', detail: 'Syncing normally', cta: 'View channels', href: '/overview?module=cos&view=live&section=channels', icon: Store, tone: 'text-emerald-600 bg-emerald-50' },
+            { step: '03', label: 'Orders', value: `${Math.max(snapshot.commerceOrders.length, 85)} new orders`, detail: `${openPayments} awaiting payment`, cta: 'Process now', href: '/overview?module=cos&view=oms', icon: ShoppingBag, tone: 'text-primary bg-primary/10' },
+            { step: '04', label: 'Fulfillment', value: `${Math.max(activeFulfillment, 12)} waiting`, detail: 'Packing queue needs action', cta: 'Call shipper', href: '/overview?module=cos&view=ship', icon: Truck, tone: 'text-amber-600 bg-amber-50' },
+            { step: '05', label: 'Stock', value: '3 low-stock alerts', detail: 'Replenishment suggested', cta: 'Restock', href: '/overview?module=cos&view=pim&section=warehouse', icon: Warehouse, tone: 'text-rose-600 bg-rose-50' },
+          ].map((stage) => {
+            const Icon = stage.icon;
+            return (
+              <article key={stage.label} className="relative min-w-0 p-4 transition-colors hover:bg-muted/30">
+                <div className="flex items-start justify-between gap-3">
+                  <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${stage.tone}`}><Icon className="size-4" /></span>
+                  <span className="font-identifier text-[10px] font-semibold text-muted-foreground">{stage.step}</span>
+                </div>
+                <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{stage.label}</div>
+                <div className="mt-1 text-lg font-semibold text-foreground">{stage.value}</div>
+                <div className="mt-0.5 min-h-5 text-xs font-medium text-muted-foreground">{stage.detail}</div>
+                <Button asChild variant="ghost" size="sm" className="mt-2 h-8 px-0 text-xs text-primary hover:bg-transparent hover:text-primary/80">
+                  <Link to={stage.href}>{stage.cta}<ArrowRight className="size-3.5" /></Link>
+                </Button>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.62fr)_minmax(280px,0.62fr)]">
-        <DashboardPanel title="Next best actions" action={<Button variant="ghost" size="sm" className="h-8 rounded-md text-primary">View all actions <ArrowRight className="size-3.5" /></Button>}>
+      <section aria-labelledby="important-heading" className="grid gap-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-destructive">Important</div>
+          <h2 id="important-heading" className="mt-1 text-lg font-semibold text-foreground">What needs attention now</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <PerformanceKpiCard label="Total Revenue" value={currency.format(snapshot.metrics.revenueMtd)} detail="25% vs last month" icon={CircleDollarSign} visual={<MiniSparkline />} />
+        <PerformanceKpiCard label="Conversion Rate" value={`${snapshot.metrics.conversionRate}%`} detail="8% vs last month" tone="emerald" icon={Target} visual={<MiniSparkline tone="emerald" />} />
+        <PerformanceKpiCard label="Total Orders" value={numberFormat.format(snapshot.commerceOrders.length)} detail={`${openPayments} awaiting payment`} icon={ShoppingBag} visual={<MiniSparkline />} />
+        <PerformanceKpiCard label="Pending Fulfillments" value={numberFormat.format(activeFulfillment)} detail="Ready for warehouse action" tone="emerald" icon={Package} visual={<MiniSparkline tone="emerald" />} />
+        </div>
+      </section>
+
+      <div className="grid gap-5">
+        <DashboardPanel title="Tasks & Fulfillments" action={<Button variant="ghost" size="sm" className="h-8 rounded-md text-primary">View all tasks <ArrowRight className="size-3.5" /></Button>}>
           <div className="divide-y divide-border">
-            {nextBestActions.map((item) => {
+            {nextBestActions.slice(0, 3).map((item) => {
               const Icon = item.icon;
               return (
                 <div key={item.title} className="grid gap-3 py-3 first:pt-0 last:pb-0 sm:grid-cols-[64px_32px_minmax(0,1fr)_auto_28px] sm:items-center">
@@ -957,40 +908,11 @@ function OverviewView({
           </div>
         </DashboardPanel>
 
-        <DashboardPanel title="Operating health" subtitle="Where attention is needed." action={<Button variant="ghost" size="sm" className="h-8 rounded-md text-primary">View all</Button>}>
-          <div className="grid gap-2">
-            {operatingHealth.map((item) => (
-              <div key={item.area} className="grid gap-2 rounded-md border border-border/70 bg-card/70 p-2.5 sm:grid-cols-[70px_72px_minmax(0,1fr)] sm:items-center">
-                <div className="text-xs font-semibold text-foreground">{item.area}</div>
-                <StatusPill status={item.status} />
-                <div className="min-w-0 truncate text-xs font-medium text-muted-foreground">{item.summary}</div>
-              </div>
-            ))}
-          </div>
-        </DashboardPanel>
-
-        <DashboardPanel title="Exceptions" subtitle="Work that needs resolution." action={<Button variant="ghost" size="sm" className="h-8 rounded-md text-primary">View all</Button>}>
-          <div className="grid gap-2">
-            {exceptionItems.map((item) => (
-              <div key={item.issue} className="grid gap-2 rounded-md border border-border/70 bg-card/70 p-2.5 sm:grid-cols-[minmax(0,1fr)_88px_64px] sm:items-center">
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-semibold text-foreground">{item.issue}</div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <span className={cn('font-semibold', item.priority === 'High' && 'text-rose-500', item.priority === 'Medium' && 'text-amber-500', item.priority === 'Low' && 'text-blue-500')}>{item.priority}</span>
-                    <span className="truncate">{item.impact}</span>
-                  </div>
-                </div>
-                <PriorityPill priority={item.priority} />
-                <Button variant="outline" size="sm" className="h-8 rounded-md px-2 text-xs text-primary" onClick={() => onOpenModule(item.module)}>
-                  {item.cta}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </DashboardPanel>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.62fr)]">
+      <section aria-labelledby="monitor-heading" className="grid gap-3">
+        <div><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600">Monitor</div><h2 id="monitor-heading" className="mt-1 text-lg font-semibold text-foreground">Commerce performance</h2></div>
+        <div className="grid gap-5">
         <DashboardPanel title="Revenue overview" subtitle={`${currency.format(snapshot.metrics.revenueMtd)} · 25% vs last month`}>
           <div className="grid gap-4">
             <div className="min-w-0 overflow-hidden">
@@ -1007,41 +929,12 @@ function OverviewView({
           </div>
         </DashboardPanel>
 
-        <DashboardPanel title="System status" subtitle="All systems operational" action={<Button variant="ghost" size="sm" className="h-8 rounded-md text-primary">View all</Button>}>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-border/70 bg-card/70 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><ShieldCheck className="size-3.5 text-emerald-500" />Services</div>
-              <div className="mt-2 text-xl font-semibold text-foreground">6 / 6</div>
-              <div className="mt-1 text-xs font-semibold text-emerald-500">Healthy</div>
-            </div>
-            <div className="rounded-lg border border-border/70 bg-card/70 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><PlugZap className="size-3.5 text-amber-500" />Connectors</div>
-              <div className="mt-2 text-xl font-semibold text-foreground">{connectedConnectors} / {snapshot.connectors.length}</div>
-              <div className="mt-1 text-xs font-semibold text-amber-500">Setup needed</div>
-            </div>
-            <div className="rounded-lg border border-border/70 bg-card/70 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Activity className="size-3.5 text-emerald-500" />Automation</div>
-              <div className="mt-2 text-xl font-semibold text-foreground">{runningSchedules} / {initialScheduledTasks.length}</div>
-              <div className="mt-1 text-xs font-semibold text-emerald-500">Running</div>
-            </div>
-            <div className="rounded-lg border border-border/70 bg-card/70 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Bot className="size-3.5 text-violet-500" />AI Engine</div>
-              <div className="mt-2 text-xl font-semibold text-foreground">Online</div>
-              <div className="mt-1 text-xs font-semibold text-emerald-500">Healthy</div>
-            </div>
-          </div>
-          <div className="mt-4 border-t border-border pt-3">
-            <div className="mb-2 text-xs font-semibold text-foreground">Recent system events</div>
-            <div className="grid gap-2 text-xs font-medium text-muted-foreground">
-              <div className="flex items-center justify-between gap-3"><span>Connector WhatsApp setup failed</span><span>10:32 AM</span></div>
-              <div className="flex items-center justify-between gap-3"><span>High intent lead from Instagram</span><span>09:41 AM</span></div>
-              <div className="flex items-center justify-between gap-3"><span>Daily revenue report generated</span><span>09:30 AM</span></div>
-            </div>
-          </div>
-        </DashboardPanel>
-      </div>
+        </div>
+      </section>
 
-      <section className="prime-dashboard-surface overflow-hidden rounded-lg border">
+      <section aria-labelledby="reference-heading" className="grid gap-3">
+        <div><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Reference</div><h2 id="reference-heading" className="mt-1 text-lg font-semibold text-foreground">Commerce data</h2></div>
+        <div className="prime-dashboard-surface overflow-hidden rounded-lg border">
         <div className="px-4 py-4">
           <h2 className="text-base font-semibold text-foreground">Data explorer</h2>
           <p className="mt-1 text-sm font-medium leading-5 text-muted-foreground">{numberFormat.format(systemRecordCount)} records across {dataCoverageRows.length} datasets.</p>
@@ -1055,7 +948,7 @@ function OverviewView({
           />
         </MinimalDataGroup>
 
-        <MinimalDataGroup title="System metrics" count={Object.keys(snapshot.metrics).length} defaultOpen>
+        <MinimalDataGroup title="Commerce metrics" count={Object.keys(snapshot.metrics).length}>
           <SystemDataTable
             columns={['Metric', 'Value']}
             rows={Object.entries(snapshot.metrics).map(([key, value]) => [
@@ -1064,14 +957,6 @@ function OverviewView({
             ])}
             minWidth={0}
           />
-        </MinimalDataGroup>
-
-        <MinimalDataGroup title="Module registry" count={moduleRows.length}>
-        <SystemDataTable
-          columns={['ID', 'Module', 'Owner', 'Status', 'Signal', 'Promise', 'Work', 'Href', '']}
-          rows={moduleRows}
-          minWidth={1160}
-        />
         </MinimalDataGroup>
 
         <MinimalDataGroup title="Funnel" count={snapshot.funnel.length}>
@@ -1265,6 +1150,93 @@ function OverviewView({
             minWidth={1020}
           />
         </MinimalDataGroup>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: (module: PrimeModuleId) => void }) {
+  const [setupCollapsed, setSetupCollapsed] = useState(false);
+  const [setupDismissed, setSetupDismissed] = useState(false);
+
+  const pipelineGroups = [
+    { title: 'Orders', icon: ShoppingBag, href: '/orders?status=pending', tone: 'bg-indigo-50 text-indigo-600', items: [{ value: '124', label: 'Pending Confirmation' }, { value: '45', label: 'Ready to Pack' }] },
+    { title: 'Fulfillment', icon: Truck, href: '/fulfillment?status=exception', tone: 'bg-amber-50 text-amber-600', items: [{ value: '12', label: 'Delivery Exceptions' }, { value: '111', label: 'Returned Orders' }] },
+    { title: 'Inventory', icon: Warehouse, href: '/inventory?status=low-stock', tone: 'bg-rose-50 text-rose-600', items: [{ value: '15', label: 'Low Stock Items' }, { value: '3', label: 'Out of Stock' }] },
+    { title: 'CRM', icon: UsersRound, href: '/crm/leads-rfqs', tone: 'bg-emerald-50 text-emerald-600', items: [{ value: '8', label: 'New Leads' }, { value: '5', label: 'Unassigned Tickets' }] },
+  ];
+  const channels = [
+    { name: 'Shopee', revenue: 48600, share: 34, color: '#635bff' },
+    { name: 'Lazada', revenue: 32900, share: 23, color: '#818cf8' },
+    { name: 'Tiki', revenue: 17200, share: 12, color: '#38bdf8' },
+    { name: 'Prime Web', revenue: 24300, share: 17, color: '#10b981', launch: 'Open Builder', href: '/builder/theme' },
+    { name: 'Prime POS', revenue: 14300, share: 10, color: '#f59e0b', launch: 'Open POS', href: '/pos/register' },
+    { name: 'Prime CRM', revenue: 5700, share: 4, color: '#f43f5e' },
+  ];
+  const channelSnapshot = [channels[0], channels[1], channels[3], channels[4]];
+  const products = [
+    { name: 'HydraGlow Essence 30ml', units: 428, image: '/images/products/B0G432Z31H/1.jpg' },
+    { name: 'Daily Barrier Cream', units: 316, image: '/images/products/B0FH1K4CMN/1.jpg' },
+    { name: 'Vitamin C Brightening Set', units: 284, image: '/images/products/B0FQHTSM8B/1.jpg' },
+    { name: 'Hydrating Mask 5-pack', units: 219, image: '/images/products/B0G5Y7YCDD/1.jpg' },
+  ];
+  const connectionHealth = [
+    { channel: 'Shopee', status: 'Connected', detail: 'Synced 1 min ago' },
+    { channel: 'TikTok', status: 'Connected', detail: 'Synced 3 min ago' },
+    { channel: 'Lazada', status: 'Error', detail: 'Token expired 18 min ago' },
+    { channel: 'Web', status: 'Connected', detail: 'Realtime webhook active' },
+  ];
+
+  return (
+    <div className="grid gap-6">
+      {!setupDismissed ? (
+        setupCollapsed ? (
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-label="Setup progress">
+            <button type="button" onClick={() => setSetupCollapsed(false)} className="flex min-h-11 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+              <span className="text-sm font-semibold text-slate-800">3/4 Setup Steps Completed</span>
+              <span className="ml-auto text-xs font-medium text-primary">Continue setup</span>
+              <ChevronRight className="size-4 text-slate-400" />
+            </button>
+            <div className="h-1 bg-slate-100"><div className="h-full w-3/4 bg-primary" /></div>
+          </section>
+        ) : (
+          <section className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="setup-heading">
+            <div className="flex items-start gap-4 p-5 pr-24">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="size-5" /></span>
+              <div className="min-w-0 flex-1"><div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Onboarding</div><h2 id="setup-heading" className="mt-1 text-lg font-semibold text-slate-900">Initial setup</h2><p className="mt-1 text-sm font-medium text-slate-500">3 of 4 steps completed. Connect your Lazada channel to start syncing orders and inventory.</p><div className="mt-4 flex flex-wrap items-center gap-3"><Button size="sm">Complete setup</Button><button type="button" onClick={() => setSetupCollapsed(true)} className="min-h-9 text-sm font-semibold text-slate-500 hover:text-slate-800">Collapse</button></div></div>
+            </div>
+            <button type="button" onClick={() => setSetupDismissed(true)} className="absolute right-3 top-3 grid size-9 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Dismiss onboarding"><X className="size-4" /></button>
+            <div className="h-1.5 bg-slate-100"><div className="h-full w-3/4 bg-primary" /></div>
+          </section>
+        )
+      ) : null}
+
+      <section aria-labelledby="pipeline-heading" className="grid gap-3">
+        <div><div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Action queue</div><h2 id="pipeline-heading" className="mt-1 text-lg font-semibold text-slate-900">Operations Pipeline</h2></div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {pipelineGroups.map((group) => { const Icon = group.icon; return (
+            <article key={group.title} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><span className={`grid size-9 place-items-center rounded-lg ${group.tone}`}><Icon className="size-4" /></span><h3 className="font-semibold text-slate-900">{group.title}</h3><ArrowRight className="ml-auto size-4 text-slate-400" /></div>
+              <div className="divide-y divide-slate-100">{group.items.map((item, index) => <Link key={item.label} to={index === 0 ? group.href : group.href} className="flex min-h-16 items-center gap-3 px-4 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className="min-w-10 text-2xl font-semibold text-slate-900">{item.value}</span><span className="text-sm font-medium text-slate-500">{item.label}</span><ChevronRight className="ml-auto size-4 text-slate-300" /></Link>)}</div>
+            </article>
+          ); })}
+        </div>
+      </section>
+
+      <section aria-labelledby="channel-snapshot-heading" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Live snapshot</div><h2 id="channel-snapshot-heading" className="mt-1 font-semibold text-slate-900">Channel Revenue Today</h2><p className="mt-1 text-xs font-medium text-slate-500">Quick signal only · detailed trends and attribution live in Analytics</p></div>
+          <Button asChild variant="outline" size="sm" className="shrink-0"><Link to="/client-reports">View full analytics <ArrowRight className="size-3.5" /></Link></Button>
+        </div>
+        <div className="grid divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+          {channelSnapshot.map((channel) => <div key={channel.name} className="min-w-0 p-4 transition-colors hover:bg-slate-50"><div className="flex items-center gap-2"><span className="size-2.5 rounded-full" style={{ backgroundColor: channel.color }} /><span className="truncate text-sm font-semibold text-slate-700">{channel.name}</span><span className="ml-auto text-xs font-semibold text-slate-400">{channel.share}%</span></div><div className="mt-3 text-xl font-semibold text-slate-900">{currency.format(channel.revenue)}</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${Math.min(100, channel.share * 2.4)}%`, backgroundColor: channel.color }} /></div>{channel.launch ? <Button asChild variant="ghost" size="sm" className="mt-2 h-7 px-0 text-xs text-primary hover:bg-transparent"><a href={channel.href} target="_blank" rel="noreferrer">{channel.launch}<ExternalLink className="size-3" /></a></Button> : null}</div>)}
+        </div>
+      </section>
+
+      <section aria-label="Operational health" className="grid gap-4 xl:grid-cols-2">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Top Selling Products</h2><p className="mt-1 text-xs font-medium text-slate-500">Highest unit sales across all channels</p></div><div className="divide-y divide-slate-100">{products.map((product, index) => <div key={product.name} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50"><span className="w-5 text-xs font-semibold text-slate-400">{index + 1}</span><img src={product.image} alt="" className="size-11 rounded-lg border border-slate-200 object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{product.name}</span><span className="shrink-0 text-sm font-semibold text-slate-900">{product.units} <span className="font-medium text-slate-400">units</span></span></div>)}</div></div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Channel Connection Health</h2><p className="mt-1 text-xs font-medium text-slate-500">Realtime marketplace API and webhook status</p></div><div className="divide-y divide-slate-100">{connectionHealth.map((connection) => <div key={connection.channel} className="flex min-h-[68px] items-center gap-3 px-5 transition-colors hover:bg-slate-50"><span className={`size-2.5 rounded-full ${connection.status === 'Error' ? 'bg-rose-500' : 'bg-emerald-500'}`} /><div className="min-w-0 flex-1"><div className="text-sm font-semibold text-slate-800">{connection.channel}</div><div className="mt-0.5 truncate text-xs font-medium text-slate-500">{connection.detail}</div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${connection.status === 'Error' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>{connection.status}</span>{connection.status === 'Error' ? <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toast.success(`${connection.channel} reconnect requested`)}><RefreshCcw className="size-3" />Reconnect</Button> : null}</div>)}</div></div>
       </section>
     </div>
   );
@@ -2153,9 +2125,9 @@ function InspectorRow({ label, value, multiline = false }: { label: string; valu
 
 function CosInlineMetric({ label, value, tone = 'text-foreground' }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="flex items-baseline gap-2 text-sm">
-      <span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span>
-      <span className={cn('font-identifier text-base font-semibold', tone)}>{value}</span>
+    <div className="inline-flex h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 text-sm">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className={cn('font-identifier text-sm font-semibold', tone)}>{value}</span>
     </div>
   );
 }
@@ -2401,41 +2373,35 @@ function CosView({ snapshot }: { snapshot: GrowthOsSnapshot }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[hsl(var(--surface-stage))]">
-      <header className="shrink-0 border-b border-border bg-background">
-        <div className="flex min-h-16 flex-col gap-3 px-4 py-3 md:px-6 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
-              <span>Commerce</span>
-              <span className="text-border">/</span>
-              <span>COS</span>
-              <span className="text-primary">Live ops</span>
-            </div>
-            <h1 className="mt-1 font-display text-2xl font-semibold leading-tight text-foreground">Commerce Operations</h1>
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-2 xl:justify-end">
+      <div className="shrink-0 bg-background px-4 pt-4 md:px-6">
+        <WorkspacePageHeader
+          title="Commerce Operations"
+          description="Control catalog, inventory, live commerce, orders, fulfillment, and channel readiness."
+          icon={ShoppingCart}
+          actions={(
+            <>
             <CosInlineMetric label="Ready" value={`${readinessScore}%`} tone={readinessScore >= 80 ? 'text-emerald-600 dark:text-emerald-300' : 'text-warning'} />
+            <div className="hidden h-6 w-px bg-border sm:block" />
             <CosInlineMetric label="Orders" value={numberFormat.format(activeOrders)} />
+            <div className="hidden h-6 w-px bg-border sm:block" />
             <CosInlineMetric label="ATP" value={numberFormat.format(totalAtp)} tone={lowStockRows.length ? 'text-warning' : 'text-emerald-600 dark:text-emerald-300'} />
-            <CosInlineMetric label="Live" value={`${liveCommerceSessions.length} sessions`} tone={liveWatchCount ? 'text-warning' : 'text-emerald-600 dark:text-emerald-300'} />
-            <CosInlineMetric label="Ship" value={activeFulfillment ? String(activeFulfillment) : 'Clear'} tone={exceptionFulfillment ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-300'} />
-            <CosInlineMetric label="Channels" value={`${connectedCommerceConnectors}/${commerceConnectorTotal}`} />
             <div className="hidden h-8 w-px bg-border lg:block" />
-            <Button variant="ghost" size="sm" className="h-9 px-2.5" onClick={() => selectCosMode('pim')}>
+            <Button variant="ghost" size="sm" className="h-8 px-2.5" onClick={() => selectCosMode('pim')}>
               <PackageCheck className="size-4" />
               Catalog
             </Button>
-            <Button variant="ghost" size="sm" className="h-9 px-2.5" onClick={() => selectCosMode('live')}>
+            <Button variant="ghost" size="sm" className="h-8 px-2.5" onClick={() => selectCosMode('live')}>
               <RadioTower className="size-4" />
               Live plan
             </Button>
-            <Button size="sm" className="h-9 px-3" onClick={() => selectCosMode('oms')}>
+            <Button size="sm" className="h-8 px-3" onClick={() => selectCosMode('oms')}>
               <ShoppingCart className="size-4" />
               Review OMS
             </Button>
-          </div>
-        </div>
-      </header>
+            </>
+          )}
+        />
+      </div>
 
       <div
         className="grid min-h-0 min-w-[920px] flex-1 border-b border-border bg-[hsl(var(--surface-workspace))]"
@@ -2542,6 +2508,32 @@ function CosView({ snapshot }: { snapshot: GrowthOsSnapshot }) {
 
         {activeCosMode === 'live' ? (
           <div className="grid gap-4">
+            <section aria-labelledby="internal-channels-heading" className="grid gap-3 md:grid-cols-2">
+              <h2 id="internal-channels-heading" className="sr-only">Internal sales channels</h2>
+              <div className="rounded-xl border border-border bg-gradient-to-br from-indigo-50 to-background p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <span className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground"><Globe2 className="size-5" /></span>
+                  <StatusPill status="Live" />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-foreground">Prime Web</h3>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">Owned storefront · 342 products published · Last sync 2 min ago</p>
+                <Button asChild variant="outline" size="sm" className="mt-4 h-9 bg-background">
+                  <Link to="/builder/theme">Launch Builder <ExternalLink className="size-3.5" /></Link>
+                </Button>
+              </div>
+              <div className="rounded-xl border border-border bg-gradient-to-br from-emerald-50 to-background p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <span className="grid size-10 place-items-center rounded-lg bg-emerald-600 text-white"><Store className="size-5" /></span>
+                  <StatusPill status="Ready" />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-foreground">POS Storefront</h3>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">3 store registers · Inventory synced · Register ready</p>
+                <Button asChild variant="outline" size="sm" className="mt-4 h-9 bg-background">
+                  <Link to="/pos/register">Open Register <ExternalLink className="size-3.5" /></Link>
+                </Button>
+              </div>
+            </section>
+
             <section className="grid gap-3 md:grid-cols-4">
               <CosKpiCard label="Live sessions" value={String(liveCommerceSessions.length)} detail={`${liveWatchCount} sessions in watch state`} icon={RadioTower} tone={liveWatchCount ? 'amber' : 'emerald'} />
               <CosKpiCard label="Allocated stock" value={numberFormat.format(liveAllocatedStock)} detail={`${liveAllocationUsage}% of sellable stock, ${numberFormat.format(liveBufferStock)} buffer`} icon={Boxes} tone={liveOverAllocated ? 'rose' : 'emerald'} />
@@ -4724,35 +4716,30 @@ function FinanceView({ snapshot }: { snapshot: GrowthOsSnapshot }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[hsl(var(--surface-stage))]">
-      <header className="shrink-0 border-b border-border bg-background">
-        <div className="flex min-h-16 flex-col gap-3 px-4 py-3 md:px-6 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
-              <span>Finance</span>
-              <span className="text-border">/</span>
-              <span>Revenue</span>
-              <span className="text-primary">Live ledger</span>
-            </div>
-            <h1 className="mt-1 font-display text-2xl font-semibold leading-tight text-foreground">Finance Operations</h1>
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 xl:justify-end">
+      <div className="shrink-0 bg-background px-4 pt-4 md:px-6">
+        <WorkspacePageHeader
+          title="Finance Operations"
+          description="Monitor revenue, collections, receivables, forecast coverage, and finance controls."
+          icon={CircleDollarSign}
+          actions={(
+            <>
             <CosInlineMetric label="MTD" value={compactCurrency.format(snapshot.metrics.revenueMtd)} />
             <CosInlineMetric label="Paid" value={compactCurrency.format(paidOrderValue)} tone="text-emerald-600 dark:text-emerald-300" />
             <CosInlineMetric label="A/R" value={compactCurrency.format(openPaymentValue)} tone={openPaymentCount ? 'text-warning' : 'text-emerald-600 dark:text-emerald-300'} />
             <CosInlineMetric label="Gap" value={compactCurrency.format(snapshot.metrics.revenueGap)} tone={snapshot.metrics.revenueGap ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-300'} />
             <div className="hidden h-8 w-px bg-border lg:block" />
-            <Button variant="ghost" size="sm" className="h-9 px-2.5" onClick={() => selectFinanceMode('payments')}>
+            <Button variant="ghost" size="sm" className="h-8 px-2.5" onClick={() => selectFinanceMode('payments')}>
               <WalletCards className="size-4" />
               Collect
             </Button>
-            <Button size="sm" className="h-9 px-3" onClick={() => selectFinanceMode('forecast')}>
+            <Button size="sm" className="h-8 px-3" onClick={() => selectFinanceMode('forecast')}>
               <Target className="size-4" />
               Forecast
             </Button>
-          </div>
-        </div>
-      </header>
+            </>
+          )}
+        />
+      </div>
 
       <div
         className="grid min-h-0 min-w-[920px] flex-1 border-b border-border bg-[hsl(var(--surface-workspace))]"
@@ -5402,7 +5389,7 @@ export function PrimeGrowthOSPage() {
   if (isLoading && !data && activeModuleId !== 'cos' && activeModuleId !== 'finance') {
     return (
       <div className="prime-stage h-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full min-w-0 max-w-[1280px] flex-col gap-5 px-4 pb-24 pt-5 sm:px-6 lg:px-7 xl:pr-20">
+        <div className="flex min-h-full w-full min-w-0 flex-col gap-5 px-4 pb-24 pt-5 sm:px-6 lg:px-7 xl:pr-20">
           <div className="flex items-center gap-3">
             <Skeleton className="size-10 rounded-lg" />
             <div>
@@ -5438,7 +5425,6 @@ export function PrimeGrowthOSPage() {
     return (
       <div className="prime-stage h-full overflow-hidden text-foreground">
         <CosView snapshot={snapshot} />
-        <AgentChatPopup snapshot={snapshot} />
       </div>
     );
   }
@@ -5447,14 +5433,13 @@ export function PrimeGrowthOSPage() {
     return (
       <div className="prime-stage h-full overflow-hidden text-foreground">
         <FinanceView snapshot={snapshot} />
-        <AgentChatPopup snapshot={snapshot} />
       </div>
     );
   }
 
   return (
     <div className="prime-stage h-full overflow-y-auto overflow-x-hidden text-foreground">
-      <div className="mx-auto flex min-h-full w-full min-w-0 max-w-[1280px] flex-col gap-5 px-4 pb-24 pt-4 sm:px-6 lg:px-7 xl:pr-20">
+      <div className="flex min-h-full w-full min-w-0 flex-col gap-5 px-4 pb-24 pt-4 sm:px-6 lg:px-7 xl:pr-20">
         <ModuleHeader module={activeModule} isLoading={isLoading} snapshot={snapshot} />
         {activeModuleId === 'overview' ? <OverviewView snapshot={snapshot} onOpenModule={openModule} /> : null}
         {activeModuleId === 'crm' ? <CrmView snapshot={snapshot} onLeadCreated={addLeadToCache} /> : null}
@@ -5463,7 +5448,6 @@ export function PrimeGrowthOSPage() {
         {activeModuleId === 'connectors' ? <ConnectorsView snapshot={snapshot} /> : null}
         {activeModuleId === 'automation' ? <AutomationView snapshot={snapshot} /> : null}
       </div>
-      {activeModuleId === 'overview' ? null : <AgentChatPopup snapshot={snapshot} />}
     </div>
   );
 }

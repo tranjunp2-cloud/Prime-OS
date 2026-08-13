@@ -1,593 +1,68 @@
 import { useMemo, useState } from 'react';
-import { Building2, Globe2, Pencil, Plus, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
-import { PageHeader } from '@/components/system/PageHeader';
-import { ConfirmDialog } from '@/components/system/ConfirmDialog';
-import { DataTable, type Column } from '@/components/system/DataTable';
-import { EmptyState } from '@/components/system/EmptyState';
-import { FiltersBar } from '@/components/system/FiltersBar';
-import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
+import type { ReactNode } from 'react';
+import { Building2, Check, Link2, MapPin, MoreHorizontal, Pencil, Plus, Search, ShoppingBag, Store, Warehouse as WarehouseIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
-import { useForm } from 'react-hook-form';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { useToast } from '@/hooks/use-toast';
-import { useInitialLoading } from '@/hooks/use-initial-loading';
-import { WarehouseCapabilityBadges } from '@/components/inventory/WarehouseCapabilityBadge';
-import { WarehouseStatusBadge } from '@/components/inventory/WarehouseStatusBadge';
-import { WarehouseTypeBadge } from '@/components/inventory/WarehouseTypeBadge';
-import {
-  getWarehouses, addWarehouse, updateWarehouse, deleteWarehouse,
-  type Warehouse, type WarehouseType, type WarehouseStatus,
-} from '@/lib/warehouse-store';
-import { useI18n } from '@/lib/i18n/I18nContext';
-import { formatLocalizedDate, formatMessage } from '@/lib/i18n/format';
+import { cn } from '@/lib/utils';
 
-const COUNTRIES = ['JP', 'SG', 'MY', 'VN', 'TH', 'US', 'CN', 'KR', 'TW', 'ID'];
-const COUNTRY_FLAGS: Record<string, string> = {
-  JP: '🇯🇵', SG: '🇸🇬', MY: '🇲🇾', VN: '🇻🇳', TH: '🇹🇭', US: '🇺🇸', CN: '🇨🇳', KR: '🇰🇷', TW: '🇹🇼', ID: '🇮🇩',
-};
+type WarehouseTab = 'channel' | 'physical';
 
-interface WarehouseFormValues {
-  code: string;
-  name: string;
-  country: string;
-  type: WarehouseType;
-  status: WarehouseStatus;
-  capabilities: string;
+const channelLocations = [
+  { channel: 'Shopee', mark: 'S', tone: 'text-orange-600', location: 'Shopee HCM Dispatch', linked: 'HCM Central', pickup: true, returns: true },
+  { channel: 'Lazada', mark: 'L', tone: 'text-violet-600', location: 'Lazada South Hub', linked: 'Binh Duong DC', pickup: true, returns: false },
+  { channel: 'PrimeWeb', mark: 'PW', tone: 'text-indigo-600', location: 'PrimeWeb Online Store', linked: 'HCM Central', pickup: true, returns: true },
+  { channel: 'PrimePOS', mark: 'POS', tone: 'text-sky-700', location: 'District 1 Store', linked: 'District 1 Branch', pickup: true, returns: true },
+  { channel: 'Amazon', mark: 'a', tone: 'text-slate-950', location: 'Amazon JP Merchant Node', linked: null, pickup: false, returns: false },
+  { channel: 'Rakuten', mark: 'R', tone: 'text-red-600', location: 'Rakuten Tokyo Store', linked: null, pickup: false, returns: true },
+];
+
+const initialPhysicalWarehouses = [
+  { id: 'wh-hcm', name: 'HCM Central Warehouse', code: 'WH-HCM-01', address: '12 Nguyen Van Linh, District 7, Ho Chi Minh City', region: 'South', skus: 1240, atp: 45200, channels: ['PW', 'POS', 'S'], rank: 1, role: 'Primary' },
+  { id: 'wh-bd', name: 'Binh Duong Distribution Center', code: 'WH-BD-02', address: 'VSIP 1, Thuan An, Binh Duong', region: 'South', skus: 986, atp: 31840, channels: ['S', 'L'], rank: 2, role: 'Backup' },
+  { id: 'wh-hn', name: 'Hanoi Fulfillment Hub', code: 'WH-HN-01', address: '38 Long Bien, Hanoi', region: 'North', skus: 742, atp: 18950, channels: ['PW', 'S', 'L'], rank: 3, role: 'Regional' },
+  { id: 'br-d1', name: 'District 1 Branch', code: 'BR-D1-01', address: '84 Nguyen Hue, District 1, Ho Chi Minh City', region: 'South', skus: 318, atp: 4280, channels: ['POS'], rank: 4, role: 'Store' },
+];
+
+function BrandMark({ mark, tone }: { mark: string; tone?: string }) {
+  return <span className={cn('inline-flex h-7 min-w-8 items-center justify-center text-xs font-black tracking-[-0.06em]', tone ?? 'text-slate-600')}>{mark}</span>;
 }
 
-const EMPTY_FORM_VALUES: WarehouseFormValues = {
-  code: '',
-  name: '',
-  country: 'JP',
-  type: 'internal',
-  status: 'active',
-  capabilities: '',
-};
+function AddressIndicator({ active }: { active: boolean }) {
+  return active ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><span className="grid size-5 place-items-center rounded-full bg-emerald-50"><Check className="size-3" /></span>Default</span> : <span className="text-xs text-slate-400">Not set</span>;
+}
 
 export default function Warehouses() {
-  const { locale, t } = useI18n();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>(getWarehouses());
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [warehousePendingDelete, setWarehousePendingDelete] = useState<Warehouse | null>(null);
+  const [tab, setTab] = useState<WarehouseTab>('channel');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const isInitialLoading = useInitialLoading();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [warehouses, setWarehouses] = useState(initialPhysicalWarehouses);
+  const filteredWarehouses = useMemo(() => warehouses.filter((warehouse) => !search || `${warehouse.name} ${warehouse.code} ${warehouse.address} ${warehouse.region}`.toLowerCase().includes(search.toLowerCase())), [search, warehouses]);
 
-  const copy = {
-    added: locale === 'ja-JP' ? '倉庫を追加しました' : locale === 'vi-VN' ? 'Đã thêm nhà kho' : 'Warehouse added',
-    updated: locale === 'ja-JP' ? '倉庫を更新しました' : locale === 'vi-VN' ? 'Đã cập nhật nhà kho' : 'Warehouse updated',
-    deleted: locale === 'ja-JP' ? '倉庫を削除しました' : locale === 'vi-VN' ? 'Đã xóa nhà kho' : 'Warehouse deleted',
-    updatedDesc: locale === 'ja-JP' ? '{name} を更新しました。' : locale === 'vi-VN' ? 'Đã cập nhật {name}.' : '{name} has been updated.',
-    createdDesc: locale === 'ja-JP' ? '{name} を作成しました。' : locale === 'vi-VN' ? 'Đã tạo {name}.' : '{name} has been created.',
-    removedDesc: locale === 'ja-JP' ? '{name} を削除しました。' : locale === 'vi-VN' ? 'Đã xóa {name}.' : '{name} has been removed.',
-    visibleWarehouses: locale === 'ja-JP' ? '表示中の倉庫' : locale === 'vi-VN' ? 'Nhà kho đang hiển thị' : 'Visible Warehouses',
-    visibleMeta: locale === 'ja-JP' ? '現在の検索・フィルター結果' : locale === 'vi-VN' ? 'Theo tìm kiếm và bộ lọc hiện tại' : 'Current view after search and filters',
-    activeNodes: locale === 'ja-JP' ? '稼働ノード' : locale === 'vi-VN' ? 'Node hoạt động' : 'Active Nodes',
-    activeNodesMeta: locale === 'ja-JP' ? '現在ルーティング可能な倉庫' : locale === 'vi-VN' ? 'Kho hiện sẵn sàng cho routing' : 'Warehouses currently available for routing',
-    countryCoverage: locale === 'ja-JP' ? '対応国数' : locale === 'vi-VN' ? 'Phạm vi quốc gia' : 'Country Coverage',
-    countryCoverageMeta: locale === 'ja-JP' ? 'このビュー内の稼働国数' : locale === 'vi-VN' ? 'Số quốc gia vận hành trong màn này' : 'Distinct operating countries in this view',
-    marketplaceNodes: locale === 'ja-JP' ? 'マーケットプレイスノード' : locale === 'vi-VN' ? 'Node marketplace' : 'Marketplace Nodes',
-    marketplaceNodesMeta: locale === 'ja-JP' ? 'FBA・FBS・仮想倉庫エンドポイント' : locale === 'vi-VN' ? 'Điểm cuối FBA, FBS và kho ảo' : 'FBA, FBS, and virtual fulfillment endpoints',
-    allStatuses: locale === 'ja-JP' ? 'すべてのステータス' : locale === 'vi-VN' ? 'Tất cả trạng thái' : 'All Statuses',
-    syncing: locale === 'ja-JP' ? '同期中' : locale === 'vi-VN' ? 'Đang đồng bộ' : 'Syncing',
-    virtual: locale === 'ja-JP' ? '仮想' : locale === 'vi-VN' ? 'Ảo' : 'Virtual',
-    resultCount: locale === 'ja-JP' ? '{count} 件の倉庫を表示中' : locale === 'vi-VN' ? '{count} nhà kho trong màn hiện tại' : '{count} warehouse{suffix} in view',
-    noAddress: locale === 'ja-JP' ? '物理住所が設定されていません' : locale === 'vi-VN' ? 'Chưa cấu hình địa chỉ thực tế' : 'No physical address configured',
-    codeLabel: locale === 'ja-JP' ? 'コード' : locale === 'vi-VN' ? 'Mã' : 'Code',
-    countryLabel: locale === 'ja-JP' ? '国' : locale === 'vi-VN' ? 'Quốc gia' : 'Country',
-    nameLabel: locale === 'ja-JP' ? '名前' : locale === 'vi-VN' ? 'Tên' : 'Name',
-    warehouseName: locale === 'ja-JP' ? '倉庫名' : locale === 'vi-VN' ? 'Tên nhà kho' : 'Warehouse name',
-    statusLabel: locale === 'ja-JP' ? 'ステータス' : locale === 'vi-VN' ? 'Trạng thái' : 'Status',
-    capabilities: locale === 'ja-JP' ? '機能' : locale === 'vi-VN' ? 'Năng lực' : 'Capabilities',
-    capabilitiesHint: locale === 'ja-JP' ? 'ルーティングや運用に使う機能をカンマ区切りで入力します。' : locale === 'vi-VN' ? 'Nhập các capability bằng dấu phẩy để phục vụ routing và vận hành.' : 'Comma-separated capabilities for routing and ops.',
-    dialogDesc: locale === 'ja-JP'
-      ? '倉庫ノードの基本情報、ステータス、機能を更新します。'
-      : locale === 'vi-VN'
-        ? 'Cập nhật thông tin cơ bản, trạng thái và capability của node kho.'
-        : 'Update the warehouse node basics, status, and operating capabilities.',
-    saveChanges: locale === 'ja-JP' ? '変更を保存' : locale === 'vi-VN' ? 'Lưu thay đổi' : 'Save Changes',
-    noWarehousesConfigured: locale === 'ja-JP' ? 'まだ倉庫がありません' : locale === 'vi-VN' ? 'Chưa có nhà kho nào' : 'No warehouses configured yet',
-    noWarehousesConfiguredDesc: locale === 'ja-JP' ? '最初の倉庫を追加して、在庫とルーティングを管理しましょう。' : locale === 'vi-VN' ? 'Hãy thêm nhà kho đầu tiên để bắt đầu quản lý tồn kho và routing.' : 'Add your first warehouse to start routing and inventory coordination.',
-    noWarehousesFiltered: locale === 'ja-JP' ? 'この条件に一致する倉庫はありません' : locale === 'vi-VN' ? 'Không có nhà kho nào khớp với bộ lọc này' : 'No warehouses match this view',
-    noWarehousesFilteredDesc: locale === 'ja-JP' ? '現在の検索やフィルターをクリアしてみてください。' : locale === 'vi-VN' ? 'Hãy xóa bộ lọc hiện tại để xem thêm node kho.' : 'Clear the current filters to see more warehouse nodes.',
-    deleteTitle: locale === 'ja-JP' ? '倉庫を削除しますか？' : locale === 'vi-VN' ? 'Xóa nhà kho này?' : 'Delete warehouse?',
-    deleteDesc: locale === 'ja-JP' ? 'このデモセッションから {name} を削除します。' : locale === 'vi-VN' ? 'Thao tác này sẽ xóa {name} khỏi phiên demo hiện tại.' : 'This will remove {name} from the current demo session.',
-    deleteConfirm: locale === 'ja-JP' ? '倉庫を削除' : locale === 'vi-VN' ? 'Xóa nhà kho' : 'Delete Warehouse',
-    keepWarehouse: locale === 'ja-JP' ? '保持する' : locale === 'vi-VN' ? 'Giữ lại' : 'Keep Warehouse',
-  } as const;
+  return <div className="space-y-5 p-4 md:p-6">
+    <WorkspacePageHeader title="Warehouse Management" description="Map channel dispatch locations to physical inventory nodes and configure fulfillment priority." icon={WarehouseIcon} />
+    <nav className="flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Warehouse type">
+      {[{ key: 'channel' as const, label: 'Kho hàng của kênh bán', count: channelLocations.length }, { key: 'physical' as const, label: 'Kho vật lý', count: warehouses.length }].map((item) => <button key={item.key} type="button" onClick={() => setTab(item.key)} className={cn('relative min-h-11 shrink-0 px-4 text-sm font-semibold transition-colors', tab === item.key ? 'text-indigo-700 after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-indigo-600' : 'text-slate-500 hover:text-slate-900')}>{item.label}<span className="ml-2 text-xs tabular-nums text-slate-400">{item.count}</span></button>)}
+    </nav>
 
-  const form = useForm<WarehouseFormValues>({
-    defaultValues: EMPTY_FORM_VALUES,
-  });
+    {tab === 'channel' ? <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="border-b border-slate-200 px-4 py-3"><h2 className="text-sm font-semibold text-slate-900">Channel warehouse mapping</h2><p className="mt-1 text-xs text-slate-500">Marketplace dispatch and return locations linked to physical stock nodes.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left"><thead className="border-b border-slate-200 bg-slate-50/60"><tr>{['STORE & CHANNEL', 'CHANNEL WAREHOUSE NAME', 'LINKED PHYSICAL WAREHOUSE', 'DEFAULT PICK-UP', 'DEFAULT RETURN', 'ACTIONS'].map((header) => <th key={header} className={cn('px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500', header === 'ACTIONS' && 'text-right')}>{header}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{channelLocations.map((location) => <tr key={location.location} className="hover:bg-slate-50/60"><td className="px-4 py-3"><span className="inline-flex items-center gap-2"><BrandMark mark={location.mark} tone={location.tone} /><span className="text-sm font-semibold text-slate-900">{location.channel}</span></span></td><td className="px-4 py-3 text-sm font-medium text-slate-700">{location.location}</td><td className="px-4 py-3">{location.linked ? <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><WarehouseIcon className="size-3.5" />{location.linked}</span> : <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">⚠ Unmapped</span>}</td><td className="px-4 py-3"><AddressIndicator active={location.pickup} /></td><td className="px-4 py-3"><AddressIndicator active={location.returns} /></td><td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={() => toast({ title: 'Warehouse linker opened', description: `Select a physical node for ${location.location}.` })}><Link2 className="size-4" />Link Warehouse</Button></td></tr>)}</tbody></table></div></section> : <>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên kho, mã kho, địa chỉ hoặc vùng..." className="h-10 pl-9" /></div><Button onClick={() => setDrawerOpen(true)}><Plus className="size-4" />Thêm kho vật lý</Button></div>
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left"><thead className="border-b border-slate-200 bg-slate-50/60"><tr>{['PHYSICAL WAREHOUSE', 'FULL ADDRESS & REGION', 'INVENTORY METRICS', 'LINKED CHANNELS', 'FULFILLMENT PRIORITY', 'ACTIONS'].map((header) => <th key={header} className={cn('px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500', header === 'ACTIONS' && 'text-right')}>{header}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredWarehouses.map((warehouse) => <tr key={warehouse.id} className="hover:bg-slate-50/60"><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-indigo-50 text-indigo-600"><Building2 className="size-4" /></span><div><p className="text-sm font-semibold text-slate-900">{warehouse.name}</p><p className="mt-1 font-mono text-xs font-semibold text-slate-500">{warehouse.code}</p></div></div></td><td className="max-w-[300px] px-4 py-3"><p className="text-sm font-medium text-slate-700">{warehouse.address}</p><p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500"><MapPin className="size-3" />{warehouse.region}</p></td><td className="px-4 py-3"><p className="text-sm font-semibold tabular-nums text-slate-900">{warehouse.skus.toLocaleString()} SKUs · {warehouse.atp.toLocaleString()} items</p><p className="mt-1 text-xs text-slate-500">Available-to-promise stock</p></td><td className="px-4 py-3"><div className="flex -space-x-1">{warehouse.channels.map((mark) => <span key={mark} className="grid size-8 place-items-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-600">{mark}</span>)}</div></td><td className="px-4 py-3"><span className={cn('inline-flex rounded-md border px-2 py-1 text-xs font-semibold', warehouse.rank === 1 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600')}>#{warehouse.rank} {warehouse.role}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" className="size-9 text-indigo-700" onClick={() => setDrawerOpen(true)} aria-label={`Edit ${warehouse.name}`}><Pencil className="size-4" /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="size-9" aria-label={`More actions for ${warehouse.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem>View inventory</DropdownMenuItem><DropdownMenuItem>Manage channel links</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-rose-600">Deactivate warehouse</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div></td></tr>)}</tbody></table></div>{filteredWarehouses.length === 0 ? <div className="grid min-h-48 place-items-center border-t border-slate-100 text-center"><div><Search className="mx-auto size-5 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-900">Không tìm thấy kho phù hợp</p></div></div> : null}</section>
+    </>}
 
-  function refresh() {
-    setWarehouses(getWarehouses());
-  }
-
-  function resetFormState() {
-    setEditingId(null);
-    form.reset(EMPTY_FORM_VALUES);
-  }
-
-  function onSubmit(values: WarehouseFormValues) {
-    const capabilities = values.capabilities.split(',').map((item) => item.trim()).filter(Boolean);
-
-    if (editingId) {
-      updateWarehouse(editingId, {
-        code: values.code.toUpperCase(),
-        name: values.name,
-        country: values.country,
-        type: values.type,
-        status: values.status,
-        capabilities,
-      });
-      toast({ title: copy.updated, description: formatMessage(copy.updatedDesc, { name: values.name }) });
-    } else {
-      addWarehouse({
-        code: values.code.toUpperCase(),
-        name: values.name,
-        country: values.country,
-        type: values.type,
-        status: values.status,
-        capabilities,
-        address: null,
-        is_virtual: values.type === 'virtual',
-      });
-      toast({ title: copy.added, description: formatMessage(copy.createdDesc, { name: values.name }) });
-    }
-
-    refresh();
-    setOpen(false);
-    resetFormState();
-  }
-
-  function handleEdit(warehouse: Warehouse) {
-    setEditingId(warehouse.id);
-    form.reset({
-      code: warehouse.code,
-      name: warehouse.name,
-      country: warehouse.country,
-      type: warehouse.type,
-      status: warehouse.status,
-      capabilities: warehouse.capabilities.join(', '),
-    });
-    setOpen(true);
-  }
-
-  function handleDelete(warehouse: Warehouse) {
-    deleteWarehouse(warehouse.id);
-    refresh();
-    toast({ title: copy.deleted, description: formatMessage(copy.removedDesc, { name: warehouse.name }) });
-    setWarehousePendingDelete(null);
-  }
-
-  function applyFilters(items: Warehouse[], overrides?: {
-    search?: string;
-    status?: string;
-    type?: string;
-  }) {
-    const activeSearch = (overrides?.search ?? search).trim().toLowerCase();
-    const activeStatus = overrides?.status ?? statusFilter;
-    const activeType = overrides?.type ?? typeFilter;
-
-    return items.filter((warehouse) => {
-      const matchesSearch = !activeSearch || [
-        warehouse.code,
-        warehouse.name,
-        warehouse.country,
-        warehouse.address ?? '',
-        warehouse.type,
-        warehouse.status,
-        ...warehouse.capabilities,
-      ].some((value) => value.toLowerCase().includes(activeSearch));
-
-      const matchesStatus = !activeStatus || warehouse.status === activeStatus;
-      const matchesType = !activeType || warehouse.type === activeType;
-
-      return matchesSearch && matchesStatus && matchesType;
-    });
-  }
-
-  const filteredWarehouses = useMemo(
-    () => applyFilters(warehouses),
-    [warehouses, search, statusFilter, typeFilter],
-  );
-
-  const statusCounts = useMemo(() => ({
-    all: applyFilters(warehouses, { status: '' }).length,
-    active: applyFilters(warehouses, { status: 'active' }).length,
-    syncing: applyFilters(warehouses, { status: 'syncing' }).length,
-    inactive: applyFilters(warehouses, { status: 'inactive' }).length,
-  }), [warehouses, search, typeFilter]);
-
-  const typeCounts = useMemo(() => ({
-    internal: applyFilters(warehouses, { type: 'internal' }).length,
-    fba: applyFilters(warehouses, { type: 'fba' }).length,
-    fbs: applyFilters(warehouses, { type: 'fbs' }).length,
-    '3pl': applyFilters(warehouses, { type: '3pl' }).length,
-    virtual: applyFilters(warehouses, { type: 'virtual' }).length,
-  }), [warehouses, search, statusFilter]);
-
-  const coverageCount = new Set(filteredWarehouses.map((warehouse) => warehouse.country)).size;
-  const activeCount = filteredWarehouses.filter((warehouse) => warehouse.status === 'active').length;
-  const marketplaceNodeCount = filteredWarehouses.filter((warehouse) =>
-    warehouse.type === 'fba' || warehouse.type === 'fbs' || warehouse.type === 'virtual',
-  ).length;
-
-  const columns: Column<Warehouse>[] = [
-    {
-      header: t('warehouses.colCode'),
-      className: 'min-w-[150px]',
-      cell: (warehouse) => (
-        <div className="min-w-0">
-          <div className="font-mono text-sm font-semibold text-foreground">{warehouse.code}</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {COUNTRY_FLAGS[warehouse.country] ?? '🌐'} {warehouse.country}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: t('warehouses.colName'),
-      className: 'min-w-[250px]',
-      cell: (warehouse) => (
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-foreground">{warehouse.name}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">
-            {warehouse.address ?? copy.noAddress}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: t('warehouses.colType'),
-      className: 'min-w-[130px]',
-      cell: (warehouse) => <WarehouseTypeBadge type={warehouse.type} />,
-    },
-    {
-      header: copy.capabilities,
-      className: 'min-w-[220px]',
-      cell: (warehouse) => <WarehouseCapabilityBadges capabilities={warehouse.capabilities} />,
-    },
-    {
-      header: t('warehouses.colStatus'),
-      className: 'min-w-[120px]',
-      cell: (warehouse) => <WarehouseStatusBadge status={warehouse.status} />,
-    },
-    {
-      header: t('inventory.colUpdated'),
-      className: 'min-w-[130px]',
-      cell: (warehouse) => (
-        <span className="text-sm text-muted-foreground">
-          {formatLocalizedDate(locale, warehouse.updated_at)}
-        </span>
-      ),
-    },
-    {
-      header: t('warehouses.colActions'),
-      className: 'min-w-[110px]',
-      headerClassName: 'text-right',
-      cellClassName: 'text-right',
-      cell: (warehouse) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            aria-label={`${t('common.edit')}: ${warehouse.code}`}
-            onClick={() => handleEdit(warehouse)}
-          >
-            <Pencil className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9 text-destructive hover:text-destructive"
-            aria-label={`${t('common.delete')}: ${warehouse.code}`}
-            onClick={() => setWarehousePendingDelete(warehouse)}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8">
-      <PageHeader
-        title={t('warehouses.pageTitle')}
-        description={`${warehouses.length} · ${t('warehouses.pageDesc')}`}
-        actions={
-          <Dialog
-            open={open}
-            onOpenChange={(nextOpen) => {
-              setOpen(nextOpen);
-              if (!nextOpen) resetFormState();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => {
-                  if (!editingId) form.reset(EMPTY_FORM_VALUES);
-                }}
-              >
-                <Plus className="size-4" />
-                {t('warehouses.addWarehouse')}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[560px]">
-              <DialogHeader>
-                <DialogTitle>{editingId ? t('warehouses.editWarehouse') : t('warehouses.addWarehouse')}</DialogTitle>
-                <DialogDescription>{copy.dialogDesc}</DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{copy.codeLabel} *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. CR-JP" {...field} className="uppercase font-mono" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="country"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{copy.countryLabel}</FormLabel>
-                          <FormControl>
-                            <select {...field} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                              {COUNTRIES.map((country) => (
-                                <option key={country} value={country}>
-                                  {COUNTRY_FLAGS[country]} {country}
-                                </option>
-                              ))}
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{copy.nameLabel} *</FormLabel>
-                          <FormControl>
-                          <Input placeholder={copy.warehouseName} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('warehouses.colType')}</FormLabel>
-                          <FormControl>
-                            <select {...field} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                              <option value="internal">{t('warehouses.typeInHouse')}</option>
-                              <option value="fba">FBA (Fulfillment by Amazon)</option>
-                              <option value="fbs">FBS (Fulfillment by Shopee)</option>
-                              <option value="3pl">{t('warehouses.type3pl')}</option>
-                              <option value="virtual">{copy.virtual}</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{copy.statusLabel}</FormLabel>
-                          <FormControl>
-                            <select {...field} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                              <option value="active">{t('common.active')}</option>
-                              <option value="syncing">{copy.syncing}</option>
-                              <option value="inactive">{t('common.inactive')}</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="capabilities"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{copy.capabilities}</FormLabel>
-                        <FormControl>
-                          <Input placeholder="pick_pack, cold_storage, cross_border" {...field} />
-                        </FormControl>
-                        <p className="text-xs text-muted-foreground">{copy.capabilitiesHint}</p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                      {t('common.cancel')}
-                    </Button>
-                    <Button type="submit">
-                      {editingId ? copy.saveChanges : t('warehouses.addWarehouse')}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        }
-      />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryMetricCard
-          label={copy.visibleWarehouses}
-          value={filteredWarehouses.length}
-          meta={copy.visibleMeta}
-          icon={<WarehouseIcon className="size-4" />}
-          tone="info"
-        />
-        <SummaryMetricCard
-          label={copy.activeNodes}
-          value={activeCount}
-          meta={copy.activeNodesMeta}
-          icon={<Building2 className="size-4" />}
-          tone="success"
-        />
-        <SummaryMetricCard
-          label={copy.countryCoverage}
-          value={coverageCount}
-          meta={copy.countryCoverageMeta}
-          icon={<Globe2 className="size-4" />}
-          tone="indigo"
-        />
-        <SummaryMetricCard
-          label={copy.marketplaceNodes}
-          value={marketplaceNodeCount}
-          meta={copy.marketplaceNodesMeta}
-          icon={<Plus className="size-4" />}
-          tone="warning"
-        />
-      </div>
-
-      <FiltersBar
-        search={{
-          value: search,
-          onChange: setSearch,
-          placeholder: t('warehouses.searchPlaceholder'),
-          onClear: () => setSearch(''),
-        }}
-        primaryFilters={{
-          value: statusFilter,
-          onChange: setStatusFilter,
-          options: [
-            { value: '', label: copy.allStatuses, count: statusCounts.all },
-            { value: 'active', label: t('common.active'), count: statusCounts.active },
-            { value: 'syncing', label: copy.syncing, count: statusCounts.syncing },
-            { value: 'inactive', label: t('common.inactive'), count: statusCounts.inactive },
-          ],
-        }}
-        secondaryFilters={{
-          value: typeFilter,
-          onChange: setTypeFilter,
-          label: t('warehouses.colType'),
-          options: [
-            { value: '', label: t('warehouses.allTypes'), count: applyFilters(warehouses, { type: '' }).length },
-            { value: 'internal', label: t('warehouses.typeInHouse'), count: typeCounts.internal },
-            { value: 'fba', label: 'FBA', count: typeCounts.fba },
-            { value: 'fbs', label: 'FBS', count: typeCounts.fbs },
-            { value: '3pl', label: '3PL', count: typeCounts['3pl'] },
-            { value: 'virtual', label: copy.virtual, count: typeCounts.virtual },
-          ],
-        }}
-        resultCount={search || statusFilter || typeFilter
-          ? formatMessage(copy.resultCount, {
-              count: filteredWarehouses.length,
-              suffix: locale === 'en-US' && filteredWarehouses.length !== 1 ? 's' : '',
-            })
-          : undefined}
-        clearAll={search || statusFilter || typeFilter ? () => {
-          setSearch('');
-          setStatusFilter('');
-          setTypeFilter('');
-        } : undefined}
-      />
-
-      <DataTable
-        columns={columns}
-        data={filteredWarehouses}
-        keyExtractor={(warehouse) => warehouse.id}
-        isLoading={isInitialLoading}
-        wrapperClassName="[&_table]:min-w-[980px]"
-        emptyState={!isInitialLoading ? (
-          <EmptyState
-            title={search || statusFilter || typeFilter ? copy.noWarehousesFiltered : copy.noWarehousesConfigured}
-            description={search || statusFilter || typeFilter
-              ? copy.noWarehousesFilteredDesc
-              : copy.noWarehousesConfiguredDesc}
-            icon={<WarehouseIcon className="size-5" />}
-            variant={search || statusFilter || typeFilter ? 'filtered' : 'empty'}
-            action={search || statusFilter || typeFilter ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setSearch('');
-                  setStatusFilter('');
-                  setTypeFilter('');
-                }}
-              >
-                {t('common.clear')}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={() => {
-                  resetFormState();
-                  setOpen(true);
-                }}
-              >
-                <Plus className="size-4" />
-                {t('warehouses.addWarehouse')}
-              </Button>
-            )}
-            className="min-h-[320px]"
-          />
-        ) : undefined}
-        emptyTitle={search || statusFilter || typeFilter ? copy.noWarehousesFiltered : t('warehouses.noWarehouses')}
-        emptyDescription={search || statusFilter || typeFilter
-          ? copy.noWarehousesFilteredDesc
-          : t('warehouses.addFirstWarehouse')}
-        emptyVariant={search || statusFilter || typeFilter ? 'filtered' : 'empty'}
-      />
-
-      <ConfirmDialog
-        open={!!warehousePendingDelete}
-        onOpenChange={(openState) => {
-          if (!openState) setWarehousePendingDelete(null);
-        }}
-        title={copy.deleteTitle}
-        description={warehousePendingDelete
-          ? formatMessage(copy.deleteDesc, { name: warehousePendingDelete.name })
-          : undefined}
-        confirmText={copy.deleteConfirm}
-        cancelText={copy.keepWarehouse}
-        variant="destructive"
-        onConfirm={() => {
-          if (warehousePendingDelete) {
-            handleDelete(warehousePendingDelete);
-          }
-        }}
-      />
-    </div>
-  );
+    <WarehouseDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onCreate={(warehouse) => { setWarehouses((current) => [...current, { ...warehouse, id: `wh-${Date.now()}`, skus: 0, atp: 0, channels: [], role: warehouse.rank === 1 ? 'Primary' : 'Backup' }]); setDrawerOpen(false); toast({ title: 'Đã thêm kho vật lý', description: `${warehouse.name} đã sẵn sàng để liên kết kênh bán.` }); }} />
+  </div>;
 }
+
+function WarehouseDrawer({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (warehouse: { name: string; code: string; address: string; region: string; rank: number }) => void }) {
+  const [name, setName] = useState(''); const [code, setCode] = useState(''); const [manager, setManager] = useState(''); const [phone, setPhone] = useState(''); const [province, setProvince] = useState('Ho Chi Minh City'); const [district, setDistrict] = useState(''); const [ward, setWard] = useState(''); const [street, setStreet] = useState(''); const [zip, setZip] = useState(''); const [rank, setRank] = useState(2); const [negative, setNegative] = useState(false);
+  return <Sheet open={open} onOpenChange={(value) => !value && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl"><SheetHeader className="border-b border-slate-200 p-5"><SheetTitle>Thêm kho vật lý</SheetTitle><SheetDescription>Tạo node tồn kho và cấu hình thứ tự ưu tiên xuất hàng.</SheetDescription></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-5 pb-24"><FormSection title="Thông tin chung"><div className="grid gap-3 sm:grid-cols-2"><Field label="Tên kho" value={name} onChange={setName} placeholder="HCM Central Warehouse" /><Field label="Mã kho" value={code} onChange={setCode} placeholder="WH-HCM-01" /><Field label="Người quản lý" value={manager} onChange={setManager} placeholder="Nguyen Van A" /><Field label="Số điện thoại" value={phone} onChange={setPhone} placeholder="0901 234 567" /></div></FormSection><FormSection title="Địa chỉ đầy đủ"><div className="grid gap-3 sm:grid-cols-2"><SelectField label="Tỉnh / Thành phố" value={province} onChange={setProvince} options={['Ho Chi Minh City', 'Hanoi', 'Binh Duong', 'Da Nang']} /><Field label="Quận / Huyện" value={district} onChange={setDistrict} placeholder="District 7" /><Field label="Phường / Xã" value={ward} onChange={setWard} placeholder="Tan Phong" /><Field label="Mã bưu chính" value={zip} onChange={setZip} placeholder="700000" /><div className="sm:col-span-2"><Field label="Số nhà, tên đường" value={street} onChange={setStreet} placeholder="12 Nguyen Van Linh" /></div></div></FormSection><FormSection title="Cấu hình fulfillment"><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Ưu tiên xuất hàng<select value={rank} onChange={(event) => setRank(Number(event.target.value))} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value={1}>#1 Primary</option><option value={2}>#2 Backup</option><option value={3}>#3 Regional</option><option value={4}>#4 Store</option></select></label><label className="flex min-h-10 items-center gap-3 self-end rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700"><input type="checkbox" checked={negative} onChange={(event) => setNegative(event.target.checked)} className="size-4" />Cho phép tồn kho âm</label></div><p className="mt-2 text-xs text-slate-500">Negative stock is currently {negative ? 'enabled' : 'disabled'}.</p></FormSection></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Hủy</Button><Button disabled={!name || !code || !street} onClick={() => onCreate({ name, code: code.toUpperCase(), address: `${street}, ${ward}, ${district}, ${province} ${zip}`.replace(/, ,/g, ','), region: province === 'Hanoi' ? 'North' : province === 'Da Nang' ? 'Central' : 'South', rank })}>Tạo kho vật lý</Button></div></SheetContent></Sheet>;
+}
+
+function FormSection({ title, children }: { title: string; children: ReactNode }) { return <section className="rounded-xl border border-slate-200 p-4"><h3 className="mb-3 text-sm font-semibold text-slate-900">{title}</h3>{children}</section>; }
+function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) { return <label className="grid gap-1.5 text-xs font-semibold text-slate-600">{label}<Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 text-sm" /></label>; }
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) { return <label className="grid gap-1.5 text-xs font-semibold text-slate-600">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select></label>; }

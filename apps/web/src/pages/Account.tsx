@@ -319,10 +319,10 @@ export default function Account() {
       });
       setAccount(response.data);
       setDisplayName(response.data.principal.display_name);
-      toast({ title: 'Đã cập nhật hồ sơ', description: 'Tên hiển thị đã được lưu trong Account Center.' });
+      toast({ title: 'Profile updated', description: 'The display name has been saved in Account Center.' });
       void loadAccount();
     } catch (saveError) {
-      toast({ variant: 'destructive', title: 'Không thể lưu hồ sơ', description: saveError instanceof Error ? saveError.message : 'Vui lòng thử lại.' });
+      toast({ variant: 'destructive', title: 'Unable to save profile', description: saveError instanceof Error ? saveError.message : 'Please try again.' });
     } finally {
       setSaving(false);
     }
@@ -338,10 +338,10 @@ export default function Account() {
         body: JSON.stringify({ email: inviteEmail.trim(), role_key: inviteRole }),
       });
       setInviteEmail('');
-      toast({ title: 'Đã tạo lời mời', description: 'Member mới đã được thêm vào hàng đợi invitation.' });
+      toast({ title: 'Invitation created', description: 'The new member has been added to the invitation queue.' });
       void loadAccount();
     } catch (inviteError) {
-      toast({ variant: 'destructive', title: 'Không thể mời thành viên', description: inviteError instanceof Error ? inviteError.message : 'Vui lòng thử lại.' });
+      toast({ variant: 'destructive', title: 'Unable to invite member', description: inviteError instanceof Error ? inviteError.message : 'Please try again.' });
     } finally {
       setInviting(false);
     }
@@ -351,10 +351,10 @@ export default function Account() {
     setActionId(`${membershipId}:${action}`);
     try {
       await request(`/api/v1/workspace-members/${membershipId}/${action}`, { method: 'POST' });
-      toast({ title: action === 'deactivate' ? 'Đã vô hiệu hóa thành viên' : 'Đã kích hoạt lại thành viên' });
+      toast({ title: action === 'deactivate' ? 'Member deactivated' : 'Member reactivated' });
       void loadAccount();
     } catch (memberError) {
-      toast({ variant: 'destructive', title: 'Không thể cập nhật thành viên', description: memberError instanceof Error ? memberError.message : 'Vui lòng thử lại.' });
+      toast({ variant: 'destructive', title: 'Unable to update member', description: memberError instanceof Error ? memberError.message : 'Please try again.' });
     } finally {
       setActionId(null);
     }

@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { seedDemoData } from '@/lib/demo-data-seeder';
-import { LanguageToggle } from '@/components/common/LanguageToggle';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { getAuthDictionary } from '@/lib/i18n/shell-dictionaries';
 
@@ -81,8 +80,8 @@ export default function Auth() {
         <section className="hidden border-r border-border bg-muted/35 p-8 lg:flex lg:flex-col lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-white p-1 shadow-sm">
-                <img src="/primeos-mark.png" alt="Prime OS" className="h-full w-full object-contain" />
+              <span className="grid h-12 w-28 shrink-0 place-items-center overflow-hidden rounded-lg bg-white px-2 shadow-sm">
+                <img src="/product-logo.png" alt="Unifi Business" className="h-full w-full object-contain" />
               </span>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
@@ -116,16 +115,10 @@ export default function Auth() {
         <section className="px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10" aria-labelledby="primeos-auth-title">
           <div className="mb-10 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 lg:hidden">
-              <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-white p-1 shadow-sm">
-                <img src="/primeos-mark.png" alt="Prime OS" className="h-full w-full object-contain" />
+              <span className="grid h-11 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white px-2 shadow-sm">
+                <img src="/product-logo.png" alt="Unifi Business" className="h-full w-full object-contain" />
               </span>
               <span className="font-display text-lg font-semibold text-foreground">{authCopy.brandTitle}</span>
-            </div>
-            <div className="ml-auto flex items-center gap-3">
-              <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
-                {authCopy.languageSwitcherLabel}
-              </span>
-              <LanguageToggle compact />
             </div>
           </div>
 

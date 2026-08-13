@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, type Dispatch } from 'react';
-import { DEFAULT_LOCALE, type Locale, type Dictionary, dictionaries, isSupportedLocale } from './dictionaries';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, type Dispatch } from 'react';
+import { DEFAULT_LOCALE, type Locale, type Dictionary, dictionaries } from './dictionaries';
 
 // eslint-disable-next-line no-unused-vars
 type Translate = (key: string) => string;
@@ -12,19 +12,6 @@ interface I18nContextType {
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
-
-function readStoredLocale(): Locale {
-    try {
-        if (typeof localStorage === 'undefined') {
-            return DEFAULT_LOCALE;
-        }
-
-        const stored = localStorage.getItem('ech.locale');
-        return isSupportedLocale(stored) ? stored : DEFAULT_LOCALE;
-    } catch {
-        return DEFAULT_LOCALE;
-    }
-}
 
 function resolveTranslation(dict: Dictionary, key: string): string | undefined {
     const keys = key.split('.');
@@ -42,19 +29,20 @@ function resolveTranslation(dict: Dictionary, key: string): string | undefined {
 }
 
 export const I18nProvider = ({ children }: { children: ReactNode }) => {
-    const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
+    const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
     useEffect(() => {
-        setLocaleState(readStoredLocale());
+        document.documentElement.lang = 'en';
+        try {
+            localStorage.removeItem('ech.locale');
+        } catch {
+            // Local storage can be unavailable in privacy-restricted browsers.
+        }
     }, []);
 
-    const setLocale = useCallback((l: Locale) => {
-        setLocaleState(l);
-        try {
-            localStorage.setItem('ech.locale', l);
-        } catch {
-            // ignores localStorage errors
-        }
+    const setLocale = useCallback((nextLocale: Locale) => {
+        setLocaleState(nextLocale);
+        document.documentElement.lang = nextLocale.split('-')[0];
     }, []);
 
     const t = useCallback((key: string): string => {

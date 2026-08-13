@@ -1,4 +1,4 @@
-import { Bot, Trash2 } from 'lucide-react';
+import { Bot, X } from 'lucide-react';
 import type { CopilotContextSummary, CopilotQuickPrompt, CopilotTelemetry, GlobalCopilotMessage } from './types';
 import { Button } from '@/components/ui/button';
 import { GlobalCopilotQuickPrompts } from './GlobalCopilotQuickPrompts';
@@ -13,7 +13,7 @@ interface GlobalCopilotSurfaceProps {
   telemetry?: CopilotTelemetry;
   onPromptSelect: (prompt: string) => void;
   onSend: (message: string) => void;
-  onClear: () => void;
+  onClose: () => void;
 }
 
 export function GlobalCopilotSurface({
@@ -24,7 +24,7 @@ export function GlobalCopilotSurface({
   telemetry,
   onPromptSelect,
   onSend,
-  onClear,
+  onClose,
 }: GlobalCopilotSurfaceProps) {
   const isAccountContext = context.title === 'Account Center';
   const isOperatingHomeContext = context.title === 'Operating Home';
@@ -67,11 +67,11 @@ export function GlobalCopilotSurface({
               variant="ghost"
               size="icon"
               className="size-9"
-              onClick={onClear}
-              aria-label="Clear Prime AI conversation"
-              title="Clear Prime AI conversation"
+              onClick={onClose}
+              aria-label="Close Prime AI"
+              title="Close Prime AI"
             >
-              <Trash2 className="size-4" />
+              <X className="size-4" />
             </Button>
           </div>
         </div>

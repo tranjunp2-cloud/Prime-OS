@@ -63,10 +63,38 @@ import {
 } from './crm-chat.js';
 import { start as startWorkerQueue, stop as stopWorkerQueue, getStats as getWorkerQueueStats, getDeadLetters, requeueDeadLetter, drainDeadLetters } from './worker-queue.js';
 import { startCredentialHealthMonitor, stopCredentialHealthMonitor, getAllConnectorHealth, getCredentialHealthStats } from './credential-health-monitor.js';
+import {
+  bulkDeleteScheduledTasks,
+  bulkToggleScheduledTasks,
+  createScheduledTask,
+  deleteScheduledTask,
+  getScheduledTask,
+  listScheduledTasks,
+  listTaskExecutionLogs,
+  runScheduledTaskNow,
+  scheduledTaskTemplates,
+  startScheduledTaskScheduler,
+  toggleScheduledTask,
+  updateScheduledTask,
+} from './scheduled-tasks.js';
+import {
+  assignReceivableOwner,
+  confirmReceivablePayment,
+  flagReceivableDispute,
+  getFinanceForecast,
+  getFinanceOpsSummary,
+  getReceivable,
+  listFinanceRisks,
+  listReceivables,
+  resolveFinanceRisk,
+  sendPaymentReminder,
+  updateFinanceTarget,
+} from './finance-ops.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
 const demoCredentialsEnabled = process.env.PRIME_ALLOW_DEMO_CREDENTIALS === 'true';
+const dockerDemoTrafficEnabled = process.env.PRIME_ALLOW_DOCKER_DEMO_TRAFFIC === 'true';
 const host = process.env.HOST || (demoCredentialsEnabled ? '127.0.0.1' : '0.0.0.0');
 const configuredAllowedOrigins = String(process.env.PRIME_ALLOWED_ORIGINS || '')
   .split(',')
@@ -297,8 +325,20 @@ function isLoopbackAddress(address) {
   return normalized === '127.0.0.1' || normalized === '::1' || normalized === 'localhost';
 }
 
+function isPrivateContainerAddress(address) {
+  const normalized = String(address || '').replace(/^::ffff:/, '');
+  return /^10\./.test(normalized)
+    || /^192\.168\./.test(normalized)
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(normalized);
+}
+
 function rejectRemoteDemoTraffic(request, response, next) {
-  if (!demoCredentialsEnabled || isLoopbackAddress(getClientAddress(request))) {
+  const clientAddress = getClientAddress(request);
+  if (
+    !demoCredentialsEnabled
+    || isLoopbackAddress(clientAddress)
+    || (dockerDemoTrafficEnabled && isPrivateContainerAddress(clientAddress))
+  ) {
     next();
     return;
   }
@@ -1003,6 +1043,183 @@ app.get('/api/admin/worker-queue', async (request, response) => {
   });
 });
 
+function requireScheduledTaskWrite(request, response) {
+  const session = buildSession(request.primeAccount);
+  if (!session.canWrite) {
+    response.status(403).json({ message: `${session.roleLabel} cannot modify scheduled tasks.` });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/v1/scheduled-tasks/templates', (_request, response) => {
+  response.json({ data: scheduledTaskTemplates });
+});
+
+app.get('/api/v1/scheduled-tasks', (request, response) => {
+  response.json(listScheduledTasks({
+    status: request.query.status,
+    search: request.query.search,
+    page: request.query.page,
+    page_size: request.query.page_size,
+  }));
+});
+
+app.post('/api/v1/scheduled-tasks/bulk-delete', (request, response) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  const deleted = bulkDeleteScheduledTasks(request.body?.ids);
+  response.json({ ok: true, deleted });
+});
+
+app.post('/api/v1/scheduled-tasks/bulk-toggle-status', (request, response) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  const updated = bulkToggleScheduledTasks(request.body?.ids, request.body?.status);
+  response.json({ ok: true, updated });
+});
+
+app.post('/api/v1/scheduled-tasks', (request, response, next) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  try {
+    response.status(201).json({ data: createScheduledTask(request.body ?? {}) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/scheduled-tasks/:id/logs', (request, response) => {
+  const task = getScheduledTask(request.params.id);
+  if (!task) {
+    response.status(404).json({ message: 'Scheduled task not found.' });
+    return;
+  }
+  response.json(listTaskExecutionLogs(request.params.id, request.query));
+});
+
+app.post('/api/v1/scheduled-tasks/:id/toggle-status', (request, response, next) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  try {
+    const task = toggleScheduledTask(request.params.id, request.body?.status);
+    if (!task) return response.status(404).json({ message: 'Scheduled task not found.' });
+    response.json({ data: task });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/v1/scheduled-tasks/:id/run-now', (request, response) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  const queued = runScheduledTaskNow(request.params.id);
+  if (!queued) return response.status(404).json({ message: 'Scheduled task not found.' });
+  response.status(202).json({ data: queued });
+});
+
+app.get('/api/v1/scheduled-tasks/:id', (request, response) => {
+  const task = getScheduledTask(request.params.id);
+  if (!task) return response.status(404).json({ message: 'Scheduled task not found.' });
+  response.json({ data: task });
+});
+
+app.put('/api/v1/scheduled-tasks/:id', (request, response, next) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  try {
+    const task = updateScheduledTask(request.params.id, request.body ?? {});
+    if (!task) return response.status(404).json({ message: 'Scheduled task not found.' });
+    response.json({ data: task });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/v1/scheduled-tasks/:id', (request, response) => {
+  if (!requireScheduledTaskWrite(request, response)) return;
+  const task = deleteScheduledTask(request.params.id);
+  if (!task) return response.status(404).json({ message: 'Scheduled task not found.' });
+  response.json({ ok: true, removed: task });
+});
+
+function requireFinanceOpsWrite(request, response) {
+  const session = buildSession(request.primeAccount);
+  if (!session.canWrite) {
+    response.status(403).json({ message: `${session.roleLabel} cannot modify Finance Ops.` });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/v1/finance/ops/summary', (_request, response) => {
+  response.json({ data: getFinanceOpsSummary() });
+});
+
+app.get('/api/v1/finance/ops/receivables', (request, response) => {
+  response.json(listReceivables(request.query));
+});
+
+app.get('/api/v1/finance/ops/receivables/:id', (request, response) => {
+  const item = getReceivable(request.params.id);
+  if (!item) return response.status(404).json({ message: 'Receivable item not found.' });
+  response.json({ data: item });
+});
+
+app.post('/api/v1/finance/ops/receivables/:id/send-reminder', (request, response) => {
+  if (!requireFinanceOpsWrite(request, response)) return;
+  const item = sendPaymentReminder(request.params.id, request.body?.channel);
+  if (!item) return response.status(404).json({ message: 'Receivable item not found.' });
+  response.json({ data: item });
+});
+
+app.post('/api/v1/finance/ops/receivables/:id/assign-owner', (request, response, next) => {
+  if (!requireFinanceOpsWrite(request, response)) return;
+  try {
+    const item = assignReceivableOwner(request.params.id, request.body?.owner_id);
+    if (!item) return response.status(404).json({ message: 'Receivable item not found.' });
+    response.json({ data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/v1/finance/ops/receivables/:id/confirm-payment', (request, response) => {
+  if (!requireFinanceOpsWrite(request, response)) return;
+  const result = confirmReceivablePayment(request.params.id, request.body?.payment_proof || null);
+  if (!result) return response.status(404).json({ message: 'Receivable item not found.' });
+  response.json({ data: result.receivable, sync_event: result.sync_event });
+});
+
+app.post('/api/v1/finance/ops/receivables/:id/flag-dispute', (request, response) => {
+  if (!requireFinanceOpsWrite(request, response)) return;
+  const item = flagReceivableDispute(request.params.id, request.body?.reason);
+  if (!item) return response.status(404).json({ message: 'Receivable item not found.' });
+  response.json({ data: item });
+});
+
+app.get('/api/v1/finance/ops/forecast', (_request, response) => {
+  response.json({ data: getFinanceForecast() });
+});
+
+app.put('/api/v1/finance/ops/target', (request, response, next) => {
+  if (!requireFinanceOpsWrite(request, response)) return;
+  try {
+    response.json({ data: updateFinanceTarget({ ...request.body, created_by: request.primeAccount?.id }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/finance/ops/risks', (request, response) => {
+  response.json(listFinanceRisks(request.query));
+});
+
+app.post('/api/v1/finance/ops/risks/:id/resolve', (request, response, next) => {
+  if (!requireFinanceOpsWrite(request, response)) return;
+  try {
+    const item = resolveFinanceRisk(request.params.id, request.body?.status || 'RESOLVED');
+    if (!item) return response.status(404).json({ message: 'Finance risk not found.' });
+    response.json({ data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/worker-queue/dead-letters/requeue', async (request, response) => {
   const session = buildSession(request.primeAccount);
   if (!session.canReset) {
@@ -1121,6 +1338,7 @@ if (process.env.NODE_ENV !== 'test') {
 
     startWorkerQueue();
     startCredentialHealthMonitor();
+    startScheduledTaskScheduler();
 
     // Auto-start Telegram polling for any persisted connected connectors
     try {

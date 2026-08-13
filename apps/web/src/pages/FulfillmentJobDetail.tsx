@@ -383,7 +383,7 @@ export default function FulfillmentJobDetail() {
         description={copy.notFoundDescription}
         icon={<Package />}
         variant="unavailable"
-        className="mx-6 mt-6 max-w-5xl lg:mx-8"
+        className="mx-6 mt-6 lg:mx-8"
         action={(
           <Button variant="outline" onClick={goBack}>
             {formatMessage(copy.backTo, { label: backLabel })}

@@ -1,4 +1,4 @@
-import { Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/theme-provider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import ThemeSwitch from '@/components/ui/theme-switch';
@@ -17,6 +17,7 @@ const THEME_OPTIONS: Array<{
 }> = [
   { value: 'light', icon: Sun },
   { value: 'dark', icon: Moon },
+  { value: 'system', icon: Monitor },
 ];
 
 export function ThemeModeSwitcher({ compact = false, className }: ThemeModeSwitcherProps) {
@@ -25,6 +26,7 @@ export function ThemeModeSwitcher({ compact = false, className }: ThemeModeSwitc
   const themeLabels = {
     light: t('sidebar.lightMode'),
     dark: t('sidebar.darkMode'),
+    system: 'System',
   } as const;
 
   if (compact) {

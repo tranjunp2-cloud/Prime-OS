@@ -781,7 +781,7 @@ function FoundationShell({ activeView, children }: { activeView: FoundationView;
 
   return (
     <div className="-m-4 min-h-[calc(100vh-70px)] bg-background px-4 py-5 md:-m-6 md:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="w-full space-y-6">
         <div className="surface-toolbar flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/70 px-4 py-3 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -969,7 +969,7 @@ function CreateFoundationScreen() {
 
   if (!selectedFlow || !activeSection) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="w-full space-y-6">
         {referenceProfile ? <ReferenceContextStrip profile={referenceProfile} copy={copy} /> : null}
         <div className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm md:p-6">
           <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">{copy.create.badge}</Badge>
@@ -1019,7 +1019,7 @@ function CreateFoundationScreen() {
   const ActiveIcon = activeSection.icon ?? Sparkles;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       {referenceProfile ? <ReferenceContextStrip profile={referenceProfile} copy={copy} /> : null}
       <div className="surface-solid rounded-lg border border-border/70 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">

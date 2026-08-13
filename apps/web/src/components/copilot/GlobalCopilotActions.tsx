@@ -30,13 +30,13 @@ export function GlobalCopilotActions({ actions }: GlobalCopilotActionsProps) {
             setCopiedValue(action.value);
             toast({
               title: 'Copied',
-              description: action.description ?? 'Đã copy nội dung từ assistant.',
+              description: action.description ?? 'Content copied from Prime AI.',
             });
             setTimeout(() => setCopiedValue(null), 2000);
           } catch {
             toast({
               title: 'Copy failed',
-              description: 'Không thể copy nội dung. Bạn thử lại giúp mình nhé.',
+              description: 'Unable to copy the content. Please try again.',
               variant: 'destructive',
             });
           }

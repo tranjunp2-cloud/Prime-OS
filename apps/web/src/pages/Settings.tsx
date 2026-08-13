@@ -1,6 +1,5 @@
 import { PageHeader } from '@/components/system/PageHeader';
 import { ThemeModeSwitcher } from '@/components/system/ThemeModeSwitcher';
-import { LanguageToggle } from '@/components/common/LanguageToggle';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Database, Boxes, Package, ShoppingCart, Truck, MonitorCog, Sparkles } from 'lucide-react';
@@ -53,16 +52,6 @@ export default function Settings() {
               {t('settings.lightModeHint')}
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="surface-solid">
-        <CardHeader>
-          <CardTitle className="text-base">{t('settings.languageTitle')}</CardTitle>
-          <CardDescription>{t('settings.languageDesc')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <LanguageToggle />
         </CardContent>
       </Card>
 

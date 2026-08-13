@@ -1,404 +1,82 @@
-import {
-  AlertTriangle,
-  Building2,
-  CalendarDays,
-  CheckCircle2,
-  CircleDollarSign,
-  Clock3,
-  Download,
-  FileText,
-  Mail,
-  Megaphone,
-  Send,
-  ShoppingCart,
-  UsersRound,
-  type LucideIcon,
-} from 'lucide-react';
-
-import { Badge } from '@/components/ui/badge';
+import { useMemo, useState } from 'react';
+import { BarChart3, Box, CalendarDays, ChevronDown, CircleDollarSign, Download, PackageCheck, Search, ShoppingBag, Truck, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { cn } from '@/lib/utils';
 
-type ReportStatus = 'ready' | 'scheduled' | 'needs_data' | 'draft';
-type ReportTone = 'success' | 'warning' | 'primary' | 'muted';
+type MetricKey = 'revenue' | 'orders' | 'products' | 'retention' | 'shipping';
+type DimensionKey = 'store' | 'product' | 'region' | 'customer';
 
-type ClientReport = {
-  id: string;
-  client: string;
-  market: string;
-  report: string;
-  period: string;
-  status: ReportStatus;
-  owner: string;
-  delivery: string;
-  sections: string[];
-  nextAction: string;
+const metrics: Array<{ key: MetricKey; label: string; value: string; detail: string; icon: typeof BarChart3 }> = [
+  { key: 'revenue', label: 'Total Revenue', value: '₫4.82B', detail: '+18.4% vs previous period', icon: CircleDollarSign },
+  { key: 'orders', label: 'Total Orders', value: '12,480', detail: '+12.6% vs previous period', icon: ShoppingBag },
+  { key: 'products', label: 'Total Products Sold', value: '18,942', detail: '+9.2% vs previous period', icon: PackageCheck },
+  { key: 'retention', label: 'Repeat Purchase Rate', value: '38.6%', detail: '+4.1 pts vs previous period', icon: UsersRound },
+  { key: 'shipping', label: 'Avg Shipping Cost', value: '₫31,400', detail: '-5.3% vs previous period', icon: Truck },
+];
+
+const chartData: Record<MetricKey, number[]> = {
+  revenue: [38, 44, 42, 55, 51, 64, 61, 72, 68, 80, 77, 89],
+  orders: [26, 34, 31, 43, 46, 52, 49, 61, 65, 69, 75, 82],
+  products: [32, 37, 35, 48, 44, 59, 57, 66, 62, 74, 81, 86],
+  retention: [42, 43, 45, 44, 47, 49, 50, 53, 54, 56, 57, 60],
+  shipping: [76, 72, 74, 68, 66, 63, 65, 59, 57, 55, 52, 49],
 };
 
-type ReportTemplate = {
-  id: string;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-  cadence: string;
-  sections: string[];
+const distributions = [
+  { title: 'Order Cancellation Reasons', subtitle: 'Reasons & initiators', items: [{ label: 'Customer request', value: 38, color: '#635bff' }, { label: 'Out of stock', value: 27, color: '#818cf8' }, { label: 'Payment failed', value: 21, color: '#38bdf8' }, { label: 'Seller initiated', value: 14, color: '#cbd5e1' }] },
+  { title: 'Top 5 Regions by Revenue', subtitle: 'Province contribution', items: [{ label: 'Ho Chi Minh City', value: 31, color: '#635bff' }, { label: 'Hanoi', value: 26, color: '#818cf8' }, { label: 'Da Nang', value: 17, color: '#38bdf8' }, { label: 'Binh Duong', value: 14, color: '#10b981' }, { label: 'Dong Nai', value: 12, color: '#f59e0b' }] },
+  { title: 'Shipping Carrier Breakdown', subtitle: 'Delivered order share', items: [{ label: 'GHN', value: 44, color: '#635bff' }, { label: 'GHTK', value: 34, color: '#38bdf8' }, { label: 'ViettelPost', value: 22, color: '#10b981' }] },
+];
+
+const tableConfigs: Record<DimensionKey, { label: string; columns: string[]; rows: string[][] }> = {
+  store: { label: 'By Store / Channel', columns: ['Store Name', 'Total Orders', 'Gross Revenue', 'Net Revenue', 'Avg Order Value', 'Total Customers'], rows: [['Shopee Flagship', '4,820', '₫1.92B', '₫1.74B', '₫398K', '3,406'], ['TikTok Shop VN', '3,150', '₫1.24B', '₫1.13B', '₫394K', '2,688'], ['Prime Web', '2,340', '₫920M', '₫868M', '₫393K', '1,976'], ['Prime POS', '1,420', '₫510M', '₫488M', '₫359K', '1,086'], ['Lazada Official', '750', '₫230M', '₫212M', '₫307K', '642']] },
+  product: { label: 'By Product', columns: ['Product Name', 'Channel', 'Revenue', 'Units Sold', 'Orders', 'Return Rate %', 'Repeat Rate %'], rows: [['HydraGlow Essence 30ml', 'All channels', '₫684M', '1,842', '1,610', '2.1%', '42.8%'], ['Daily Barrier Cream', 'Shopee', '₫492M', '1,316', '1,108', '1.8%', '38.4%'], ['Vitamin C Brightening Set', 'TikTok Shop', '₫417M', '984', '876', '3.2%', '31.6%'], ['Hydrating Mask 5-pack', 'Prime Web', '₫318M', '1,219', '940', '1.4%', '45.2%']] },
+  region: { label: 'By Region', columns: ['Province', 'Revenue', 'Total Orders', 'Delivered', 'Canceled', 'Returned', 'Avg Ship Fee'], rows: [['Ho Chi Minh City', '₫1.49B', '3,868', '3,612', '151', '105', '₫24,800'], ['Hanoi', '₫1.25B', '3,214', '2,984', '142', '88', '₫27,400'], ['Da Nang', '₫819M', '2,106', '1,928', '112', '66', '₫31,200'], ['Binh Duong', '₫675M', '1,742', '1,608', '79', '55', '₫22,600']] },
+  customer: { label: 'By Customer Segment', columns: ['Store', 'Total Customers', 'New Customers', 'New Revenue', 'Repeat Customers', 'Repeat Revenue'], rows: [['Shopee Flagship', '3,406', '2,108', '₫982M', '1,298', '₫758M'], ['TikTok Shop VN', '2,688', '1,902', '₫804M', '786', '₫326M'], ['Prime Web', '1,976', '1,024', '₫448M', '952', '₫420M'], ['Prime POS', '1,086', '694', '₫298M', '392', '₫190M']] },
 };
 
-const statusMeta: Record<ReportStatus, { label: string; className: string; icon: LucideIcon }> = {
-  ready: {
-    label: 'Ready',
-    className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    icon: CheckCircle2,
-  },
-  scheduled: {
-    label: 'Scheduled',
-    className: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
-    icon: CalendarDays,
-  },
-  needs_data: {
-    label: 'Needs data',
-    className: 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300',
-    icon: AlertTriangle,
-  },
-  draft: {
-    label: 'Draft',
-    className: 'border-border bg-muted text-muted-foreground',
-    icon: Clock3,
-  },
-};
+function Donut({ items }: { items: Array<{ label: string; value: number; color: string }> }) {
+  let cursor = 0;
+  const stops = items.map((item) => { const start = cursor; cursor += item.value; return `${item.color} ${start}% ${cursor}%`; }).join(', ');
+  return <div className="grid gap-5 sm:grid-cols-[140px_minmax(0,1fr)] sm:items-center"><div className="mx-auto grid size-32 place-items-center rounded-full" style={{ background: `conic-gradient(${stops})` }}><div className="grid size-20 place-items-center rounded-full bg-white text-sm font-semibold text-slate-700">100%</div></div><div className="grid gap-2">{items.map((item) => <div key={item.label} className="flex items-center gap-2 text-xs"><span className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} /><span className="min-w-0 flex-1 truncate font-medium text-slate-600">{item.label}</span><span className="font-semibold text-slate-900">{item.value}%</span></div>)}</div></div>;
+}
 
-const toneClass: Record<ReportTone, string> = {
-  success: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  warning: 'border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-300',
-  primary: 'border-primary/25 bg-primary/10 text-primary',
-  muted: 'border-border bg-card text-foreground',
-};
-
-const metricCards = [
-  { label: 'Clients covered', value: '08', detail: 'Reporting workspaces', icon: UsersRound, tone: 'primary' as ReportTone },
-  { label: 'Ready to send', value: '05', detail: 'Awaiting client delivery', icon: Send, tone: 'success' as ReportTone },
-  { label: 'Needs source data', value: '02', detail: 'Connector or spend gap', icon: AlertTriangle, tone: 'warning' as ReportTone },
-  { label: 'Scheduled reports', value: '12', detail: 'Weekly and monthly runs', icon: CalendarDays, tone: 'muted' as ReportTone },
-];
-
-const clientReports: ClientReport[] = [
-  {
-    id: 'cr_001',
-    client: 'Nordic Desk JP',
-    market: 'Japan',
-    report: 'Monthly Business Review',
-    period: 'Jul 2026',
-    status: 'ready',
-    owner: 'Admatik Ops',
-    delivery: 'Email + portal',
-    sections: ['GMV', 'orders', 'marketplace health', 'next actions'],
-    nextAction: 'Send to client owner',
-  },
-  {
-    id: 'cr_002',
-    client: 'Venus Beauty SEA',
-    market: 'SEA',
-    report: 'Campaign Recap',
-    period: 'Wk 31',
-    status: 'scheduled',
-    owner: 'Growth Team',
-    delivery: 'Friday 09:00',
-    sections: ['ad spend', 'lead quality', 'booking conversion'],
-    nextAction: 'Wait for scheduled send',
-  },
-  {
-    id: 'cr_003',
-    client: 'Atelier Coffee VN',
-    market: 'Vietnam',
-    report: 'Marketplace Operations',
-    period: 'Jul 2026',
-    status: 'needs_data',
-    owner: 'Connector Ops',
-    delivery: 'Manual review',
-    sections: ['Shopee', 'TikTok Shop', 'listing blockers'],
-    nextAction: 'Reconnect TikTok Shop spend',
-  },
-  {
-    id: 'cr_004',
-    client: 'Prime Studio Services',
-    market: 'Vietnam',
-    report: 'Service Booking Report',
-    period: 'Jul 2026',
-    status: 'draft',
-    owner: 'Service Team',
-    delivery: 'Client portal',
-    sections: ['booking sources', 'lead conversion', 'rebooking'],
-    nextAction: 'Generate final summary',
-  },
-];
-
-const reportTemplates: ReportTemplate[] = [
-  {
-    id: 'tpl_mbr',
-    title: 'Monthly Business Review',
-    description: 'Client-facing summary for revenue, orders, lead conversion, channel health, and recommended next actions.',
-    icon: FileText,
-    cadence: 'Monthly',
-    sections: ['Executive summary', 'Revenue movement', 'Channel health', 'Action plan'],
-  },
-  {
-    id: 'tpl_campaign',
-    title: 'Campaign Recap',
-    description: 'Shows which campaign created leads, customers, bookings, and revenue so Admatik can prove impact.',
-    icon: Megaphone,
-    cadence: 'Weekly or campaign end',
-    sections: ['Spend', 'Lead quality', 'Conversion', 'Scale decision'],
-  },
-  {
-    id: 'tpl_marketplace',
-    title: 'Marketplace Operations',
-    description: 'Turns connector, listing, order, and fulfillment signals into a client-ready marketplace status report.',
-    icon: ShoppingCart,
-    cadence: 'Weekly',
-    sections: ['Marketplace status', 'Order issues', 'Listing blockers', 'Sync health'],
-  },
-  {
-    id: 'tpl_finance',
-    title: 'Revenue Evidence Pack',
-    description: 'Packages settlements, refunds, invoices, and marketplace proof for owner or finance review.',
-    icon: CircleDollarSign,
-    cadence: 'Monthly',
-    sections: ['Settlements', 'Refunds', 'Invoices', 'Evidence gaps'],
-  },
-];
-
-const scheduledDeliveries = [
-  { client: 'Nordic Desk JP', report: 'Monthly Business Review', time: 'Today 16:00', channel: 'Email', status: 'Ready' },
-  { client: 'Venus Beauty SEA', report: 'Campaign Recap', time: 'Fri 09:00', channel: 'Portal', status: 'Scheduled' },
-  { client: 'Atelier Coffee VN', report: 'Marketplace Operations', time: 'Blocked', channel: 'Manual', status: 'Needs data' },
-  { client: 'Prime Studio Services', report: 'Service Booking Report', time: 'Tomorrow 10:30', channel: 'Portal', status: 'Draft' },
-];
-
-const clientCoverage = [
-  { client: 'Nordic Desk JP', dataCoverage: 96, lastGenerated: 'Today 11:45', reports: '4 active', issue: 'None' },
-  { client: 'Venus Beauty SEA', dataCoverage: 91, lastGenerated: 'Today 09:20', reports: '3 active', issue: 'None' },
-  { client: 'Atelier Coffee VN', dataCoverage: 74, lastGenerated: 'Yesterday 17:10', reports: '2 active', issue: 'Ad spend gap' },
-  { client: 'Prime Studio Services', dataCoverage: 82, lastGenerated: 'Yesterday 14:35', reports: '2 active', issue: 'Draft approval' },
-];
-
-function StatusBadge({ status }: { status: ReportStatus }) {
-  const meta = statusMeta[status];
-  const Icon = meta.icon;
-
-  return (
-    <Badge variant="outline" className={cn('gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold', meta.className)}>
-      <Icon className="size-3" />
-      {meta.label}
-    </Badge>
-  );
+function TrendChart({ metric }: { metric: MetricKey }) {
+  const values = chartData[metric];
+  const points = values.map((value, index) => `${32 + index * 82},${205 - value * 1.65}`).join(' ');
+  return <svg viewBox="0 0 960 230" className="h-[260px] w-full" role="img" aria-label={`${metrics.find((item) => item.key === metric)?.label} trend chart`}>
+    {[35, 75, 115, 155, 195].map((y) => <line key={y} x1="26" x2="934" y1={y} y2={y} stroke="#e2e8f0" />)}
+    <polyline points={points} fill="none" stroke="#635bff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+    {points.split(' ').map((point, index) => { const [cx, cy] = point.split(','); return <circle key={index} cx={cx} cy={cy} r="4" fill="white" stroke="#635bff" strokeWidth="3" />; })}
+    {['Aug 1', 'Aug 5', 'Aug 9', 'Aug 13', 'Aug 17', 'Aug 21'].map((label, index) => <text key={label} x={32 + index * 180} y="224" fill="#64748b" fontSize="11">{label}</text>)}
+  </svg>;
 }
 
 export function PrimeClientReportsPage() {
-  return (
-    <div className="space-y-6 p-4 pb-28 md:p-6 md:pb-28">
-      <header className="border-b pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              <Building2 className="size-4 text-primary" />
-              Reports / Client Delivery
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Client Reports</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Generate, review, schedule, and send client-facing reports. This page packages PrimeOS performance evidence instead of duplicating the live Performance dashboard.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="h-9 rounded-md">
-              <Download className="size-4" />
-              Export index
-            </Button>
-            <Button className="h-9 rounded-md">
-              <FileText className="size-4" />
-              New report
-            </Button>
-          </div>
-        </div>
-      </header>
+  const [activeMetric, setActiveMetric] = useState<MetricKey>('revenue');
+  const [aggregation, setAggregation] = useState('Daily');
+  const [dimension, setDimension] = useState<DimensionKey>('store');
+  const [query, setQuery] = useState('');
+  const table = tableConfigs[dimension];
+  const filteredRows = useMemo(() => table.rows.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase())), [query, table.rows]);
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Client report summary">
-        {metricCards.map((metric) => {
-          const Icon = metric.icon;
+  return <div className="space-y-6 p-4 pb-28 md:p-6">
+    <WorkspacePageHeader title="Unified Analytics Hub" description="Revenue, commerce, product, fulfillment, and customer performance in one operating view." icon={BarChart3} />
 
-          return (
-            <Card key={metric.label} className={cn('rounded-lg shadow-sm', toneClass[metric.tone])}>
-              <CardContent className="flex items-start justify-between gap-3 p-4">
-                <div>
-                  <div className="text-xs font-semibold text-muted-foreground">{metric.label}</div>
-                  <div className="mt-2 text-3xl font-semibold tracking-tight">{metric.value}</div>
-                  <div className="mt-1 text-xs font-medium text-muted-foreground">{metric.detail}</div>
-                </div>
-                <span className="grid size-9 shrink-0 place-items-center rounded-md border bg-background/70">
-                  <Icon className="size-4" />
-                </span>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </section>
+    <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-end" aria-label="Analytics filters">
+      <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600"><span>Date range</span><button type="button" className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"><CalendarDays className="size-4 text-slate-400" />Aug 1, 2026 — Aug 31, 2026<ChevronDown className="ml-auto size-4 text-slate-400" /></button></label>
+      <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600"><span>Stores</span><button type="button" className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"><Box className="size-4 text-slate-400" />All stores (6)<ChevronDown className="ml-auto size-4 text-slate-400" /></button></label>
+      <Button className="min-h-10 px-6">Apply</Button>
+    </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card className="overflow-hidden rounded-lg shadow-sm">
-          <CardHeader className="border-b px-4 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Client reporting queue</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">Reports are grouped by client, period, delivery state, and source-data readiness.</p>
-              </div>
-              <Badge variant="secondary" className="rounded-md">{clientReports.length} reports</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table variant="compact">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Report</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Delivery</TableHead>
-                  <TableHead>Next action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientReports.map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell>
-                      <div className="font-semibold text-foreground">{report.client}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{report.market} - Owner {report.owner}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium text-foreground">{report.report}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{report.period}</div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {report.sections.slice(0, 3).map((section) => (
-                          <span key={section} className="rounded-md border bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{section}</span>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell><StatusBadge status={report.status} /></TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                        <Mail className="size-3.5" />
-                        {report.delivery}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-xs font-semibold text-foreground">{report.nextAction}</div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Analytics KPI summary">{metrics.map((metric) => { const Icon = metric.icon; const active = activeMetric === metric.key; return <button key={metric.key} type="button" onClick={() => setActiveMetric(metric.key)} className={cn('rounded-xl border bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', active ? 'border-primary ring-1 ring-primary/20' : 'border-slate-200')}><span className={cn('grid size-9 place-items-center rounded-lg', active ? 'bg-primary text-white' : 'bg-indigo-50 text-indigo-600')}><Icon className="size-4" /></span><div className="mt-4 text-xs font-semibold text-slate-500">{metric.label}</div><div className="mt-1 text-2xl font-semibold text-slate-900">{metric.value}</div><div className={cn('mt-1 text-xs font-semibold', metric.key === 'shipping' ? 'text-emerald-600' : 'text-indigo-600')}>{metric.detail}</div></button>; })}</section>
 
-        <Card className="rounded-lg shadow-sm">
-          <CardHeader className="border-b px-4 py-4">
-            <CardTitle className="text-base">Scheduled delivery</CardTitle>
-            <p className="text-xs text-muted-foreground">What Admatik sends next, and where it is blocked.</p>
-          </CardHeader>
-          <CardContent className="grid gap-3 p-4">
-            {scheduledDeliveries.map((item) => (
-              <div key={`${item.client}-${item.report}`} className="rounded-md border bg-muted/20 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-foreground">{item.client}</div>
-                    <div className="mt-1 truncate text-xs font-medium text-muted-foreground">{item.report}</div>
-                  </div>
-                  <span className="rounded-md border bg-background px-2 py-1 text-[11px] font-semibold text-muted-foreground">{item.status}</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                  <span>{item.time}</span>
-                  <span>{item.channel}</span>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="font-semibold text-slate-900">Unified Trend</h2><p className="mt-1 text-xs font-medium text-slate-500">One chart for every primary business metric</p></div><div className="flex flex-wrap gap-2"><select value={activeMetric} onChange={(event) => setActiveMetric(event.target.value as MetricKey)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium"><option value="revenue">Revenue</option><option value="orders">Order Count</option><option value="products">Products Sold</option><option value="retention">Customer Retention (New vs Repeat)</option></select><div className="flex rounded-lg border border-slate-200 p-0.5">{['Daily', 'Weekly', 'Monthly'].map((item) => <button key={item} type="button" onClick={() => setAggregation(item)} className={cn('h-8 rounded-md px-3 text-xs font-semibold transition-colors', aggregation === item ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50')}>{item}</button>)}</div></div></div><div className="overflow-x-auto p-4"><TrendChart metric={activeMetric} /></div></section>
 
-      <section className="grid gap-3 lg:grid-cols-4" aria-label="Report templates">
-        {reportTemplates.map((template) => {
-          const Icon = template.icon;
+    <section className="grid gap-4 xl:grid-cols-3">{distributions.map((card) => <article key={card.title} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold text-slate-900">{card.title}</h2><p className="mt-1 text-xs font-medium text-slate-500">{card.subtitle}</p><div className="mt-5"><Donut items={card.items} /></div></article>)}</section>
 
-          return (
-            <Card key={template.id} className="rounded-lg shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-md border bg-primary/10 text-primary">
-                    <Icon className="size-4" />
-                  </span>
-                  <Badge variant="outline" className="rounded-md">{template.cadence}</Badge>
-                </div>
-                <h2 className="mt-4 text-base font-semibold text-foreground">{template.title}</h2>
-                <p className="mt-2 min-h-16 text-xs leading-5 text-muted-foreground">{template.description}</p>
-                <div className="mt-4 grid gap-1.5 text-xs font-medium text-muted-foreground">
-                  {template.sections.map((section) => (
-                    <div key={section} className="flex items-center gap-2">
-                      <CheckCircle2 className="size-3.5 text-emerald-500" />
-                      <span>{section}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </section>
-
-      <Card className="overflow-hidden rounded-lg shadow-sm">
-        <CardHeader className="border-b px-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Client coverage and readiness</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">Report readiness should reflect data completeness, not only visual dashboard availability.</p>
-            </div>
-            <Button variant="outline" className="h-8 rounded-md text-xs">
-              <Send className="size-3.5" />
-              Send ready reports
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table variant="compact">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Data coverage</TableHead>
-                <TableHead>Last generated</TableHead>
-                <TableHead>Active reports</TableHead>
-                <TableHead>Issue</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clientCoverage.map((client) => (
-                <TableRow key={client.client}>
-                  <TableCell className="font-semibold text-foreground">{client.client}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Progress value={client.dataCoverage} className="h-2 min-w-28" />
-                      <span className="w-10 text-right text-xs font-semibold text-foreground">{client.dataCoverage}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{client.lastGenerated}</TableCell>
-                  <TableCell className="text-xs font-semibold text-foreground">{client.reports}</TableCell>
-                  <TableCell className={cn('text-xs font-semibold', client.issue === 'None' ? 'text-emerald-600' : 'text-amber-700 dark:text-amber-300')}>
-                    {client.issue}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-4"><div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"><div className="flex min-w-0 gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1">{(Object.keys(tableConfigs) as DimensionKey[]).map((key) => <button key={key} type="button" onClick={() => setDimension(key)} className={cn('min-h-9 shrink-0 rounded-md px-3 text-xs font-semibold transition-colors', dimension === key ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-800')}>{tableConfigs[key].label}</button>)}</div><div className="flex gap-2"><div className="relative min-w-0 flex-1 xl:w-64"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search master data..." className="h-10 pl-9" /></div><Button variant="outline" className="h-10 shrink-0"><Download className="size-4" />CSV Export</Button></div></div></div><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead className="border-b border-slate-200 bg-slate-50"><tr>{table.columns.map((column) => <th key={column} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredRows.map((row, rowIndex) => <tr key={rowIndex} className="transition-colors hover:bg-slate-50">{row.map((cell, cellIndex) => <td key={cellIndex} className={cn('px-4 py-3 text-sm text-slate-600', cellIndex === 0 && 'font-semibold text-slate-900')}>{cell}</td>)}</tr>)}</tbody></table></div><div className="border-t border-slate-200 px-4 py-3 text-xs font-medium text-slate-500">Showing {filteredRows.length} records · Updated 2 minutes ago</div></section>
+  </div>;
 }

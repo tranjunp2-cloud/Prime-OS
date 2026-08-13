@@ -16,11 +16,11 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 4%;
 
-    --primary: 243 58% 55%;
+    --primary: 244 100% 50%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 243 48% 48%;
-    --primary-soft: 243 76% 96%;
-    --brand-secondary: 112 86% 32%;
+    --primary-hover: 244 100% 40%;
+    --primary-soft: 244 100% 97%;
+    --brand-secondary: 25 100% 50%;
 
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 10%;
@@ -46,17 +46,17 @@
 
     --border: 240 12% 92%;
     --input: 240 12% 92%;
-    --ring: 243 75% 59%;
-    --ring-accent: 243 75% 59%;
+    --ring: 244 100% 50%;
+    --ring-accent: 25 100% 50%;
 
     --radius: 0.5rem;
     --radius-sm: 0.25rem;
     --radius-md: 0.375rem;
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
-    --header-height: 3.5rem;
+    --header-height: 4rem;
     --sidebar-width-compact: 4.75rem;
-    --sidebar-width-expanded: 19.75rem;
+    --sidebar-width-expanded: 14.25rem;
     --row-height-compact: 2.25rem;
     --row-height-default: 2.75rem;
     --command-palette-width: 40rem;
@@ -81,9 +81,9 @@
     --surface-control: 0 0% 100%;
     --surface-overlay: 0 0% 100%;
     --surface-command: 0 0% 100%;
-    --surface-selected: 239 84% 96%;
+    --surface-selected: 244 100% 97%;
     --surface-row-hover: 240 12% 96%;
-    --surface-row-selected: 239 84% 96%;
+    --surface-row-selected: 244 100% 97%;
     --surface-hover: 240 12% 96%;
     --surface-glass: 0 0% 100%;
     --surface-highlight: 0 0% 100%;
@@ -91,18 +91,18 @@
 
     --border-divider: 240 12% 92%;
     --border-highlight: 0 0% 100%;
-    --border-active: 243 75% 59%;
+    --border-active: 244 100% 50%;
 
     --sidebar-background: 240 10% 6%;
     --sidebar-foreground: 240 12% 94%;
-    --sidebar-primary: 243 58% 60%;
+    --sidebar-primary: 244 100% 64%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 8% 13%;
     --sidebar-accent-foreground: 240 12% 96%;
     --sidebar-border: 240 8% 17%;
-    --sidebar-ring: 243 58% 60%;
+    --sidebar-ring: 244 100% 64%;
 
-    --chart-1: 243 75% 59%;
+    --chart-1: 244 100% 50%;
     --chart-2: 160 84% 39%;
     --chart-3: 38 92% 50%;
     --chart-4: 17 100% 55%;
@@ -152,10 +152,11 @@
     --popover: 240 20% 15%;
     --popover-foreground: 240 12% 95%;
 
-    --primary: 243 58% 64%;
+    --primary: 244 100% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 243 45% 56%;
-    --primary-soft: 243 42% 18%;
+    --primary-hover: 244 100% 66%;
+    --primary-soft: 244 55% 19%;
+    --brand-secondary: 25 100% 58%;
 
     --secondary: 240 16% 13%;
     --secondary-foreground: 240 12% 95%;
@@ -181,8 +182,8 @@
 
     --border: 240 14% 20%;
     --input: 240 14% 20%;
-    --ring: 236 57% 60%;
-    --ring-accent: 233 55% 64%;
+    --ring: 244 100% 66%;
+    --ring-accent: 25 100% 58%;
 
     --surface-stage: 240 11% 7%;
     --surface-sidebar: 240 16% 13%;
@@ -193,9 +194,9 @@
     --surface-control: 240 20% 15%;
     --surface-overlay: 240 20% 15%;
     --surface-command: 240 20% 15%;
-    --surface-selected: 236 57% 16%;
+    --surface-selected: 244 55% 18%;
     --surface-row-hover: 240 20% 15%;
-    --surface-row-selected: 236 57% 13%;
+    --surface-row-selected: 244 55% 15%;
     --surface-hover: 240 20% 15%;
     --surface-glass: 240 18% 14%;
     --surface-highlight: 0 0% 100%;
@@ -208,18 +209,18 @@
 
     --border-divider: 240 14% 20%;
     --border-highlight: 0 0% 100%;
-    --border-active: 236 57% 60%;
+    --border-active: 244 100% 66%;
 
     --sidebar-background: 240 10% 6%;
     --sidebar-foreground: 240 12% 94%;
-    --sidebar-primary: 243 58% 64%;
+    --sidebar-primary: 244 100% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 8% 13%;
     --sidebar-accent-foreground: 240 12% 95%;
     --sidebar-border: 240 8% 17%;
-    --sidebar-ring: 243 58% 64%;
+    --sidebar-ring: 244 100% 66%;
 
-    --chart-1: 236 57% 60%;
+    --chart-1: 244 100% 66%;
     --chart-2: 148 65% 54%;
     --chart-3: 48 100% 47%;
     --chart-4: 17 100% 55%;
@@ -392,6 +393,52 @@
       linear-gradient(90deg, hsl(var(--border-divider) / 0.18) 1px, transparent 1px);
     background-size: auto, 48px 48px, 48px 48px;
     background-position: 0 0, -1px -1px, -1px -1px;
+  }
+
+  .app-sidebar-light {
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 29% 19%;
+    --sidebar-primary: 244 100% 50%;
+    --sidebar-primary-foreground: 244 100% 50%;
+    --sidebar-accent: 226 100% 97%;
+    --sidebar-accent-foreground: 244 100% 50%;
+    --sidebar-border: 220 14% 90%;
+    --sidebar-ring: 244 100% 50%;
+  }
+
+  .dark .app-sidebar-light {
+    --sidebar-background: 240 10% 6%;
+    --sidebar-foreground: 240 12% 94%;
+    --sidebar-primary: 244 100% 64%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 8% 13%;
+    --sidebar-accent-foreground: 240 12% 96%;
+    --sidebar-border: 240 8% 17%;
+    --sidebar-ring: 244 100% 64%;
+  }
+
+  .workspace-theme-main {
+    --primary: 244 82% 59%;
+    --primary-hover: 244 76% 53%;
+    --primary-soft: 244 100% 97%;
+    --ring: 244 82% 59%;
+    --border-active: 244 82% 59%;
+  }
+
+  .workspace-theme-primeweb {
+    --primary: 158 84% 34%;
+    --primary-hover: 158 84% 27%;
+    --primary-soft: 152 76% 95%;
+    --ring: 158 84% 34%;
+    --border-active: 158 84% 34%;
+  }
+
+  .workspace-theme-pos {
+    --primary: 32 95% 44%;
+    --primary-hover: 28 92% 36%;
+    --primary-soft: 40 100% 95%;
+    --ring: 32 95% 44%;
+    --border-active: 32 95% 44%;
   }
 
   .prime-dashboard-surface {

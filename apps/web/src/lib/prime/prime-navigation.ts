@@ -207,6 +207,13 @@ export const primeNavigation: PrimeNavNode[] = [
     icon: RadioTower,
     children: [
       {
+        id: 'crm-overview',
+        label: 'CRM & Customers',
+        kind: 'tower',
+        href: '/crm/sources',
+        icon: LayoutDashboard,
+      },
+      {
         id: 'crm-hub',
         label: 'Customer Inbox',
         kind: 'tower',
@@ -372,7 +379,7 @@ export const primeNavigation: PrimeNavNode[] = [
     href: '/account',
     icon: Settings2,
   },
-];
+].filter((node) => node.id !== 'intelligence');
 
 const splitRoute = (route: string) => {
   const [pathAndSearch, hash = ''] = route.split('#');

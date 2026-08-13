@@ -516,14 +516,14 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
     return {
       domain: 'dashboard',
       title: 'Operating Home',
-      description: 'Mission Control cho status van hanh hom nay: action queue, risk radar, area readiness va evidence stack.',
-      insight: 'Prime AI nen tap trung vao viec giai thich vi sao action duoc uu tien, owner nao can xu ly, risk nao can mo tiep.',
+      description: "Mission Control for today's operations: action queue, risk radar, area readiness, and evidence stack.",
+      insight: 'Prime AI explains why an action is prioritized, which owner should respond, and which risk needs investigation.',
       citations: ['Current route: /overview', 'Source: Prime operating snapshot'],
       quickPrompts: [
-        { label: 'Uu tien hom nay', prompt: 'Action nao can xu ly dau tien tren Operating Home?' },
-        { label: 'Giai thich risk', prompt: 'Vi sao risk radar dang can chu y?' },
-        { label: 'Mo decision', prompt: 'Mo Launch Decisions' },
-        { label: 'Mo action queue', prompt: 'Trang nay dung de lam gi?' },
+        { label: "Today's priority", prompt: 'Which action should be handled first on Operating Home?' },
+        { label: 'Explain risk', prompt: 'Why does the risk radar need attention?' },
+        { label: 'Open decisions', prompt: 'Open Launch Decisions' },
+        { label: 'Explain this page', prompt: 'What is this page used for?' },
       ],
     };
   }
@@ -1676,7 +1676,7 @@ export function buildWelcomeMessage(context: CopilotContextSummary): CopilotResp
       confidenceBucket: 'high',
     }),
     followUpPrompts: takePrompts(context.quickPrompts),
-    content: `Mình đang đọc context của ${context.title} để tư vấn khách hàng phù hợp, chiến dịch nên chạy và kênh tiếp thị phù hợp cho seller.`,
+    content: `I am reviewing the context of ${context.title} to recommend the right customers, campaigns, and marketing channels for the seller.`,
   }, context);
 }
 
@@ -1696,11 +1696,11 @@ export function buildFallbackResponse(context: CopilotContextSummary): CopilotRe
       takePrompts(context.quickPrompts).map((prompt) => ({
         type: 'copy',
         label: prompt.label,
-        description: 'Copy prompt mẫu để dùng tiếp',
+        description: 'Copy this example prompt',
         value: prompt.prompt,
       })),
     ),
-    content: `Mình chưa đủ chắc để trả lời ngay mà không đoán sai trong ${context.title}.`,
+    content: `I do not have enough context to answer confidently in ${context.title}. Choose one of the suggested prompts or provide more detail.`,
   }, context);
 }
 

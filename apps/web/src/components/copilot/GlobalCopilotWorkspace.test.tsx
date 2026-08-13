@@ -63,8 +63,11 @@ vi.mock('@/components/ui/tooltip', () => ({
 }));
 
 vi.mock('./GlobalCopilotSurface', () => ({
-  GlobalCopilotSurface: ({ context }: { context: { title: string } }) => (
-    <div data-testid="assistant-surface">{context.title}</div>
+  GlobalCopilotSurface: ({ context, onClose }: { context: { title: string }; onClose: () => void }) => (
+    <div data-testid="assistant-surface">
+      {context.title}
+      <button type="button" onClick={onClose}>Close Prime AI</button>
+    </div>
   ),
 }));
 
@@ -143,6 +146,17 @@ describe('GlobalCopilotWorkspace', () => {
 
     fireEvent.click(screen.getByTestId('assistant-fab'));
     expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('open');
+  });
+
+  it('closes the desktop assistant without clearing the conversation', () => {
+    renderWorkspace();
+
+    fireEvent.click(screen.getByTestId('assistant-fab'));
+    fireEvent.click(screen.getByRole('button', { name: 'Close Prime AI' }));
+
+    expect(screen.queryByTestId('assistant-surface')).not.toBeInTheDocument();
+    expect(mockEngine.clearMessages).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('closed');
   });
 
   it('falls back to FAB + drawer on mobile and opens the drawer on click', () => {

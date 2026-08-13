@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import {
   cancelBooking,
   completeBooking,
@@ -279,35 +280,30 @@ export default function Service() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[hsl(var(--surface-stage))]">
-      <header className="shrink-0 border-b border-border bg-background">
-        <div className="flex min-h-16 flex-col gap-3 px-4 py-3 md:px-6 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
-              <span>Customer</span>
-              <span className="text-border">/</span>
-              <span>Service</span>
-              <span className="text-primary">Live desk</span>
-            </div>
-            <h1 className="mt-1 font-display text-2xl font-semibold leading-tight text-foreground">Prime Service Control</h1>
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-2 xl:justify-end">
+      <div className="shrink-0 bg-background px-4 pt-4 md:px-6">
+        <WorkspacePageHeader
+          title="Prime Service Control"
+          description="Handle conversations, booking intent, service schedules, and customer follow-up from one workspace."
+          icon={Inbox}
+          actions={(
+            <>
             <InlineMetric label="Open" value={String(activeCustomerCount)} />
             <InlineMetric label="Hot intent" value={String(hotIntentCount)} />
             <InlineMetric label="Waiting" value={String(pendingReplyCount)} tone="text-warning" />
             <InlineMetric label="Booking" value={String(bookingStats.total)} />
             <div className="hidden h-8 w-px bg-border lg:block" />
-            <Button variant="ghost" size="sm" className="h-9 px-2.5">
+            <Button variant="ghost" size="sm" className="h-8 px-2.5">
               <UsersRound className="size-4" />
               Import
             </Button>
-            <Button size="sm" className="h-9 px-3">
+            <Button size="sm" className="h-8 px-3">
               <Plus className="size-4" />
               Outreach
             </Button>
-          </div>
-        </div>
-      </header>
+            </>
+          )}
+        />
+      </div>
 
       <div
         className="grid min-h-0 min-w-[920px] flex-1 border-b border-border bg-[hsl(var(--surface-workspace))]"

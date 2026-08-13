@@ -17,19 +17,19 @@ function getAssistantMessageTone(intent: GlobalCopilotMessage['intent']) {
   switch (intent) {
     case 'clarify':
       return {
-        label: 'Cần làm rõ',
+        label: 'Needs clarification',
         bubbleClassName: 'border-amber-500/30 bg-amber-500/10',
         badgeClassName: 'border-amber-500/30 bg-amber-500/15 text-amber-100',
       };
     case 'write_draft':
       return {
-        label: 'Draft an toàn',
+        label: 'Safe draft',
         bubbleClassName: 'border-primary/30 bg-primary/10',
         badgeClassName: 'border-primary/20 bg-primary/15 text-primary',
       };
     case 'navigate':
       return {
-        label: 'Điều hướng',
+        label: 'Navigation',
         bubbleClassName: 'border-emerald-500/25 bg-emerald-500/10',
         badgeClassName: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-200',
       };
@@ -96,7 +96,7 @@ function UserMessageContent({ content }: { content: string }) {
           className="mt-2 text-xs font-medium text-primary-foreground/90 underline-offset-4 hover:underline"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? 'Thu gọn' : 'Read more'}
+          {expanded ? 'Show less' : 'Read more'}
         </button>
       ) : null}
     </>
@@ -253,7 +253,7 @@ export function GlobalCopilotChatThread({
       {messages.length === 0 && !isProcessing && (
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
           <Bot className="size-12 mb-4 opacity-50" />
-          <p className="text-sm">Bắt đầu hỏi để dùng PrimeOS Assistant</p>
+          <p className="text-sm">Ask a question to start using Prime AI</p>
         </div>
       )}
     </div>

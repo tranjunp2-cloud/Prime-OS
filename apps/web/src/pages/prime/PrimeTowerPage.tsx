@@ -6610,7 +6610,7 @@ export function PrimeCrmHubPage() {
 
   return (
     <div className="min-h-[calc(100dvh-var(--header-height))] bg-background">
-      <div className="mx-auto max-w-[1520px] space-y-5 p-4 pb-4 md:p-6 md:pb-6">
+      <div className="w-full space-y-5 p-4 pb-4 md:p-6 md:pb-6">
         <section data-testid="demand-command-bar" className="overflow-hidden rounded-lg border bg-card shadow-sm">
           <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.62fr)_auto] lg:items-center">
             <div className="min-w-0">
@@ -7192,7 +7192,7 @@ export function PrimeCrmSourcesPage() {
           entities={[
             { label: 'Workspace', value: 'Sources', tone: 'purple' },
             { label: 'Function', value: selectedFunctionMeta?.label || 'All source functions', tone: 'info' },
-            { label: 'Signals', value: formatCompactCount(totalSignals), href: '/intelligence/signals', tone: 'info' },
+            { label: 'Signals', value: formatCompactCount(totalSignals), href: '/overview', tone: 'info' },
             { label: 'Leads', value: String(overview.totalLeads), href: '/crm/leads-rfqs', tone: 'success' },
             { label: 'RFQs', value: String(overview.totalRfqs), href: '/crm/leads-rfqs', tone: 'warning' },
             { label: 'Top source', value: overview.topSource?.name || 'None', href: overview.topSource?.nextActionRoute, tone: 'muted' },

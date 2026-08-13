@@ -267,7 +267,7 @@ function OperatorMessageContent({ content }: { content: string }) {
           className="mt-2 text-xs font-medium text-primary-foreground/90 underline-offset-4 hover:underline"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? 'Thu gọn' : 'Read more'}
+          {expanded ? 'Show less' : 'Read more'}
         </button>
       ) : null}
     </>

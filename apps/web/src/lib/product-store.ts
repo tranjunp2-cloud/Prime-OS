@@ -11,6 +11,16 @@ export interface Sku {
   weight_g: number;
   units_per_carton: number;
   status: 'active' | 'inactive';
+  image_url?: string;
+  price?: number;
+  stock?: number;
+}
+
+export interface ChannelOverride {
+  enabled: boolean;
+  title: string;
+  price_markup: number;
+  description: string;
 }
 
 export interface ChannelListing {
@@ -57,11 +67,17 @@ export interface Product {
   hs_code: string;
   // Media
   images: string[];
+  image_alt_texts?: string[];
+  slug?: string;
+  meta_title?: string;
+  meta_description?: string;
+  specifications?: Array<{ name: string; value: string }>;
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
   channels: ChannelListing[];
+  channel_overrides?: Partial<Record<'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social', ChannelOverride>>;
   // Workflow
   status: 'draft' | 'review' | 'published' | 'archived';
   created_at: string;

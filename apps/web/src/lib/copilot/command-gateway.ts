@@ -53,7 +53,7 @@ export function prepareProductCreateDraftCommand(input: Record<string, string>):
     confirmAction: {
       type: 'confirm_draft',
       label: 'Review draft product',
-      description: 'HITL confirm: mở form prefill, chưa save/publish.',
+      description: 'Human confirmation: open the prefilled form without saving or publishing.',
       url: `/products/new?${new URLSearchParams(input).toString()}`,
       draftId: commandId,
       command: request,
@@ -62,7 +62,7 @@ export function prepareProductCreateDraftCommand(input: Record<string, string>):
     cancelAction: {
       type: 'cancel_draft',
       label: 'Cancel draft',
-      description: 'Hủy draft suggestion trong copilot session.',
+      description: 'Cancel the draft suggestion in this Prime AI session.',
       draftId: commandId,
       command: request,
     },

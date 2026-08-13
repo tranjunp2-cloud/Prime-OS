@@ -1,8 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Info, Image, Package, Truck, Layers, Check,
   Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes, PackageCheck,
+  Globe2, CircleCheck, CircleAlert, CloudUpload, Search, ChevronRight, Save,
+  ShoppingBag, Store, MonitorSmartphone, MessageSquare, Radio,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { addProduct, updateProduct, getProductById, getAllSkus, type Product, type ChannelListing, type ProductType } from '@/lib/product-store';
 import type { AmazonVariant } from '@/lib/amazon-catalog';
@@ -33,7 +37,11 @@ interface VariantItem {
   price: string;
   stock: string;
   selected: boolean;
+  image_url: string;
 }
+
+type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social';
+interface ChannelOverrideForm { enabled: boolean; title: string; price_markup: string; description: string }
 
 interface FormState {
   gtin: string;
@@ -62,6 +70,9 @@ interface FormState {
   country_of_origin: string;
   hs_code: string;               // ← NEW: HS code for cross-border
   has_variants: boolean;
+  slug: string;
+  meta_title: string;
+  meta_description: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -76,54 +87,47 @@ const WAREHOUSES = [
 const CONDITIONS = ['new', 'refurbished', 'used_like_new', 'used_acceptable'];
 const CURRENCIES = ['JPY', 'USD', 'SGD', 'MYR', 'VND'];
 const COUNTRIES = ['JP', 'CN', 'KR', 'US', 'SG', 'MY', 'VN', 'TW', 'TH', 'ID'];
+const OVERRIDE_CHANNELS: Array<{
+  key: OverrideChannel;
+  label: string;
+  description: string;
+  icon: typeof Globe2;
+  iconClassName: string;
+}> = [
+  { key: 'webstore', label: 'PrimeWeb', description: 'Online storefront', icon: Globe2, iconClassName: 'bg-emerald-50 text-emerald-600' },
+  { key: 'pos', label: 'PrimePOS', description: 'Retail outlets', icon: Store, iconClassName: 'bg-violet-50 text-violet-600' },
+  { key: 'shopee', label: 'Shopee', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-orange-50 text-orange-600' },
+  { key: 'lazada', label: 'Lazada', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-blue-50 text-blue-600' },
+  { key: 'tiktok', label: 'TikTok Shop', description: 'Social commerce', icon: MonitorSmartphone, iconClassName: 'bg-slate-100 text-slate-700' },
+  { key: 'amazon', label: 'Amazon', description: 'Global marketplace', icon: ShoppingBag, iconClassName: 'bg-amber-50 text-amber-700' },
+  { key: 'social', label: 'Social Inbox', description: 'Chat-assisted sales', icon: MessageSquare, iconClassName: 'bg-sky-50 text-sky-600' },
+];
 const CATEGORIES = [
   'Watch', 'Shoe', 'Bag', 'Hat', 'Jacket', 'Sunglasses',
   'Bicycle', 'Headphones', 'Electronics', 'Food & Beverages',
   'Beauty & Personal Care', 'Home & Living', 'Sports', 'Books', 'Toys',
+];
+const CATEGORY_TREE = [
+  { label: 'Fashion', children: [
+    { label: 'Apparel', children: ['Jacket', 'Shoe', 'Hat'] },
+    { label: 'Accessories', children: ['Bag', 'Watch', 'Sunglasses'] },
+  ] },
+  { label: 'Electronics', children: [
+    { label: 'Consumer Electronics', children: ['Electronics', 'Headphones'] },
+  ] },
+  { label: 'Lifestyle', children: [
+    { label: 'Home & Living', children: ['Home & Living', 'Food & Beverages'] },
+    { label: 'Leisure', children: ['Sports', 'Bicycle', 'Books', 'Toys'] },
+  ] },
+  { label: 'Personal Care', children: [
+    { label: 'Beauty', children: ['Beauty & Personal Care'] },
+  ] },
 ];
 const PRODUCT_TYPE_ICONS = {
   single: Package,
   variant: Layers,
   bundle: Boxes,
 } satisfies Record<ProductType, typeof PackageCheck>;
-
-const CATEGORY_LABELS: Record<string, Record<string, string>> = {
-  'en-US': Object.fromEntries(CATEGORIES.map((category) => [category, category])),
-  'ja-JP': {
-    Watch: '腕時計',
-    Shoe: '靴',
-    Bag: 'バッグ',
-    Hat: '帽子',
-    Jacket: 'ジャケット',
-    Sunglasses: 'サングラス',
-    Bicycle: '自転車',
-    Headphones: 'ヘッドホン',
-    Electronics: '家電・電子機器',
-    'Food & Beverages': '食品・飲料',
-    'Beauty & Personal Care': '美容・パーソナルケア',
-    'Home & Living': 'ホーム・リビング',
-    Sports: 'スポーツ',
-    Books: '書籍',
-    Toys: '玩具',
-  },
-  'vi-VN': {
-    Watch: 'Đồng hồ',
-    Shoe: 'Giày',
-    Bag: 'Túi',
-    Hat: 'Mũ',
-    Jacket: 'Áo khoác',
-    Sunglasses: 'Kính râm',
-    Bicycle: 'Xe đạp',
-    Headphones: 'Tai nghe',
-    Electronics: 'Điện tử',
-    'Food & Beverages': 'Thực phẩm & đồ uống',
-    'Beauty & Personal Care': 'Làm đẹp & chăm sóc cá nhân',
-    'Home & Living': 'Nhà cửa & đời sống',
-    Sports: 'Thể thao',
-    Books: 'Sách',
-    Toys: 'Đồ chơi',
-  },
-};
 
 const EMPTY_FORM: FormState = {
   gtin: '', mpn: '', model_number: '', brand: '',
@@ -135,12 +139,16 @@ const EMPTY_FORM: FormState = {
   prod_length: '', prod_height: '', prod_width: '', prod_weight: '',
   pkg_length: '', pkg_height: '', pkg_width: '', pkg_weight: '',
   country_of_origin: '', hs_code: '', has_variants: false,
+  slug: '', meta_title: '', meta_description: '',
 };
 
 function genId(prefix = 'id') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 function num(v: string) { return v ? Number(v) : 0; }
+function slugify(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
 
 // Cartesian product of string arrays
 function cartesian<T>(arrs: T[][]): T[][] {
@@ -224,6 +232,9 @@ function VariantSection({
   const [groupInput, setGroupInput] = useState<Record<string, string>>({});
   const [addGroupName, setAddGroupName] = useState('');
   const [showAddGroup, setShowAddGroup] = useState(false);
+  const [bulkPrice, setBulkPrice] = useState('');
+  const [bulkStock, setBulkStock] = useState('');
+  const [bulkSku, setBulkSku] = useState('');
 
   // Build variant keys from groups
   const variantKeys = useMemo(() => {
@@ -234,10 +245,8 @@ function VariantSection({
   }, [groups]);
 
   // Init items when keys change
-  const prevKeysRef = useMemo(() => variantKeys.map(k => k.join('|')).join('||'), [variantKeys]);
+  const variantSignature = useMemo(() => variantKeys.map(k => k.join('|')).join('||'), [variantKeys]);
   const initializedItems = useMemo<VariantItem[]>(() => {
-    const currentKeys = variantKeys.map(k => k.join('|')).join('||');
-    if (currentKeys === prevKeysRef && items.length > 0) return items;
     return variantKeys.map(combo => {
       const key = combo.join(' / ');
       const existing = items.find(i => i.key === key);
@@ -248,20 +257,39 @@ function VariantSection({
         price: basePrice,
         stock: '0',
         selected: true,
+        image_url: '',
       };
     });
-  }, [variantKeys]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [basePrice, items, parentSku, variantKeys]);
+
+  useEffect(() => {
+    const currentSignature = items.map(item => item.key.replaceAll(' / ', '|')).join('||');
+    if (currentSignature !== variantSignature) onItemsChange(initializedItems);
+  }, [initializedItems, items, onItemsChange, variantSignature]);
 
   function setItems(newItems: VariantItem[]) {
     onItemsChange(newItems);
   }
 
   function updateItem(key: string, field: keyof VariantItem, value: string | boolean) {
-    setItems(items.map(i => i.key === key ? { ...i, [field]: value } : i));
+    setItems(initializedItems.map(i => i.key === key ? { ...i, [field]: value } : i));
   }
 
   function toggleSelectAll(selected: boolean) {
-    setItems(items.map(i => ({ ...i, selected })));
+    setItems(initializedItems.map(i => ({ ...i, selected })));
+  }
+
+  function applyBulkValues() {
+    setItems(initializedItems.map((item, index) => ({
+      ...item,
+      price: bulkPrice || item.price,
+      stock: bulkStock || item.stock,
+      sku_code: bulkSku ? `${bulkSku.trim().toUpperCase()}-${String(index + 1).padStart(3, '0')}` : item.sku_code,
+    })));
+  }
+
+  function updateGroupImage(firstValue: string, imageUrl: string) {
+    setItems(initializedItems.map(item => item.key.split(' / ')[0] === firstValue ? { ...item, image_url: imageUrl } : item));
   }
 
   function deleteGroup(id: string) {
@@ -272,7 +300,7 @@ function VariantSection({
 
   function addGroup() {
     const name = addGroupName.trim();
-    if (!name) return;
+    if (!name || groups.length >= 2) return;
     if (groups.find(g => g.name.toLowerCase() === name.toLowerCase())) {
       setErrors(e => ({ ...e, addGroup: copy.duplicateAttribute }));
       return;
@@ -383,10 +411,12 @@ function VariantSection({
             size="sm"
             className="text-xs h-8"
             onClick={() => setShowAddGroup(true)}
+            disabled={groups.length >= 2}
           >
             <Plus className="size-3 mr-1" /> {copy.addVariantAttribute}
           </Button>
         )}
+        <p className="text-[11px] text-muted-foreground">Up to 2 attributes are supported, for example Color × Size.</p>
 
         {/* Variant Matrix Summary */}
         {totalCombinations > 0 && (
@@ -406,20 +436,30 @@ function VariantSection({
 
             {/* Variant Table */}
             <div className="border rounded-lg overflow-hidden">
+              <div className="grid gap-2 border-b bg-muted/40 p-3 sm:grid-cols-[1fr_1fr_1.2fr_auto]">
+                <Field label="Bulk Price"><Input type="number" value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Leave unchanged" className="h-8 text-xs" /></Field>
+                <Field label="Bulk Stock"><Input type="number" value={bulkStock} onChange={event => setBulkStock(event.target.value)} placeholder="Leave unchanged" className="h-8 text-xs" /></Field>
+                <Field label="SKU Prefix"><Input value={bulkSku} onChange={event => setBulkSku(event.target.value)} placeholder="e.g. SHIRT" className="h-8 text-xs uppercase" /></Field>
+                <Button type="button" size="sm" className="self-end" disabled={!bulkPrice && !bulkStock && !bulkSku.trim()} onClick={applyBulkValues}>Apply to all</Button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-muted/50 border-b">
                       <th className="w-8 p-2"></th>
                       <th className="text-left p-2 font-medium">{copy.variant}</th>
+                      <th className="text-left p-2 font-medium w-16">Image</th>
                       <th className="text-left p-2 font-medium w-40">{copy.skuCode}</th>
                       <th className="text-right p-2 font-medium w-28">{copy.price} ({basePrice ? 'JPY' : '—'})</th>
                       <th className="text-right p-2 font-medium w-24">{copy.stock}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {initializedItems.map(item => {
+                    {initializedItems.map((item, itemIndex) => {
                       const skuDup = item.sku_code && existingSkus.includes(item.sku_code) && !(item.sku_code.startsWith(parentSku));
+                      const firstValue = item.key.split(' / ')[0];
+                      const isFirstInGroup = itemIndex === 0 || initializedItems[itemIndex - 1]?.key.split(' / ')[0] !== firstValue;
+                      const groupSize = initializedItems.filter(candidate => candidate.key.split(' / ')[0] === firstValue).length;
                       return (
                         <tr key={item.key} className={`border-b last:border-0 ${item.selected ? '' : 'opacity-40'}`}>
                           <td className="p-1.5 text-center">
@@ -429,6 +469,20 @@ function VariantSection({
                             />
                           </td>
                           <td className="p-2 font-medium text-foreground">{item.key}</td>
+                          {isFirstInGroup ? <td className="p-1.5 align-middle" rowSpan={groupSize}>
+                            <label className="grid size-9 cursor-pointer place-items-center overflow-hidden rounded-md border border-dashed bg-muted/30 hover:bg-muted/60" title="Upload variant image">
+                              <input type="file" accept="image/*" className="sr-only" onChange={event => {
+                                const file = event.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = () => updateGroupImage(firstValue, String(reader.result ?? ''));
+                                reader.readAsDataURL(file);
+                                event.target.value = '';
+                              }} />
+                              {item.image_url ? <img src={item.image_url} alt={`${item.key} variant`} className="size-full object-cover" /> : <Upload className="size-3.5 text-muted-foreground" />}
+                            </label>
+                            <p className="mt-1 max-w-12 truncate text-center text-[9px] text-muted-foreground">{firstValue}</p>
+                          </td> : null}
                           <td className="p-1.5">
                             <Input
                               value={item.sku_code}
@@ -904,20 +958,11 @@ export default function ProductCreatePage() {
     used_like_new: 'Used like new',
     used_acceptable: 'Used acceptable',
   };
-  const categoryLabels = CATEGORY_LABELS[locale] ?? CATEGORY_LABELS['en-US'];
-
   // Edit mode: read product ID from URL param (:id) or query (?edit=)
   const queryEdit = new URLSearchParams(location.search).get('edit');
   const editId = params.id ?? (queryEdit ?? undefined);
   const existingProduct = editId ? getProductById(editId) : null;
   const existingSkuList = getAllSkus();
-
-  // Guard: if editing but product not found, redirect to create page
-  if (editId && !existingProduct) {
-    navigate('/ecom/cos/product-master/new', { replace: true });
-    return null;
-  }
-
 
   const [inventory, setInventory] = useState<Record<string, string>>(
     existingProduct
@@ -932,7 +977,6 @@ export default function ProductCreatePage() {
   const urlSku = searchParams.get('sku') ?? '';
   const urlFamily = searchParams.get('family') ?? '';
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const initForm = () => {
     if (existingProduct) {
       return {
@@ -962,6 +1006,9 @@ export default function ProductCreatePage() {
         country_of_origin: existingProduct.country_of_origin,
         hs_code: existingProduct.hs_code ?? '',
         has_variants: existingProduct.has_variants,
+        slug: existingProduct.slug ?? slugify(existingProduct.name),
+        meta_title: existingProduct.meta_title ?? '',
+        meta_description: existingProduct.meta_description ?? '',
       };
     }
     return { ...EMPTY_FORM, sku_code: urlSku || '', category: urlFamily || '' };
@@ -997,7 +1044,7 @@ export default function ProductCreatePage() {
             if (!attrMap[attr].includes(val)) attrMap[attr].push(val);
           }
         }
-        const groups: VariantGroup[] = Object.entries(attrMap).map(([name, values]) => ({
+        const groups: VariantGroup[] = Object.entries(attrMap).slice(0, 2).map(([name, values]) => ({
           id: genId('grp'),
           name,
           values,
@@ -1017,6 +1064,7 @@ export default function ProductCreatePage() {
             price: v.msrp ? String(v.msrp) : basePrice,
             stock: '0',
             selected: true,
+            image_url: '',
           };
         });
         setVariantItems(items);
@@ -1040,19 +1088,78 @@ export default function ProductCreatePage() {
   const [channels, setChannels] = useState<ChannelListing[]>(
     existingProduct?.channels ?? []
   );
+  const [packageWeightUnit, setPackageWeightUnit] = useState<'g' | 'kg'>('g');
+  const [channelOverrides, setChannelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
+    const saved = existingProduct?.channel_overrides;
+    const make = (key: OverrideChannel): ChannelOverrideForm => ({
+      enabled: saved?.[key]?.enabled ?? false,
+      title: saved?.[key]?.title ?? '',
+      price_markup: saved?.[key]?.price_markup ? String(saved[key]?.price_markup) : '',
+      description: saved?.[key]?.description ?? '',
+    });
+    return Object.fromEntries(OVERRIDE_CHANNELS.map(channel => [channel.key, make(channel.key)])) as Record<OverrideChannel, ChannelOverrideForm>;
+  });
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishPercent, setPublishPercent] = useState(0);
+  const [dirtyTrackingReady, setDirtyTrackingReady] = useState(false);
+  const [hasScrolledFromTop, setHasScrolledFromTop] = useState(false);
+  const baselineSnapshotRef = useRef('');
+  const latestSnapshotRef = useRef('');
+
+  useEffect(() => {
+    if (editId && !existingProduct) navigate('/products/new', { replace: true });
+  }, [editId, existingProduct, navigate]);
 
   // Images (stored as data URLs)
   const [images, setImages] = useState<string[]>(existingProduct?.images ?? []);
+  const [imageAltTexts, setImageAltTexts] = useState<string[]>(existingProduct?.image_alt_texts ?? []);
   const [uploadingImageCount, setUploadingImageCount] = useState(0);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [categoryLevelOne, setCategoryLevelOne] = useState(CATEGORY_TREE[0].label);
+  const [categoryLevelTwo, setCategoryLevelTwo] = useState(CATEGORY_TREE[0].children[0].label);
+  const [pendingCategory, setPendingCategory] = useState(form.category);
+  const [activeSection, setActiveSection] = useState('channels');
+  const [specifications, setSpecifications] = useState<Array<{ id: string; name: string; value: string }>>(
+    existingProduct?.specifications?.map(item => ({ ...item, id: genId('spec') })) ?? [{ id: genId('spec'), name: '', value: '' }]
+  );
 
   // Variant state
   const [variantGroups, setVariantGroups] = useState<VariantGroup[]>([]);
   const [variantItems, setVariantItems] = useState<VariantItem[]>([]);
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; type: 'toNonVariant' | 'toVariant' }>({ open: false, type: 'toNonVariant' });
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; target: Exclude<ProductType, 'variant'> }>({ open: false, target: 'single' });
 
   function setField<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm(f => ({ ...f, [k]: v }));
     if (errors[k]) setErrors(e => ({ ...e, [k]: '' }));
+  }
+
+  function updateProductName(value: string) {
+    setForm(current => ({
+      ...current,
+      name: value,
+      slug: current.slug && current.slug !== slugify(current.name) ? current.slug : slugify(value),
+    }));
+    if (errors.name) setErrors(current => ({ ...current, name: '' }));
+  }
+
+  function scrollToSection(id: string) {
+    document.getElementById(`product-section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveSection(id);
+  }
+
+  useEffect(() => {
+    const ids = ['channels', 'basic', 'pricing', 'shipping', 'more'];
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveSection(visible.target.id.replace('product-section-', ''));
+    }, { rootMargin: '-25% 0px -60% 0px', threshold: [0.05, 0.25] });
+    ids.forEach(id => { const element = document.getElementById(`product-section-${id}`); if (element) observer.observe(element); });
+    return () => observer.disconnect();
+  }, []);
+
+  function updateChannelOverride(channel: OverrideChannel, patch: Partial<ChannelOverrideForm>) {
+    setChannelOverrides(current => ({ ...current, [channel]: { ...current[channel], ...patch } }));
   }
 
   async function handleImageUpload(file: File, mode: 'primary' | 'gallery') {
@@ -1066,6 +1173,7 @@ export default function ProductCreatePage() {
     try {
       const result = await uploadProductImage(file, existingProduct?.id ?? 'new');
       setImages((prev) => (mode === 'primary' ? [result.url, ...prev] : [...prev, result.url]));
+      setImageAltTexts((prev) => (mode === 'primary' ? ['', ...prev] : [...prev, '']));
       toast({ title: copy.imageUploaded, description: result.filename });
     } catch {
       toast({ title: copy.uploadFailed, description: copy.couldNotReadFile, variant: 'destructive' });
@@ -1074,30 +1182,27 @@ export default function ProductCreatePage() {
     }
   }
 
-  function handleHasVariantsChange(checked: boolean) {
-    if (form.has_variants && !checked) {
-      // Switching from variant → non-variant
-      if (variantGroups.length > 0 || variantItems.length > 0) {
-        setConfirmDialog({ open: true, type: 'toNonVariant' });
-        return;
-      }
-    }
-    if (!form.has_variants && checked) {
-      // Switching from non-variant → variant
-      setForm(f => ({ ...f, has_variants: true }));
+  function handleProductTypeChange(nextType: ProductType) {
+    if (nextType === form.product_type) return;
+    if (nextType === 'variant') {
+      setForm(current => ({ ...current, product_type: 'variant', has_variants: true }));
       return;
     }
-    setForm(f => ({ ...f, has_variants: checked }));
+    if (form.has_variants && (variantGroups.length > 0 || variantItems.length > 0)) {
+      setConfirmDialog({ open: true, target: nextType });
+      return;
+    }
+    setForm(current => ({ ...current, product_type: nextType, has_variants: false }));
   }
 
   function handleConfirmSwitch() {
     setVariantGroups([]);
     setVariantItems([]);
-    setForm(f => ({ ...f, has_variants: confirmDialog.type === 'toNonVariant' ? false : true }));
-    setConfirmDialog({ open: false, type: 'toNonVariant' });
+    setForm(current => ({ ...current, product_type: confirmDialog.target, has_variants: false }));
+    setConfirmDialog({ open: false, target: 'single' });
   }
 
-  function handleSave() {
+  function handleSave(statusOverride?: Product['status']) {
     if (uploadingImageCount > 0) {
       toast({
         title: copy.imagesStillUploading,
@@ -1141,8 +1246,12 @@ export default function ProductCreatePage() {
         weight_g: 0,
         units_per_carton: 10,
         status: 'active' as const,
+        image_url: i.image_url,
+        price: num(i.price),
+        stock: num(i.stock),
       }));
 
+    const variantRetailPrices = variants.map(variant => variant.price).filter(price => price > 0);
     const payload: Product = {
       id: existingProduct?.id ?? genId('prod'),
       sku_code: form.sku_code.trim().toUpperCase(),
@@ -1158,7 +1267,7 @@ export default function ProductCreatePage() {
       condition: form.condition,
       description: form.description.trim(),
       original_price: num(form.original_price),
-      retail_price: num(form.retail_price),
+      retail_price: form.has_variants && variantRetailPrices.length > 0 ? Math.min(...variantRetailPrices) : num(form.retail_price),
       price_currency: form.price_currency,
       prod_length: num(form.prod_length),
       prod_height: num(form.prod_height),
@@ -1171,10 +1280,21 @@ export default function ProductCreatePage() {
       country_of_origin: form.country_of_origin,
       hs_code: form.hs_code.trim(),
       images,
+      image_alt_texts: imageAltTexts,
+      slug: form.slug.trim() || slugify(form.name),
+      meta_title: form.meta_title.trim(),
+      meta_description: form.meta_description.trim(),
+      specifications: specifications.filter(item => item.name.trim() && item.value.trim()).map(({ name, value }) => ({ name: name.trim(), value: value.trim() })),
       inventory: Object.fromEntries(Object.entries(inventory).map(([k, v]) => [k, num(v)])),
       has_variants: form.has_variants,
       channels,
-      status: existingProduct?.status ?? 'draft',
+      channel_overrides: Object.fromEntries(Object.entries(channelOverrides).map(([key, value]) => [key, {
+        enabled: value.enabled,
+        title: value.title.trim(),
+        price_markup: num(value.price_markup),
+        description: value.description.trim(),
+      }])),
+      status: statusOverride ?? existingProduct?.status ?? 'draft',
       created_at: existingProduct?.created_at ?? now,
       updated_at: now,
       skus: variants,
@@ -1189,33 +1309,124 @@ export default function ProductCreatePage() {
       toast({ title: copy.created, description: formatMessage(copy.createdDescription, { name: payload.name }) });
     }
 
-    navigate('/products');
+    navigate('/products/master-catalog');
   }
 
   const totalStock = Object.values(inventory).reduce((s, v) => s + num(v), 0);
-  const totalVariants = variantItems.filter(i => i.selected).length;
+  const selectedVariantItems = variantItems.filter(item => item.selected);
+  const hasGeneratedVariants = form.has_variants && selectedVariantItems.length > 0;
+  const variantPricingReady = hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim() && num(item.price) > 0) && selectedVariantItems.reduce((sum, item) => sum + num(item.stock), 0) > 0;
+  const pricingAndInventoryReady = hasGeneratedVariants ? variantPricingReady : num(form.retail_price) > 0 && totalStock > 0;
+  const logisticsReady = Boolean(form.pkg_length && form.pkg_width && form.pkg_height && form.pkg_weight);
+  const completionChecks = useMemo(() => {
+    const channelReadyForPublishing =
+      Object.values(channelOverrides).some(item => item.enabled) &&
+      form.name.trim().length >= 3 &&
+      form.description.trim().length >= 100 &&
+      Boolean(form.category) &&
+      images.length >= 3 &&
+      pricingAndInventoryReady &&
+      logisticsReady;
+    const checks = [
+      { id: 'identity', label: 'Add product name and master SKU', done: form.name.trim().length >= 3 && Boolean(form.sku_code.trim()) },
+      { id: 'media', label: 'Add at least 3 product images', done: images.length >= 3 },
+      { id: 'content', label: 'Write a detailed description (100+ characters)', done: form.description.trim().length >= 100 },
+      { id: 'category', label: 'Select an accurate product category', done: Boolean(form.category) },
+      { id: 'price', label: form.has_variants ? 'Configure variant pricing and stock' : 'Configure base price and inventory', done: pricingAndInventoryReady },
+      { id: 'shipping', label: 'Configure package weight and dimensions', done: logisticsReady },
+    ];
+
+    if (form.has_variants) {
+      checks.push({
+        id: 'variants',
+        label: 'Complete all selected variants',
+        done: variantGroups.length > 0 && hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim()),
+      });
+    }
+
+    checks.push({ id: 'channels', label: 'Prepare at least one channel for publishing', done: channelReadyForPublishing });
+    return checks;
+  }, [channelOverrides, form, hasGeneratedVariants, images.length, logisticsReady, pricingAndInventoryReady, selectedVariantItems, variantGroups.length]);
+  const completion = Math.round((completionChecks.filter(check => check.done).length / completionChecks.length) * 100);
+  const readiness = (Object.entries(channelOverrides) as Array<[OverrideChannel, ChannelOverrideForm]>).map(([key, override]) => {
+    const masterDataReady = form.name.trim().length >= 3 && form.description.trim().length >= 100 && Boolean(form.category) && images.length >= 3 && pricingAndInventoryReady && logisticsReady;
+    const overrideStarted = Boolean(override.title.trim() || override.description.trim() || override.price_markup);
+    const incompleteOverride = overrideStarted && (!override.title.trim() || !override.description.trim());
+    const channel = OVERRIDE_CHANNELS.find(item => item.key === key);
+    return {
+      key,
+      label: channel?.label ?? key,
+      state: !override.enabled ? 'inactive' : !masterDataReady ? 'blocked' : incompleteOverride ? 'warning' : 'ready',
+      detail: !override.enabled ? 'Not selected' : !masterDataReady ? 'Complete the required master product data' : incompleteOverride ? 'Complete or clear the optional overrides' : '100% Ready',
+    } as const;
+  });
+  const selectedCategoryGroup = CATEGORY_TREE.find(item => item.label === categoryLevelOne) ?? CATEGORY_TREE[0];
+  const selectedCategorySubgroup = selectedCategoryGroup.children.find(item => item.label === categoryLevelTwo) ?? selectedCategoryGroup.children[0];
+  const matchingCategoryPaths = CATEGORY_TREE.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group: group.label, subgroup: subgroup.label, leaf })))).filter(item => !categorySearch.trim() || `${item.group} ${item.subgroup} ${item.leaf}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
+  const currentSnapshot = JSON.stringify({ form, inventory, images, imageAltTexts, variantGroups, variantItems, channels, channelOverrides, specifications });
+  latestSnapshotRef.current = currentSnapshot;
+  const isDirty = dirtyTrackingReady && currentSnapshot !== baselineSnapshotRef.current;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      baselineSnapshotRef.current = latestSnapshotRef.current;
+      setDirtyTrackingReady(true);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const scrollContainer = document.getElementById('main-content');
+    const updateScrollState = () => setHasScrolledFromTop((scrollContainer?.scrollTop ?? window.scrollY) > 64);
+    updateScrollState();
+    const target: HTMLElement | Window = scrollContainer ?? window;
+    target.addEventListener('scroll', updateScrollState, { passive: true });
+    return () => target.removeEventListener('scroll', updateScrollState);
+  }, []);
+
+  function beginPublish() {
+    if (!form.sku_code.trim() || !form.name.trim() || !form.category) {
+      handleSave();
+      return;
+    }
+    setPublishOpen(true);
+    setPublishPercent(8);
+    [24, 42, 68, 86, 100].forEach((value, index) => {
+      window.setTimeout(() => setPublishPercent(value), 600 * (index + 1));
+    });
+    window.setTimeout(() => handleSave('published'), 3900);
+  }
+
+  if (editId && !existingProduct) return null;
 
   return (
     <div data-testid="product-editor-page" className="flex min-h-full flex-col bg-background">
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-card shrink-0">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/products')} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <div className={`sticky top-0 z-[100] flex flex-wrap items-center gap-3 border-b bg-card/95 px-4 backdrop-blur transition-[padding,box-shadow] duration-200 motion-reduce:transition-none sm:px-6 ${hasScrolledFromTop ? 'py-2 shadow-sm' : 'py-4'}`}>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-3">
+          <button onClick={() => navigate('/products/master-catalog')} className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
             <ArrowLeft className="size-4" />
-            {copy.productMaster}
+            {hasScrolledFromTop ? (existingProduct ? 'Edit Product' : 'Create Product') : copy.productMaster}
           </button>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-medium">
+          {!hasScrolledFromTop ? <><span className="text-muted-foreground">/</span><span className="truncate text-sm font-medium">
             {existingProduct ? copy.editDetails : copy.createNew}
-          </span>
+          </span></> : null}
+          {hasScrolledFromTop ? <div className="ml-2 flex min-w-24 max-w-sm flex-1 items-center gap-2"><Progress value={completion} aria-label={`Overall Completion: ${completion}%`} className="h-2" /><span className="shrink-0 text-xs font-semibold tabular-nums text-primary">{completion}%</span></div> : null}
+          </div>
+          {!hasScrolledFromTop ? <div className="mt-3 flex max-w-xl items-center gap-3">
+            <div className="flex items-center gap-2 whitespace-nowrap text-xs font-semibold text-foreground"><span>Overall Completion</span><span className="tabular-nums text-primary">{completion}%</span></div>
+            <Progress value={completion} aria-label={`Overall Completion: ${completion}%`} className="h-2" />
+          </div> : null}
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => navigate('/products')} disabled={uploadingImageCount > 0}>
-            {copy.cancel}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <Button variant="ghost" className="text-primary hover:bg-primary/5 hover:text-primary" onClick={() => handleSave('draft')} disabled={uploadingImageCount > 0 || !isDirty}>
+            {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Save Draft
           </Button>
-          <Button onClick={handleSave} disabled={uploadingImageCount > 0}>
-            {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4 mr-1.5" />}
-            {existingProduct ? copy.saveChanges : copy.saveProduct}
+          <Button onClick={beginPublish} disabled={uploadingImageCount > 0 || publishOpen}>
+            {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : <CloudUpload className="size-4" />}
+            Save & Publish
           </Button>
         </div>
       </div>
@@ -1239,15 +1450,81 @@ export default function ProductCreatePage() {
         </div>
       )}
 
+      <nav className="sticky top-[104px] z-30 flex min-h-12 gap-1 overflow-x-auto border-b bg-background/95 px-6 backdrop-blur sm:top-14" aria-label="Product form sections">
+        {[
+          ['channels', 'Sales Channels'],
+          ['basic', 'Basic Info'],
+          ['pricing', 'Pricing & Variants'],
+          ['shipping', 'Shipping & Inventory'],
+          ['more', 'More Information'],
+        ].map(([id, label]) => <button key={id} type="button" onClick={() => scrollToSection(id)} aria-current={activeSection === id ? 'step' : undefined} className={`relative min-h-12 shrink-0 px-3 text-sm font-medium transition-colors ${activeSection === id ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-muted-foreground hover:text-foreground'}`}>{label}</button>)}
+      </nav>
+
       {/* Content */}
       <div data-testid="product-editor-content">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[1fr_300px]">
+        <div className="grid w-full grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_300px]">
 
           {/* Left Column */}
           <div className="space-y-5">
 
+            {/* Sales Channels */}
+            <Card id="product-section-channels" className="scroll-mt-28 border-primary/20">
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Sales Channels</CardTitle>
+                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground">Choose where this product will be published. You can configure channel-specific content later.</p>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{Object.values(channelOverrides).filter(channel => channel.enabled).length} selected</span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {OVERRIDE_CHANNELS.map(channel => {
+                    const override = channelOverrides[channel.key];
+                    const ChannelIcon = channel.icon;
+                    return <label key={channel.key} className={`flex min-h-16 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${override.enabled ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
+                      <Checkbox checked={override.enabled} onCheckedChange={value => updateChannelOverride(channel.key, { enabled: Boolean(value) })} aria-label={`Publish to ${channel.label}`} />
+                      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${channel.iconClassName}`}><ChannelIcon className="size-4" /></span>
+                      <span className="min-w-0"><span className="block truncate text-sm font-semibold">{channel.label}</span><span className="block truncate text-[11px] text-muted-foreground">{channel.description}</span></span>
+                    </label>;
+                  })}
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="mb-3">
+                    <Label>Channel-specific overrides</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">Optional. Leave fields empty to use the master product title, price and description.</p>
+                  </div>
+                  {Object.values(channelOverrides).every(channel => !channel.enabled) ? (
+                    <div className="flex min-h-20 items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20 px-4 text-center text-xs text-muted-foreground"><Radio className="size-4" />Select at least one sales channel to configure publishing details.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {OVERRIDE_CHANNELS.filter(channel => channelOverrides[channel.key].enabled).map(channel => {
+                        const override = channelOverrides[channel.key];
+                        const ChannelIcon = channel.icon;
+                        return <details key={channel.key} className="group rounded-lg border bg-background open:border-primary/25">
+                          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                            <span className={`grid size-8 shrink-0 place-items-center rounded-md ${channel.iconClassName}`}><ChannelIcon className="size-4" /></span>
+                            <span className="text-sm font-semibold">{channel.label}</span>
+                            <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Optional overrides</span>
+                            <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
+                          </summary>
+                          <div className="grid gap-3 border-t bg-muted/10 p-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+                            <Field label="Custom Title"><Input value={override.title} onChange={event => updateChannelOverride(channel.key, { title: event.target.value })} placeholder={form.name || `${channel.label} product title`} /></Field>
+                            <Field label="Price Markup %"><Input type="number" value={override.price_markup} onChange={event => updateChannelOverride(channel.key, { price_markup: event.target.value })} placeholder="0" /></Field>
+                            <div className="sm:col-span-2"><Field label="Custom Description"><Textarea rows={2} value={override.description} onChange={event => updateChannelOverride(channel.key, { description: event.target.value })} placeholder={`Description optimized for ${channel.label}`} /></Field></div>
+                          </div>
+                        </details>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Product Identity */}
-            <Card>
+            <Card id="product-section-basic" className="scroll-mt-28">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Layers className="size-4 text-primary" />
@@ -1256,16 +1533,16 @@ export default function ProductCreatePage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
+                  {([
                     { label: 'GTIN', key: 'gtin', placeholder: copy.gtinPlaceholder },
                     { label: 'MPN', key: 'mpn', placeholder: copy.mpnPlaceholder },
-                    { label: locale === 'ja-JP' ? '型番' : locale === 'vi-VN' ? 'Model' : 'Model Number', key: 'model_number', placeholder: copy.modelPlaceholder },
-                    { label: locale === 'ja-JP' ? 'ブランド名' : locale === 'vi-VN' ? 'Tên thương hiệu' : 'Brand name', key: 'brand', placeholder: copy.brandPlaceholder },
+                    { label: 'Model Number', key: 'model_number', placeholder: copy.modelPlaceholder },
+                    { label: 'Brand Name', key: 'brand', placeholder: copy.brandPlaceholder },
                     { label: 'ASIN', key: 'asin', placeholder: copy.asinPlaceholder },
-                    { label: locale === 'ja-JP' ? 'メーカー名' : locale === 'vi-VN' ? 'Tên nhà sản xuất' : 'Manufacturer name', key: 'manufacturer', placeholder: copy.manufacturerPlaceholder },
-                  ].map(f => (
+                    { label: 'Manufacturer Name', key: 'manufacturer', placeholder: copy.manufacturerPlaceholder },
+                  ] as const).map(f => (
                     <Field key={f.key} label={f.label}>
-                      <Input value={(form as any)[f.key]} onChange={e => setField(f.key as any, e.target.value)} placeholder={f.placeholder} />
+                      <Input value={form[f.key]} onChange={e => setField(f.key, e.target.value)} placeholder={f.placeholder} />
                     </Field>
                   ))}
                 </div>
@@ -1286,7 +1563,7 @@ export default function ProductCreatePage() {
                     <Input value={form.sku_code} onChange={e => setField('sku_code', e.target.value.toUpperCase())} placeholder={copy.skuPlaceholder} className="font-mono uppercase" />
                   </Field>
                   <Field label={copy.productName} required error={errors.name}>
-                    <Input value={form.name} onChange={e => setField('name', e.target.value)} placeholder={copy.namePlaceholder} />
+                    <Input value={form.name} onChange={e => updateProductName(e.target.value)} placeholder={copy.namePlaceholder} minLength={3} maxLength={120} />
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label={copy.description}>
@@ -1294,10 +1571,7 @@ export default function ProductCreatePage() {
                     </Field>
                   </div>
                   <Field label={copy.category} required error={errors.category}>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.category} onChange={e => setField('category', e.target.value)}>
-                      <option value="">{copy.selectCategory}</option>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabels[c] ?? c}</option>)}
-                    </select>
+                    <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(form.category); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
                   </Field>
                   <Field label={copy.condition}>
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.condition} onChange={e => setField('condition', e.target.value)}>
@@ -1305,6 +1579,33 @@ export default function ProductCreatePage() {
                     </select>
                   </Field>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Product Structure */}
+            <Card id="product-section-pricing" className="scroll-mt-28">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />Product Structure</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">Choose how this product is sold. Selecting Variants opens the attribute and SKU matrix builder below.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Product structure">
+                  {([
+                    { type: 'single', title: 'Single product', description: 'One SKU with one price and stock record.' },
+                    { type: 'variant', title: 'Product with variants', description: 'Multiple SKUs by Color, Size or other options.' },
+                    { type: 'bundle', title: 'Product bundle', description: 'A set of products sold together.' },
+                  ] as const).map(option => {
+                    const TypeIcon = PRODUCT_TYPE_ICONS[option.type];
+                    const selected = form.product_type === option.type;
+                    return <button key={option.type} type="button" role="radio" aria-checked={selected} onClick={() => handleProductTypeChange(option.type)} className={`min-h-28 rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
+                      <span className="flex items-start gap-3">
+                        <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}><TypeIcon className="size-4" /></span>
+                        <span><span className="flex items-center gap-2 text-sm font-semibold">{option.title}{selected ? <Check className="size-4 text-primary" /> : null}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span></span>
+                      </span>
+                    </button>;
+                  })}
+                </div>
+                {form.product_type === 'variant' ? <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-primary"><CircleCheck className="size-4 shrink-0" /><span><strong>Variant builder enabled.</strong> Add up to two attributes below to generate the SKU matrix.</span></div> : null}
               </CardContent>
             </Card>
 
@@ -1317,7 +1618,7 @@ export default function ProductCreatePage() {
                 onItemsChange={setVariantItems}
                 parentSku={form.sku_code}
                 parentTitle={form.name}
-                basePrice={form.original_price}
+                basePrice={form.retail_price}
                 existingSkus={existingSkuList}
                 copy={{
                   duplicateAttribute: copy.duplicateAttribute,
@@ -1339,13 +1640,14 @@ export default function ProductCreatePage() {
               />
             )}
 
-            {/* Price */}
-            <Card>
+            {/* Base/default price is replaced by the variant matrix once variants exist. */}
+            {!hasGeneratedVariants && <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Info className="size-4 text-primary" />
-                  {copy.price}
+                  {form.has_variants ? 'Default Pricing' : copy.price}
                 </CardTitle>
+                {form.has_variants ? <p className="text-xs leading-5 text-muted-foreground">Used as the starting price for newly generated variants. Once the variant matrix exists, manage pricing directly in the matrix.</p> : null}
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1372,42 +1674,46 @@ export default function ProductCreatePage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card>}
 
-            {/* Shipping & Return */}
-            <Card>
+            {/* Shipping & Logistics */}
+            <Card id="product-section-shipping" className="scroll-mt-28">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Truck className="size-4 text-primary" />
-                  {copy.shippingReturn}
+                  Shipping & Logistics
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <RowField label={copy.productDimensions} fields={[
                   { label: copy.length, value: form.prod_length, onChange: v => setField('prod_length', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.height, value: form.prod_height, onChange: v => setField('prod_height', v), placeholder: '0', suffix: 'cm' },
                   { label: copy.width, value: form.prod_width, onChange: v => setField('prod_width', v), placeholder: '0', suffix: 'cm' },
+                  { label: copy.height, value: form.prod_height, onChange: v => setField('prod_height', v), placeholder: '0', suffix: 'cm' },
                   { label: copy.weight, value: form.prod_weight, onChange: v => setField('prod_weight', v), placeholder: '0', suffix: 'g' },
                 ]} />
-                <RowField label={copy.packageDimensions} fields={[
+                <div className="flex items-center justify-between gap-3">
+                  <div><Label>Package Dimensions & Weight</Label><p className="mt-1 text-xs text-muted-foreground">Required for marketplace shipping rates and carrier labels.</p></div>
+                  <select aria-label="Package weight unit" value={packageWeightUnit} onChange={event => setPackageWeightUnit(event.target.value as 'g' | 'kg')} className="h-8 rounded-md border border-input bg-background px-2 text-xs font-semibold"><option value="g">Grams (g)</option><option value="kg">Kilograms (kg)</option></select>
+                </div>
+                <RowField label="L × W × H" fields={[
                   { label: copy.length, value: form.pkg_length, onChange: v => setField('pkg_length', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.height, value: form.pkg_height, onChange: v => setField('pkg_height', v), placeholder: '0', suffix: 'cm' },
                   { label: copy.width, value: form.pkg_width, onChange: v => setField('pkg_width', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.weight, value: form.pkg_weight, onChange: v => setField('pkg_weight', v), placeholder: '0', suffix: 'g' },
+                  { label: copy.height, value: form.pkg_height, onChange: v => setField('pkg_height', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Package Weight', value: packageWeightUnit === 'kg' && form.pkg_weight ? String(num(form.pkg_weight) / 1000) : form.pkg_weight, onChange: v => setField('pkg_weight', packageWeightUnit === 'kg' ? String(num(v) * 1000) : v), placeholder: '0', suffix: packageWeightUnit },
                 ]} />
               </CardContent>
             </Card>
 
             {/* Others */}
-            <Card>
+            <Card id="product-section-more" className="scroll-mt-28">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Info className="size-4 text-primary" />
                   {copy.others}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="max-w-xs space-y-3">
+              <CardContent className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <Field label={copy.countryOfOrigin}>
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.country_of_origin} onChange={e => setField('country_of_origin', e.target.value)}>
                       <option value="">{copy.selectCountry}</option>
@@ -1426,6 +1732,15 @@ export default function ProductCreatePage() {
                     </p>
                   </Field>
                 </div>
+                <div className="border-t pt-4">
+                  <div className="mb-3 flex items-center justify-between"><div><Label>Specifications</Label><p className="mt-1 text-xs text-muted-foreground">Reusable attributes shown across channels.</p></div><Button type="button" variant="outline" size="sm" disabled={specifications.length >= 20} onClick={() => setSpecifications(current => [...current, { id: genId('spec'), name: '', value: '' }])}><Plus className="size-3.5" />Add information</Button></div>
+                  <div className="space-y-2">{specifications.map((spec, index) => <div key={spec.id} className="grid grid-cols-[1fr_1fr_auto] gap-2"><Input value={spec.name} onChange={event => setSpecifications(current => current.map(item => item.id === spec.id ? { ...item, name: event.target.value } : item))} placeholder="Attribute name" aria-label={`Specification ${index + 1} name`} /><Input value={spec.value} onChange={event => setSpecifications(current => current.map(item => item.id === spec.id ? { ...item, value: event.target.value } : item))} placeholder="Value" aria-label={`Specification ${index + 1} value`} /><Button type="button" variant="ghost" size="icon" aria-label={`Remove specification ${index + 1}`} onClick={() => setSpecifications(current => current.filter(item => item.id !== spec.id))}><Trash2 className="size-4" /></Button></div>)}</div>
+                </div>
+                <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2"><Field label="Product URL"><div className="flex h-10 items-center rounded-md border border-input bg-muted/20 pl-3 text-xs text-muted-foreground"><span className="shrink-0">store.primeweb.com/products/</span><Input value={form.slug} onChange={event => setField('slug', slugify(event.target.value))} className="h-9 border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0" placeholder="product-url" /></div></Field></div>
+                  <Field label="SEO Meta Title"><Input value={form.meta_title} maxLength={70} onChange={event => setField('meta_title', event.target.value)} placeholder={form.name || 'Search result title'} /><p className="text-right text-[10px] text-muted-foreground">{form.meta_title.length}/70</p></Field>
+                  <Field label="SEO Meta Description"><Textarea rows={2} value={form.meta_description} maxLength={160} onChange={event => setField('meta_description', event.target.value)} placeholder="Short search-engine description" /><p className="text-right text-[10px] text-muted-foreground">{form.meta_description.length}/160</p></Field>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1433,61 +1748,22 @@ export default function ProductCreatePage() {
           {/* Right Column */}
           <div className="space-y-5">
 
-            {/* Product Information */}
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Info className="size-4 text-primary" />
-                  {copy.productInformation}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1.5 block">{copy.productType}</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {(['single', 'variant', 'bundle'] as const).map(pt => {
-                      const TypeIcon = PRODUCT_TYPE_ICONS[pt];
-                      return (
-                        <label
-                          key={pt}
-                          className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                            form.product_type === pt
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-transparent bg-muted/50 hover:bg-muted'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="product_type"
-                            value={pt}
-                            checked={form.product_type === pt}
-                            onChange={() => setField('product_type', pt)}
-                            className="sr-only"
-                          />
-                          <TypeIcon className="size-3.5" />
-                          {pt === 'single' ? copy.productTypeSingle : pt === 'variant' ? copy.productTypeVariant : copy.productTypeBundle}
-                        </label>
-                      );
-                    })}
+              <CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-sm">Product Content Strength</CardTitle><span className="text-sm font-bold tabular-nums text-primary">{completion}%</span></div><Progress value={completion} className="mt-2 h-2" /></CardHeader>
+              <CardContent><ul className="space-y-2">{completionChecks.map(check => <li key={check.id} className={`flex items-start gap-2 text-xs leading-5 ${check.done ? 'text-foreground' : 'text-muted-foreground'}`}><span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border ${check.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-border'}`}>{check.done ? <Check className="size-2.5" /> : null}</span><span>{check.label}</span></li>)}</ul></CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-sm"><CircleCheck className="size-4 text-primary" />Channel Readiness</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {readiness.every(channel => channel.state === 'inactive') ? <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-center text-xs leading-5 text-muted-foreground">No publishing channels selected yet.</div> : readiness.filter(channel => channel.state !== 'inactive').map(channel => <div key={channel.key} className="rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`size-2.5 rounded-full ${channel.state === 'ready' ? 'bg-emerald-500' : channel.state === 'warning' ? 'bg-amber-400' : 'bg-rose-500'}`} />
+                    <span className="text-sm font-semibold">{channel.label}</span>
+                    <span className={`ml-auto text-xs font-semibold ${channel.state === 'ready' ? 'text-emerald-700' : channel.state === 'warning' ? 'text-amber-700' : 'text-rose-700'}`}>{channel.state === 'ready' ? '100%' : channel.state === 'warning' ? 'Needs content' : 'Blocked'}</span>
                   </div>
-                </div>
-                {form.product_type === 'variant' && (
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      id="has-variants"
-                      checked={form.has_variants}
-                      onCheckedChange={v => handleHasVariantsChange(Boolean(v))}
-                      className="mt-0.5"
-                    />
-                    <Label htmlFor="has-variants" className="text-sm font-normal cursor-pointer">
-                      {copy.hasVariations}
-                    </Label>
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground space-y-1 pt-1 border-t">
-                  <p><span className="text-foreground font-medium">{copy.family}:</span> {form.category ? categoryLabels[form.category] ?? form.category : '—'}</p>
-                  <p><span className="text-foreground font-medium">{copy.variants}:</span> {form.has_variants ? formatMessage(copy.selected, { count: totalVariants }) : copy.no}</p>
-                </div>
+                  <p className="mt-1.5 pl-[18px] text-[11px] leading-4 text-muted-foreground">{channel.detail}</p>
+                </div>)}
               </CardContent>
             </Card>
 
@@ -1522,7 +1798,7 @@ export default function ProductCreatePage() {
                     <div className="relative size-24 rounded-lg overflow-hidden border">
                       <img src={images[0]} alt={copy.mainAlt} className="w-full h-full object-cover" />
                       <button
-                        onClick={() => setImages(imgs => imgs.slice(1))}
+                        onClick={() => { setImages(imgs => imgs.slice(1)); setImageAltTexts(items => items.slice(1)); }}
                         aria-label={copy.removeMainImage}
                         className="absolute top-1 right-1 size-5 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
                       >
@@ -1579,7 +1855,7 @@ export default function ProductCreatePage() {
                           className="w-full h-full object-cover"
                         />
                         <button
-                          onClick={() => setImages(imgs => imgs.filter((_, idx) => idx !== i + 1))}
+                          onClick={() => { setImages(imgs => imgs.filter((_, idx) => idx !== i + 1)); setImageAltTexts(items => items.filter((_, idx) => idx !== i + 1)); }}
                           aria-label={formatMessage(copy.removeAdditionalImage, { index: i + 2 })}
                           className="absolute top-1 right-1 size-4 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
                         >
@@ -1589,6 +1865,7 @@ export default function ProductCreatePage() {
                     ))}
                   </div>
                 </div>
+                {images.length > 0 ? <div className="space-y-2 border-t pt-3"><p className="text-xs font-medium">Image alt text</p>{images.map((url, index) => <div key={`${url}-alt`} className="flex items-center gap-2"><img src={url} alt="" className="size-8 rounded border object-cover" /><Input value={imageAltTexts[index] ?? ''} maxLength={125} onChange={event => setImageAltTexts(current => { const next = [...current]; next[index] = event.target.value; return next; })} placeholder={`Describe image ${index + 1}`} aria-label={`Alt text for image ${index + 1}`} className="h-8 text-xs" /></div>)}</div> : null}
               </CardContent>
             </Card>
 
@@ -1638,6 +1915,20 @@ export default function ProductCreatePage() {
       </div>
 
       {/* Confirm Dialog */}
+      <Dialog open={categoryOpen} onOpenChange={setCategoryOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="border-b p-5"><DialogTitle>Select product category</DialogTitle><DialogDescription>Choose the most accurate master category. Channel mappings can be configured during publishing.</DialogDescription></DialogHeader>
+          <div className="p-5">
+            <div className="relative mb-4"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={categorySearch} onChange={event => setCategorySearch(event.target.value)} placeholder="Search categories..." className="pl-9" /></div>
+            {categorySearch.trim() ? <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border p-2">{matchingCategoryPaths.map(item => <button key={`${item.group}-${item.subgroup}-${item.leaf}`} type="button" onClick={() => { setCategoryLevelOne(item.group); setCategoryLevelTwo(item.subgroup); setPendingCategory(item.leaf); }} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${pendingCategory === item.leaf ? 'bg-primary/10 text-primary' : ''}`}><span>{item.group} / {item.subgroup} / <strong>{item.leaf}</strong></span>{pendingCategory === item.leaf ? <Check className="size-4" /> : null}</button>)}</div> : <div className="grid min-h-72 grid-cols-1 overflow-hidden rounded-lg border sm:grid-cols-3">
+              <div className="border-b p-2 sm:border-b-0 sm:border-r">{CATEGORY_TREE.map(group => <button key={group.label} type="button" onClick={() => { setCategoryLevelOne(group.label); setCategoryLevelTwo(group.children[0].label); }} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelOne === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
+              <div className="border-b p-2 sm:border-b-0 sm:border-r">{selectedCategoryGroup.children.map(group => <button key={group.label} type="button" onClick={() => setCategoryLevelTwo(group.label)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelTwo === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
+              <div className="p-2">{selectedCategorySubgroup.children.map(category => <button key={category} type="button" onClick={() => setPendingCategory(category)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${pendingCategory === category ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{category}{pendingCategory === category ? <Check className="size-4" /> : null}</button>)}</div>
+            </div>}
+          </div>
+          <div className="flex flex-col gap-3 border-t p-5 sm:flex-row sm:items-center"><p className="mr-auto truncate text-xs text-muted-foreground">Selected: <strong className="text-foreground">{pendingCategory || 'None'}</strong></p><Button variant="outline" onClick={() => setCategoryOpen(false)}>Cancel</Button><Button disabled={!pendingCategory} onClick={() => { setField('category', pendingCategory); setCategoryOpen(false); setCategorySearch(''); }}>Confirm Category</Button></div>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={confirmDialog.open}
         onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
@@ -1648,6 +1939,31 @@ export default function ProductCreatePage() {
         cancelText={copy.keepVariants}
         variant="destructive"
       />
+      <Dialog open={publishOpen} onOpenChange={open => { if (publishPercent >= 100) setPublishOpen(open); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Publishing product</DialogTitle><DialogDescription>Prime OS is saving master data and synchronizing every enabled channel.</DialogDescription></DialogHeader>
+          <div className="space-y-5 py-2">
+            <div><div className="mb-2 flex items-center justify-between text-sm font-semibold"><span>Overall sync progress</span><span className="tabular-nums text-primary">{publishPercent}%</span></div><Progress value={publishPercent} className="h-2.5" /></div>
+            <div className="space-y-2">
+              {[
+                { label: 'Master DB Saved', threshold: 24 },
+                { label: 'Media Uploaded', threshold: 42 },
+                { label: 'Shopee Synced', threshold: 68 },
+                { label: 'TikTok Synced', threshold: 86 },
+                { label: 'WebStore Published', threshold: 100 },
+              ].map((step, index) => {
+                const complete = publishPercent >= step.threshold;
+                const active = !complete && (index === 0 || publishPercent >= [0, 24, 42, 68, 86][index]);
+                return <div key={step.label} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+                  {complete ? <CircleCheck className="size-4 text-emerald-600" /> : active ? <Loader2 className="size-4 animate-spin text-primary" /> : <CircleAlert className="size-4 text-muted-foreground/50" />}
+                  <span className={`text-sm ${complete ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{step.label}</span>
+                  <span className="ml-auto text-xs tabular-nums text-muted-foreground">{complete ? '100%' : active ? 'Syncing…' : 'Queued'}</span>
+                </div>;
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

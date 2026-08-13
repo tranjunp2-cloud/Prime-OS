@@ -7,6 +7,9 @@
     "packages/*"
   ],
   "scripts": {
+    "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:dev:logs": "docker compose -f docker-compose.dev.yml logs -f",
+    "docker:dev:stop": "docker compose -f docker-compose.dev.yml down",
     "dev:web": "npm run dev:5177 --workspace @primeos/web -- --host 127.0.0.1",
     "dev:admin": "npm run dev --workspace @primeos/admin",
     "dev:api": "npm run dev --workspace @primeos/api",

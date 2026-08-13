@@ -44,7 +44,7 @@ export function GlobalCopilotComposer({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder='Hỏi Prime AI...'
+          placeholder="Ask Prime AI..."
           disabled={disabled}
           className="min-h-[52px] max-h-[120px] resize-none rounded-lg border-border/60 bg-muted/20 px-4 py-3 text-sm leading-6 shadow-none placeholder:text-muted-foreground/70"
           rows={1}
@@ -64,7 +64,7 @@ export function GlobalCopilotComposer({
       <div className="mt-2 flex items-start gap-2 rounded-md bg-muted/30 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
         <ShieldCheck className="mt-0.5 size-3.5 flex-shrink-0 text-primary" />
         <p>
-          Prime AI chỉ tạo draft/đề xuất trước; thao tác ghi dữ liệu luôn cần xác nhận.
+          Prime AI creates drafts and recommendations first; any data-changing action requires confirmation.
         </p>
       </div>
     </div>

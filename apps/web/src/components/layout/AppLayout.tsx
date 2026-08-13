@@ -1,571 +1,67 @@
-import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  BellRing,
-  ChevronRight,
-  ChevronDown,
-  ClipboardList,
-  Grid3X3,
-  Hash,
-  LogOut,
-  Megaphone,
-  Package,
-  Search,
-  ShoppingCart,
-  UserRoundCheck,
-  X,
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { LayoutDashboard, UsersRound } from 'lucide-react';
+import { NavLink, Routes, useLocation } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
+import { AppHeader } from './AppHeader';
 import { PrimeCommandPalette } from './PrimeCommandPalette';
-import { WorkspaceTabBar } from '@/components/workspace/WorkspaceTabBar';
-import { TabContentHost } from '@/components/workspace/TabContentHost';
 import { GlobalCopilotWorkspace } from '@/components/copilot/GlobalCopilotWorkspace';
-import { useAuth } from '@/contexts/AuthContext';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 import { useI18n } from '@/lib/i18n/I18nContext';
-import { getShellDictionary, getShellNavLabel } from '@/lib/i18n/shell-dictionaries';
-import { getPrimeSnapshot } from '@/lib/prime/prime-data';
-import { getPrimeNavPath } from '@/lib/prime/prime-navigation';
-import { findPrimeProductSettingsItemByHref, flattenPrimeProductSettingsItems, getPrimeProductSettingsRootMatchPaths, primeProductSettingsGroups, type PrimeProductSettingsGroup, type PrimeProductSettingsItem } from '@/lib/prime/prime-product-settings-nav';
-import { closeTab, focusTab, getWorkspaceTabsState, openTab, reopenLastClosedTab, useWorkspaceTabs } from '@/lib/workspace/workspace-tabs-store';
+import { getShellDictionary } from '@/lib/i18n/shell-dictionaries';
 import { cn } from '@/lib/utils';
+import { PrimeRoutes } from '@/routes/PrimeRoutes';
+import { CrmJourneyOverviewContent } from '@/pages/prime/PrimeCrmOverviewPage';
+import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 
-type SearchKind = 'Area' | 'Tower' | 'Floor' | 'Product' | 'SKU' | 'Order' | 'Lead' | 'Customer' | 'RFQ' | 'Campaign' | 'Alert';
+const CRM_ONBOARDING_HIDDEN_KEY = 'primeos.crm-onboarding.hidden';
+const CRM_ONBOARDING_SESSION_KEY = 'primeos.crm-onboarding.seen-this-session';
 
-interface GlobalSearchResult {
-  id: string;
-  kind: SearchKind;
-  title: string;
-  detail: string;
-  href: string;
-  keywords: string;
-  priority: number;
-}
-
-const productSettingsDisplayLabels: Record<string, string> = {
-  ecom: 'Commerce',
-  cos: 'Commerce Operations',
-  mdec: 'Multi-channel CRM Engagement Center',
-  'content-creator-ops': 'Content and Social',
-  'sources-ads': 'Advertising Source',
-  'fin-support': 'Finance Support',
-  'lead-response-capture': 'Leads and Requests for Quote',
-  'consulting-agent-kpi': 'Key Performance Indicator Dashboard',
-};
-
-function getProductSettingsDisplayLabel(item: Pick<PrimeProductSettingsItem | PrimeProductSettingsGroup, 'id' | 'label'>) {
-  return productSettingsDisplayLabels[item.id] || item.label.replace(/\bRFQs\b/g, 'Requests for Quote');
-}
-
-function flattenProductSettingsFunctions(items: PrimeProductSettingsItem[]): PrimeProductSettingsItem[] {
-  return items.flatMap((item) => (item.children.length ? flattenProductSettingsFunctions(item.children) : item));
-}
-
-function ProductSettingsFlyout({
-  groups,
-  activeGroupId,
-  onActiveGroupChange,
-  onNavigate,
-}: {
-  groups: PrimeProductSettingsGroup[];
-  activeGroupId: string;
-  onActiveGroupChange: (groupId: string) => void;
-  onNavigate: (item: PrimeProductSettingsItem) => void;
-}) {
-  const activeGroup = groups.find((group) => group.id === activeGroupId) || groups[0];
-  const [activeProductId, setActiveProductId] = useState(activeGroup?.items[0]?.id || '');
-  const activeProduct = activeGroup?.items.find((item) => item.id === activeProductId) || activeGroup?.items[0];
-  const productFunctions = flattenProductSettingsFunctions(activeProduct?.children || []);
-  const hasProductFunctions = productFunctions.length > 0;
-  const ActiveProductIcon = activeProduct?.icon || Package;
-
-  useEffect(() => {
-    setActiveProductId(activeGroup?.items[0]?.id || '');
-  }, [activeGroup?.id, activeGroup?.items]);
-
-  return (
-    <div
-      className="panel-shadow absolute left-0 top-[calc(100%+0.5rem)] z-[120] grid h-[min(520px,calc(100svh_-_var(--header-height)_-_1rem))] w-[min(1160px,calc(100vw_-_15rem_-_2rem))] grid-cols-[minmax(240px,0.78fr)_minmax(300px,0.95fr)_minmax(360px,1.25fr)] overflow-hidden rounded-lg border bg-popover text-sm text-popover-foreground"
-    >
-      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r bg-muted/30 p-3">
-        <div className="flex items-center justify-between gap-2 px-2 pb-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Suites</div>
-          <div className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Layer 1</div>
-        </div>
-        <div className="grid gap-2">
-          {groups.map((group) => {
-            const Icon = group.icon;
-            const active = group.id === activeGroup?.id;
-
-            return (
-              <button
-                key={group.id}
-                type="button"
-                className={cn(
-                  'group flex w-full min-w-0 items-center gap-3 rounded-md px-2.5 py-2.5 text-left font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
-                )}
-                onMouseEnter={() => onActiveGroupChange(group.id)}
-                onFocus={() => onActiveGroupChange(group.id)}
-                onClick={() => onActiveGroupChange(group.id)}
-              >
-                <span className={cn('grid size-8 shrink-0 place-items-center rounded-md border transition-colors', active ? 'border-primary/25 bg-primary/10 text-primary' : 'border-border bg-background/70 group-hover:border-primary/25')}>
-                  {Icon ? <Icon className="size-4" /> : null}
-                </span>
-                <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{getProductSettingsDisplayLabel(group)}</span>
-                <span className="font-identifier shrink-0 rounded-full border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">{group.badgeCount}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-r p-3">
-        <div className="flex items-center justify-between gap-2 px-2 pb-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Products</div>
-          <div className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Layer 2</div>
-        </div>
-        <div className="grid gap-2">
-          {activeGroup?.items.map((item) => {
-            const Icon = item.icon;
-            const active = item.id === activeProduct?.id;
-            const functionCount = flattenProductSettingsFunctions(item.children).length;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={cn(
-                  'group flex w-full min-w-0 items-center gap-2.5 rounded-md border px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  active ? 'border-primary/25 bg-primary/10 text-primary shadow-sm' : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/70 hover:text-foreground'
-                )}
-                onMouseEnter={() => setActiveProductId(item.id)}
-                onFocus={() => setActiveProductId(item.id)}
-                onClick={() => setActiveProductId(item.id)}
-              >
-                <span className={cn('grid size-8 shrink-0 place-items-center rounded-md border transition-colors', active ? 'border-primary/25 bg-background text-primary' : 'border-border bg-background/70 group-hover:border-primary/25')}>
-                  {Icon ? <Icon className="size-4" /> : null}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block whitespace-normal break-words text-sm font-semibold leading-5">{getProductSettingsDisplayLabel(item)}</span>
-                  <span className="block whitespace-normal text-[11px] leading-4 text-muted-foreground">{functionCount ? `${functionCount} functions` : 'Direct product route'}</span>
-                </span>
-                <ChevronRight className={cn('size-3.5 shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="relative flex min-h-0 flex-col overflow-hidden p-4">
-        <div className="relative mb-3 flex min-w-0 shrink-0 items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Product functions</div>
-              <div className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Layer 3</div>
-            </div>
-            <h3 className="mt-1 whitespace-normal break-words text-lg font-semibold leading-6 text-foreground">{activeProduct ? getProductSettingsDisplayLabel(activeProduct) : 'Select product'}</h3>
-            <p className="mt-0.5 max-w-md text-xs leading-5 text-muted-foreground">
-              {hasProductFunctions ? 'Hover to preview. Click product or function to open its Prime OS route.' : 'This product opens directly and has no nested function pages.'}
-            </p>
-          </div>
-          {activeProduct ? (
-            <button
-              type="button"
-              className="max-w-full shrink-0 whitespace-normal rounded-md border bg-background px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:whitespace-nowrap"
-              onClick={() => onNavigate(activeProduct)}
-            >
-              Open product
-            </button>
-          ) : null}
-        </div>
-
-        {hasProductFunctions ? (
-          <div className="relative -mx-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-2">
-            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
-            {productFunctions.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="group flex min-h-[116px] flex-col rounded-md border bg-background p-3 text-left shadow-sm transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => onNavigate(item)}
-                >
-                  <span className="mb-3 grid size-9 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary">
-                    {Icon ? <Icon className="size-4" /> : null}
-                  </span>
-                  <span className="block whitespace-normal text-base font-semibold leading-snug text-foreground [overflow-wrap:normal] [word-break:normal] hyphens-none">{getProductSettingsDisplayLabel(item)}</span>
-                  <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-medium text-primary">Open <ChevronRight className="size-3" /></span>
-                </button>
-              );
-            })}
-            </div>
-          </div>
-        ) : (
-          <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-background p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary">
-                <ActiveProductIcon className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="whitespace-normal break-words font-semibold text-foreground">{activeProduct ? getProductSettingsDisplayLabel(activeProduct) : 'Open product'}</div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Direct product route. Open it from here or choose another product with nested function pages.
-                </p>
-              </div>
-            </div>
-            {activeProduct ? (
-              <button
-                type="button"
-                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => onNavigate(activeProduct)}
-              >
-                Open product <ChevronRight className="size-3.5" />
-              </button>
-            ) : null}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const searchKindIcons: Record<SearchKind, ReactNode> = {
-  Area: <Grid3X3 className="size-4" />,
-  Tower: <Grid3X3 className="size-4" />,
-  Floor: <Grid3X3 className="size-4" />,
-  Product: <Package className="size-4" />,
-  SKU: <Hash className="size-4" />,
-  Order: <ShoppingCart className="size-4" />,
-  Lead: <UserRoundCheck className="size-4" />,
-  Customer: <UserRoundCheck className="size-4" />,
-  RFQ: <ClipboardList className="size-4" />,
-  Campaign: <Megaphone className="size-4" />,
-  Alert: <BellRing className="size-4" />,
-};
-
-function normalizeSearchText(value: unknown) {
-  return String(value ?? '').trim().toLowerCase();
-}
-
-function buildSearchText(parts: unknown[]) {
-  return parts.map((part) => normalizeSearchText(part)).filter(Boolean).join(' ');
-}
-
-function getAccountInitials(fullName?: string, email?: string) {
-  const source = fullName?.trim() || email?.split('@')[0] || 'PrimeOS';
-  return source
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'PO';
-}
-
-function getAccountRoleLabel(role?: string) {
-  if (role === 'admin') return 'Admin';
-  if (role === 'user') return 'Operator';
-  return 'Viewer';
-}
-
-function scoreSearchResult(result: GlobalSearchResult, query: string) {
-  const normalizedQuery = normalizeSearchText(query);
-  const title = normalizeSearchText(result.title);
-  const keywords = normalizeSearchText(result.keywords);
-
-  if (!normalizedQuery) {
-    return 0;
-  }
-
-  if (title === normalizedQuery) {
-    return 1000 + result.priority;
-  }
-
-  if (title.startsWith(normalizedQuery)) {
-    return 820 + result.priority;
-  }
-
-  if (title.includes(normalizedQuery)) {
-    return 640 + result.priority;
-  }
-
-  if (keywords.includes(normalizedQuery)) {
-    return 420 + result.priority;
-  }
-
-  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
-  const matchedTerms = terms.filter((term) => keywords.includes(term)).length;
-
-  return matchedTerms > 0 ? matchedTerms * 120 + result.priority : 0;
-}
-
-function buildGlobalSearchResults(): GlobalSearchResult[] {
-  const snapshot = getPrimeSnapshot();
-
-  const productSettingsResults = primeProductSettingsGroups.flatMap((group) => {
-    const groupResult: GlobalSearchResult = {
-      id: `area-${group.id}`,
-      kind: 'Area',
-      title: group.label,
-      detail: `Workspace map · ${group.badgeCount} products/towers`,
-      href: group.href,
-      keywords: buildSearchText([group.id, group.label, 'workspace map', 'area overview', 'tower catalog']),
-      priority: 95,
-    };
-
-    const itemResults = flattenPrimeProductSettingsItems([group]).map((item) => ({
-      id: `${item.kind}-${item.id}`,
-      kind: item.kind === 'floor' ? 'Floor' as const : 'Tower' as const,
-      title: item.label,
-      detail: `${group.label} · Workspace map · ${item.kind}`,
-      href: item.href,
-      keywords: buildSearchText([item.id, item.label, item.kind, group.label, item.matchPaths.join(' '), 'workspace map']),
-      priority: item.kind === 'floor' ? 78 : 88,
-    }));
-
-    return [groupResult, ...itemResults];
-  });
-
-  const productResults = snapshot.products.flatMap((product) => {
-    const productResult: GlobalSearchResult = {
-      id: `product-${product.id}`,
-      kind: 'Product',
-      title: product.name,
-      detail: `${product.brand} · ${product.sku_code} · ${product.status}`,
-      href: '/overview?module=cos&view=pim',
-      keywords: buildSearchText([
-        product.name,
-        product.brand,
-        product.category,
-        product.sku_code,
-        product.asin,
-        product.gtin,
-        product.mpn,
-        product.model_number,
-        product.status,
-      ]),
-      priority: 80,
-    };
-
-    const skuResults = product.skus.map((sku) => ({
-      id: `sku-${sku.id}`,
-      kind: 'SKU' as const,
-      title: sku.sku_code,
-      detail: `${product.name} · ${sku.variation_name}`,
-      href: '/overview?module=cos&view=pim',
-      keywords: buildSearchText([sku.sku_code, sku.variation_name, product.name, product.brand, product.category]),
-      priority: 90,
-    }));
-
-    return [productResult, ...skuResults];
-  });
-
-  const orderResults = snapshot.orders.map((order) => ({
-    id: `order-${order.id}`,
-    kind: 'Order' as const,
-    title: order.order_id,
-    detail: `${order.customer_name} · ${order.channel} · ${order.status}`,
-    href: '/overview?module=cos&view=oms',
-    keywords: buildSearchText([
-      order.order_id,
-      order.channel_order_ref,
-      order.customer_name,
-      order.customer_email,
-      order.customer_phone,
-      order.status,
-      order.lifecycle_stage,
-      order.tracking_number,
-      order.channel,
-    ]),
-    priority: 95,
-  }));
-
-  const customerResults = snapshot.customers.map((customer) => ({
-    id: `customer-${customer.id}`,
-    kind: 'Customer' as const,
-    title: customer.name,
-    detail: `${customer.company} · ${customer.segment} · ${customer.lifecycle}`,
-    href: `/customer/crm-compact?floor=account&customer=${encodeURIComponent(customer.id)}`,
-    keywords: buildSearchText([
-      customer.name,
-      customer.company,
-      customer.email,
-      customer.segment,
-      customer.lifecycle,
-      customer.b2bAccount,
-      customer.notes.join(' '),
-    ]),
-    priority: 75,
-  }));
-
-  const leadResults = snapshot.leads.map((lead) => ({
-    id: `lead-${lead.id}`,
-    kind: 'Lead' as const,
-    title: lead.company,
-    detail: `${lead.contact} · ${lead.score} lead score · ${lead.status}`,
-    href: `/crm/leads-rfqs?lead=${encodeURIComponent(lead.id)}`,
-    keywords: buildSearchText([
-      lead.id,
-      lead.company,
-      lead.contact,
-      lead.email,
-      lead.status,
-      lead.source,
-      lead.lastTouch,
-    ]),
-    priority: 70,
-  }));
-
-  const rfqResults = snapshot.rfqs.map((rfq) => ({
-    id: `rfq-${rfq.id}`,
-    kind: 'RFQ' as const,
-    title: rfq.id.toUpperCase(),
-    detail: `${rfq.requestedBy} · ${rfq.quantity} units · ${rfq.status}`,
-    href: `/crm/leads-rfqs?rfq=${encodeURIComponent(rfq.id)}`,
-    keywords: buildSearchText([rfq.id, rfq.requestedBy, rfq.status, rfq.skuId, rfq.quantity]),
-    priority: 72,
-  }));
-
-  const campaignResults = snapshot.campaigns.map((campaign) => ({
-    id: `campaign-${campaign.id}`,
-    kind: 'Campaign' as const,
-    title: campaign.name,
-    detail: `${campaign.channel} · ${campaign.targetSegment} · ${campaign.status}`,
-    href: `/crm/campaigns?campaign=${encodeURIComponent(campaign.id)}`,
-    keywords: buildSearchText([
-      campaign.name,
-      campaign.channel,
-      campaign.status,
-      campaign.targetSegment,
-      campaign.skuCode,
-    ]),
-    priority: 68,
-  }));
-
-  const alertResults = snapshot.alerts.map((alert) => ({
-    id: `alert-${alert.id}`,
-    kind: 'Alert' as const,
-    title: alert.title,
-    detail: `${alert.area} · ${alert.severity} severity`,
-    href: `/intelligence/alerts?alert=${encodeURIComponent(alert.id)}`,
-    keywords: buildSearchText([
-      alert.id,
-      alert.title,
-      alert.area,
-      alert.severity,
-      alert.linkedEntity,
-      alert.recommendationId,
-    ]),
-    priority: alert.severity === 'high' ? 88 : 60,
-  }));
-
-  return [
-    ...productSettingsResults,
-    ...productResults,
-    ...orderResults,
-    ...customerResults,
-    ...leadResults,
-    ...rfqResults,
-    ...campaignResults,
-    ...alertResults,
-  ];
-}
+const crmJourneyItems = [
+  { id: 'sources', label: 'Sources', href: '/crm/sources', matchPath: '/crm/sources' },
+  { id: 'campaigns', label: 'Campaigns', href: '/crm/campaigns', matchPath: '/crm/campaigns' },
+  { id: 'leads-rfqs', label: 'Leads & RFQs', href: '/crm/leads-rfqs', matchPath: '/crm/leads-rfqs' },
+  { id: 'contact-leads', label: 'Contact Leads', href: '/crm/contact-leads', matchPath: '/crm/contact-leads' },
+  { id: 'customers', label: 'Customers', href: '/crm/customers', matchPath: '/crm/customers' },
+  { id: 'segments', label: 'Segments & Tags', href: '/crm/segments', matchPath: '/crm/segments' },
+  { id: 'quick-replies', label: 'Quick Replies', href: '/crm/quick-replies', matchPath: '/crm/quick-replies' },
+  { id: 'cs-analytics', label: 'CS Analytics', href: '/crm/cs-analytics', matchPath: '/crm/cs-analytics' },
+  { id: 're-engagement', label: 'Re-engagement', href: '/crm/re-engage', matchPath: '/crm/re-engage' },
+] as const;
 
 export function AppLayout() {
   const [bootstrapping, setBootstrapping] = useState(true);
-  const [signingOut, setSigningOut] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [productSettingsOpen, setProductSettingsOpen] = useState(false);
-  const [activeProductSettingsGroupId, setActiveProductSettingsGroupId] = useState(primeProductSettingsGroups[0]?.id || '');
-  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
-  const searchBoxRef = useRef<HTMLDivElement>(null);
-  const productSettingsRef = useRef<HTMLDivElement>(null);
-  const { user, signOut } = useAuth();
+  const [crmOnboardingOpen, setCrmOnboardingOpen] = useState(false);
+  const [hideCrmOnboarding, setHideCrmOnboarding] = useState(true);
+  const [workspaceSwitching, setWorkspaceSwitching] = useState(false);
   const { locale } = useI18n();
-  const navigate = useNavigate();
   const location = useLocation();
-  const workspaceTabs = useWorkspaceTabs();
+  const isInboxWorkspace = location.pathname.startsWith('/inbox/');
   const shellCopy = useMemo(() => getShellDictionary(locale), [locale]);
-  const globalSearchResults = useMemo(() => (
-    bootstrapping ? [] : buildGlobalSearchResults()
-  ), [bootstrapping]);
-  const visibleSearchResults = useMemo(() => {
-    const query = searchQuery.trim();
-
-    if (!query) {
-      return [];
-    }
-
-    return globalSearchResults
-      .map((result) => ({ result, score: scoreSearchResult(result, query) }))
-      .filter((item) => item.score > 0)
-      .sort((left, right) => right.score - left.score)
-      .slice(0, 9)
-      .map((item) => item.result);
-  }, [globalSearchResults, searchQuery]);
-
-  const breadcrumbItems = useMemo(() => (
-    getPrimeNavPath(location.pathname === '/account' ? `${location.pathname}${location.hash}` : `${location.pathname}${location.search}`).map((node) => ({
-      id: node.id,
-      label: getShellNavLabel(locale, node.id, node.label),
-    }))
-  ), [locale, location.hash, location.pathname, location.search]);
-  const currentWorkspaceUrl = `${location.pathname}${location.search}${location.hash}`;
+  const activeCrmJourneyItem = crmJourneyItems.find((item) => location.pathname.startsWith(item.matchPath));
+  const isCrmOverview = location.pathname.startsWith('/crm/overview');
+  const isCrmArea = Boolean(activeCrmJourneyItem) || isCrmOverview;
+  const workspaceTheme = location.pathname.startsWith('/builder')
+    ? 'workspace-theme-primeweb'
+    : location.pathname.startsWith('/pos')
+      ? 'workspace-theme-pos'
+      : 'workspace-theme-main';
 
   useEffect(() => {
-    if (bootstrapping || location.pathname === '/auth' || location.pathname === '/__ui-regression') {
-      return;
-    }
-
-    const existing = workspaceTabs.tabs.find((tab) => tab.url === currentWorkspaceUrl);
-
-    if (existing) {
-      if (workspaceTabs.activeId !== existing.id) {
-        focusTab(existing.id);
-      }
-      return;
-    }
-
-    const settingsItem = findPrimeProductSettingsItemByHref(currentWorkspaceUrl);
-
-    openTab(settingsItem ? {
-      productId: settingsItem.id,
-      rootProductId: settingsItem.rootProductId,
-      url: currentWorkspaceUrl,
-      title: getProductSettingsDisplayLabel(settingsItem),
-      reuseScope: 'product',
-      rootProductMatchPaths: getPrimeProductSettingsRootMatchPaths(settingsItem.rootProductId),
-    } : {
-      productId: currentWorkspaceUrl,
-      url: currentWorkspaceUrl,
-      title: breadcrumbItems.at(-1)?.label || 'PrimeOS',
-    });
-  }, [bootstrapping, breadcrumbItems, currentWorkspaceUrl, location.pathname, workspaceTabs.activeId, workspaceTabs.tabs]);
-
-  const accountInitials = getAccountInitials(user?.fullName, user?.email);
-  const accountRoleLabel = getAccountRoleLabel(user?.role);
-
-  const shouldShowSearchPanel = searchOpen && searchQuery.trim().length > 0;
-  const searchListboxId = 'primeos-global-search-results';
-  const activeSearchResult = shouldShowSearchPanel ? visibleSearchResults[activeSearchIndex] : undefined;
-  const isCrmInboxWorkspace = ['/crm', '/crm/hub', '/crm/chat'].includes(location.pathname);
-  const isCustomerServiceWorkspace = location.pathname === '/customer/service';
-  const isMinimalWorkspace = location.pathname === '/overview' || isCrmInboxWorkspace || isCustomerServiceWorkspace;
+    let timeoutId: number | undefined;
+    const handleWorkspaceSwitch = () => {
+      setWorkspaceSwitching(true);
+      timeoutId = window.setTimeout(() => setWorkspaceSwitching(false), 420);
+    };
+    window.addEventListener('workspace:switch-start', handleWorkspaceSwitch);
+    return () => {
+      window.removeEventListener('workspace:switch-start', handleWorkspaceSwitch);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -575,208 +71,51 @@ export function AppLayout() {
 
       try {
         await seedDemoData('prime-os-phase-1-demo');
-      } catch (error) {
-        console.error('[PrimeOS] Failed to bootstrap linked demo data', error);
+      } catch {
+        // Individual screens keep their own deterministic fallback data.
       } finally {
-        if (!cancelled) {
-          setBootstrapping(false);
-        }
+        if (!cancelled) setBootstrapping(false);
       }
     };
 
     void bootstrapDemoData();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    const handleWorkspaceShortcut = (event: globalThis.KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      const commandLike = event.metaKey || event.ctrlKey;
+    if (!activeCrmJourneyItem) return;
+    try {
+      const permanentlyHidden = window.localStorage.getItem(CRM_ONBOARDING_HIDDEN_KEY) === 'true';
+      const seenThisSession = window.sessionStorage.getItem(CRM_ONBOARDING_SESSION_KEY) === 'true';
+      if (!permanentlyHidden && !seenThisSession) setCrmOnboardingOpen(true);
+    } catch {
+      // Storage can be unavailable in privacy-restricted browsers; CRM remains usable.
+    }
+  }, [activeCrmJourneyItem]);
 
-      if (commandLike && key === 'k') {
+  const dismissCrmOnboarding = () => {
+    try {
+      window.sessionStorage.setItem(CRM_ONBOARDING_SESSION_KEY, 'true');
+      if (hideCrmOnboarding) window.localStorage.setItem(CRM_ONBOARDING_HIDDEN_KEY, 'true');
+    } catch {
+      // Dismiss the modal even when preferences cannot be persisted.
+    }
+    setCrmOnboardingOpen(false);
+  };
+
+  useEffect(() => {
+    const handleCommandShortcut = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandOpen((value) => !value);
-        return;
-      }
-
-      if (commandLike && key === 'w') {
-        const activeTab = workspaceTabs.tabs.find((tab) => tab.id === workspaceTabs.activeId);
-
-        if (!activeTab) {
-          return;
-        }
-
-        if (activeTab.dirty && !window.confirm(`Close ${activeTab.title}? Unsaved changes will stay only in this session.`)) {
-          return;
-        }
-
-        event.preventDefault();
-        closeTab(activeTab.id);
-        const nextActive = getWorkspaceTabsState().tabs.find((tab) => tab.id === getWorkspaceTabsState().activeId);
-        navigate(nextActive?.url || '/overview');
-        return;
-      }
-
-      if (commandLike && event.shiftKey && key === 't') {
-        event.preventDefault();
-        reopenLastClosedTab();
-        const nextActive = getWorkspaceTabsState().tabs.find((tab) => tab.id === getWorkspaceTabsState().activeId);
-        if (nextActive) {
-          navigate(nextActive.url);
-        }
-        return;
-      }
-
-      if (commandLike && /^[1-9]$/.test(key)) {
-        const tab = workspaceTabs.tabs[Number(key) - 1];
-
-        if (tab) {
-          event.preventDefault();
-          focusTab(tab.id);
-          navigate(tab.url);
-        }
-        return;
-      }
-
-      if (event.ctrlKey && key === 'tab' && workspaceTabs.tabs.length > 1) {
-        event.preventDefault();
-        const activeIndex = Math.max(0, workspaceTabs.tabs.findIndex((tab) => tab.id === workspaceTabs.activeId));
-        const offset = event.shiftKey ? -1 : 1;
-        const nextIndex = (activeIndex + offset + workspaceTabs.tabs.length) % workspaceTabs.tabs.length;
-        const tab = workspaceTabs.tabs[nextIndex];
-        focusTab(tab.id);
-        navigate(tab.url);
       }
     };
 
-    window.addEventListener('keydown', handleWorkspaceShortcut);
+    window.addEventListener('keydown', handleCommandShortcut);
+    return () => window.removeEventListener('keydown', handleCommandShortcut);
+  }, []);
 
-    return () => {
-      window.removeEventListener('keydown', handleWorkspaceShortcut);
-    };
-  }, [navigate, workspaceTabs.activeId, workspaceTabs.tabs]);
-
-  useEffect(() => {
-    setActiveSearchIndex(0);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (!searchOpen) {
-      return;
-    }
-
-    const closeIfOutside = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-
-      if (target && searchBoxRef.current?.contains(target)) {
-        return;
-      }
-
-      setSearchOpen(false);
-    };
-
-    document.addEventListener('pointerdown', closeIfOutside);
-
-    return () => {
-      document.removeEventListener('pointerdown', closeIfOutside);
-    };
-  }, [searchOpen]);
-
-  useEffect(() => {
-    if (!productSettingsOpen) {
-      return;
-    }
-
-    const closeIfOutside = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-
-      if (target && productSettingsRef.current?.contains(target)) {
-        return;
-      }
-
-      setProductSettingsOpen(false);
-    };
-
-    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setProductSettingsOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', closeIfOutside);
-    document.addEventListener('keydown', closeOnEscape);
-
-    return () => {
-      document.removeEventListener('pointerdown', closeIfOutside);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [productSettingsOpen]);
-
-  function openSearchResult(result: GlobalSearchResult) {
-    setSearchOpen(false);
-    setSearchQuery('');
-    openTab({
-      productId: result.id,
-      url: result.href,
-      title: result.title,
-    });
-    navigate(result.href);
-  }
-
-  function openProductSettingsItem(item: PrimeProductSettingsItem) {
-    setProductSettingsOpen(false);
-    openTab({
-      productId: item.id,
-      rootProductId: item.rootProductId,
-      url: item.href,
-      title: getProductSettingsDisplayLabel(item),
-      reuseScope: 'product',
-      rootProductMatchPaths: getPrimeProductSettingsRootMatchPaths(item.rootProductId),
-    });
-    navigate(item.href);
-  }
-
-  function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') {
-      setSearchOpen(false);
-      return;
-    }
-
-    if (!shouldShowSearchPanel || visibleSearchResults.length === 0) {
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setActiveSearchIndex((index) => Math.min(index + 1, visibleSearchResults.length - 1));
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setActiveSearchIndex((index) => Math.max(index - 1, 0));
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      openSearchResult(visibleSearchResults[activeSearchIndex] || visibleSearchResults[0]);
-    }
-  }
-
-  async function handleSignOut() {
-    setSigningOut(true);
-
-    try {
-      await signOut();
-    } finally {
-      setSigningOut(false);
-      navigate('/auth', { replace: true });
-    }
-  }
-
-  if (bootstrapping) {
+  if (bootstrapping && !isInboxWorkspace) {
     return (
       <div className="prime-stage flex h-screen overflow-hidden">
         <AppSidebar />
@@ -792,211 +131,93 @@ export function AppLayout() {
     );
   }
 
+  if (isInboxWorkspace) {
+    return <div className="h-screen overflow-hidden"><Routes>{PrimeRoutes()}</Routes></div>;
+  }
+
   return (
-    <div className="prime-stage flex h-screen overflow-hidden">
+    <div className={cn('prime-stage flex h-screen overflow-hidden', workspaceTheme)}>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:rounded focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
       >
         {shellCopy.skipToMainContent}
       </a>
       <AppSidebar />
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <GlobalCopilotWorkspace>
-          {!isMinimalWorkspace ? (
-          <header className="sticky top-0 z-[100] flex min-h-[var(--header-height)] items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-5">
-            <div ref={productSettingsRef} className="relative hidden shrink-0 md:block">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-9 gap-2 px-3 font-semibold"
-                aria-haspopup="dialog"
-                aria-expanded={productSettingsOpen}
-                onClick={() => setProductSettingsOpen((value) => !value)}
-              >
-                <Grid3X3 className="size-4 text-primary" />
-                Workspace Map
-                <ChevronDown className={cn('size-3.5 text-muted-foreground transition-transform', productSettingsOpen && 'rotate-180')} />
-              </Button>
-
-              {productSettingsOpen ? (
-                <ProductSettingsFlyout
-                  groups={primeProductSettingsGroups}
-                  activeGroupId={activeProductSettingsGroupId}
-                  onActiveGroupChange={setActiveProductSettingsGroupId}
-                  onNavigate={openProductSettingsItem}
-                />
-              ) : null}
-            </div>
-
-            <div ref={searchBoxRef} className="relative min-w-[16rem] flex-1 md:max-w-[42rem]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                aria-label={shellCopy.searchAriaLabel}
-                aria-autocomplete="list"
-                aria-controls={searchListboxId}
-                aria-expanded={shouldShowSearchPanel}
-                aria-activedescendant={activeSearchResult ? `primeos-search-result-${activeSearchResult.id}` : undefined}
-                role="combobox"
-                autoComplete="off"
-                className="h-9 w-full bg-background pl-9 pr-16"
-                placeholder={shellCopy.searchPlaceholder}
-                value={searchQuery}
-                onChange={(event) => {
-                  setSearchQuery(event.target.value);
-                  setSearchOpen(true);
-                }}
-                onFocus={() => setSearchOpen(true)}
-                onKeyDown={handleSearchKeyDown}
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  aria-label={shellCopy.clearSearch}
-                  className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSearchOpen(false);
-                  }}
-                >
-                  <X className="size-3.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  aria-label={shellCopy.openCommandPalette}
-                  className="font-identifier absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-sm border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground sm:block"
-                  onClick={() => setCommandOpen(true)}
-                >
-                  ⌘K
-                </button>
-              )}
-
-              {shouldShowSearchPanel ? (
-                <div className="panel-shadow absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[80] overflow-hidden rounded-lg border bg-popover text-popover-foreground" role="region" aria-label={shellCopy.searchPanelHeading}>
-                  <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {shellCopy.searchPanelHeading}
-                  </div>
-
-                  {visibleSearchResults.length > 0 ? (
-                    <div id={searchListboxId} className="max-h-[min(70vh,420px)] overflow-y-auto p-2" role="listbox">
-                      {visibleSearchResults.map((result, index) => {
-                        const meta = {
-                          icon: searchKindIcons[result.kind],
-                          label: shellCopy.searchKindLabels[result.kind],
-                        };
-                        const isActive = index === activeSearchIndex;
-
-                        return (
-                          <button
-                            key={result.id}
-                            id={`primeos-search-result-${result.id}`}
-                            type="button"
-                            role="option"
-                            aria-selected={isActive}
-                            className={cn(
-                              'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
-                              isActive ? 'bg-primary/10 text-foreground ring-1 ring-primary/20' : 'hover:bg-muted/70'
-                            )}
-                            onMouseEnter={() => setActiveSearchIndex(index)}
-                            onClick={() => openSearchResult(result)}
-                          >
-                            <span className={cn(
-                              'flex size-9 shrink-0 items-center justify-center rounded-md border',
-                              isActive ? 'border-primary/20 bg-primary/10 text-primary' : 'bg-muted/50 text-muted-foreground'
-                            )}>
-                              {meta.icon}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex min-w-0 items-center gap-2">
-                                <span className="truncate text-sm font-semibold">{result.title}</span>
-                                <Badge variant="outline" className="shrink-0 text-[10px]">
-                                  {meta.label}
-                                </Badge>
-                              </span>
-                              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{result.detail}</span>
-                            </span>
-                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-6 text-sm text-muted-foreground">
-                      {shellCopy.noSearchResults}
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-            <nav className="hidden min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground md:flex" aria-label="Breadcrumb">
-              {breadcrumbItems.length > 0 ? breadcrumbItems.map((item, index) => (
-                <span key={item.id} className="flex min-w-0 items-center gap-1">
-                  {index > 0 ? <ChevronRight className="size-3 shrink-0" /> : null}
-                  <span className={cn('truncate', index === breadcrumbItems.length - 1 && 'font-semibold text-foreground')}>
-                    {item.label}
-                  </span>
-                </span>
-              )) : <span aria-hidden="true" />}
-            </nav>
-            <div className="flex min-w-0 shrink-0 items-center justify-end gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 min-w-0 max-w-[260px] justify-start gap-2 px-2 lg:min-w-[220px]"
-                    aria-label={`Open account menu for ${user?.email || shellCopy.demoWorkspace}`}
-                  >
-                    <Avatar className="size-8 border border-primary/15 bg-primary/10">
-                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                        {accountInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="hidden min-w-0 flex-1 flex-col items-start text-left lg:flex">
-                      <span className="max-w-full truncate text-xs font-semibold leading-4 text-foreground">
-                        {user?.workspace || user?.fullName || shellCopy.demoWorkspace}
-                      </span>
-                      <span className="max-w-full truncate text-[11px] leading-4 text-muted-foreground">
-                        {user?.email || shellCopy.sessionLabel}
-                      </span>
-                    </span>
-                    <Badge variant="secondary" className="hidden max-w-[76px] shrink-0 truncate px-2 py-0.5 text-[10px] xl:inline-flex">
-                      {accountRoleLabel}
-                    </Badge>
-                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 p-2">
-                  <DropdownMenuLabel className="truncate px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                    {user?.email || shellCopy.sessionLabel}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem className="rounded-md py-2.5 text-sm font-semibold" onSelect={() => navigate('/account')}>
-                    {accountRoleLabel}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="gap-2 rounded-md text-destructive focus:text-destructive" disabled={signingOut} onSelect={handleSignOut}>
-                    <LogOut className="size-4" />
-                    {signingOut ? shellCopy.signingOut : shellCopy.logout}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </header>
-          ) : null}
           <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
-          <div className={cn('flex min-h-0 flex-col', isMinimalWorkspace ? 'h-full' : 'h-[calc(100%-var(--header-height))]')}>
-            {!isMinimalWorkspace ? (
-              <WorkspaceTabBar
-                onNavigate={(url) => navigate(url)}
-                onOpenProductSettings={() => setProductSettingsOpen(true)}
-              />
+          <Dialog open={crmOnboardingOpen} onOpenChange={(open) => { if (!open) dismissCrmOnboarding(); else setCrmOnboardingOpen(true); }}>
+            <DialogContent className="flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-[1180px] flex-col gap-0 overflow-hidden p-0">
+              <DialogHeader className="border-b px-6 py-5 text-left">
+                <DialogTitle className="text-xl">Welcome to CRM &amp; Customers</DialogTitle>
+                <DialogDescription>Start with the big picture. You can reopen this guide anytime from Journey overview.</DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto px-6 py-5"><CrmJourneyOverviewContent onboarding onNavigate={dismissCrmOnboarding} /></div>
+              <DialogFooter className="flex-row items-center justify-between gap-4 border-t bg-background px-6 py-4 sm:justify-between">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" checked={hideCrmOnboarding} onChange={(event) => setHideCrmOnboarding(event.target.checked)} className="size-4 rounded border-border accent-primary" />Don’t show this guide again</label>
+                <Button asChild><NavLink to="/crm/sources" onClick={dismissCrmOnboarding}>Start working with Sources</NavLink></Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <div className="flex h-full min-h-0 flex-col">
+            <AppHeader />
+            {isCrmArea ? (
+              <div className="shrink-0 border-b bg-background">
+                <div className="px-4 pt-4 md:px-6">
+                  <WorkspacePageHeader
+                    title="CRM & Customers"
+                    description="Manage acquisition, sales opportunities, customer relationships, and retention in one workspace."
+                    icon={UsersRound}
+                    className="border-b-0"
+                  />
+                </div>
+                <div className="border-t bg-muted/20 px-3 py-2 md:px-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <nav aria-label="CRM customer journey" className="scrollbar-none flex min-w-0 flex-1 gap-1 overflow-x-auto pb-0.5 lg:pb-0">
+                    {crmJourneyItems.map((item) => (
+                      <NavLink
+                        key={item.id}
+                        to={item.href}
+                        className={cn(
+                          'shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          activeCrmJourneyItem?.id === item.id
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:bg-background hover:text-foreground'
+                        )}
+                        aria-current={activeCrmJourneyItem?.id === item.id ? 'page' : undefined}
+                      >
+                        {item.label}
+                      </NavLink>
+                    ))}
+                  </nav>
+                  <NavLink
+                    to="/crm/overview"
+                    className={cn(
+                      'ml-auto flex min-h-9 w-fit shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+                      isCrmOverview
+                        ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-100'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/60 hover:text-indigo-700'
+                    )}
+                    aria-current={isCrmOverview ? 'page' : undefined}
+                  >
+                    <LayoutDashboard className="size-4" />Customer conversion journey
+                  </NavLink>
+                </div>
+                </div>
+              </div>
             ) : null}
-            <main
-              id="main-content"
-              className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
-            >
-              <TabContentHost />
+            <main id="main-content" className="scrollbar-visible flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto bg-background">
+              <div className="relative min-h-full min-w-0 flex-1">
+                {workspaceSwitching ? (
+                  <div className="absolute inset-0 z-20 grid content-start gap-5 bg-background p-6" aria-label="Loading workspace">
+                    <Skeleton className="h-12 w-72" />
+                    <div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-32" /><Skeleton className="h-32" /><Skeleton className="h-32" /></div>
+                    <Skeleton className="h-80 w-full" />
+                  </div>
+                ) : null}
+                <Routes>{PrimeRoutes()}</Routes>
+              </div>
             </main>
           </div>
         </GlobalCopilotWorkspace>
