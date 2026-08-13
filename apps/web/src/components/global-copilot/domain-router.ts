@@ -145,7 +145,7 @@ function calculateRisk(intent: CopilotIntent, domain: CopilotDomain): RiskLevel 
 }
 
 // Get redirect message for Inventory Module 2
-export function getInventoryRedirectMessage(locale: 'vi-VN' | 'ja-JP' | 'en-US' = 'vi-VN'): string {
+export function getInventoryRedirectMessage(locale: 'vi-VN' | 'ja-JP' | 'en-US' = 'en-US'): string {
   const messages = {
     'vi-VN': `Phần này thuộc **Inventory Copilot (Module 2)** và đang tách riêng để đảm bảo độ chính xác & kiểm soát.
 

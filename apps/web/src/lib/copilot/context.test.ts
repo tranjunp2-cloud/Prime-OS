@@ -20,7 +20,7 @@ describe('copilot context resolver', () => {
 
     expect(context.title).toBe('Create Product');
     expect(context.domain).toBe('product');
-    expect(context.quickPrompts.some((prompt) => prompt.label === 'Tạo product')).toBe(true);
+    expect(context.quickPrompts.some((prompt) => prompt.label === 'Create Product')).toBe(true);
   });
 
   it('maps pending-order navigation requests to filtered order routes', () => {
@@ -39,15 +39,15 @@ describe('copilot context resolver', () => {
     expect(response?.intent).toBe('write_draft');
     expect(response?.actions?.[0]?.url).toContain('/products/new?');
     expect(response?.actions?.[0]?.url).toContain('sku=PRIME-LAMP-001');
-    expect(response?.content).toContain('chưa có dữ liệu nào được save');
+    expect(response?.content).toContain('Nothing is saved or published');
   });
 
   it('answers contextual page-help questions from the active route', () => {
     const response = resolveContextualResponse('Trang này dùng để làm gì?', '/orders');
 
     expect(response?.domain).toBe('orders');
-    expect(response?.content).toContain('Đây là màn hình **Orders**');
-    expect(response?.content).toContain('Theo dõi intake, allocation, reservation');
+    expect(response?.content).toContain('This is the **Orders** screen');
+    expect(response?.content).toContain('Monitor intake, allocation, reservation');
   });
 
   it('finds orders from natural language and returns detail-safe summaries', () => {
@@ -84,7 +84,7 @@ describe('copilot context resolver', () => {
 
     expect(response.domain).toBe('orders');
     expect(response.content).toContain(order.order_id);
-    expect(response.followUpPrompts?.some((prompt) => prompt.label === 'Kho xử lý')).toBe(true);
+    expect(response.followUpPrompts?.some((prompt) => prompt.label === 'Fulfillment warehouse')).toBe(true);
     expect(response.debug?.selectedStrategy).toBe('conversation-entity');
     expect(response.debug?.usedConversationMemory).toBe(true);
   });
@@ -93,7 +93,7 @@ describe('copilot context resolver', () => {
     const response = resolveCopilotResponse('check ho', '/orders');
 
     expect(response.intent).toBe('clarify');
-    expect(response.content).toContain('chưa đủ');
+    expect(response.content).toContain('do not have enough context');
     expect(response.debug?.selectedStrategy).toBe('clarify');
     expect(response.debug?.confidenceBucket).toBe('low');
   });

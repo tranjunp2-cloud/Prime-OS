@@ -4,9 +4,6 @@ import {
   Bell,
   BookOpen,
   ChevronDown,
-  CircleHelp,
-  Edit3,
-  Home,
   LogOut,
   Languages,
   MessageSquare,
@@ -32,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { getLocaleMeta, SUPPORTED_LOCALES, type Locale } from '@/lib/i18n/dictionaries';
 import { cn } from '@/lib/utils';
+import { UserFeedbackWidget } from '@/components/system/UserFeedbackWidget';
 
 const localeCodes: Record<Locale, string> = { 'en-US': 'EN', 'ja-JP': 'JA', 'vi-VN': 'VI' };
 const themes: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
@@ -46,6 +44,7 @@ function getInitials(name: string) {
 
 export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { locale, setLocale } = useI18n();
@@ -84,7 +83,7 @@ export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
           </div>
 
           <div className="space-y-0.5 p-1.5">
-            <NavLink to="/customer/service?topic=feedback" onClick={close} className={menuLinkClass}><MessageSquare className="size-4 text-slate-500 dark:text-zinc-400" />Feedback</NavLink>
+            <button type="button" onClick={() => { close(); setFeedbackOpen(true); }} className={cn(menuLinkClass, 'w-full')}><MessageSquare className="size-4 text-slate-500 dark:text-zinc-400" />Feedback</button>
             <div className="rounded-md px-3 py-2">
               <div className="mb-2 flex items-center gap-3 text-[13px] font-medium text-slate-700 dark:text-zinc-200"><Sun className="size-4 text-slate-500 dark:text-zinc-400" />Theme</div>
               <div className="grid grid-cols-3 gap-1 rounded-md bg-slate-100 p-1 dark:bg-zinc-800" role="radiogroup" aria-label="Theme">
@@ -92,10 +91,7 @@ export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
               </div>
             </div>
             <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className={cn(menuLinkClass, 'w-full')}><Languages className="size-4 text-slate-500 dark:text-zinc-400" /><span className="flex-1 text-left">Language</span><span className="text-xs text-slate-500 dark:text-zinc-400">{getLocaleMeta(locale).nativeName}</span><ChevronDown className="size-3.5" /></button></DropdownMenuTrigger><DropdownMenuContent side="right" align="start" className="w-52"><DropdownMenuRadioGroup value={locale} onValueChange={(value) => setLocale(value as Locale)}>{SUPPORTED_LOCALES.map((code) => <DropdownMenuRadioItem key={code} value={code} className="min-h-11 gap-2 pl-8"><span className="w-6 text-[10px] font-bold text-muted-foreground">{localeCodes[code]}</span><span>{getLocaleMeta(code).nativeName}</span></DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu>
-            <NavLink to="/overview" onClick={close} className={menuLinkClass}><Home className="size-4 text-slate-500 dark:text-zinc-400" />Home Page</NavLink>
-            <NavLink to="/overview?view=changelog" onClick={close} className={menuLinkClass}><Edit3 className="size-4 text-slate-500 dark:text-zinc-400" />Changelog</NavLink>
-            <NavLink to="/customer/service" onClick={close} className={menuLinkClass}><CircleHelp className="size-4 text-slate-500 dark:text-zinc-400" />Help &amp; Support</NavLink>
-            <NavLink to="/customer/service?view=docs" onClick={close} className={menuLinkClass}><BookOpen className="size-4 text-slate-500 dark:text-zinc-400" />Docs</NavLink>
+            <NavLink to="/docs" onClick={close} className={menuLinkClass}><BookOpen className="size-4 text-slate-500 dark:text-zinc-400" />Docs</NavLink>
           </div>
 
           <div className="border-t border-slate-200 p-2 dark:border-zinc-800">
@@ -106,6 +102,7 @@ export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
           <NavLink to="/overview?module=system&view=health" onClick={close} className="flex min-h-10 items-center justify-center gap-2 border-t border-slate-200 px-3 text-[11px] font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:animate-none" /><span className="relative inline-flex size-2 rounded-full bg-emerald-500" /></span>All systems normal.</NavLink>
         </PopoverContent>
       </Popover>
+      <UserFeedbackWidget open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </footer>
   );
 }

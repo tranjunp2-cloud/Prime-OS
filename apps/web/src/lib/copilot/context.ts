@@ -31,10 +31,10 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 };
 
 const ORDER_STATUS_PROMPTS = [
-  { label: 'Đơn pending', prompt: 'Cho mình danh sách order đang pending' },
-  { label: 'Đang giao', prompt: 'Tóm tắt queue shipping hiện tại' },
-  { label: 'Tạo product', prompt: 'Tạo product mới tên "Travel Organizer" brand "PrimeOS" sku PRIME-TRAVEL-ORG-01' },
-  { label: 'Sang Inventory', prompt: 'Tại sao inventory copilot tách riêng?' },
+  { label: 'Pending Orders', prompt: 'Show the pending order queue' },
+  { label: 'Shipping Orders', prompt: 'Summarize the current shipping queue' },
+  { label: 'Create Product', prompt: 'Create a new product named "Travel Organizer" with brand "PrimeOS" and SKU PRIME-TRAVEL-ORG-01' },
+  { label: 'Open Inventory', prompt: 'Why is Inventory Copilot a separate module?' },
 ];
 
 const NAVIGATION_VERBS = [
@@ -162,7 +162,7 @@ function attachFollowUps(response: CopilotResponse, prompts: CopilotQuickPrompt[
 
 function buildClarifyResponse(context: CopilotContextSummary, prompts?: CopilotQuickPrompt[]): CopilotResponse {
   const followUps = prompts?.length ? prompts : [
-    { label: 'Giải thích trang', prompt: 'Trang này dùng để làm gì?' },
+    { label: 'Explain This Page', prompt: 'What is this page used for?' },
     ...takePrompts(context.quickPrompts, 2),
   ];
 
@@ -177,11 +177,11 @@ function buildClarifyResponse(context: CopilotContextSummary, prompts?: CopilotQ
     }),
     followUpPrompts: followUps,
     content: [
-      'Mình hiểu được một phần, nhưng chưa đủ chắc để đoán thay bạn.',
-      'Bạn muốn mình đi theo hướng nào hơn:',
-      '- giải thích màn hình hoặc dữ liệu đang thấy',
-      '- mở đúng module / queue',
-      '- chuẩn bị một draft action an toàn',
+      'I understand part of the request, but I do not have enough context to make a reliable assumption.',
+      'Which direction should I take?',
+      '- explain the current screen or data',
+      '- open the relevant module or queue',
+      '- prepare a safe draft action',
     ].join('\n'),
   };
 }
@@ -199,15 +199,15 @@ function buildCapabilitiesResponse(context: CopilotContextSummary): CopilotRespo
       confidenceBucket: 'high',
     }),
     followUpPrompts: [
-      { label: 'Trang này làm gì?', prompt: 'Trang này dùng để làm gì?' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
       ...takePrompts(context.quickPrompts, 2),
     ],
     content: [
-      `Mình đang hỗ trợ trực tiếp trên **${context.title}** với 4 kiểu việc chính:`,
-      '- giải thích màn hình, dữ liệu hoặc entity bạn đang mở',
-      '- tìm nhanh order / product / warehouse liên quan',
-      '- mở đúng module, queue hoặc filter phù hợp',
-      '- chuẩn bị draft an toàn trước khi bạn xác nhận thao tác',
+      `I can assist directly in **${context.title}** with four types of work:`,
+      '- explain the current screen, data, or entity',
+      '- find related orders, products, or warehouses',
+      '- open the relevant module, queue, or filter',
+      '- prepare a safe draft before you confirm an action',
     ].join('\n'),
   };
 }
@@ -220,14 +220,14 @@ function createProductsSummary(): CopilotContextSummary {
   return {
     domain: 'product',
     title: 'Products',
-    description: 'Quản lý product master, SKU structure, pricing và channel readiness.',
+    description: 'Manage master products, SKU structure, pricing, and channel readiness.',
     insight: `${products.length} products · ${publishedCount} published · ${draftCount} draft`,
     citations: ['Current route: /products', 'Source: product-store'],
     quickPrompts: [
-      { label: 'Tóm tắt product', prompt: 'Tóm tắt product master hiện tại' },
-      { label: 'Tạo mới', prompt: 'Tạo product mới tên "Compact Desk Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
-      { label: 'Đang draft', prompt: 'Có bao nhiêu product đang ở draft?' },
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
+      { label: 'Product Summary', prompt: 'Summarize the current master product catalog' },
+      { label: 'Create Product', prompt: 'Create a new product named "Compact Desk Lamp" with brand "PrimeOS" and SKU PRIME-LAMP-001' },
+      { label: 'Draft Products', prompt: 'How many products are in draft status?' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
     ],
   };
 }
@@ -239,11 +239,11 @@ function createProductDetailSummary(productId: string): CopilotContextSummary {
     return {
       domain: 'product',
       title: 'Product Detail',
-      description: 'Không tìm thấy product từ route hiện tại.',
+      description: 'No product was found for the current route.',
       citations: ['Current route: product detail'],
       quickPrompts: [
-        { label: 'Về Products', prompt: 'Mở lại danh sách products' },
-        { label: 'Tạo draft', prompt: 'Mở form tạo product mới' },
+        { label: 'Open Products', prompt: 'Open the product catalog' },
+        { label: 'Create Draft', prompt: 'Open the new product form' },
       ],
     };
   }
@@ -255,10 +255,10 @@ function createProductDetailSummary(productId: string): CopilotContextSummary {
     insight: `${product.channels.length} channels · ${product.skus.length} sku lines`,
     citations: [`Current entity: ${product.id}`, 'Source: product-store'],
     quickPrompts: [
-      { label: 'Bán ở đâu?', prompt: 'Product này đang publish ở channel nào?' },
-      { label: 'Tóm tắt SKU', prompt: 'Tóm tắt SKU của product này' },
-      { label: 'Về Products', prompt: 'Mở lại danh sách products' },
-      { label: 'Tạo tương tự', prompt: `Tạo product mới tên "${product.name}" brand "${product.brand}"` },
+      { label: 'Published Channels', prompt: 'Which channels publish this product?' },
+      { label: 'SKU Summary', prompt: 'Summarize this product’s SKUs' },
+      { label: 'Open Products', prompt: 'Open the product catalog' },
+      { label: 'Create Similar', prompt: `Create a product named "${product.name}" with brand "${product.brand}"` },
     ],
   };
 }
@@ -275,7 +275,7 @@ function createOrdersSummary(): CopilotContextSummary {
   return {
     domain: 'orders',
     title: 'Orders',
-    description: 'Theo dõi intake, allocation, reservation, shipping và exception của order flow.',
+    description: 'Monitor intake, allocation, reservation, shipping, and exceptions across the order flow.',
     insight: [
       formatStatusCount('Pending', counts.pending),
       formatStatusCount('Ready', counts.readyToShip),
@@ -294,7 +294,7 @@ function createOrderDetailSummary(orderId: string): CopilotContextSummary {
     return {
       domain: 'orders',
       title: 'Order Detail',
-      description: 'Không tìm thấy order từ route hiện tại.',
+      description: 'No order was found for the current route.',
       citations: ['Current route: order detail'],
       quickPrompts: ORDER_STATUS_PROMPTS,
     };
@@ -307,10 +307,10 @@ function createOrderDetailSummary(orderId: string): CopilotContextSummary {
     insight: `${formatCurrency(order.total_amount, order.currency)} · Lifecycle ${order.lifecycle_stage}`,
     citations: [`Current entity: ${order.id}`, 'Source: order-store'],
     quickPrompts: [
-      { label: 'Đơn này ra sao?', prompt: 'Đơn này đang stuck ở đâu?' },
-      { label: 'Kho xử lý', prompt: 'Order này đang allocate vào warehouse nào?' },
-      { label: 'Về Orders', prompt: 'Mở lại danh sách orders' },
-      { label: 'Đơn pending', prompt: 'Cho mình danh sách order đang pending' },
+      { label: 'Order Status', prompt: 'Where is this order blocked?' },
+      { label: 'Allocated Warehouse', prompt: 'Which warehouse is allocated to this order?' },
+      { label: 'Open Orders', prompt: 'Open the order list' },
+      { label: 'Pending Orders', prompt: 'Show the pending order queue' },
     ],
   };
 }
@@ -324,14 +324,14 @@ function createWarehousesSummary(): CopilotContextSummary {
   return {
     domain: 'warehouse',
     title: 'Warehouses',
-    description: 'Xem topology kho, capability, trạng thái sync và loại kho vận hành.',
+    description: 'Review warehouse topology, capabilities, synchronization status, and operating type.',
     insight: `${warehouses.length} warehouses · ${activeCount} active · ${virtualCount} virtual · ${thirdPartyCount} 3PL`,
     citations: ['Current route: /warehouses', 'Source: warehouse-store'],
     quickPrompts: [
-      { label: 'Tóm tắt kho', prompt: 'Tóm tắt network warehouse hiện tại' },
-      { label: 'Kho virtual', prompt: 'Có bao nhiêu virtual warehouse?' },
-      { label: 'Sang Inventory', prompt: 'Tại sao inventory copilot tách riêng?' },
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
+      { label: 'Warehouse Summary', prompt: 'Summarize the current warehouse network' },
+      { label: 'Virtual Warehouses', prompt: 'How many virtual warehouses are configured?' },
+      { label: 'Open Inventory', prompt: 'Why is Inventory Copilot a separate module?' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
     ],
   };
 }
@@ -345,14 +345,14 @@ function createListingsSummary(): CopilotContextSummary {
   return {
     domain: 'listing',
     title: 'Listings',
-    description: 'Điều phối channel listing state tách khỏi product master.',
+    description: 'Manage channel listing state separately from the master product record.',
     insight: `${listings.length} listings · Amazon ${amazonCount} · Shopee ${shopeeCount} · Rakuten ${rakutenCount}`,
     citations: ['Current route: /listings', 'Source: listing-store'],
     quickPrompts: [
-      { label: 'Theo kênh', prompt: 'Tóm tắt listing theo channel hiện tại' },
-      { label: 'Về Products', prompt: 'Mở lại product master' },
-      { label: 'Listings để làm gì?', prompt: 'Channel layer trong PrimeOS dùng để làm gì?' },
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
+      { label: 'By Channel', prompt: 'Summarize listings by channel' },
+      { label: 'Open Products', prompt: 'Open the master product catalog' },
+      { label: 'Explain Listings', prompt: 'What is the channel layer used for in PrimeOS?' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
     ],
   };
 }
@@ -364,14 +364,14 @@ function createFulfillmentSummary(): CopilotContextSummary {
   return {
     domain: 'fulfillment',
     title: 'Fulfillment',
-    description: 'Theo dõi pick-pack-ship flow và partner execution.',
+    description: 'Monitor pick, pack, ship flows and fulfillment partner execution.',
     insight: `${jobs.length} jobs · ${openCount} active jobs`,
     citations: ['Current route: /fulfillment', 'Source: fulfillment-store'],
     quickPrompts: [
-      { label: 'Tóm tắt queue', prompt: 'Tóm tắt fulfillment queue hiện tại' },
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
-      { label: 'Về Orders', prompt: 'Mở lại orders' },
-      { label: 'Về Returns', prompt: 'Mở lại returns' },
+      { label: 'Queue Summary', prompt: 'Summarize the current fulfillment queue' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
+      { label: 'Open Orders', prompt: 'Open Orders' },
+      { label: 'Open Returns', prompt: 'Open Returns' },
     ],
   };
 }
@@ -383,11 +383,11 @@ function createFulfillmentDetailSummary(jobId: string): CopilotContextSummary {
     return {
       domain: 'fulfillment',
       title: 'Fulfillment Detail',
-      description: 'Không tìm thấy fulfillment job từ route hiện tại.',
+      description: 'No fulfillment job was found for the current route.',
       citations: ['Current route: fulfillment detail'],
       quickPrompts: [
-        { label: 'Tóm tắt queue', prompt: 'Tóm tắt fulfillment queue hiện tại' },
-        { label: 'Về Fulfillment', prompt: 'Mở lại fulfillment' },
+        { label: 'Queue Summary', prompt: 'Summarize the current fulfillment queue' },
+        { label: 'Open Fulfillment', prompt: 'Open Fulfillment' },
       ],
     };
   }
@@ -399,9 +399,9 @@ function createFulfillmentDetailSummary(jobId: string): CopilotContextSummary {
     insight: `${job.order?.customer_name ?? 'Unknown customer'} · ${job.warehouse?.code ?? 'No warehouse'}`,
     citations: [`Current entity: ${job.id}`, 'Source: fulfillment-store'],
     quickPrompts: [
-      { label: 'Job này ra sao?', prompt: 'Job này đang ở bước nào?' },
-      { label: 'Về queue', prompt: 'Mở lại fulfillment queue' },
-      { label: 'Về Orders', prompt: 'Mở lại orders' },
+      { label: 'Job Status', prompt: 'Which step is this job currently in?' },
+      { label: 'Open Queue', prompt: 'Open the fulfillment queue' },
+      { label: 'Open Orders', prompt: 'Open Orders' },
     ],
   };
 }
@@ -414,14 +414,14 @@ function createReturnsSummary(): CopilotContextSummary {
   return {
     domain: 'returns',
     title: 'Returns',
-    description: 'Quản lý return intake, QC, disposition và refund signals.',
+    description: 'Manage return intake, quality control, disposition, and refund signals.',
     insight: `${returns.length} returns · ${qcCount} in QC · ${completedCount} completed`,
     citations: ['Current route: /returns', 'Source: return-store'],
     quickPrompts: [
-      { label: 'Tóm tắt returns', prompt: 'Tóm tắt returns hiện tại' },
-      { label: 'Đang QC', prompt: 'Bao nhiêu return đang ở bước QC?' },
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
-      { label: 'Về Fulfillment', prompt: 'Mở lại fulfillment' },
+      { label: 'Returns Summary', prompt: 'Summarize the current returns queue' },
+      { label: 'In Quality Control', prompt: 'How many returns are in quality control?' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
+      { label: 'Open Fulfillment', prompt: 'Open Fulfillment' },
     ],
   };
 }
@@ -433,11 +433,11 @@ function createReturnDetailSummary(returnId: string): CopilotContextSummary {
     return {
       domain: 'returns',
       title: 'Return Detail',
-      description: 'Không tìm thấy return record từ route hiện tại.',
+      description: 'No return record was found for the current route.',
       citations: ['Current route: return detail'],
       quickPrompts: [
-        { label: 'Tóm tắt returns', prompt: 'Tóm tắt returns hiện tại' },
-        { label: 'Về Returns', prompt: 'Mở lại returns' },
+        { label: 'Returns Summary', prompt: 'Summarize the current returns queue' },
+        { label: 'Open Returns', prompt: 'Open Returns' },
       ],
     };
   }
@@ -449,9 +449,9 @@ function createReturnDetailSummary(returnId: string): CopilotContextSummary {
     insight: `QC ${item.qc_grade ?? '-'} · Disposition ${item.disposition ?? '-'}`,
     citations: [`Current entity: ${item.id}`, 'Source: return-store'],
     quickPrompts: [
-      { label: 'Return này ra sao?', prompt: 'Return này đang ở bước nào?' },
-      { label: 'Tóm tắt QC', prompt: 'Return này có QC outcome gì?' },
-      { label: 'Về Returns', prompt: 'Mở lại returns' },
+      { label: 'Return Status', prompt: 'Which step is this return currently in?' },
+      { label: 'Quality Control Summary', prompt: 'What is the quality control outcome for this return?' },
+      { label: 'Open Returns', prompt: 'Open Returns' },
     ],
   };
 }
@@ -460,14 +460,14 @@ function createInventorySummary(): CopilotContextSummary {
   return {
     domain: 'inventory',
     title: 'Inventory',
-    description: 'Inventory-specific diagnostics vẫn nên đi qua copilot chuyên dụng.',
-    insight: 'Global assistant sẽ redirect khi câu hỏi đi sâu vào ATS hoặc stock diagnostics.',
+    description: 'Inventory-specific diagnostics should use the dedicated Inventory Copilot.',
+    insight: 'The global assistant redirects detailed ATP and stock diagnostics to the specialized inventory workflow.',
     citations: ['Current route: /inventory', 'Boundary: dedicated inventory copilot'],
     quickPrompts: [
-      { label: 'Vì sao tách riêng?', prompt: 'Tại sao inventory copilot tách riêng?' },
-      { label: 'Về Warehouses', prompt: 'Mở lại warehouses' },
-      { label: 'Về Orders', prompt: 'Mở lại orders' },
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
+      { label: 'Why Is It Separate?', prompt: 'Why is Inventory Copilot a separate module?' },
+      { label: 'Open Warehouses', prompt: 'Open Warehouses' },
+      { label: 'Open Orders', prompt: 'Open Orders' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
     ],
   };
 }
@@ -476,13 +476,13 @@ function createSettingsSummary(): CopilotContextSummary {
   return {
     domain: 'settings',
     title: 'Settings',
-    description: 'Điểm cấu hình app, policy, routing và preferences.',
+    description: 'Configure application policies, routing rules, and preferences.',
     citations: ['Current route: /settings'],
     quickPrompts: [
-      { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
-      { label: 'Bạn xử lý sao?', prompt: 'Assistant đang chạy safety model nào?' },
-      { label: 'Về Orders', prompt: 'Mở lại orders' },
-      { label: 'Về Products', prompt: 'Mở lại products' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
+      { label: 'Safety Model', prompt: 'What safety model does the assistant use?' },
+      { label: 'Open Orders', prompt: 'Open Orders' },
+      { label: 'Open Products', prompt: 'Open Products' },
     ],
   };
 }
@@ -532,14 +532,14 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
     return {
       domain: 'product',
       title: 'Create Product',
-      description: 'Tạo product draft mới, prefill low-risk fields và review trước khi submit.',
-      insight: 'Assistant có thể chuẩn bị query-prefill cho form create này.',
+      description: 'Create a new product draft, prefill low-risk fields, and review before submission.',
+      insight: 'The assistant can prepare query-prefill values for this creation form.',
       citations: ['Current route: /products/new'],
       quickPrompts: [
-        { label: 'Tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
-        { label: 'Trang này', prompt: 'Trang này dùng để làm gì?' },
-        { label: 'Về Products', prompt: 'Mở lại products' },
-        { label: 'Bạn xử lý sao?', prompt: 'Assistant đang chạy safety model nào?' },
+        { label: 'Create Product', prompt: 'Create a new product named "Compact Lamp" with brand "PrimeOS" and SKU PRIME-LAMP-001' },
+        { label: 'Explain This Page', prompt: 'What is this page used for?' },
+        { label: 'Open Products', prompt: 'Open Products' },
+        { label: 'Safety Model', prompt: 'What safety model does the assistant use?' },
       ],
     };
   }
@@ -595,14 +595,14 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
   return {
     domain: 'dashboard',
     title: 'Seller Growth',
-    description: 'Tư vấn nhóm khách hàng, sản phẩm, KOL/livestream và kênh tiếp thị phù hợp để tăng bán hàng.',
-    insight: 'Prime AI có thể gợi ý khách hàng mục tiêu, thông điệp, kênh triển khai và next best campaign.',
+    description: 'Recommend customer segments, products, creators, live commerce tactics, and marketing channels to increase sales.',
+    insight: 'Prime AI can recommend target customers, messaging, activation channels, and the next best campaign.',
     citations: ['Current route: dashboard'],
     quickPrompts: [
-      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
-      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
-      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
-      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+      { label: 'Find Best Customers', prompt: 'Which customer segments best fit the seller’s current products?' },
+      { label: 'Recommend Campaign', prompt: 'Recommend the best marketing campaign to increase sales.' },
+      { label: 'Channel Mix', prompt: 'Which channels should the seller use to improve sales?' },
+      { label: 'Creator / Live Commerce', prompt: 'How should creators or live commerce be used to generate demand?' },
     ],
   };
 }
@@ -616,15 +616,15 @@ function buildRouteOverview(context: CopilotContextSummary): CopilotResponse {
       takePrompts(context.quickPrompts, 2).map((prompt) => ({
         type: 'copy',
         label: prompt.label,
-        description: 'Copy prompt để hỏi tiếp',
+        description: 'Copy this prompt to continue',
         value: prompt.prompt,
       })),
     ),
     followUpPrompts: takePrompts(context.quickPrompts),
     content: [
-      `Đây là màn hình **${context.title}**.`,
+      `This is the **${context.title}** screen.`,
       context.description,
-      context.insight ? `Snapshot nhanh: ${context.insight}` : null,
+      context.insight ? `Quick snapshot: ${context.insight}` : null,
     ].filter(Boolean).join('\n'),
   };
 }
@@ -642,32 +642,32 @@ function summarizeOrder(order: Order): CopilotResponse {
       label: order.order_id,
     },
     followUpPrompts: [
-      { label: 'Đơn này stuck?', prompt: 'Đơn này đang stuck ở đâu?' },
-      { label: 'Kho xử lý', prompt: 'Đơn này đang allocate vào warehouse nào?' },
-      { label: 'Mở Orders', prompt: 'Mở lại orders' },
+      { label: 'Why Is It Blocked?', prompt: 'Where is this order blocked?' },
+      { label: 'Allocated Warehouse', prompt: 'Which warehouse is allocated to this order?' },
+      { label: 'Open Orders', prompt: 'Open Orders' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở order detail',
-        description: 'Đi thẳng tới order này',
+        label: 'Open Order Details',
+        description: 'Open this order directly',
         url: actionUrl,
         emphasis: 'primary',
       },
       {
         type: 'navigate',
-        label: 'Mở Orders',
-        description: 'Quay lại toàn bộ orders',
+        label: 'Open Orders',
+        description: 'Return to all orders',
         url: '/orders',
       },
     ],
     content: [
-      `Mình tìm thấy order **${order.order_id}**.`,
+      `I found order **${order.order_id}**.`,
       `- Customer: ${order.customer_name}`,
       `- Status: ${ORDER_STATUS_LABELS[order.status] ?? order.status}`,
       `- Lifecycle: ${order.lifecycle_stage}`,
       `- Total: ${formatCurrency(order.total_amount, order.currency)}`,
-      `- Warehouse: ${order.allocated_warehouse?.code ?? order.warehouse_id ?? 'Chưa allocate'}`,
+      `- Warehouse: ${order.allocated_warehouse?.code ?? order.warehouse_id ?? 'Not allocated'}`,
     ].join('\n'),
   };
 }
@@ -683,31 +683,31 @@ function summarizeProduct(product: Product): CopilotResponse {
       label: product.name,
     },
     followUpPrompts: [
-      { label: 'SKU của product', prompt: 'Tóm tắt SKU của product này' },
-      { label: 'Publish ở đâu?', prompt: 'Product này đang publish ở channel nào?' },
-      { label: 'Về Products', prompt: 'Mở lại danh sách products' },
+      { label: 'Product SKUs', prompt: 'Summarize the SKUs for this product' },
+      { label: 'Published Channels', prompt: 'Which channels publish this product?' },
+      { label: 'Open Products', prompt: 'Open the product catalog' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở product detail',
-        description: 'Đi thẳng tới product này',
+        label: 'Open Product Details',
+        description: 'Open this product directly',
         url: `/products/${product.id}`,
         emphasis: 'primary',
       },
       {
         type: 'copy',
         label: 'Copy SKU',
-        description: 'Copy parent SKU để dán sang flow khác',
+        description: 'Copy the parent SKU for another workflow',
         value: product.sku_code,
       },
     ],
     content: [
-      `Mình tìm thấy product **${product.name}**.`,
+      `I found product **${product.name}**.`,
       `- SKU: ${product.sku_code}`,
       `- Brand: ${product.brand}`,
       `- Status: ${product.status}`,
-      `- Channels: ${product.channels.map((item) => item.channel).join(', ') || 'Chưa có'}`,
+      `- Channels: ${product.channels.map((item) => item.channel).join(', ') || 'None'}`,
       `- Base retail: ${formatCurrency(product.retail_price, product.price_currency)}`,
     ].join('\n'),
   };
@@ -813,15 +813,15 @@ function resolveConversationEntityResponse(
         citations: [`Conversation entity: ${job.id}`, 'Source: fulfillment-store'],
         entityRef,
         content: [
-          `Job **${job.job_code ?? job.id}** hiện đang ở đây:`,
+          `Job **${job.job_code ?? job.id}** is currently at this stage:`,
           `- Status: ${job.status}`,
           `- Flow: ${job.flow_type}`,
           `- Priority: ${job.priority}`,
-          `- Warehouse: ${job.warehouse?.code ?? 'Chưa có'}`,
+          `- Warehouse: ${job.warehouse?.code ?? 'Not assigned'}`,
         ].join('\n'),
       }, [
-        { label: 'Job này ra sao?', prompt: 'Job này đang ở bước nào?' },
-        { label: 'Về Fulfillment', prompt: 'Mở lại fulfillment' },
+        { label: 'Job status', prompt: 'What stage is this job in?' },
+        { label: 'Back to Fulfillment', prompt: 'Open Fulfillment' },
       ]);
     }
     case 'return': {
@@ -834,15 +834,15 @@ function resolveConversationEntityResponse(
         citations: [`Conversation entity: ${item.id}`, 'Source: return-store'],
         entityRef,
         content: [
-          `Return **${item.rma_number ?? item.id}** hiện có trạng thái này:`,
+          `Return **${item.rma_number ?? item.id}** currently has this status:`,
           `- Status: ${item.status}`,
           `- QC Grade: ${item.qc_grade ?? 'N/A'}`,
           `- Disposition: ${item.disposition ?? 'N/A'}`,
           `- Refund: ${formatCurrency(item.refund_amount)}`,
         ].join('\n'),
       }, [
-        { label: 'Return này ra sao?', prompt: 'Return này đang ở bước nào?' },
-        { label: 'Về Returns', prompt: 'Mở lại returns' },
+        { label: 'Return status', prompt: 'What stage is this return in?' },
+        { label: 'Back to Returns', prompt: 'Open Returns' },
       ]);
     }
     default:
@@ -861,27 +861,27 @@ export function resolveNavigationResponse(message: string): CopilotResponse | nu
       intent: 'navigate',
       citations: ['Inventory-specific help routes to dedicated inventory workflow'],
       followUpPrompts: [
-        { label: 'Mở Inventory', prompt: 'Mở inventory' },
-        { label: 'Mở Warehouses', prompt: 'Mở warehouses' },
-        { label: 'Vì sao tách riêng?', prompt: 'Tại sao inventory copilot tách riêng?' },
+        { label: 'Open Inventory', prompt: 'Open Inventory' },
+        { label: 'Open Warehouses', prompt: 'Open Warehouses' },
+        { label: 'Why separate?', prompt: 'Why is the Inventory Copilot separate?' },
       ],
       actions: [
         {
           type: 'navigate',
-          label: 'Mở Inventory',
-          description: 'Đi tới workspace tồn kho',
+          label: 'Open Inventory',
+          description: 'Go to the inventory workspace',
           url: '/inventory',
           emphasis: 'primary',
         },
         {
           type: 'navigate',
-          label: 'Mở Warehouses',
-          description: 'Xem topology kho',
+          label: 'Open Warehouses',
+          description: 'View the warehouse topology',
           url: '/warehouses',
         },
       ],
       content:
-        'Nếu bạn đang hỏi về ATS, tồn kho khả dụng, reservation hay warehouse availability thì mình khuyên mở thẳng Inventory module để có đúng context chuyên sâu.',
+        'For ATS, available stock, reservations, or warehouse availability, open the Inventory module for the complete operational context.',
     };
   }
 
@@ -902,20 +902,20 @@ export function resolveNavigationResponse(message: string): CopilotResponse | nu
         intent: 'navigate',
         citations: ['Orders page supports q + status URL filters'],
         followUpPrompts: [
-          { label: 'Pending Orders', prompt: 'Cho mình danh sách order đang pending' },
-          { label: 'Shipping Orders', prompt: 'Mở order đang shipping' },
-          { label: 'Trang Orders', prompt: 'Trang này dùng để làm gì?' },
+          { label: 'Pending Orders', prompt: 'Show pending orders' },
+          { label: 'Shipping Orders', prompt: 'Open shipping orders' },
+          { label: 'About Orders', prompt: 'What is this page used for?' },
         ],
         actions: [
           {
             type: 'navigate',
-            label: `Mở ${matchedStatus.label}`,
-            description: 'Đi tới danh sách đã filter sẵn',
+            label: `Open ${matchedStatus.label}`,
+            description: 'Go to the pre-filtered order list',
             url: `/orders?status=${matchedStatus.status}`,
             emphasis: 'primary',
           },
         ],
-        content: `Mình có thể đưa bạn thẳng tới danh sách orders đã lọc theo trạng thái **${matchedStatus.label}**.`,
+        content: `Open the order list filtered by **${matchedStatus.label}**.`,
       };
     }
 
@@ -927,13 +927,13 @@ export function resolveNavigationResponse(message: string): CopilotResponse | nu
       actions: [
         {
           type: 'navigate',
-          label: 'Mở Orders',
-          description: 'Đi tới OMS index',
+          label: 'Open Orders',
+          description: 'Go to Order Management',
           url: '/orders',
           emphasis: 'primary',
         },
       ],
-      content: 'Mình sẽ mở lại workspace Orders để bạn thao tác nhanh hơn.',
+      content: 'Open the Orders workspace to continue.',
     };
   }
 
@@ -956,19 +956,19 @@ export function resolveNavigationResponse(message: string): CopilotResponse | nu
     intent: 'navigate',
     citations: ['Navigation helper'],
     followUpPrompts: [
-      { label: `Mở ${routeMatch.label}`, prompt: `Mở ${routeMatch.label}` },
-      { label: 'Giải thích trang', prompt: 'Trang này dùng để làm gì?' },
+      { label: `Open ${routeMatch.label}`, prompt: `Open ${routeMatch.label}` },
+      { label: 'About this page', prompt: 'What is this page used for?' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: `Mở ${routeMatch.label}`,
-        description: 'Đi tới đúng module tương ứng',
+        label: `Open ${routeMatch.label}`,
+        description: 'Go to the corresponding module',
         url: routeMatch.url,
         emphasis: 'primary',
       },
     ],
-    content: `Mình có thể mở nhanh module **${routeMatch.label}** cho bạn.`,
+    content: `Open the **${routeMatch.label}** module.`,
   };
 }
 
@@ -1035,20 +1035,20 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       intent: 'write_draft',
       citations: ['Product create page supports URL-based prefill'],
       followUpPrompts: [
-        { label: 'Mở form create', prompt: 'Mở form tạo product mới' },
-        { label: 'Ví dụ tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
+        { label: 'Open create form', prompt: 'Open the new product form' },
+        { label: 'Product example', prompt: 'Create a product named "Compact Lamp" with brand "PrimeOS" and SKU PRIME-LAMP-001' },
       ],
       actions: [
         {
           type: 'navigate',
-          label: 'Mở form tạo product',
-          description: 'Mở form trống để nhập tay',
+          label: 'Open product form',
+          description: 'Open a blank form for manual entry',
           url: '/products/new',
           emphasis: 'primary',
         },
       ],
       content:
-        'Mình có thể chuẩn bị draft product cho bạn. Nếu muốn prefill mạnh hơn, hãy cho mình ít nhất `title`, `brand` hoặc `sku`; còn nếu chưa có thì mình mở form create trống ngay cũng được.',
+        'I can prepare a product draft. Provide at least a `title`, `brand`, or `sku` to prefill the form, or open a blank create form.',
     };
   }
 
@@ -1071,8 +1071,8 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       'Target flow: /products/new query-prefill',
     ],
     followUpPrompts: [
-      { label: 'Mở draft product', prompt: `Tạo product mới tên "${title || 'Compact Lamp'}" brand "${brand || 'PrimeOS'}" sku ${resolvedSku}` },
-      { label: 'Về Products', prompt: 'Mở lại products' },
+      { label: 'Open product draft', prompt: `Create a product named "${title || 'Compact Lamp'}" with brand "${brand || 'PrimeOS'}" and SKU ${resolvedSku}` },
+      { label: 'Back to Products', prompt: 'Open Products' },
     ],
     actions: [
       preparedCommand.confirmAction,
@@ -1080,21 +1080,21 @@ export function resolveProductDraftResponse(message: string): CopilotResponse | 
       {
         type: 'copy',
         label: 'Copy SKU',
-        description: 'Copy SKU để dùng tiếp ở luồng khác',
+        description: 'Copy the SKU for another workflow',
         value: resolvedSku,
       },
     ],
     content: [
-      'Mình đã chuẩn bị một **product draft** an toàn để bạn review trong form create.',
-      `- Title: ${title || 'Chưa set'}`,
-      `- Brand: ${brand || 'Chưa set'}`,
+      'A safe **product draft** is ready for review in the create form.',
+      `- Title: ${title || 'Not set'}`,
+      `- Brand: ${brand || 'Not set'}`,
       `- SKU: ${resolvedSku}`,
       asin ? `- ASIN: ${asin}` : null,
       family ? `- Category: ${family}` : null,
       msrp ? `- MSRP: ${msrp}` : null,
       '',
       `Command prepared: ${preparedCommand.request.commandName} · risk ${preparedCommand.request.risk}.`,
-      'Assistant mới chỉ prefill low-risk fields; chưa có dữ liệu nào được save hay publish cho tới khi bạn xác nhận trong form.',
+      'Only low-risk fields have been prefilled. Nothing is saved or published until you confirm the form.',
     ].filter(Boolean).join('\n'),
   };
 }
@@ -1111,21 +1111,21 @@ function summarizeWarehouseNetwork() {
     intent: 'read' as const,
     citations: ['Source: warehouse-store'],
     followUpPrompts: [
-      { label: 'Kho virtual', prompt: 'Có bao nhiêu virtual warehouse?' },
-      { label: 'Mở Warehouses', prompt: 'Mở lại warehouses' },
-      { label: 'Sang Inventory', prompt: 'Tại sao inventory copilot tách riêng?' },
+      { label: 'Virtual warehouses', prompt: 'How many virtual warehouses are there?' },
+      { label: 'Open Warehouses', prompt: 'Open Warehouses' },
+      { label: 'Go to Inventory', prompt: 'Why is the Inventory Copilot separate?' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở Warehouses',
-        description: 'Đi tới warehouse index',
+        label: 'Open Warehouses',
+        description: 'Go to the warehouse directory',
         url: '/warehouses',
         emphasis: 'primary',
       },
     ],
     content: [
-      'Đây là snapshot warehouse network hiện tại:',
+      'Current warehouse network snapshot:',
       `- Total: ${warehouses.length}`,
       `- Active: ${warehouses.filter((item) => item.status === 'active').length}`,
       `- Virtual: ${warehouses.filter((item) => item.is_virtual).length}`,
@@ -1149,20 +1149,20 @@ function summarizeOrdersIndex() {
     actions: [
       {
         type: 'navigate',
-        label: 'Mở Pending Orders',
-        description: 'Đi tới queue pending',
+        label: 'Open Pending Orders',
+        description: 'Go to the pending queue',
         url: '/orders?status=pending',
         emphasis: 'primary',
       },
       {
         type: 'navigate',
-        label: 'Mở Shipping Orders',
-        description: 'Đi tới queue shipping',
+        label: 'Open Shipping Orders',
+        description: 'Go to the shipping queue',
         url: '/orders?status=shipping',
       },
     ],
     content: [
-      'Snapshot orders hiện tại:',
+      'Current order snapshot:',
       ...counts.map((item) => `- ${ORDER_STATUS_LABELS[item.status]}: ${item.count}`),
     ].join('\n'),
   };
@@ -1179,22 +1179,22 @@ function summarizeProductsIndex() {
     intent: 'read' as const,
     citations: ['Source: product-store'],
     followUpPrompts: [
-      { label: 'Tạo product', prompt: 'Tạo product mới tên "Compact Lamp" brand "PrimeOS" sku PRIME-LAMP-001' },
-      { label: 'Đang draft', prompt: 'Có bao nhiêu product đang ở draft?' },
-      { label: 'Mở Products', prompt: 'Mở lại products' },
+      { label: 'Create product', prompt: 'Create a product named "Compact Lamp" with brand "PrimeOS" and SKU PRIME-LAMP-001' },
+      { label: 'Draft products', prompt: 'How many products are in draft?' },
+      { label: 'Open Products', prompt: 'Open Products' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở Product Master',
-        description: 'Đi tới products index',
+        label: 'Open Product Master',
+        description: 'Go to the product catalog',
         url: '/products',
         emphasis: 'primary',
       },
       {
         type: 'navigate',
-        label: 'Tạo Product Mới',
-        description: 'Mở form create product',
+        label: 'Create Product',
+        description: 'Open the product creation form',
         url: '/products/new',
       },
     ],
@@ -1219,15 +1219,15 @@ function summarizeListingsIndex() {
     intent: 'read' as const,
     citations: ['Source: listing-store'],
     followUpPrompts: [
-      { label: 'Theo kênh', prompt: 'Tóm tắt listing theo channel hiện tại' },
-      { label: 'Mở Listings', prompt: 'Mở lại listings' },
-      { label: 'Về Products', prompt: 'Mở lại product master' },
+      { label: 'By channel', prompt: 'Summarize current listings by channel' },
+      { label: 'Open Listings', prompt: 'Open Listings' },
+      { label: 'Back to Products', prompt: 'Open Product Master' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở Listings',
-        description: 'Đi tới channel listings',
+        label: 'Open Listings',
+        description: 'Go to channel listings',
         url: '/listings',
         emphasis: 'primary',
       },
@@ -1248,15 +1248,15 @@ function summarizeFulfillmentIndex() {
     intent: 'read' as const,
     citations: ['Source: fulfillment-store'],
     followUpPrompts: [
-      { label: 'Tóm tắt queue', prompt: 'Tóm tắt fulfillment queue hiện tại' },
-      { label: 'Mở Fulfillment', prompt: 'Mở lại fulfillment' },
-      { label: 'Về Orders', prompt: 'Mở lại orders' },
+      { label: 'Queue summary', prompt: 'Summarize the current fulfillment queue' },
+      { label: 'Open Fulfillment', prompt: 'Open Fulfillment' },
+      { label: 'Back to Orders', prompt: 'Open Orders' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở Fulfillment',
-        description: 'Đi tới fulfillment queue',
+        label: 'Open Fulfillment',
+        description: 'Go to the fulfillment queue',
         url: '/fulfillment',
         emphasis: 'primary',
       },
@@ -1278,15 +1278,15 @@ function summarizeReturnsIndex() {
     intent: 'read' as const,
     citations: ['Source: return-store'],
     followUpPrompts: [
-      { label: 'Đang QC', prompt: 'Bao nhiêu return đang ở bước QC?' },
-      { label: 'Mở Returns', prompt: 'Mở lại returns' },
-      { label: 'Về Fulfillment', prompt: 'Mở lại fulfillment' },
+      { label: 'In QC', prompt: 'How many returns are in QC?' },
+      { label: 'Open Returns', prompt: 'Open Returns' },
+      { label: 'Back to Fulfillment', prompt: 'Open Fulfillment' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở Returns',
-        description: 'Đi tới returns queue',
+        label: 'Open Returns',
+        description: 'Go to the returns queue',
         url: '/returns',
         emphasis: 'primary',
       },
@@ -1311,25 +1311,25 @@ function buildOrderDetailAnswer(order: Order) {
       label: order.order_id,
     },
     followUpPrompts: [
-      { label: 'Kho xử lý', prompt: 'Order này đang allocate vào warehouse nào?' },
-      { label: 'Đơn stuck ở đâu?', prompt: 'Đơn này đang stuck ở đâu?' },
-      { label: 'Về Orders', prompt: 'Mở lại danh sách orders' },
+      { label: 'Fulfillment warehouse', prompt: 'Which warehouse is this order allocated to?' },
+      { label: 'Order blocker', prompt: 'Where is this order blocked?' },
+      { label: 'Back to Orders', prompt: 'Open the order list' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở lại Orders',
-        description: 'Quay về danh sách orders',
+        label: 'Back to Orders',
+        description: 'Return to the order list',
         url: '/orders',
       },
     ],
     content: [
-      `Đơn **${order.order_id}** hiện đang ở đây:`,
+      `Order **${order.order_id}** is currently at this stage:`,
       `- Status: ${ORDER_STATUS_LABELS[order.status] ?? order.status}`,
       `- Lifecycle: ${order.lifecycle_stage}`,
       `- Customer: ${order.customer_name}`,
       `- Total: ${formatCurrency(order.total_amount, order.currency)}`,
-      `- Warehouse: ${order.allocated_warehouse?.name ?? order.warehouse_id ?? 'Chưa allocate'}`,
+      `- Warehouse: ${order.allocated_warehouse?.name ?? order.warehouse_id ?? 'Not allocated'}`,
     ].join('\n'),
   };
 }
@@ -1345,9 +1345,9 @@ function buildProductDetailAnswer(product: Product) {
       label: product.name,
     },
     followUpPrompts: [
-      { label: 'SKU của product', prompt: 'Tóm tắt SKU của product này' },
-      { label: 'Publish ở đâu?', prompt: 'Product này đang publish ở channel nào?' },
-      { label: 'Về Products', prompt: 'Mở lại danh sách products' },
+      { label: 'Product SKUs', prompt: 'Summarize the SKUs for this product' },
+      { label: 'Published channels', prompt: 'Which channels is this product published to?' },
+      { label: 'Back to Products', prompt: 'Open the product list' },
     ],
     actions: [
       {
@@ -1358,17 +1358,17 @@ function buildProductDetailAnswer(product: Product) {
       },
       {
         type: 'navigate',
-        label: 'Mở lại Products',
-        description: 'Quay về product master',
+        label: 'Back to Products',
+        description: 'Return to Product Master',
         url: '/products',
       },
     ],
     content: [
-      `Product **${product.name}** đang có snapshot này:`,
+      `Current snapshot for **${product.name}**:`,
       `- Parent SKU: ${product.sku_code}`,
       `- Brand: ${product.brand}`,
       `- Status: ${product.status}`,
-      `- Channels: ${product.channels.map((item) => item.channel).join(', ') || 'Chưa có'}`,
+      `- Channels: ${product.channels.map((item) => item.channel).join(', ') || 'None'}`,
       `- Variants/SKUs: ${product.skus.length}`,
       `- Retail price: ${formatCurrency(product.retail_price, product.price_currency)}`,
     ].join('\n'),
@@ -1386,15 +1386,15 @@ function buildWarehouseDetailAnswer(warehouse: Warehouse) {
       label: warehouse.code,
     },
     followUpPrompts: [
-      { label: 'Capability kho', prompt: 'Kho này có capability gì?' },
-      { label: 'Về Warehouses', prompt: 'Mở lại warehouses' },
-      { label: 'Sang Inventory', prompt: 'Tại sao inventory copilot tách riêng?' },
+      { label: 'Warehouse capabilities', prompt: 'What capabilities does this warehouse have?' },
+      { label: 'Back to Warehouses', prompt: 'Open Warehouses' },
+      { label: 'Go to Inventory', prompt: 'Why is the Inventory Copilot separate?' },
     ],
     actions: [
       {
         type: 'navigate',
-        label: 'Mở lại Warehouses',
-        description: 'Quay về warehouse list',
+        label: 'Back to Warehouses',
+        description: 'Return to the warehouse list',
         url: '/warehouses',
       },
     ],
@@ -1416,36 +1416,36 @@ function buildSellerGrowthAudienceResponse(): CopilotResponse {
     intent: 'read',
     citations: ['Mock intelligence layer: persona fit from social, CRM, and campaign signals'],
     followUpPrompts: [
-      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
-      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
-      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+      { label: 'Campaign idea', prompt: 'Suggest the best marketing campaign to increase sales.' },
+      { label: 'Channel strategy', prompt: 'Which channels should we use to improve sales?' },
+      { label: 'Creator commerce', prompt: 'How should we use creators or livestreams to generate demand?' },
     ],
     actions: buildActions([
-      { type: 'copy', label: 'Copy audience brief', description: 'Dùng brief này cho seller team', value: 'Segment A: Creator commerce buyers 24-32 / Segment B: Repeat refill buyers 28-40 / Segment C: B2B office replenishment managers 30-45' },
-      { type: 'copy', label: 'Copy key message', description: 'Dùng làm định hướng thông điệp', value: 'Bundle convenience, refill value, trust proof, MOQ clarity, service follow-up' },
+      { type: 'copy', label: 'Copy audience brief', description: 'Share with the seller team', value: 'Segment A: Creator commerce buyers 24-32 / Segment B: Repeat refill buyers 28-40 / Segment C: B2B office replenishment managers 30-45' },
+      { type: 'copy', label: 'Copy key message', description: 'Use as messaging direction', value: 'Bundle convenience, refill value, trust proof, MOQ clarity, service follow-up' },
     ]),
     content: [
-      'Prime AI đang ưu tiên 3 nhóm khách hàng cho seller này.',
+      'Prime AI recommends prioritizing three customer segments.',
       '',
       '**1. Creator Commerce Buyers**',
-      '- Hồ sơ: 24-32 tuổi, mua theo cảm hứng nhưng cần trust signal mạnh.',
-      '- Nơi xuất hiện: TikTok livestream, creator clip, social save/share.',
-      '- Trigger mua hàng: xem demo nhanh, thấy bundle tiện hơn mua lẻ, có creator proof rõ.',
-      '- KPI mock: CTR 2.8%, add-to-cart rate 9.4%, conversion window 24-48h.',
+      '- Profile: ages 24-32, discovery-led buyers who need strong trust signals.',
+      '- Touchpoints: TikTok livestreams, creator clips, and social saves or shares.',
+      '- Purchase triggers: quick demos, clear bundle value, and creator proof.',
+      '- Sample KPI: 2.8% CTR, 9.4% add-to-cart rate, 24-48 hour conversion window.',
       '',
       '**2. Repeat / Refill Buyers**',
-      '- Hồ sơ: đã từng mua hoặc từng tương tác nhiều lần với cùng nhóm sản phẩm.',
-      '- Nơi xuất hiện: email reopen, chat follow-up, revisit vào refill/bundle pages.',
-      '- Trigger mua hàng: nhắc đúng thời điểm, lợi ích tiết kiệm, combo/refill rõ ràng.',
-      '- KPI mock: reopen rate 31%, repeat conversion 12.6%, CAC thấp hơn broad audience 27%.',
+      '- Profile: previous buyers or shoppers with repeated engagement in the category.',
+      '- Touchpoints: email reopen, chat follow-up, and refill or bundle page revisits.',
+      '- Purchase triggers: timely reminders, savings, and clear refill value.',
+      '- Sample KPI: 31% reopen rate, 12.6% repeat conversion, 27% lower CAC than broad audiences.',
       '',
       '**3. B2B Replenishment Accounts**',
-      '- Hồ sơ: buyer doanh nghiệp, office/admin procurement hoặc đối tác mua định kỳ.',
-      '- Nơi xuất hiện: quote-page dwell, RFQ intent, LinkedIn matched audience, sales chat.',
-      '- Trigger mua hàng: MOQ rõ, giá trị gói mua số lượng, SLA và fulfillment đáng tin.',
-      '- KPI mock: RFQ submit rate 8.7%, quote-to-order 21%, AOV cao gấp 3.2x nhóm retail.',
+      '- Profile: business buyers, office procurement teams, or recurring partners.',
+      '- Touchpoints: quote pages, RFQ intent, matched audiences, and sales chat.',
+      '- Purchase triggers: clear MOQ, volume value, reliable SLA, and fulfillment.',
+      '- Sample KPI: 8.7% RFQ submission, 21% quote-to-order, and 3.2x retail AOV.',
       '',
-      'Tín hiệu mạnh nhất hiện tại đang đến từ livestream comments, save/share trên creator content, revisit vào refill pages, và các phiên quote intent lặp lại.',
+      'The strongest signals currently come from livestream comments, creator-content saves and shares, refill-page revisits, and repeated quote intent.',
     ].join('\n'),
   };
 }
@@ -1456,41 +1456,41 @@ function buildSellerGrowthCampaignResponse(): CopilotResponse {
     intent: 'read',
     citations: ['Mock campaign planning: social demand + CRM segment + conversion path'],
     followUpPrompts: [
-      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
-      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
-      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+      { label: 'Find customers', prompt: 'Which customer segments are the best fit for the current products?' },
+      { label: 'Channel strategy', prompt: 'Which channels should we use to improve sales?' },
+      { label: 'Creator commerce', prompt: 'How should we use creators or livestreams to generate demand?' },
     ],
     actions: buildActions([
-      { type: 'copy', label: 'Copy campaign brief', description: 'Dùng làm brief nội bộ', value: '72h refill bundle sprint / creator-led demo / retarget engaged viewers / chat follow-up for high intent users' },
-      { type: 'copy', label: 'Copy offer idea', description: 'Dùng làm thông điệp ưu đãi', value: 'Buy smarter with bundle value, refill convenience, and limited-time incentive' },
+      { type: 'copy', label: 'Copy campaign brief', description: 'Use as an internal brief', value: '72h refill bundle sprint / creator-led demo / retarget engaged viewers / chat follow-up for high intent users' },
+      { type: 'copy', label: 'Copy offer idea', description: 'Use as promotional messaging', value: 'Buy smarter with bundle value, refill convenience, and limited-time incentive' },
     ]),
     content: [
-      'Chiến dịch mock phù hợp nhất là **72-hour Bundle & Refill Sprint**.',
+      'The recommended sample campaign is a **72-hour Bundle & Refill Sprint**.',
       '',
-      '**Mục tiêu**',
-      '- Tăng đơn hàng ngắn hạn từ nhóm khách đã có ý định mua.',
-      '- Giảm lãng phí media vào nhóm lạnh chưa có trust signal.',
+      '**Objectives**',
+      '- Increase short-term orders from high-intent customers.',
+      '- Reduce media waste on cold audiences without trust signals.',
       '',
-      '**Cấu trúc chiến dịch**',
-      '- Giai đoạn 1: Creator clip / livestream hook để tạo lực hút ban đầu.',
-      '- Giai đoạn 2: Retarget người đã xem trên 50%, đã save, hoặc đã click nhưng chưa mua.',
-      '- Giai đoạn 3: Email + chat follow-up cho nhóm có dấu hiệu refill hoặc quote intent.',
+      '**Campaign structure**',
+      '- Stage 1: Creator clips or livestream hooks to generate demand.',
+      '- Stage 2: Retarget users who watched over 50%, saved, or clicked without buying.',
+      '- Stage 3: Email and chat follow-up for refill or quote intent.',
       '',
-      '**Thông điệp chính**',
-      '- Bundle tiết kiệm hơn mua lẻ.',
-      '- Refill tiện hơn cho nhu cầu mua lại.',
-      '- Có proof từ creator hoặc customer use-case thật.',
+      '**Core message**',
+      '- Bundles provide better value than individual purchases.',
+      '- Refills make repeat purchasing easier.',
+      '- Support claims with creator proof or real customer use cases.',
       '',
-      '**Phân bổ mock budget**',
+      '**Sample budget allocation**',
       '- 40% creator/livestream traffic.',
       '- 35% retargeting conversion.',
       '- 15% CRM/email/chat activation.',
-      '- 10% test angle mới hoặc lookalike audience.',
+      '- 10% new-angle or lookalike audience tests.',
       '',
-      '**KPI mock kỳ vọng**',
-      '- +18% lift đơn hàng trong 7 ngày.',
-      '- +22% add-to-cart từ nhóm đã xem creator content.',
-      '- -19% wasted spend nhờ loại bớt audience không còn phù hợp.',
+      '**Sample expected KPIs**',
+      '- 18% order lift within seven days.',
+      '- 22% add-to-cart lift among creator-content viewers.',
+      '- 19% less wasted spend by excluding low-fit audiences.',
     ].join('\n'),
   };
 }
@@ -1501,36 +1501,36 @@ function buildSellerGrowthChannelResponse(): CopilotResponse {
     intent: 'read',
     citations: ['Mock channel orchestration: paid + owned + chat-assisted commerce'],
     followUpPrompts: [
-      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
-      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
-      { label: 'KOL / livestream', prompt: 'Nếu dùng KOL hoặc livestream thì nên đi theo hướng nào để kích cầu?' },
+      { label: 'Find customers', prompt: 'Which customer segments are the best fit for the current products?' },
+      { label: 'Campaign idea', prompt: 'Suggest the best marketing campaign to increase sales.' },
+      { label: 'Creator commerce', prompt: 'How should we use creators or livestreams to generate demand?' },
     ],
     actions: buildActions([
-      { type: 'copy', label: 'Copy channel mix', description: 'Dùng làm media direction', value: 'TikTok livestream / creator clips -> Meta or platform retargeting -> Email / LINE / Zalo -> Sales chat for high intent users' },
-      { type: 'copy', label: 'Copy rollout', description: 'Dùng làm sequencing plan', value: 'Awareness proof -> engagement retargeting -> CRM push -> chat conversion assist' },
+      { type: 'copy', label: 'Copy channel mix', description: 'Use as media direction', value: 'TikTok livestream / creator clips -> Meta or platform retargeting -> Email / LINE / Zalo -> Sales chat for high intent users' },
+      { type: 'copy', label: 'Copy rollout', description: 'Use as the sequencing plan', value: 'Awareness proof -> engagement retargeting -> CRM push -> chat conversion assist' },
     ]),
     content: [
-      'Prime AI đề xuất chạy theo **channel sequence**, không phải chọn một kênh đơn lẻ.',
+      'Prime AI recommends a **channel sequence** rather than relying on one channel.',
       '',
-      '**Kênh 1. Demand trigger**',
+      '**Channel 1. Demand trigger**',
       '- TikTok livestream / creator short-form content.',
-      '- Mục đích: tạo trust và nhu cầu ban đầu.',
-      '- KPI mock: video completion 34%, comment rate 6.2%, click-out 2.8%.',
+      '- Purpose: build trust and initial demand.',
+      '- Sample KPI: 34% video completion, 6.2% comment rate, and 2.8% click-out.',
       '',
-      '**Kênh 2. Conversion retargeting**',
-      '- Retargeting trên social / marketplace / website audiences.',
-      '- Mục đích: bám lại người đã tương tác nhưng chưa chốt đơn.',
-      '- KPI mock: CPA thấp hơn broad targeting 24%, ROAS tăng 17%.',
+      '**Channel 2. Conversion retargeting**',
+      '- Retarget social, marketplace, and website audiences.',
+      '- Purpose: re-engage shoppers who interacted but did not purchase.',
+      '- Sample KPI: 24% lower CPA than broad targeting and 17% higher ROAS.',
       '',
-      '**Kênh 3. CRM / owned channels**',
-      '- Email, LINE, Zalo, WhatsApp hoặc chat platform.',
-      '- Mục đích: kích hoạt nhóm có intent cao, refill buyers, hoặc khách vừa bỏ giỏ.',
-      '- KPI mock: open rate 38%, reply rate 14%, assisted conversion 9%.',
+      '**Channel 3. CRM / owned channels**',
+      '- Email, LINE, Zalo, WhatsApp, or chat platforms.',
+      '- Purpose: activate high-intent, refill, or recently abandoned-cart customers.',
+      '- Sample KPI: 38% open rate, 14% reply rate, and 9% assisted conversion.',
       '',
-      '**Kênh 4. Sales / quote assist**',
-      '- Sales chat, quote follow-up, B2B outbound nhẹ.',
-      '- Mục đích: chốt nhóm account có AOV cao.',
-      '- KPI mock: quote-to-order 21%, average basket tăng 3.2x retail.',
+      '**Channel 4. Sales / quote assist**',
+      '- Sales chat, quote follow-up, and targeted B2B outreach.',
+      '- Purpose: convert high-AOV accounts.',
+      '- Sample KPI: 21% quote-to-order and 3.2x retail average basket.',
     ].join('\n'),
   };
 }
@@ -1541,36 +1541,36 @@ function buildSellerGrowthKolResponse(): CopilotResponse {
     intent: 'read',
     citations: ['Mock creator intelligence: host fit + offer timing + social proof'],
     followUpPrompts: [
-      { label: 'Tìm khách phù hợp', prompt: 'Nhóm khách hàng nào phù hợp nhất với sản phẩm của seller hiện tại?' },
-      { label: 'Gợi ý chiến dịch', prompt: 'Hãy gợi ý chiến dịch tiếp thị tốt nhất để seller tăng bán hàng.' },
-      { label: 'Kênh nên chạy', prompt: 'Nên triển khai qua các kênh nào để bán tốt hơn?' },
+      { label: 'Find customers', prompt: 'Which customer segments are the best fit for the current products?' },
+      { label: 'Campaign idea', prompt: 'Suggest the best marketing campaign to increase sales.' },
+      { label: 'Channel strategy', prompt: 'Which channels should we use to improve sales?' },
     ],
     actions: buildActions([
-      { type: 'copy', label: 'Copy livestream angle', description: 'Dùng làm creator brief', value: 'Problem-solution demo + trust proof + short-time bundle close' },
-      { type: 'copy', label: 'Copy host script', description: 'Dùng làm opening hook', value: 'Open with pain point, demo real use, show bundle value, close with urgency' },
+      { type: 'copy', label: 'Copy livestream angle', description: 'Use as the creator brief', value: 'Problem-solution demo + trust proof + short-time bundle close' },
+      { type: 'copy', label: 'Copy host script', description: 'Use as the opening hook', value: 'Open with pain point, demo real use, show bundle value, close with urgency' },
     ]),
     content: [
-      'Nếu dùng KOL hoặc livestream, Prime AI đang ưu tiên format **problem-solution demo + trust proof + bundle close**.',
+      'For creators or livestreams, Prime AI recommends **problem-solution demo + trust proof + bundle close**.',
       '',
-      '**Host fit mock**',
-      '- Ưu tiên micro hoặc mid creator có tỷ lệ bình luận thật cao hơn là chỉ nhìn tổng reach.',
-      '- Chỉ số mock nên theo: comment velocity > 4.5%, save/share rate > 3.2%, click-to-cart > 2.1%.',
+      '**Sample host fit**',
+      '- Prioritize micro or mid-tier creators with authentic comment engagement over raw reach.',
+      '- Sample thresholds: comment velocity > 4.5%, save/share rate > 3.2%, click-to-cart > 2.1%.',
       '',
-      '**Flow livestream đề xuất**',
-      '- 0-30 giây: nêu vấn đề người mua đang gặp.',
-      '- 30-90 giây: demo cách sản phẩm giải quyết vấn đề.',
-      '- 90-150 giây: chứng minh trust bằng review, use-case, hoặc social proof.',
-      '- 150 giây trở đi: chốt bằng bundle/refill incentive và CTA ngắn hạn.',
+      '**Recommended livestream flow**',
+      '- 0-30 seconds: introduce the customer problem.',
+      '- 30-90 seconds: demonstrate how the product solves it.',
+      '- 90-150 seconds: establish trust with reviews, use cases, or social proof.',
+      '- After 150 seconds: close with a bundle or refill incentive and time-bound CTA.',
       '',
-      '**Offer mock phù hợp**',
-      '- Bundle ưu đãi trong 90 phút đầu livestream.',
-      '- Refill bonus cho khách từng mua hoặc từng tương tác.',
-      '- DM/chat follow-up cho người comment nhưng chưa mua.',
+      '**Sample offer**',
+      '- Bundle incentive during the first 90 minutes.',
+      '- Refill bonus for previous buyers or engaged shoppers.',
+      '- DM or chat follow-up for commenters who did not purchase.',
       '',
-      '**KPI mock kỳ vọng**',
-      '- +26% add-to-cart trong khung livestream.',
-      '- +14% follow-up conversion từ nhóm đã comment.',
-      '- +11% repeat purchase nếu nối thêm CRM reminder sau live 24 giờ.',
+      '**Sample expected KPIs**',
+      '- 26% add-to-cart lift during the livestream.',
+      '- 14% follow-up conversion among commenters.',
+      '- 11% repeat-purchase lift with a CRM reminder 24 hours after the livestream.',
     ].join('\n'),
   };
 }
@@ -1597,7 +1597,7 @@ export function resolveContextualResponse(message: string, pathname: string): Co
     }
   }
 
-  if (hasAnyKeyword(normalized, ['trang nay', 'page nay', 'screen nay', 'route nay', 'dung de lam gi', 'lam gi o day'])) {
+  if (hasAnyKeyword(normalized, ['trang nay', 'page nay', 'screen nay', 'route nay', 'dung de lam gi', 'lam gi o day', 'what is this page', 'what is this screen', 'explain this page'])) {
     return buildRouteOverview(context);
   }
 
@@ -1645,21 +1645,21 @@ export function resolveContextualResponse(message: string, pathname: string): Co
       intent: 'policy_qa',
       citations: ['Boundary: dedicated inventory copilot'],
       followUpPrompts: [
-        { label: 'Mở Inventory', prompt: 'Mở inventory' },
-        { label: 'Mở Warehouses', prompt: 'Mở warehouses' },
-        { label: 'Vì sao tách riêng?', prompt: 'Tại sao inventory copilot tách riêng?' },
+        { label: 'Open Inventory', prompt: 'Open Inventory' },
+        { label: 'Open Warehouses', prompt: 'Open Warehouses' },
+        { label: 'Why Is It Separate?', prompt: 'Why is Inventory Copilot a separate module?' },
       ],
       actions: [
         {
           type: 'navigate',
-          label: 'Mở Inventory',
-          description: 'Đi tới inventory workspace',
+          label: 'Open Inventory',
+          description: 'Open the inventory workspace',
           url: '/inventory',
           emphasis: 'primary',
         },
       ],
       content:
-        'Ở route inventory, mình vẫn giữ nguyên boundary: assistant sẽ định hướng và nhắc context, còn inventory diagnostics sâu thì nên chạy ở luồng copilot chuyên dụng để không bị lẫn với orchestration Q&A.',
+        'Inventory keeps a clear module boundary: the global assistant provides navigation and context, while detailed stock diagnostics run through the dedicated Inventory Copilot.',
     };
   }
 
@@ -1755,7 +1755,7 @@ export function resolveCopilotResponse(
     && top.key !== runnerUp.key
   ) {
     return finalizeCopilotResponse(buildClarifyResponse(context, [
-      { label: 'Giải thích trang', prompt: 'Trang này dùng để làm gì?' },
+      { label: 'Explain This Page', prompt: 'What is this page used for?' },
       ...takePrompts(top.response.followUpPrompts ?? context.quickPrompts, 2),
     ]), context);
   }

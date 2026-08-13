@@ -37,22 +37,22 @@ function summarizeActionLine(response: CopilotResponse, context: CopilotContextS
     return response.followUpPrompts.slice(0, 2).map((prompt) => prompt.label).join(' · ');
   }
 
-  return `Tiếp tục trong ${context.title}`;
+  return `Continue in ${context.title}`;
 }
 
 function summarizeRecommendationLine(response: CopilotResponse, context: CopilotContextSummary) {
   switch (response.intent) {
     case 'navigate':
-      return `Mở đúng module hoặc queue liên quan trong ${context.title} để xử lý nhanh hơn`;
+      return `Open the relevant module or queue in ${context.title}`;
     case 'write_draft':
-      return `Dùng draft an toàn trước, rồi mới xác nhận thực thi trong ${context.title}`;
+      return `Review the safe draft before confirming the action in ${context.title}`;
     case 'clarify':
-      return `Chốt một hướng cụ thể để mình giảm mơ hồ và trả lời sát hơn với ${context.title}`;
+      return `Choose a specific direction to get a more relevant answer for ${context.title}`;
     default:
       if (response.entityRef?.label) {
-        return `Đọc kỹ context của ${response.entityRef.label} rồi quyết định bước xử lý tiếp theo`;
+        return `Review the context for ${response.entityRef.label} before choosing the next action`;
       }
-      return `Dùng phần context hiện tại của ${context.title} để chọn next best action phù hợp`;
+      return `Use the current ${context.title} context to choose the next best action`;
   }
 }
 

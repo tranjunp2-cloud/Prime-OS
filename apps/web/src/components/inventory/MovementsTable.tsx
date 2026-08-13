@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftRight, Layers, HelpCircle, Building2 } from 'lucide-react';
+import { ArrowLeftRight, Layers, Info, Building2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -204,7 +204,7 @@ export function MovementsTable({ movements, isLoading, onBatchClick }: Movements
                 <Tooltip>
                   <TooltipTrigger className="flex items-center gap-1">
                     {t('orders.colType')}
-                    <HelpCircle className="size-3" />
+                    <Info className="size-3" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{t('inventory.tooltipTypeAllocation')}</p>

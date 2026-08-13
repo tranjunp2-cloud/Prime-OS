@@ -1,18 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import {
-  Activity,
-  ArrowRight,
   Bell,
   Building2,
   Check,
   CreditCard,
   Printer,
   Settings2,
-  ShieldCheck,
   Tags,
   Truck,
-  UserPlus,
   UsersRound,
   WalletCards,
   type LucideIcon,
@@ -25,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { TeamAccessConfiguration } from '@/components/settings/TeamAccessConfiguration';
 
 type SettingsKey = 'general' | 'team-access' | 'payments' | 'shipping-delivery' | 'customer-data' | 'templates-notifications';
 type Feature = { title: string; description: string; status?: string };
@@ -112,8 +109,7 @@ function GeneralConfiguration() {
 }
 
 function TeamConfiguration() {
-  const roles = [['Admin', 'Full workspace and configuration access'], ['POS Cashier', 'Checkout, returns, and assigned shift'], ['CRM Sales', 'Leads, customers, and communications'], ['Warehouse Manager', 'Inventory, fulfillment, and adjustments'], ['Web Editor', 'PrimeWeb content and publishing']];
-  return <div className="grid gap-4 xl:grid-cols-[1fr_1fr]"><Card className="shadow-none"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">RBAC role matrix</CardTitle><CardDescription>Role scopes are enforced across all Prime OS workspaces.</CardDescription></div><Button asChild size="sm"><Link to="/account#roles"><ShieldCheck className="size-4" />Open matrix</Link></Button></div></CardHeader><CardContent className="space-y-2">{roles.map(([role, scope]) => <div key={role} className="flex min-h-14 items-center gap-3 rounded-lg border border-border px-3"><ShieldCheck className="size-4 text-primary" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{role}</p><p className="truncate text-xs text-muted-foreground">{scope}</p></div><ArrowRight className="size-4 text-muted-foreground" /></div>)}</CardContent></Card><div className="space-y-4"><Card className="shadow-none"><CardHeader><CardTitle className="text-base">Staff management</CardTitle><CardDescription>Invite employees and manage account status or workspace seats.</CardDescription></CardHeader><CardContent className="grid gap-2"><Button asChild><Link to="/account#members"><UserPlus className="size-4" />Invite and manage staff</Link></Button></CardContent></Card><Card className="shadow-none"><CardHeader><CardTitle className="text-base">Activity audit logs</CardTitle><CardDescription>Review who changed prices, deleted orders, or cancelled promotions.</CardDescription></CardHeader><CardContent><Button asChild variant="outline" className="w-full"><Link to="/account#audit"><Activity className="size-4" />Open activity logs</Link></Button></CardContent></Card></div></div>;
+  return <TeamAccessConfiguration />;
 }
 
 function PaymentsConfiguration() {
@@ -159,5 +155,6 @@ export default function BusinessSettings() {
   const page = useMemo(() => resolveSettingsKey(pathname), [pathname]);
   if (!page) return <Navigate to="/settings/general" replace />;
   const definition = settingsDefinitions[page];
-  return <main className="min-h-full bg-[hsl(var(--surface-stage))] p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1600px] space-y-5"><WorkspacePageHeader title={definition.title} description={definition.description} icon={definition.icon} actions={<Button onClick={() => toast.success(`${definition.title} settings saved`)}><Check className="size-4" />Save changes</Button>} /><FeatureSummary features={definition.features} /><ConfigurationSurface page={page} /></div></main>;
+  const headerActions = page === 'team-access' ? undefined : <Button onClick={() => toast.success(`${definition.title} settings saved`)}><Check className="size-4" />Save changes</Button>;
+  return <main className="min-h-full bg-[hsl(var(--surface-stage))] p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1600px] space-y-5"><WorkspacePageHeader title={definition.title} description={definition.description} icon={definition.icon} actions={headerActions} /><FeatureSummary features={definition.features} /><ConfigurationSurface page={page} /></div></main>;
 }

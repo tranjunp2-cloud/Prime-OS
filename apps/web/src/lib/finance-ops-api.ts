@@ -12,13 +12,22 @@ export interface FinanceSummary {
   target_amount: number;
   target_progress: number;
   collected: number;
+  collection_rate: number;
   amount_to_collect: number;
+  overdue_count: number;
   remaining_to_target: number;
   finance_health_index: number;
+  finance_health_status: 'HEALTHY' | 'WATCH' | 'AT_RISK';
   health_components: Record<string, number>;
   overview: { commerce_revenue: number; service_booking_revenue: number; sales_pipeline: number; active_risk_count: number };
   aging: Record<AgingBucket, { count: number; amount: number }>;
   finance_queue: Array<{ id: string; type: string; severity: 'CRITICAL' | 'WARNING' | 'INFO'; title: string; description: string; action_label: string; target_view: FinanceView }>;
+}
+
+export interface FinanceOverview {
+  finance_queue: FinanceSummary['finance_queue'];
+  revenue_breakdown: Array<{ key: string; label: string; amount: number; color: string }>;
+  recent_activity: Array<{ id: string; at: string; type: string; message: string; receivable_id: string; source_id: string; customer_name: string }>;
 }
 
 export interface ReceivableTimelineItem { id: string; at: string; type: string; message: string }
@@ -69,6 +78,7 @@ export interface FinanceRisk {
   status: RiskStatus;
   created_at: string;
   resolved_at: string | null;
+  resolution_notes?: string | null;
 }
 
 export interface PaymentConnection { id: string; name: string; status: 'CONNECTED' | 'DISCONNECTED' }
@@ -84,14 +94,15 @@ async function request<T>(path: string, init: RequestInit = {}) {
 
 export const financeOpsApi = {
   summary: () => request<{ data: FinanceSummary }>('/api/v1/finance/ops/summary'),
+  overview: () => request<{ data: FinanceOverview }>('/api/v1/finance/ops/overview'),
   receivables: (params = new URLSearchParams()) => request<{ data: ReceivableItem[]; meta: { total: number }; owners: FinanceOwner[] }>(`/api/v1/finance/ops/receivables?${params}`),
   receivable: (id: string) => request<{ data: ReceivableItem }>(`/api/v1/finance/ops/receivables/${id}`),
   sendReminder: (id: string, channel = 'EMAIL') => request<{ data: ReceivableItem }>(`/api/v1/finance/ops/receivables/${id}/send-reminder`, { method: 'POST', body: JSON.stringify({ channel }) }),
   assignOwner: (id: string, owner_id: string) => request<{ data: ReceivableItem }>(`/api/v1/finance/ops/receivables/${id}/assign-owner`, { method: 'POST', body: JSON.stringify({ owner_id }) }),
-  confirmPayment: (id: string, payment_proof: PaymentEvidence | null) => request<{ data: ReceivableItem; sync_event: { id: string; status: string } }>(`/api/v1/finance/ops/receivables/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify({ payment_proof }) }),
+  confirmPayment: (id: string, payment_proof: PaymentEvidence | null, collection_note = '') => request<{ data: ReceivableItem; sync_event: { id: string; status: string } }>(`/api/v1/finance/ops/receivables/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify({ payment_proof, collection_note }) }),
   flagDispute: (id: string, reason: string) => request<{ data: ReceivableItem }>(`/api/v1/finance/ops/receivables/${id}/flag-dispute`, { method: 'POST', body: JSON.stringify({ reason }) }),
   forecast: () => request<{ data: FinanceForecast }>('/api/v1/finance/ops/forecast'),
   updateTarget: (month_year: string, target_amount: number) => request<{ data: FinanceTarget }>('/api/v1/finance/ops/target', { method: 'PUT', body: JSON.stringify({ month_year, target_amount }) }),
   risks: () => request<{ data: FinanceRisk[]; meta: { total: number }; payment_connections: PaymentConnection[] }>('/api/v1/finance/ops/risks'),
-  updateRisk: (id: string, status: Exclude<RiskStatus, 'OPEN'>) => request<{ data: FinanceRisk }>(`/api/v1/finance/ops/risks/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status }) }),
+  updateRisk: (id: string, status: Exclude<RiskStatus, 'OPEN'>, resolution_notes = '') => request<{ data: FinanceRisk }>(`/api/v1/finance/ops/risks/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status, resolution_notes }) }),
 };

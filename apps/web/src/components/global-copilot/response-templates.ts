@@ -1,7 +1,6 @@
-// Response templates for the PrimeOS orchestration copilot
-// Provides domain-specific responses for the UI shell (Phase 1)
+// English response templates for the PrimeOS orchestration copilot.
 
-import { CopilotDomain, GlobalCopilotMessage, GlobalCopilotAction } from './types';
+import { type CopilotDomain, type GlobalCopilotAction, type GlobalCopilotMessage } from './types';
 
 interface TemplateResponse {
   content: string;
@@ -11,245 +10,186 @@ interface TemplateResponse {
 export function getWelcomeMessage(): Omit<GlobalCopilotMessage, 'id' | 'timestamp'> {
   return {
     role: 'assistant',
-    content: `👋 **Xin chào! Tôi là PrimeOS Copilot.**
+    content: `**Hello, I am PrimeOS Copilot.**
 
-Tôi có thể hỗ trợ bạn với:
+I can help you with:
 
-• **Product Master**: Tạo/chuẩn hóa sản phẩm, generate listing content
-• **Listings**: Quản lý listings trên Amazon, Shopee, Rakuten
-• **Warehouses**: Xem thông tin kho, cấu hình routing
-• **Orders**: Theo dõi đơn hàng, troubleshoot vấn đề
-• **QC & Support**: Tra cứu policy, tạo dữ liệu test
+- **Product Master**: Create and standardize products or generate listing content.
+- **Listings**: Manage listings across Amazon, Shopee, and Rakuten.
+- **Warehouses**: Review warehouse information and routing configuration.
+- **Orders**: Track orders and troubleshoot operational issues.
+- **QC & Support**: Review policies and create test data.
 
-⚠️ **Lưu ý**: Để tra cứu tồn kho, vui lòng sử dụng **Inventory Copilot** tại trang Inventory Summary.
+For inventory availability and stock diagnostics, use **Inventory Copilot** from Inventory Summary.
 
-Bạn cần hỗ trợ gì?`,
+How can I help?`,
     actions: [
-      { type: 'navigate', label: 'Mở Products', url: '/products' },
-      { type: 'navigate', label: 'Mở Orders', url: '/orders' },
-      { type: 'navigate', label: 'Mở Inventory Copilot', url: '/inventory/summary' },
+      { type: 'navigate', label: 'Open Products', url: '/products' },
+      { type: 'navigate', label: 'Open Orders', url: '/orders' },
+      { type: 'navigate', label: 'Open Inventory Copilot', url: '/inventory/summary' },
     ],
   };
 }
 
 export function getHelpResponse(): TemplateResponse {
   return {
-    content: `📚 **Tôi có thể giúp gì cho bạn?**
+    content: `**What can I help you with?**
 
 **1. Product Master AI**
-- "Tạo sản phẩm mới cho NISSIN Raoh"
-- "Chuẩn hóa attributes cho Amazon JP"
-- "Generate listing content cho SKU XYZ"
+- Create a new product.
+- Standardize attributes for a marketplace.
+- Generate listing content for a SKU.
 
 **2. Listings**
-- "Trạng thái listing của sản phẩm ABC"
-- "Tại sao listing bị error?"
-- "Sync listings với Amazon"
+- Check a product listing status.
+- Diagnose listing errors.
+- Synchronize listings with a marketplace.
 
 **3. Warehouses & Routing**
-- "Xem routing config của Tokyo Warehouse"
-- "Thay đổi priority ranking"
-- "Tại sao không sửa được kho marketplace?"
+- Review a warehouse routing configuration.
+- Change priority ranking.
+- Explain why a marketplace-managed warehouse is read-only.
 
 **4. Orders**
-- "Tại sao đơn hàng #123 bị stuck?"
-- "Hướng dẫn cancel order"
-- "Troubleshoot shipping delay"
+- Diagnose why an order is blocked.
+- Review cancellation steps.
+- Troubleshoot shipping delays.
 
 **5. QC & Policy**
-- "Giải thích quy trình đồng bộ kho"
-- "Tạo test data cho QA"
+- Explain warehouse synchronization policies.
+- Create test data for QA.
 
-⚠️ Tra cứu tồn kho → Dùng **Inventory Copilot** tại Inventory Summary.`,
-    actions: [
-      { type: 'navigate', label: 'Inventory Copilot', url: '/inventory/summary' },
-    ],
+For stock lookup, use **Inventory Copilot** from Inventory Summary.`,
+    actions: [{ type: 'navigate', label: 'Open Inventory Copilot', url: '/inventory/summary' }],
   };
 }
 
 export function getDomainResponse(domain: CopilotDomain): TemplateResponse {
   switch (domain) {
-    case 'product':
-      return getProductDomainResponse();
-    case 'listing':
-      return getListingDomainResponse();
+    case 'product': return getProductDomainResponse();
+    case 'listing': return getListingDomainResponse();
     case 'warehouse':
-    case 'routing_config':
-      return getWarehouseDomainResponse();
-    case 'orders':
-      return getOrdersDomainResponse();
-    case 'qc_support':
-      return getQcSupportResponse();
-    case 'admin_integration':
-      return getAdminIntegrationResponse();
-    default:
-      return getUnknownDomainResponse();
+    case 'routing_config': return getWarehouseDomainResponse();
+    case 'orders': return getOrdersDomainResponse();
+    case 'qc_support': return getQcSupportResponse();
+    case 'admin_integration': return getAdminIntegrationResponse();
+    default: return getUnknownDomainResponse();
   }
 }
 
 function getProductDomainResponse(): TemplateResponse {
   return {
-    content: `📦 **Product Master AI**
+    content: `**Product Master AI**
 
-Tôi có thể hỗ trợ:
-- **Xem sản phẩm**: Tra cứu thông tin product/SKU hiện có
-- **Tạo sản phẩm mới**: Draft product master record
-- **Generate content**: Tạo title, bullets, description cho platform
-- **Validate attributes**: Kiểm tra thuộc tính theo schema platform
+I can help you:
+- Review existing product and SKU records.
+- Prepare a new master product draft.
+- Generate titles, bullets, and descriptions for a sales channel.
+- Validate attributes against marketplace requirements.
 
-**Ví dụ câu hỏi:**
-- "Show product ICHIRAN-RAMEN-SET-5"
-- "Tạo listing content cho Amazon JP"
-- "Validate attributes cho Shopee"
-
-Bạn muốn làm gì?`,
+What would you like to do?`,
     actions: [
-      { type: 'navigate', label: 'Mở Products', url: '/products' },
-      { type: 'navigate', label: 'Tạo Product mới', url: '/products/new' },
+      { type: 'navigate', label: 'Open Products', url: '/products' },
+      { type: 'navigate', label: 'Create New Product', url: '/products/new' },
     ],
   };
 }
 
 function getListingDomainResponse(): TemplateResponse {
   return {
-    content: `📋 **Listings Management**
+    content: `**Listings Management**
 
-Tôi có thể hỗ trợ:
-- **Xem listings**: Tra cứu trạng thái listings trên các platform
-- **Draft listing**: Tạo listing từ product/SKU
-- **Diagnose errors**: Phân tích lỗi listing dựa trên validation rules
-- **Sync status**: Kiểm tra trạng thái đồng bộ
+I can help you:
+- Review listing status across connected channels.
+- Prepare a listing from an existing master product or SKU.
+- Diagnose validation and synchronization errors.
+- Check the latest synchronization status.
 
-**Trạng thái listing:**
-- Draft → Pending → Active
-- Error: có vấn đề cần fix
-
-Bạn cần tra cứu listing nào?`,
-    actions: [
-      { type: 'navigate', label: 'Mở Listings', url: '/listings' },
-    ],
+Which listing would you like to review?`,
+    actions: [{ type: 'navigate', label: 'Open Listings', url: '/listings' }],
   };
 }
 
 function getWarehouseDomainResponse(): TemplateResponse {
   return {
-    content: `🏭 **Warehouses & Fulfillment Network**
+    content: `**Warehouses & Fulfillment Network**
 
-Tôi có thể hỗ trợ:
-- **Xem thông tin kho**: Profile, capabilities, constraints
-- **Routing Config**: Xem và điều chỉnh cấu hình định tuyến
-- **Ranking Rules**: Giải thích logic xếp hạng fulfillment
+I can help you:
+- Review warehouse profiles, capabilities, and constraints.
+- Review and adjust routing configuration.
+- Explain fulfillment ranking rules.
 
-⚠️ **Lưu ý quan trọng:**
-- Kho **Marketplace-managed** (virtual) là **read-only**
-- Không thể sửa/xóa kho được đồng bộ từ Amazon FBA, Shopee Fulfillment, etc.
+Marketplace-managed virtual warehouses are read-only because Amazon FBA, Shopee Fulfillment, and similar providers control their source data.
 
-**Ví dụ:**
-- "Xem routing config của Tokyo Warehouse"
-- "Tại sao không edit được kho Amazon FBA?"
-- "Thay đổi priority ranking cho sla_speed"
-
-Bạn cần hỗ trợ gì về warehouse?`,
-    actions: [
-      { type: 'navigate', label: 'Mở Warehouses', url: '/inventory/warehouses' },
-    ],
+What warehouse information do you need?`,
+    actions: [{ type: 'navigate', label: 'Open Warehouses', url: '/warehouses' }],
   };
 }
 
 function getOrdersDomainResponse(): TemplateResponse {
   return {
-    content: `📬 **Orders Management**
+    content: `**Orders Management**
 
-Tôi có thể hỗ trợ:
-- **Tra cứu đơn hàng**: Xem trạng thái, timeline, thông tin giao hàng
-- **Troubleshoot**: Phân tích tại sao đơn bị stuck
-- **Triage actions**: Hướng dẫn xử lý cancel, refund, re-ship
+I can help you:
+- Review order status, timeline, and shipping information.
+- Diagnose why an order is blocked.
+- Guide cancellation, refund, and reshipment triage.
 
-**Các trạng thái đơn hàng:**
-- Pending → Processing → Shipped → Delivered
-- Cancelled / Returned
-
-**Ví dụ câu hỏi:**
-- "Tại sao đơn #ABC123 bị stuck?"
-- "Hướng dẫn cancel order"
-- "Kiểm tra tracking number"
-
-Bạn cần tra cứu đơn hàng nào?`,
-    actions: [
-      { type: 'navigate', label: 'Mở Orders', url: '/orders' },
-    ],
+Which order would you like to review?`,
+    actions: [{ type: 'navigate', label: 'Open Orders', url: '/orders' }],
   };
 }
 
 function getQcSupportResponse(): TemplateResponse {
   return {
-    content: `🔍 **QC & Support**
+    content: `**QC & Support**
 
-Tôi có thể hỗ trợ:
-- **Policy Q&A**: Tra cứu SOP, quy trình, chính sách
-- **Test Data**: Tạo dữ liệu demo cho môi trường QA
-- **Troubleshooting Guide**: Hướng dẫn xử lý các tình huống
+I can help you:
+- Review SOPs, processes, and operational policies.
+- Create demo data for a QA environment.
+- Explain troubleshooting procedures.
 
-**Ví dụ:**
-- "Giải thích quy trình đồng bộ kho marketplace"
-- "Tại sao không cho sửa kho virtual?"
-- "Tạo test data cho inventory"
-
-Bạn cần hỗ trợ gì?`,
-    actions: [
-      { type: 'navigate', label: 'Seed Demo Data', url: '/products' },
-    ],
+What would you like help with?`,
+    actions: [{ type: 'navigate', label: 'Open Products', url: '/products' }],
   };
 }
 
 function getAdminIntegrationResponse(): TemplateResponse {
   return {
-    content: `🔌 **Admin & Integrations**
+    content: `**Admin & Integrations**
 
-Tôi có thể hỗ trợ:
-- **Connection Status**: Xem trạng thái kết nối các platform
-- **Sync Status**: Kiểm tra lần sync cuối, errors
-- **Troubleshoot**: Phân tích vấn đề đồng bộ
+I can help you:
+- Review connection status for supported platforms.
+- Check the latest synchronization and error status.
+- Diagnose integration issues.
 
-**Platforms được hỗ trợ:**
-- Amazon JP / US
-- Shopee (VN, MY, TH, etc.)
-- Rakuten
+Credentials are managed by administrators, and some changes require owner-level permission.
 
-**Lưu ý:**
-- Credentials được quản lý bởi Admin
-- Một số thay đổi cần permission owner_admin
-
-Bạn cần kiểm tra connection nào?`,
+Which connection would you like to check?`,
     actions: [],
   };
 }
 
 function getUnknownDomainResponse(): TemplateResponse {
   return {
-    content: `🤔 Tôi chưa hiểu rõ yêu cầu của bạn.
+    content: `I do not yet have enough detail to understand the request.
 
-**Thử hỏi như:**
-- "Tạo listing cho sản phẩm XYZ"
-- "Tại sao đơn hàng #123 bị stuck?"
-- "Xem routing config của Tokyo Warehouse"
-- "Giải thích policy đồng bộ kho"
+Try one of these:
+- "Create a listing for product XYZ."
+- "Why is order #123 blocked?"
+- "Open the warehouse routing configuration."
+- "Explain the warehouse synchronization policy."
 
-Hoặc chọn một module từ **Quick Actions** bên trên!
-
-⚠️ Nếu bạn muốn **tra cứu tồn kho**, vui lòng dùng **Inventory Copilot** tại Inventory Summary.`,
-    actions: [
-      { type: 'navigate', label: 'Mở Inventory Copilot', url: '/inventory/summary' },
-    ],
+For inventory availability, use **Inventory Copilot** from Inventory Summary.`,
+    actions: [{ type: 'navigate', label: 'Open Inventory Copilot', url: '/inventory/summary' }],
   };
 }
 
-// Quick prompts by domain
 export const QUICK_PROMPTS = [
-  { label: 'Hướng dẫn sử dụng', prompt: 'help' },
-  { label: 'Tạo product mới', prompt: 'Tạo product mới' },
-  { label: 'Xem listings', prompt: 'Xem listings' },
-  { label: 'Tra cứu đơn hàng', prompt: 'Tra cứu đơn hàng' },
-  { label: 'Routing config', prompt: 'Xem routing config' },
-  { label: 'Policy kho virtual', prompt: 'Tại sao không sửa được kho marketplace?' },
+  { label: 'How to Use Copilot', prompt: 'help' },
+  { label: 'Create New Product', prompt: 'Create a new product' },
+  { label: 'Review Listings', prompt: 'Show listings' },
+  { label: 'Find an Order', prompt: 'Find an order' },
+  { label: 'Routing Configuration', prompt: 'Show routing configuration' },
+  { label: 'Virtual Warehouse Policy', prompt: 'Why is a marketplace warehouse read-only?' },
 ];

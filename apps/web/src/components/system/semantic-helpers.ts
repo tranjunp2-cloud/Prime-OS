@@ -222,7 +222,7 @@ const slaRegistry: Record<SlaState, SemanticMeta> = {
 const alertSeverityRegistry: Record<AlertSeverity, AlertSeverityMeta> = {
   CRITICAL: {
     label: 'Critical',
-    description: 'Cần xử lý ngay để tránh ảnh hưởng SLA hoặc đồng bộ dữ liệu.',
+    description: 'Requires immediate action to prevent SLA or data synchronization impact.',
     tone: 'danger',
     className: TONE_CLASS_NAMES.danger,
     borderClassName: BORDER_TONE_CLASS_NAMES.danger,
@@ -231,7 +231,7 @@ const alertSeverityRegistry: Record<AlertSeverity, AlertSeverityMeta> = {
   },
   WARNING: {
     label: 'Warning',
-    description: 'Cần theo dõi sớm để tránh leo thang thành critical.',
+    description: 'Review soon to prevent this warning from becoming critical.',
     tone: 'warning',
     className: TONE_CLASS_NAMES.warning,
     borderClassName: BORDER_TONE_CLASS_NAMES.warning,
@@ -240,7 +240,7 @@ const alertSeverityRegistry: Record<AlertSeverity, AlertSeverityMeta> = {
   },
   INFO: {
     label: 'Info',
-    description: 'Thông tin vận hành cần review nhưng chưa chặn flow hiện tại.',
+    description: 'Operational information that needs review but does not block the current flow.',
     tone: 'info',
     className: TONE_CLASS_NAMES.info,
     borderClassName: BORDER_TONE_CLASS_NAMES.info,

@@ -82,6 +82,7 @@ import {
   confirmReceivablePayment,
   flagReceivableDispute,
   getFinanceForecast,
+  getFinanceOpsOverview,
   getFinanceOpsSummary,
   getReceivable,
   listFinanceRisks,
@@ -90,6 +91,8 @@ import {
   sendPaymentReminder,
   updateFinanceTarget,
 } from './finance-ops.js';
+import { createFeedback } from './feedbacks.js';
+import { getOnboardingStatus, updateOnboardingPreferences } from './onboarding.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
@@ -177,7 +180,7 @@ app.use(cors({
     'X-MoMo-Signature',
     'X-WC-Webhook-Signature'
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
 }));
 app.use(express.json({
   limit: process.env.PRIME_JSON_LIMIT || '1mb',
@@ -205,32 +208,57 @@ const roleDefinitions = [
   {
     role_key: 'admin',
     label: 'Admin',
-    description: 'Quản lý workspace, thành viên và quyền truy cập cơ bản.',
-    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.members.read', 'iam.members.invite', 'iam.members.suspend', 'iam.members.reactivate', 'iam.roles.read', 'iam.audit.read']
+    description: 'Full workspace, configuration, member, and audit access.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.members.read', 'iam.members.invite', 'iam.members.suspend', 'iam.members.reactivate', 'iam.members.update_role', 'iam.roles.read', 'iam.roles.update', 'iam.audit.read']
   },
   {
-    role_key: 'operator',
-    label: 'Operator',
-    description: 'Vận hành PrimeOS và tự quản lý hồ sơ cá nhân.',
-    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.roles.read']
+    role_key: 'pos_cashier',
+    label: 'POS Cashier',
+    description: 'Checkout, returns, assigned register, and shift operations.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.roles.read', 'pos.checkout', 'pos.returns', 'pos.shift.read']
   },
   {
-    role_key: 'viewer',
-    label: 'Viewer',
-    description: 'Xem thông tin cá nhân/workspace, không có quyền quản trị.',
-    permissions: ['account.profile.read_self', 'workspace.read', 'iam.roles.read']
+    role_key: 'crm_sales',
+    label: 'CRM Sales',
+    description: 'Leads, customer profiles, conversations, and follow-up activities.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.roles.read', 'crm.customers.read', 'crm.leads.manage', 'crm.conversations.manage']
+  },
+  {
+    role_key: 'warehouse_manager',
+    label: 'Warehouse Manager',
+    description: 'Inventory, fulfillment, transfers, and stock adjustments.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.roles.read', 'inventory.read', 'inventory.adjust', 'fulfillment.manage']
+  },
+  {
+    role_key: 'web_editor',
+    label: 'Web Editor',
+    description: 'PrimeWeb content, navigation, theme, and publishing workflows.',
+    permissions: ['account.profile.read_self', 'account.profile.update_self', 'workspace.read', 'iam.roles.read', 'web.content.manage', 'web.theme.manage', 'web.publish']
   }
 ];
-const membershipOverrides = new Map();
-const memberInvitations = [];
-const accountAuditEvents = [];
+const membershipOverrides = new Map([
+  ['login_user_001', { role_key: 'warehouse_manager', status: 'active', last_active_at: '2026-08-13T12:18:00.000Z' }]
+]);
+const memberInvitations = [
+  { id: 'inv_demo_web', workspace_id: accountWorkspace.id, email: 'maya.web@unifi.business', role_key: 'web_editor', seat_type: 'seller_operator', status: 'pending', expires_at: '2026-08-20T03:00:00.000Z', created_at: '2026-08-13T03:00:00.000Z' },
+  { id: 'inv_demo_pos', workspace_id: accountWorkspace.id, email: 'cashier.tanbinh@unifi.business', role_key: 'pos_cashier', seat_type: 'seller_operator', status: 'pending', expires_at: '2026-08-19T04:30:00.000Z', created_at: '2026-08-12T04:30:00.000Z' },
+  { id: 'inv_demo_crm', workspace_id: accountWorkspace.id, email: 'sales.hcm@unifi.business', role_key: 'crm_sales', seat_type: 'seller_operator', status: 'pending', expires_at: '2026-08-18T08:15:00.000Z', created_at: '2026-08-11T08:15:00.000Z' }
+];
+const accountAuditEvents = [
+  { id: 'audit_demo_008', workspace_id: accountWorkspace.id, actor_principal_id: 'login_admin_001', session_id: null, action: 'catalog.price.updated', target_type: 'master_product', target_id: 'CR-NTB-BLK-A5', before: { price: 2650000 }, after: { price: 2800000 }, result: 'success', request_id: 'demo_price', ip: '127.0.0.1', user_agent: 'PrimeOS Web', created_at: '2026-08-13T12:42:00.000Z' },
+  { id: 'audit_demo_007', workspace_id: accountWorkspace.id, actor_principal_id: 'login_user_001', session_id: null, action: 'inventory.adjustment.approved', target_type: 'warehouse_stock', target_id: 'WH-HCM-CR-SKB-MDN-A5', before: { available: 42 }, after: { available: 48 }, result: 'success', request_id: 'demo_inventory', ip: '127.0.0.1', user_agent: 'PrimeOS Web', created_at: '2026-08-13T11:20:00.000Z' },
+  { id: 'audit_demo_006', workspace_id: accountWorkspace.id, actor_principal_id: 'login_admin_001', session_id: null, action: 'promotion.campaign.cancelled', target_type: 'promotion', target_id: 'FLASH-AUG-15', before: { status: 'scheduled' }, after: { status: 'cancelled' }, result: 'success', request_id: 'demo_promo', ip: '127.0.0.1', user_agent: 'PrimeOS Web', created_at: '2026-08-13T09:05:00.000Z' },
+  { id: 'audit_demo_005', workspace_id: accountWorkspace.id, actor_principal_id: 'login_admin_001', session_id: null, action: 'iam.role.permissions.updated', target_type: 'role_definition', target_id: 'warehouse_manager', before: { rules: 6 }, after: { rules: 7 }, result: 'success', request_id: 'demo_role', ip: '127.0.0.1', user_agent: 'PrimeOS Web', created_at: '2026-08-12T10:35:00.000Z' },
+  { id: 'audit_demo_004', workspace_id: accountWorkspace.id, actor_principal_id: 'login_admin_001', session_id: null, action: 'order.delete.blocked', target_type: 'commerce_order', target_id: 'ORD-10508', before: null, after: null, result: 'failure', request_id: 'demo_blocked', ip: '127.0.0.1', user_agent: 'PrimeOS Web', created_at: '2026-08-12T08:10:00.000Z' },
+  { id: 'audit_demo_003', workspace_id: accountWorkspace.id, actor_principal_id: 'login_admin_001', session_id: null, action: 'iam.member.invited', target_type: 'invitation', target_id: 'inv_demo_web', before: null, after: { role_key: 'web_editor' }, result: 'success', request_id: 'demo_invite', ip: '127.0.0.1', user_agent: 'PrimeOS Web', created_at: '2026-08-11T07:45:00.000Z' }
+];
 
 function nowIso() {
   return new Date().toISOString();
 }
 
 function getRoleKey(account) {
-  return account?.role === 'admin' ? 'admin' : 'operator';
+  return account?.role === 'admin' ? 'admin' : 'warehouse_manager';
 }
 
 function getMembershipForAccount(account) {
@@ -535,6 +563,32 @@ app.get('/api/session', async (request, response) => {
   response.json(buildSession(request.primeAccount));
 });
 
+app.post('/api/v1/system/feedback', (request, response, next) => {
+  try {
+    createFeedback(request.body || {}, toSafeAccount(request.primeAccount));
+    response.status(201).json({ success: true, message: 'Feedback submitted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/onboarding/status', async (request, response, next) => {
+  try {
+    response.json(await getOnboardingStatus(toSafeAccount(request.primeAccount)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/v1/onboarding/preferences', (request, response, next) => {
+  try {
+    updateOnboardingPreferences(toSafeAccount(request.primeAccount), request.body || {});
+    response.json({ success: true, preferences: request.body });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/meta', async (request, response, next) => {
   try {
     const session = buildSession(request.primeAccount);
@@ -614,6 +668,19 @@ app.get('/api/v1/role-definitions', async (request, response) => {
   response.json({ data: roleDefinitions, meta: { request_id: request.primeRequestId } });
 });
 
+app.patch('/api/v1/role-definitions/:roleKey', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.roles.update')) return;
+  const role = roleDefinitions.find((item) => item.role_key === request.params.roleKey);
+  if (!role) return accountError(response, 404, 'iam.role_not_found', 'Role definition not found.', request.primeRequestId);
+  if (role.role_key === 'admin') return accountError(response, 409, 'iam.admin_role_locked', 'The Admin role is protected and cannot be modified.', request.primeRequestId);
+  const permissions = Array.isArray(request.body?.permissions) ? [...new Set(request.body.permissions.map(String))] : null;
+  if (!permissions?.length) return accountError(response, 400, 'iam.invalid_permissions', 'Select at least one permission.', request.primeRequestId);
+  const before = { ...role, permissions: [...role.permissions] };
+  role.permissions = permissions;
+  appendAccountAudit(request, 'iam.role.permissions.updated', 'role_definition', role.role_key, before, role);
+  response.json({ data: role, meta: { request_id: request.primeRequestId } });
+});
+
 app.get('/api/v1/workspace-members', async (request, response) => {
   if (!requireCapability(request, response, 'iam.members.read')) return;
   const accounts = listIdentityAccounts();
@@ -648,8 +715,8 @@ app.get('/api/v1/workspace-members', async (request, response) => {
 app.post('/api/v1/workspace-member-invitations', async (request, response) => {
   if (!requireCapability(request, response, 'iam.members.invite')) return;
   const email = String(request.body?.email || '').trim().toLowerCase();
-  const roleKey = String(request.body?.role_key || 'operator');
-  const allowedRoleKeys = new Set(['admin', 'operator', 'viewer']);
+  const roleKey = String(request.body?.role_key || 'crm_sales');
+  const allowedRoleKeys = new Set(roleDefinitions.map((role) => role.role_key));
 
   if (!/^\S+@\S+\.\S+$/.test(email)) {
     accountError(response, 400, 'iam.invalid_email', 'A valid email is required.', request.primeRequestId, [{ field: 'email', reason: 'invalid' }]);
@@ -670,7 +737,7 @@ app.post('/api/v1/workspace-member-invitations', async (request, response) => {
     workspace_id: accountWorkspace.id,
     email,
     role_key: roleKey,
-    seat_type: roleKey === 'viewer' ? 'viewer' : 'seller_operator',
+    seat_type: roleKey === 'admin' ? 'full_admin' : 'seller_operator',
     status: 'pending',
     expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
     created_at: nowIso()
@@ -678,6 +745,51 @@ app.post('/api/v1/workspace-member-invitations', async (request, response) => {
   memberInvitations.unshift(invitation);
   appendAccountAudit(request, 'iam.member.invited', 'invitation', invitation.id, null, invitation);
   response.status(201).json({ data: invitation, meta: { request_id: request.primeRequestId } });
+});
+
+app.post('/api/v1/workspace-member-invitations/:invitationId/resend', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.invite')) return;
+  const invitation = memberInvitations.find((item) => item.id === request.params.invitationId && item.status === 'pending');
+  if (!invitation) return accountError(response, 404, 'iam.invitation_not_found', 'Pending invitation not found.', request.primeRequestId);
+  const before = { ...invitation };
+  invitation.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+  invitation.last_sent_at = nowIso();
+  appendAccountAudit(request, 'iam.invitation.resent', 'invitation', invitation.id, before, invitation);
+  response.json({ data: invitation, meta: { request_id: request.primeRequestId } });
+});
+
+app.delete('/api/v1/workspace-member-invitations/:invitationId', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.invite')) return;
+  const invitation = memberInvitations.find((item) => item.id === request.params.invitationId && item.status === 'pending');
+  if (!invitation) return accountError(response, 404, 'iam.invitation_not_found', 'Pending invitation not found.', request.primeRequestId);
+  const before = { ...invitation };
+  invitation.status = 'cancelled';
+  appendAccountAudit(request, 'iam.invitation.cancelled', 'invitation', invitation.id, before, invitation);
+  response.json({ data: invitation, meta: { request_id: request.primeRequestId } });
+});
+
+app.patch('/api/v1/workspace-members/:membershipId/role', async (request, response) => {
+  if (!requireCapability(request, response, 'iam.members.update_role')) return;
+  const membershipId = String(request.params.membershipId || '');
+  const nextRoleKey = String(request.body?.role_key || '');
+  if (!roleDefinitions.some((role) => role.role_key === nextRoleKey)) return accountError(response, 400, 'iam.invalid_role', 'Role is not supported.', request.primeRequestId);
+  if (membershipId.startsWith('wm_inv_')) {
+    const invitation = memberInvitations.find((item) => `wm_${item.id}` === membershipId && item.status === 'pending');
+    if (!invitation) return accountError(response, 404, 'iam.invitation_not_found', 'Pending invitation not found.', request.primeRequestId);
+    const before = { ...invitation };
+    invitation.role_key = nextRoleKey;
+    invitation.seat_type = nextRoleKey === 'admin' ? 'full_admin' : 'seller_operator';
+    appendAccountAudit(request, 'iam.invitation.role.updated', 'invitation', invitation.id, before, invitation);
+    return response.json({ data: invitation, meta: { request_id: request.primeRequestId } });
+  }
+  const accountId = membershipId.replace(/^wm_/, '');
+  const target = getSafeAccountById(accountId);
+  if (!target) return accountError(response, 404, 'iam.member_not_found', 'Workspace member not found.', request.primeRequestId);
+  const before = getMembershipForAccount(target);
+  membershipOverrides.set(target.id, { ...(membershipOverrides.get(target.id) || {}), role_key: nextRoleKey });
+  const after = getMembershipForAccount(target);
+  appendAccountAudit(request, 'iam.member.role.updated', 'workspace_membership', before.id, before, after);
+  response.json({ data: { principal: getPrincipal(target), membership: after }, meta: { request_id: request.primeRequestId } });
 });
 
 app.post('/api/v1/workspace-members/:membershipId/deactivate', async (request, response) => {
@@ -1150,6 +1262,10 @@ app.get('/api/v1/finance/ops/summary', (_request, response) => {
   response.json({ data: getFinanceOpsSummary() });
 });
 
+app.get('/api/v1/finance/ops/overview', (_request, response) => {
+  response.json({ data: getFinanceOpsOverview() });
+});
+
 app.get('/api/v1/finance/ops/receivables', (request, response) => {
   response.json(listReceivables(request.query));
 });
@@ -1180,7 +1296,7 @@ app.post('/api/v1/finance/ops/receivables/:id/assign-owner', (request, response,
 
 app.post('/api/v1/finance/ops/receivables/:id/confirm-payment', (request, response) => {
   if (!requireFinanceOpsWrite(request, response)) return;
-  const result = confirmReceivablePayment(request.params.id, request.body?.payment_proof || null);
+  const result = confirmReceivablePayment(request.params.id, request.body?.payment_proof || null, request.body?.collection_note);
   if (!result) return response.status(404).json({ message: 'Receivable item not found.' });
   response.json({ data: result.receivable, sync_event: result.sync_event });
 });
@@ -1212,7 +1328,7 @@ app.get('/api/v1/finance/ops/risks', (request, response) => {
 app.post('/api/v1/finance/ops/risks/:id/resolve', (request, response, next) => {
   if (!requireFinanceOpsWrite(request, response)) return;
   try {
-    const item = resolveFinanceRisk(request.params.id, request.body?.status || 'RESOLVED');
+    const item = resolveFinanceRisk(request.params.id, request.body?.status || 'RESOLVED', request.body?.resolution_notes);
     if (!item) return response.status(404).json({ message: 'Finance risk not found.' });
     response.json({ data: item });
   } catch (error) {

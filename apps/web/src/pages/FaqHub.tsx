@@ -88,7 +88,7 @@ export default function FaqHub() {
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">How can we help?</h1>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-              Find step-by-step guidance for commerce operations, storefronts, POS, and customer conversations.
+              Diagnose issues, recover blocked workflows, and find the right support path across every workspace.
             </p>
             <div className="mt-7">
               <label className="relative block min-w-0">
@@ -98,7 +98,7 @@ export default function FaqHub() {
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search setup, orders, products, POS, or Inbox..."
+                  placeholder="Search an error, symptom, or question..."
                   className="h-12 w-full rounded-lg border border-slate-300 bg-white pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                 />
               </label>
@@ -184,8 +184,8 @@ export default function FaqHub() {
 
             <section aria-labelledby="categories-title">
               <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600">Browse by topic</p>
-                <h2 id="categories-title" className="mt-1 text-xl font-bold">Help categories</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600">Solve by area</p>
+                <h2 id="categories-title" className="mt-1 text-xl font-bold">Troubleshooting categories</h2>
               </div>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {faqCategories.map((category) => {

@@ -5,6 +5,7 @@ import { emit } from './event-bus.js';
 import { enqueue, getStats as getWorkerStats } from './worker-queue.js';
 
 const STORE_PATH = path.resolve(process.env.PRIME_FINANCE_OPS_STORE_PATH || path.join('data', 'finance-ops.json'));
+const DEMO_SEED_VERSION = 2;
 
 const owners = [
   { id: 'finance_owner_linh', name: 'Linh Nguyen' },
@@ -38,6 +39,10 @@ function seedReceivable(input) {
   };
 }
 
+function demoTimeline(...entries) {
+  return entries.map(([at, type, message]) => ({ id: randomUUID(), at, type, message }));
+}
+
 function seedStore() {
   const receivables = [
     seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10492', customer_name: 'Nguyen Minh Anh', total_amount: 12650000, collected_amount: 0, due_date: '2026-08-13', collection_status: 'UNPAID', assigned_owner_id: 'finance_owner_linh', assigned_owner_name: 'Linh Nguyen', linked_invoice_id: 'INV-2026-0813-001', invoice_status: 'Issued', payment_method: 'Bank transfer' }),
@@ -46,9 +51,19 @@ function seedStore() {
     seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10398', customer_name: 'Vo Thanh Mai', total_amount: 18450000, collected_amount: 4000000, due_date: '2026-07-07', collection_status: 'PARTIAL', assigned_owner_id: 'finance_owner_anh', assigned_owner_name: 'Anh Pham', linked_invoice_id: 'INV-2026-0810-026', invoice_status: 'Issued', payment_method: 'Bank transfer', evidence: { file_name: 'bank-transfer-ord-10398.pdf', provider_status: 'Awaiting verification', uploaded_at: '2026-08-12T04:20:00.000Z' } }),
     seedReceivable({ source_type: 'SERVICE_BOOKING', source_id: 'BOOK-7714', customer_name: 'Do Quang Huy', total_amount: 8650000, collected_amount: 0, due_date: '2026-08-17', collection_status: 'UNPAID', assigned_owner_id: null, assigned_owner_name: null, linked_invoice_id: null, invoice_status: 'Not issued', payment_method: 'Stripe' }),
     seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10508', customer_name: 'Le Hoang Nam', total_amount: 28920000, collected_amount: 0, due_date: '2026-08-12', collection_status: 'DISPUTED', assigned_owner_id: 'finance_owner_linh', assigned_owner_name: 'Linh Nguyen', linked_invoice_id: 'INV-2026-0812-018', invoice_status: 'Error', payment_method: 'Bank transfer' }),
+    seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10521', customer_name: 'Lotus Beauty Co., Ltd.', total_amount: 42600000, collected_amount: 20000000, due_date: '2026-08-13', collection_status: 'PARTIAL', assigned_owner_id: 'finance_owner_anh', assigned_owner_name: 'Anh Pham', linked_invoice_id: 'INV-2026-0813-021', invoice_status: 'Issued', payment_method: 'Bank transfer', evidence: { file_name: 'lotus-beauty-deposit.pdf', provider_status: 'Verified', uploaded_at: '2026-08-12T07:45:00.000Z' }, timeline: demoTimeline(['2026-08-12T07:45:00.000Z', 'PROOF_VERIFIED', 'Deposit proof was verified by Anh Pham.'], ['2026-08-10T03:20:00.000Z', 'REMINDER_SENT', 'Payment reminder sent through email.'], ['2026-08-04T08:00:00.000Z', 'CREATED', 'Receivable created from source record.']) }),
+    seedReceivable({ source_type: 'SERVICE_BOOKING', source_id: 'BOOK-8945', customer_name: 'Aurora Wellness Studio', total_amount: 15750000, collected_amount: 0, due_date: '2026-08-09', collection_status: 'UNPAID', assigned_owner_id: 'finance_owner_minh', assigned_owner_name: 'Minh Tran', linked_invoice_id: 'INV-2026-0811-031', invoice_status: 'Pending', payment_method: 'Stripe', timeline: demoTimeline(['2026-08-12T02:15:00.000Z', 'REMINDER_SENT', 'Second payment reminder sent through email.'], ['2026-08-09T02:15:00.000Z', 'REMINDER_SENT', 'First payment reminder sent through email.'], ['2026-08-03T08:00:00.000Z', 'CREATED', 'Receivable created from service booking.']) }),
+    seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10477', customer_name: 'Minh Long Trading', total_amount: 36800000, collected_amount: 12000000, due_date: '2026-08-06', collection_status: 'PARTIAL', assigned_owner_id: 'finance_owner_linh', assigned_owner_name: 'Linh Nguyen', linked_invoice_id: 'INV-2026-0806-014', invoice_status: 'Issued', payment_method: 'Bank transfer', evidence: { file_name: 'mlt-partial-payment.png', provider_status: 'Awaiting verification', uploaded_at: '2026-08-12T09:10:00.000Z' } }),
+    seedReceivable({ source_type: 'SERVICE_BOOKING', source_id: 'BOOK-8602', customer_name: 'The Bloom Clinic', total_amount: 9800000, collected_amount: 0, due_date: '2026-07-29', collection_status: 'UNPAID', assigned_owner_id: 'finance_owner_anh', assigned_owner_name: 'Anh Pham', linked_invoice_id: 'INV-2026-0729-008', invoice_status: 'Issued', payment_method: 'Xendit' }),
+    seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10284', customer_name: 'Saigon Retail Partners', total_amount: 78200000, collected_amount: 40000000, due_date: '2026-07-18', collection_status: 'PARTIAL', assigned_owner_id: 'finance_owner_minh', assigned_owner_name: 'Minh Tran', linked_invoice_id: 'INV-2026-0718-003', invoice_status: 'Issued', payment_method: 'Bank transfer', timeline: demoTimeline(['2026-08-11T08:45:00.000Z', 'OWNER_ASSIGNED', 'Collection escalated to Minh Tran.'], ['2026-08-08T05:30:00.000Z', 'REMINDER_SENT', 'Escalation reminder sent through email.'], ['2026-08-02T06:00:00.000Z', 'PARTIAL_PAYMENT', 'Partial payment of 40000000 was recorded.'], ['2026-07-12T08:00:00.000Z', 'CREATED', 'Receivable created from source record.']) }),
+    seedReceivable({ source_type: 'SERVICE_BOOKING', source_id: 'BOOK-7440', customer_name: 'Nami Hospitality Group', total_amount: 24500000, collected_amount: 0, due_date: '2026-06-30', collection_status: 'DISPUTED', assigned_owner_id: 'finance_owner_linh', assigned_owner_name: 'Linh Nguyen', linked_invoice_id: 'INV-2026-0630-011', invoice_status: 'Cancelled', payment_method: 'Bank transfer', timeline: demoTimeline(['2026-08-10T04:00:00.000Z', 'DISPUTE_FLAGGED', 'Customer disputed the completed service scope.'], ['2026-07-01T08:00:00.000Z', 'REMINDER_SENT', 'Payment reminder sent through email.'], ['2026-06-25T08:00:00.000Z', 'CREATED', 'Receivable created from service booking.']) }),
+    seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10532', customer_name: 'Green Corner Market', total_amount: 7250000, collected_amount: 0, due_date: '2026-08-20', collection_status: 'UNPAID', assigned_owner_id: null, assigned_owner_name: null, linked_invoice_id: 'INV-2026-0813-034', invoice_status: 'Draft', payment_method: 'Cash on delivery' }),
+    seedReceivable({ source_type: 'SERVICE_BOOKING', source_id: 'BOOK-9012', customer_name: 'Mori Concept Store', total_amount: 12600000, collected_amount: 0, due_date: '2026-08-25', collection_status: 'UNPAID', assigned_owner_id: null, assigned_owner_name: null, linked_invoice_id: null, invoice_status: 'Not issued', payment_method: 'Stripe' }),
+    seedReceivable({ source_type: 'COMMERCE_ORDER', source_id: 'ORD-10435', customer_name: 'An Khang Pharmacy', total_amount: 19500000, collected_amount: 19500000, due_date: '2026-08-05', collection_status: 'PAID', assigned_owner_id: 'finance_owner_anh', assigned_owner_name: 'Anh Pham', linked_invoice_id: 'INV-2026-0805-009', invoice_status: 'Issued', payment_method: 'Bank transfer', evidence: { file_name: 'ankhang-payment.pdf', provider_status: 'Verified', uploaded_at: '2026-08-05T03:12:00.000Z' }, timeline: demoTimeline(['2026-08-05T03:15:00.000Z', 'PAYMENT_CONFIRMED', 'Payment was matched and confirmed automatically.'], ['2026-08-01T08:00:00.000Z', 'CREATED', 'Receivable created from source record.']) }),
   ];
 
   return {
+    seed_version: DEMO_SEED_VERSION,
     metrics: {
       month_year: '2026-08',
       commerce_revenue: 1220000000,
@@ -59,7 +74,11 @@ function seedStore() {
       repeat_revenue_rate: 34,
       payment_connection_coverage: 75,
     },
-    targets: [{ id: randomUUID(), month_year: '2026-08', target_amount: 2500000000, created_by: 'admin_local', created_at: '2026-08-01T00:00:00.000Z' }],
+    targets: [
+      { id: randomUUID(), month_year: '2026-08', target_amount: 2500000000, created_by: 'admin_local', created_at: '2026-08-01T00:00:00.000Z' },
+      { id: randomUUID(), month_year: '2026-07', target_amount: 2250000000, created_by: 'admin_local', created_at: '2026-07-01T00:00:00.000Z' },
+      { id: randomUUID(), month_year: '2026-06', target_amount: 2100000000, created_by: 'admin_local', created_at: '2026-06-01T00:00:00.000Z' },
+    ],
     receivables,
     risks: [
       { id: randomUUID(), risk_type: 'UNVERIFIED_PROOF', severity: 'CRITICAL', title: '4 payment proofs require verification', description: 'Manual bank receipts worth ₫42.8M have not been verified.', status: 'OPEN', created_at: '2026-08-13T02:15:00.000Z', resolved_at: null },
@@ -67,6 +86,8 @@ function seedStore() {
       { id: randomUUID(), risk_type: 'UNASSIGNED_SERVICE', severity: 'WARNING', title: '7 service bookings are unassigned', description: 'Bookings worth ₫86.5M need an owner before collection follow-up.', status: 'OPEN', created_at: '2026-08-13T02:25:00.000Z', resolved_at: null },
       { id: randomUUID(), risk_type: 'CONNECTOR_DISCONNECTED', severity: 'CRITICAL', title: 'Xendit payment connection is disconnected', description: 'Payment status updates may be delayed until the connection is restored.', status: 'OPEN', created_at: '2026-08-13T02:30:00.000Z', resolved_at: null },
       { id: randomUUID(), risk_type: 'LOW_REPEAT_REVENUE', severity: 'INFO', title: 'Repeat revenue is below the 40% benchmark', description: 'Repeat customers currently contribute 34% of monthly revenue.', status: 'OPEN', created_at: '2026-08-13T02:35:00.000Z', resolved_at: null },
+      { id: randomUUID(), risk_type: 'UNVERIFIED_PROOF', severity: 'WARNING', title: 'High-value deposit is awaiting verification', description: 'The ₫12M proof attached to ORD-10477 needs a finance reviewer.', status: 'ACKNOWLEDGED', created_at: '2026-08-12T09:15:00.000Z', acknowledged_at: '2026-08-12T10:00:00.000Z', resolved_at: null },
+      { id: randomUUID(), risk_type: 'CONNECTOR_DISCONNECTED', severity: 'INFO', title: 'Stripe webhook latency returned to normal', description: 'Delayed payment notifications were replayed successfully.', status: 'RESOLVED', created_at: '2026-08-10T03:00:00.000Z', resolved_at: '2026-08-10T04:20:00.000Z', resolution_notes: 'Webhook queue replayed and reconciliation completed.' },
     ],
     payment_connections: [
       { id: 'stripe', name: 'Stripe', status: 'CONNECTED' },
@@ -87,6 +108,11 @@ function ensureStore() {
 function readStore() {
   ensureStore();
   const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+  if (parsed.seed_version !== DEMO_SEED_VERSION) {
+    const demoStore = seedStore();
+    writeStore(demoStore);
+    return demoStore;
+  }
   return { ...seedStore(), ...parsed };
 }
 
@@ -121,15 +147,21 @@ export function getFinanceOpsSummary() {
   const targetCoverage = target ? Math.min(100, (revenue / target) * 100) : 0;
   const health = Math.round((targetCoverage + store.metrics.order_collection_rate + store.metrics.repeat_revenue_rate + store.metrics.payment_connection_coverage) / 4);
   const openRisks = store.risks.filter((risk) => risk.status !== 'RESOLVED');
+  const overdueItems = store.receivables.map((item) => getAging(item)).filter((item) => item.collection_status !== 'PAID' && item.aging_days > 0);
+  const totalCollectable = store.metrics.collected + amountToCollect;
+  const collectionRate = totalCollectable ? (store.metrics.collected / totalCollectable) * 100 : 0;
   return {
     month_year: store.metrics.month_year,
     revenue_this_month: revenue,
     target_amount: target,
     target_progress: targetCoverage,
     collected: store.metrics.collected,
+    collection_rate: collectionRate,
     amount_to_collect: amountToCollect,
+    overdue_count: overdueItems.length,
     remaining_to_target: Math.max(0, target - revenue),
     finance_health_index: health,
+    finance_health_status: health >= 80 ? 'HEALTHY' : health >= 60 ? 'WATCH' : 'AT_RISK',
     health_components: {
       target_coverage: Math.round(targetCoverage),
       order_collection_rate: store.metrics.order_collection_rate,
@@ -154,7 +186,32 @@ export function getFinanceOpsSummary() {
   };
 }
 
-export function listReceivables({ search = '', source_type, payment_status, owner_id, aging_bucket, page = 1, page_size = 25 } = {}) {
+export function getFinanceOpsOverview() {
+  const store = readStore();
+  const summary = getFinanceOpsSummary();
+  const repeatRevenue = Math.round(summary.revenue_this_month * (store.metrics.repeat_revenue_rate / 100));
+  const recentActivity = store.receivables
+    .flatMap((receivable) => receivable.timeline.map((entry) => ({
+      ...entry,
+      receivable_id: receivable.id,
+      source_id: receivable.source_id,
+      customer_name: receivable.customer_name,
+    })))
+    .sort((left, right) => right.at.localeCompare(left.at))
+    .slice(0, 8);
+
+  return {
+    finance_queue: summary.finance_queue,
+    revenue_breakdown: [
+      { key: 'commerce', label: 'Commerce Revenue', amount: store.metrics.commerce_revenue, color: '#635bff' },
+      { key: 'services', label: 'Service Bookings', amount: store.metrics.service_booking_revenue, color: '#38bdf8' },
+      { key: 'repeat', label: 'Repeat Revenue', amount: repeatRevenue, color: '#10b981' },
+    ],
+    recent_activity: recentActivity,
+  };
+}
+
+export function listReceivables({ search = '', source_type, payment_status, owner_id, aging_bucket, page = 1, page_size, limit = 25 } = {}) {
   const store = readStore();
   const query = String(search).trim().toLowerCase();
   const filtered = store.receivables.map((item) => getAging(item)).filter((item) => {
@@ -166,7 +223,7 @@ export function listReceivables({ search = '', source_type, payment_status, owne
     return searchMatches && sourceMatches && statusMatches && ownerMatches && agingMatches;
   }).sort((left, right) => right.balance_due - left.balance_due);
   const safePage = Math.max(1, Number(page) || 1);
-  const safeSize = Math.min(100, Math.max(1, Number(page_size) || 25));
+  const safeSize = Math.min(100, Math.max(1, Number(page_size ?? limit) || 25));
   const start = (safePage - 1) * safeSize;
   return { data: filtered.slice(start, start + safeSize), meta: { page: safePage, page_size: safeSize, total: filtered.length }, owners };
 }
@@ -218,7 +275,7 @@ function dispatchCollectedEvent(syncEventId, eventPayload) {
   else setTimeout(handler, 0);
 }
 
-export function confirmReceivablePayment(id, paymentProof = null) {
+export function confirmReceivablePayment(id, paymentProof = null, collectionNote = '') {
   const store = readStore();
   const index = store.receivables.findIndex((item) => item.id === id);
   if (index < 0) return null;
@@ -231,7 +288,7 @@ export function confirmReceivablePayment(id, paymentProof = null) {
     balance_due: 0,
     collection_status: 'PAID',
     evidence: paymentProof || current.evidence,
-    timeline: [{ id: randomUUID(), at, type: 'PAYMENT_CONFIRMED', message: 'Manual payment confirmed and source sync queued.' }, ...current.timeline],
+    timeline: [{ id: randomUUID(), at, type: 'PAYMENT_CONFIRMED', message: `Manual payment confirmed and source sync queued.${String(collectionNote || '').trim() ? ` Note: ${String(collectionNote).trim()}` : ''}` }, ...current.timeline],
   };
   store.receivables[index] = updated;
   store.metrics.collected += current.balance_due;
@@ -272,12 +329,13 @@ export function getFinanceForecast() {
 
 export function updateFinanceTarget({ month_year, target_amount, created_by }) {
   const amount = Number(target_amount);
-  if (!month_year || !/^\d{4}-\d{2}$/.test(month_year)) throw validationError('month_year must use YYYY-MM format.');
+  const effectiveMonth = month_year || readStore().metrics.month_year || isoNow().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(effectiveMonth)) throw validationError('month_year must use YYYY-MM format.');
   if (!Number.isFinite(amount) || amount <= 0) throw validationError('target_amount must be a positive number.');
   const store = readStore();
-  const target = { id: randomUUID(), month_year, target_amount: amount, created_by: created_by || 'admin_local', created_at: isoNow() };
+  const target = { id: randomUUID(), month_year: effectiveMonth, target_amount: amount, created_by: created_by || 'admin_local', created_at: isoNow() };
   store.targets.unshift(target);
-  store.metrics.month_year = month_year;
+  store.metrics.month_year = effectiveMonth;
   writeStore(store);
   return target;
 }
@@ -288,12 +346,12 @@ export function listFinanceRisks({ status = 'ALL', severity = 'ALL' } = {}) {
   return { data, meta: { total: data.length }, payment_connections: store.payment_connections };
 }
 
-export function resolveFinanceRisk(id, requestedStatus = 'RESOLVED') {
+export function resolveFinanceRisk(id, requestedStatus = 'RESOLVED', resolutionNotes = '') {
   if (!['ACKNOWLEDGED', 'RESOLVED'].includes(requestedStatus)) throw validationError('status must be ACKNOWLEDGED or RESOLVED.');
   const store = readStore();
   const index = store.risks.findIndex((risk) => risk.id === id);
   if (index < 0) return null;
-  store.risks[index] = { ...store.risks[index], status: requestedStatus, resolved_at: requestedStatus === 'RESOLVED' ? isoNow() : null };
+  store.risks[index] = { ...store.risks[index], status: requestedStatus, resolution_notes: String(resolutionNotes || '').trim() || null, resolved_at: requestedStatus === 'RESOLVED' ? isoNow() : null };
   writeStore(store);
   return store.risks[index];
 }

@@ -6,7 +6,7 @@ describe('copilot knowledge pack', () => {
     const response = getKnowledgeResponse('Assistant này làm được gì?');
 
     expect(response?.domain).toBe('saas');
-    expect(response?.content).toContain('4 lớp việc chính');
+    expect(response?.content).toContain('four core workflows');
     expect(response?.citations).toContain('Safety mode: read-only by default, no silent mutations');
   });
 
@@ -18,14 +18,14 @@ describe('copilot knowledge pack', () => {
       type: 'navigate',
       url: '/inventory',
     });
-    expect(response?.content).toContain('đẩy bạn sang luồng inventory chuyên dụng');
+    expect(response?.content).toContain('dedicated Inventory workflow');
   });
 
   it('avoids hallucinating pricing answers when pricing docs are not loaded', () => {
     const response = getKnowledgeResponse('Gói Growth khác Enterprise ở điểm nào?');
 
     expect(response?.domain).toBe('saas');
-    expect(response?.content).toContain('chưa được nạp vào runtime local này');
+    expect(response?.content).toContain('not loaded in this local runtime');
     expect(response?.citations).toContain('Pricing matrix is not loaded into the local app runtime');
   });
 });

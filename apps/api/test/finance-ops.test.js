@@ -11,6 +11,7 @@ const {
   assignReceivableOwner,
   confirmReceivablePayment,
   getFinanceForecast,
+  getFinanceOpsOverview,
   getFinanceOpsSummary,
   listFinanceRisks,
   listReceivables,
@@ -26,13 +27,29 @@ test('Finance Ops summary, aging filters, and target history are calculated and 
   assert.equal(summary.revenue_this_month, 1580000000);
   assert.equal(summary.remaining_to_target, 920000000);
   assert.equal(Number.isInteger(summary.finance_health_index), true);
+  assert.equal(summary.collection_rate > 0, true);
+  assert.equal(summary.overdue_count > 0, true);
+
+  const overview = getFinanceOpsOverview();
+  assert.equal(overview.finance_queue.length, 3);
+  assert.equal(overview.revenue_breakdown.length, 3);
+  assert.equal(overview.recent_activity.length > 0, true);
 
   const overdue = listReceivables({ payment_status: 'OVERDUE' });
   assert.equal(overdue.data.every((item) => item.aging_days > 0), true);
+  const demoLedger = listReceivables({ limit: 100 });
+  assert.equal(demoLedger.meta.total, 15);
+  assert.equal(demoLedger.data.some((item) => item.collection_status === 'PAID'), true);
+  assert.equal(demoLedger.data.some((item) => item.collection_status === 'DISPUTED'), true);
+  assert.equal(demoLedger.data.some((item) => item.evidence?.provider_status === 'Awaiting verification'), true);
+  assert.equal(Object.values(summary.aging).every((bucket) => bucket.count > 0), true);
 
   const target = updateFinanceTarget({ month_year: '2026-08', target_amount: 2800000000, created_by: 'admin_test' });
   assert.equal(target.target_amount, 2800000000);
   assert.equal(getFinanceForecast().target_history[0].id, target.id);
+
+  const contractTarget = updateFinanceTarget({ target_amount: 3000000000, created_by: 'admin_test' });
+  assert.equal(contractTarget.month_year, '2026-08');
 });
 
 test('collection actions persist timeline, ownership, payment, and risk state', async () => {
@@ -49,6 +66,10 @@ test('collection actions persist timeline, ownership, payment, and risk state', 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   const risk = listFinanceRisks().data[0];
+  assert.equal(listFinanceRisks().data.some((item) => item.status === 'ACKNOWLEDGED'), true);
+  assert.equal(listFinanceRisks().data.some((item) => item.status === 'RESOLVED'), true);
   assert.equal(resolveFinanceRisk(risk.id, 'ACKNOWLEDGED').status, 'ACKNOWLEDGED');
-  assert.equal(resolveFinanceRisk(risk.id, 'RESOLVED').status, 'RESOLVED');
+  const resolved = resolveFinanceRisk(risk.id, 'RESOLVED', 'Connector restored and proof verified.');
+  assert.equal(resolved.status, 'RESOLVED');
+  assert.equal(resolved.resolution_notes, 'Connector restored and proof verified.');
 });

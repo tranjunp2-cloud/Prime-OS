@@ -191,7 +191,7 @@ export function GlobalCopilotChatThread({
                 {showInlineClarifyChoices ? (
                   <div className="mt-3">
                     <p className="mb-2 text-[11px] font-medium text-muted-foreground">
-                      Chọn nhanh một hướng để mình đi tiếp
+                      Choose a direction to continue
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {message.followUpPrompts?.map((prompt) => (

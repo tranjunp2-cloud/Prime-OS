@@ -4,7 +4,6 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
-  Bot,
   Check,
   ChevronRight,
   Clock3,
@@ -182,14 +181,19 @@ export default function FaqArticle() {
               <h2 className="mt-4 font-bold text-slate-900">Still need help?</h2>
               <p className="mt-2 text-sm leading-5 text-slate-500">Continue with a customer support agent in Prime Inbox.</p>
               <Button asChild variant="outline" className="mt-4 w-full justify-between bg-white"><Link to="/inbox/conversation">Open Live Support Chat<ExternalLink className="size-4" /></Link></Button>
-              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('prime-ai:open', { detail: { source: 'faq-article', article: article.title } }))} className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md text-xs font-semibold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                <Bot className="size-4" /> Ask Prime AI instead
-              </button>
             </div>
+
+            {article.related_doc_id ? (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-5">
+                <span className="grid size-9 place-items-center rounded-lg bg-white text-indigo-700"><FileText className="size-4" /></span>
+                <h2 className="mt-4 font-bold text-slate-900">Learn how this works</h2>
+                <p className="mt-2 text-sm leading-5 text-slate-600">Read the product documentation for concepts, expected behavior, and the complete workflow.</p>
+                <Button asChild variant="outline" className="mt-4 w-full justify-between bg-white"><Link to={`/docs?article=${article.related_doc_id}`}>Open documentation<ArrowRight className="size-4" /></Link></Button>
+              </div>
+            ) : null}
           </div>
         </aside>
       </div>
     </div>
   );
 }
-

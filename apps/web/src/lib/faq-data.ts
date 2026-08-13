@@ -19,6 +19,7 @@ export interface FaqArticle {
   is_top_issue?: boolean;
   read_time: number;
   updated_at: string;
+  related_doc_id?: string;
   related_settings_link?: {
     label: string;
     href: string;
@@ -54,6 +55,7 @@ export const faqArticles: FaqArticle[] = [
     is_top_issue: true,
     read_time: 4,
     updated_at: 'August 10, 2026',
+    related_doc_id: 'connect-store',
     related_settings_link: { label: 'Go to Channel Settings', href: '/settings/channels' },
     content: `## Before you connect
 
@@ -165,6 +167,7 @@ If messages are visible on the social network but absent after reconnecting, ope
     is_top_issue: true,
     read_time: 3,
     updated_at: 'August 7, 2026',
+    related_doc_id: 'warehouse-mapping',
     related_settings_link: { label: 'Review Warehouse Settings', href: '/warehouses' },
     content: `## Confirm the blocker
 
@@ -191,6 +194,7 @@ Transfer stock, split the order according to policy, or contact the customer bef
     tags: ['Products', 'PIM', 'Publishing'],
     read_time: 6,
     updated_at: 'August 6, 2026',
+    related_doc_id: 'master-product',
     related_settings_link: { label: 'Add Master Product', href: '/products/new' },
     content: `## Create the source record
 
@@ -217,6 +221,7 @@ Use the product action menu and choose **Unlist** for a specific channel. This r
     tags: ['Orders', 'Status', 'Sync'],
     read_time: 4,
     updated_at: 'August 4, 2026',
+    related_doc_id: 'order-lifecycle',
     content: `## Lifecycle status
 
 Lifecycle status describes operational progress: Pending Confirmation, Awaiting Shipment, In Transit, Completed, or Cancelled / Returned.
@@ -259,6 +264,7 @@ Count each payment method, review differences, and submit the shift. A manager m
     tags: ['CRM', 'Tags', 'Segments'],
     read_time: 5,
     updated_at: 'August 2, 2026',
+    related_doc_id: 'customer-profile',
     related_settings_link: { label: 'Open Segments & Tags', href: '/crm/segments' },
     content: `## Apply a manual tag
 

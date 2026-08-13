@@ -35,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { createPrimeAuthHeaders, resolvePrimeBackendBase } from '@/lib/prime/backend-auth';
 
-type AccountRoleKey = 'admin' | 'operator' | 'viewer';
+type AccountRoleKey = 'admin' | 'pos_cashier' | 'crm_sales' | 'warehouse_manager' | 'web_editor';
 type AccountStatus = 'active' | 'invited' | 'suspended';
 type AccountTab = 'overview' | 'members' | 'roles' | 'security' | 'audit' | 'api-keys';
 type MemberStatusFilter = AccountStatus | 'all';
@@ -98,8 +98,10 @@ interface AccountAuditEvent {
 
 const roleScope: Record<AccountRoleKey, string> = {
   admin: 'Workspace admin',
-  operator: 'Business operations',
-  viewer: 'Read-only',
+  pos_cashier: 'POS register operations',
+  crm_sales: 'Customer and sales operations',
+  warehouse_manager: 'Inventory and fulfillment',
+  web_editor: 'PrimeWeb content and publishing',
 };
 
 const permissionGroups = [
@@ -135,8 +137,11 @@ function getInitials(name?: string, email?: string) {
 
 function formatRole(role?: string) {
   if (role === 'admin') return 'Admin';
-  if (role === 'operator' || role === 'user') return 'Operator';
-  return 'Viewer';
+  if (role === 'pos_cashier') return 'POS Cashier';
+  if (role === 'crm_sales') return 'CRM Sales';
+  if (role === 'warehouse_manager' || role === 'operator' || role === 'user') return 'Warehouse Manager';
+  if (role === 'web_editor') return 'Web Editor';
+  return 'Unassigned';
 }
 
 function formatSeat(value?: string | null) {
@@ -218,7 +223,7 @@ export default function Account() {
   const [auditEvents, setAuditEvents] = useState<AccountAuditEvent[]>([]);
   const [displayName, setDisplayName] = useState(user?.fullName || '');
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<AccountRoleKey>('operator');
+  const [inviteRole, setInviteRole] = useState<AccountRoleKey>('crm_sales');
   const [memberQuery, setMemberQuery] = useState('');
   const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>('all');
   const [loading, setLoading] = useState(true);
@@ -720,9 +725,11 @@ export default function Account() {
                       <div className="space-y-2">
                         <Label htmlFor="invite-member-role">Role</Label>
                         <select id="invite-member-role" className="h-10 min-w-[150px] rounded-md border border-input bg-background px-3 text-sm" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as AccountRoleKey)}>
-                          <option value="operator">Operator</option>
-                          <option value="viewer">Viewer</option>
                           <option value="admin">Admin</option>
+                          <option value="pos_cashier">POS Cashier</option>
+                          <option value="crm_sales">CRM Sales</option>
+                          <option value="warehouse_manager">Warehouse Manager</option>
+                          <option value="web_editor">Web Editor</option>
                         </select>
                       </div>
                       <Button type="submit" disabled={inviting || !inviteEmail.trim()}>

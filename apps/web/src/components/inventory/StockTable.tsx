@@ -15,7 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { HelpCircle } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { SkuBadge } from '@/components/system/SkuBadge';
 
 export interface StockItem {
@@ -69,7 +69,7 @@ export function StockTable({ items, isLoading }: StockTableProps) {
                 <Tooltip>
                   <TooltipTrigger className="flex items-center gap-1 ml-auto">
                     {t('inventory.colReserved')}
-                    <HelpCircle className="size-3" />
+                    <Info className="size-3" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{t('inventory.tooltipReserved')}</p>
@@ -82,7 +82,7 @@ export function StockTable({ items, isLoading }: StockTableProps) {
                 <Tooltip>
                   <TooltipTrigger className="flex items-center gap-1 ml-auto">
                     {t('inventory.colInTransit')}
-                    <HelpCircle className="size-3" />
+                    <Info className="size-3" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{t('inventory.tooltipInTransit')}</p>
@@ -96,7 +96,7 @@ export function StockTable({ items, isLoading }: StockTableProps) {
                 <Tooltip>
                   <TooltipTrigger className="flex items-center gap-1">
                     {t('inventory.colMode')}
-                    <HelpCircle className="size-3" />
+                    <Info className="size-3" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <p>

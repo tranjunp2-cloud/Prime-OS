@@ -98,6 +98,7 @@ import { getPrimeSnapshot } from '@/lib/prime/prime-data';
 import { getFulfillmentJobs } from '@/lib/fulfillment-store';
 import { cn } from '@/lib/utils';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { InitialSetupBanner } from '@/components/onboarding/InitialSetupBanner';
 
 type PrimeModuleId = 'overview' | 'crm' | 'scheduled' | 'cos' | 'service' | 'connectors' | 'finance' | 'automation';
 type ConnectorStatusFilter = 'all' | 'connected' | 'needs_setup' | 'watch';
@@ -1157,9 +1158,6 @@ function LegacyOverviewView({
 }
 
 function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: (module: PrimeModuleId) => void }) {
-  const [setupCollapsed, setSetupCollapsed] = useState(false);
-  const [setupDismissed, setSetupDismissed] = useState(false);
-
   const pipelineGroups = [
     { title: 'Orders', icon: ShoppingBag, href: '/orders?status=pending', tone: 'bg-indigo-50 text-indigo-600', items: [{ value: '124', label: 'Pending Confirmation' }, { value: '45', label: 'Ready to Pack' }] },
     { title: 'Fulfillment', icon: Truck, href: '/fulfillment?status=exception', tone: 'bg-amber-50 text-amber-600', items: [{ value: '12', label: 'Delivery Exceptions' }, { value: '111', label: 'Returned Orders' }] },
@@ -1190,27 +1188,7 @@ function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: 
 
   return (
     <div className="grid gap-6">
-      {!setupDismissed ? (
-        setupCollapsed ? (
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-label="Setup progress">
-            <button type="button" onClick={() => setSetupCollapsed(false)} className="flex min-h-11 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
-              <span className="text-sm font-semibold text-slate-800">3/4 Setup Steps Completed</span>
-              <span className="ml-auto text-xs font-medium text-primary">Continue setup</span>
-              <ChevronRight className="size-4 text-slate-400" />
-            </button>
-            <div className="h-1 bg-slate-100"><div className="h-full w-3/4 bg-primary" /></div>
-          </section>
-        ) : (
-          <section className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="setup-heading">
-            <div className="flex items-start gap-4 p-5 pr-24">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="size-5" /></span>
-              <div className="min-w-0 flex-1"><div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Onboarding</div><h2 id="setup-heading" className="mt-1 text-lg font-semibold text-slate-900">Initial setup</h2><p className="mt-1 text-sm font-medium text-slate-500">3 of 4 steps completed. Connect your Lazada channel to start syncing orders and inventory.</p><div className="mt-4 flex flex-wrap items-center gap-3"><Button size="sm">Complete setup</Button><button type="button" onClick={() => setSetupCollapsed(true)} className="min-h-9 text-sm font-semibold text-slate-500 hover:text-slate-800">Collapse</button></div></div>
-            </div>
-            <button type="button" onClick={() => setSetupDismissed(true)} className="absolute right-3 top-3 grid size-9 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Dismiss onboarding"><X className="size-4" /></button>
-            <div className="h-1.5 bg-slate-100"><div className="h-full w-3/4 bg-primary" /></div>
-          </section>
-        )
-      ) : null}
+      <InitialSetupBanner />
 
       <section aria-labelledby="pipeline-heading" className="grid gap-3">
         <div><div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Action queue</div><h2 id="pipeline-heading" className="mt-1 text-lg font-semibold text-slate-900">Operations Pipeline</h2></div>

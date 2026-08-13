@@ -15,12 +15,12 @@ describe('GlobalCopilotChatThread', () => {
           {
             id: 'assistant-clarify',
             role: 'assistant',
-            content: 'Mình cần bạn nói rõ hơn một chút.',
+            content: 'I need a little more detail.',
             timestamp: new Date(),
             intent: 'clarify',
             followUpPrompts: [
-              { label: 'Giải thích trang', prompt: 'Trang này dùng để làm gì?' },
-              { label: 'Mở orders', prompt: 'Mở orders' },
+              { label: 'Explain this page', prompt: 'What is this page used for?' },
+              { label: 'Open Orders', prompt: 'Open Orders' },
             ],
           },
         ]}
@@ -29,10 +29,10 @@ describe('GlobalCopilotChatThread', () => {
       />
     );
 
-    expect(screen.getByText('Cần làm rõ')).toBeInTheDocument();
-    expect(screen.getByText('Chọn nhanh một hướng để mình đi tiếp')).toBeInTheDocument();
+    expect(screen.getByText('Needs clarification')).toBeInTheDocument();
+    expect(screen.getByText('Choose a direction to continue')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Giải thích trang' }));
-    expect(onPromptSelect).toHaveBeenCalledWith('Trang này dùng để làm gì?');
+    fireEvent.click(screen.getByRole('button', { name: 'Explain this page' }));
+    expect(onPromptSelect).toHaveBeenCalledWith('What is this page used for?');
   });
 });

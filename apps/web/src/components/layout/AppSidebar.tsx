@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRightLeft,
   BadgePercent,
   BarChart3,
   Building2,
@@ -11,6 +12,7 @@ import {
   ChevronRight,
   CircleHelp,
   Clock3,
+  ClipboardCheck,
   CreditCard,
   FilePlus2,
   Gift,
@@ -74,7 +76,10 @@ const mainNavigation: NavGroup[] = [
       { id: 'product-inventory', label: 'Inventory', href: '/products/inventory', icon: Warehouse },
     ] },
     { id: 'warehouse', label: 'Warehouse', icon: Warehouse, children: [
-      { id: 'warehouse-list', label: 'Warehouses', href: '/warehouses', icon: Warehouse },
+      { id: 'warehouse-mapping', label: 'Warehouse Mapping', href: '/warehouse/mapping', icon: Link2 },
+      { id: 'warehouse-stock', label: 'Stock Levels', href: '/warehouse/stock', icon: Boxes },
+      { id: 'warehouse-transfers', label: 'Stock Transfers', href: '/warehouse/transfers', icon: ArrowRightLeft },
+      { id: 'warehouse-adjustments', label: 'Adjustments', href: '/warehouse/adjustments', icon: ClipboardCheck },
     ] },
     { id: 'channels', label: 'Sales Channels', icon: Store, children: [
       { id: 'connected-channels', label: 'Connected Channels', href: '/sales-channels/connected-channels', icon: Store },

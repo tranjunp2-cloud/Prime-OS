@@ -26,11 +26,11 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Safety mode: read-only by default, no silent mutations',
       ],
       content: [
-        'Mình đang hỗ trợ 4 lớp việc chính ngay trong app:',
-        '- trả lời câu hỏi về workflow SaaS và các module PrimeOS',
-        '- giải thích ngữ cảnh của page hoặc entity bạn đang mở',
-        '- mở đúng màn hình / bộ lọc phù hợp cho user',
-        '- chuẩn bị low-risk draft như prefill Create Product để user chỉ cần review rồi submit',
+        'I support four core workflows in the app:',
+        '- answer questions about SaaS workflows and PrimeOS modules',
+        '- explain the context of the current page or entity',
+        '- open the relevant screen or preconfigured filter',
+        '- prepare low-risk drafts, such as prefilling Create Product for review before submission',
       ].join('\n'),
     },
   },
@@ -47,20 +47,20 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
       actions: [
         {
           type: 'navigate',
-          label: 'Mở Inventory',
-          description: 'Đi tới inventory workspace hiện tại',
+          label: 'Open Inventory',
+          description: 'Go to the Inventory workspace',
           url: '/inventory',
           emphasis: 'primary',
         },
         {
           type: 'navigate',
-          label: 'Mở Warehouses',
-          description: 'Xem warehouse topology và capability',
+          label: 'Open Warehouses',
+          description: 'View warehouse topology and capabilities',
           url: '/warehouses',
         },
       ],
       content:
-        'Inventory copilot được tách riêng để xử lý các câu hỏi đụng tới ATS, reservation, availability và inventory analytics sâu hơn. Global assistant vẫn giúp định hướng, nhưng khi cần mổ xẻ tồn kho thật kỹ thì mình sẽ đẩy bạn sang luồng inventory chuyên dụng.',
+        'The Inventory Copilot is separate so it can handle ATS, reservations, availability, and deeper inventory analytics. The global assistant provides guidance and routes detailed stock investigations to the dedicated Inventory workflow.',
     },
   },
   {
@@ -74,7 +74,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Inventory and order execution live in other towers',
       ],
       content:
-        'Trong PrimeOS, Product Master là nơi giữ identity của hàng hóa: SKU, brand, media, pricing, compliance, và variant structure. Nó không phải nơi tính ATS hay điều phối order execution; các phần đó đi qua Inventory và OMS/Fulfillment.',
+        'In PrimeOS, Product Master owns product identity: SKU, brand, media, pricing, compliance, and variant structure. ATS calculations and order execution are handled by Inventory and OMS/Fulfillment.',
     },
   },
   {
@@ -88,13 +88,13 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Capabilities and status determine operational fit',
       ],
       content: [
-        'PrimeOS hiện đang xoay quanh vài nhóm warehouse chính:',
-        '- internal: kho vận hành trực tiếp',
-        '- fba / fbs: kho marketplace-managed',
-        '- 3pl: đối tác fulfillment ngoài',
-        '- virtual: warehouse logic cho orchestration hoặc marketplace abstraction',
+        'PrimeOS supports these primary warehouse types:',
+        '- internal: directly operated warehouses',
+        '- fba / fbs: marketplace-managed warehouses',
+        '- 3pl: external fulfillment partners',
+        '- virtual: logical warehouses for orchestration or marketplace abstraction',
         '',
-        'Khi assistant đề xuất route hoặc action, mình sẽ ưu tiên loại kho phù hợp với capability thay vì chỉ nhìn country.',
+        'When recommending a route or action, the assistant prioritizes warehouse capabilities instead of country alone.',
       ].join('\n'),
     },
   },
@@ -109,7 +109,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Order status and lifecycle stage are tracked separately',
       ],
       content:
-        'OMS đang tách 2 lớp rõ ràng: `status` để nhìn trạng thái vận hành ở mức business, và `lifecycle_stage` để biết order đang ở bước nào trong pipeline nội bộ. Điều này giúp assistant giải thích được một order “đang shipping” nhưng thực tế đã reserved hay chưa.',
+        'OMS separates two layers: `status` shows the business-level operational state, while `lifecycle_stage` identifies the order\'s position in the internal pipeline. This lets the assistant distinguish a shipping order from one that has or has not been reserved.',
     },
   },
   {
@@ -123,7 +123,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Current mock data is optimized for Amazon, Shopee, Rakuten, and manual flows',
       ],
       content:
-        'Channel state được giữ riêng ở listing layer để product master không bị trộn với dữ liệu marketplace. Hiện app đang bám các luồng Amazon, Shopee, Rakuten và manual/website để làm control tower cho seller đa kênh.',
+        'Channel state is kept in the listing layer so Product Master remains separate from marketplace data. The app currently supports Amazon, Shopee, Rakuten, and manual or website flows for omnichannel control.',
     },
   },
   {
@@ -137,7 +137,7 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
         'Draft before commit for business-impacting writes',
       ],
       content:
-        'Assistant đang bám đúng safety model của plan: đọc trước, gợi ý sau, và chỉ chuẩn bị draft cho các thao tác có ảnh hưởng business. Bất kỳ mutation đáng kể nào cũng nên đi qua preview/confirm thay vì tự chạy âm thầm.',
+        'The assistant follows a read-first safety model: review context, recommend an action, and prepare a draft for business-impacting changes. Material mutations require preview and confirmation.',
     },
   },
 ];
@@ -159,7 +159,7 @@ export function getKnowledgeResponse(message: string): CopilotResponse | null {
         intent: 'policy_qa',
         citations: ['Pricing matrix is not loaded into the local app runtime'],
         content:
-          'Phần pricing / package commercial chưa được nạp vào runtime local này, nên mình không muốn bịa. Nếu bạn cần, mình có thể vẫn giải thích capability theo module hiện có trong app, hoặc mình sẽ cần bộ pricing docs để trả lời chính xác hơn.',
+          'Pricing and commercial package data is not loaded in this local runtime. I can explain the capabilities of the available modules, but accurate pricing answers require the pricing documentation.',
       };
     }
 

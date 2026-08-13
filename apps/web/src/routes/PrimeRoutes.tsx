@@ -27,6 +27,7 @@ import PromotionsManagement from "@/pages/PromotionsManagement";
 import { TouchpointWorkspace } from "@/pages/TouchpointWorkspace";
 import ScheduledTasksPage from "@/pages/ScheduledTasks";
 import FinanceOps from "@/pages/FinanceOps";
+import Docs from "@/pages/Docs";
 import {
   PrimeCrmCampaignsSimplePage,
   PrimeCrmCustomersSimplePage,
@@ -60,6 +61,7 @@ export function PrimeRoutes() {
   return (
     <>
     <Route path="/overview" element={<PrimeGrowthOSPage />} />
+    <Route path="/home" element={<PrimeGrowthOSPage />} />
     <Route path="/admin/dashboard" element={<PrimeGrowthOSPage />} />
     <Route path="/builder" element={<Navigate to="/builder/theme" replace />} />
     <Route path="/builder/*" element={<TouchpointWorkspace kind="primeweb" />} />
@@ -107,6 +109,7 @@ export function PrimeRoutes() {
     <Route path="/sales-channels/connected-channels" element={<ConnectedChannelsPage />} />
     <Route path="/sales-channels/live-commerce" element={<LiveCommercePage />} />
     <Route path="/sales-channels/conversation-channels" element={<ConversationChannelsPage />} />
+    <Route path="/channels/:channel/connect" element={<ConnectedChannelsPage />} />
     <Route path="/channels/social-integrations" element={<Navigate to="/sales-channels/conversation-channels" replace />} />
     <Route path="/inbox/conversation" element={<PrimeInboxWorkspace />} />
     <Route path="/faq" element={<FaqHub />} />
@@ -157,7 +160,12 @@ export function PrimeRoutes() {
     <Route path="/products/new" element={<ProductCreatePage />} />
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
     <Route path="/products/:id" element={<ProductDetail />} />
-    <Route path="/warehouses" element={<Warehouses />} />
+    <Route path="/warehouses" element={<Navigate to="/warehouse/mapping" replace />} />
+    <Route path="/docs" element={<Docs />} />
+    <Route path="/warehouse/mapping" element={<Warehouses />} />
+    <Route path="/warehouse/stock" element={<Warehouses />} />
+    <Route path="/warehouse/transfers" element={<Warehouses />} />
+    <Route path="/warehouse/adjustments" element={<Warehouses />} />
     <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />
     <Route path="/orders" element={<Orders />} />
     <Route path="/orders/fulfillment" element={<Orders view="fulfillment" />} />

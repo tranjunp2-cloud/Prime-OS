@@ -39,6 +39,10 @@ test('Finance Ops API exposes summary, ledger actions, forecast, target, and ris
   assert.equal(summaryResponse.status, 200);
   assert.equal((await summaryResponse.json()).data.finance_health_index > 0, true);
 
+  const overviewResponse = await request('/api/v1/finance/ops/overview');
+  assert.equal(overviewResponse.status, 200);
+  assert.equal((await overviewResponse.json()).data.revenue_breakdown.length, 3);
+
   const ledgerResponse = await request('/api/v1/finance/ops/receivables?payment_status=OVERDUE');
   const ledger = await ledgerResponse.json();
   assert.equal(ledgerResponse.status, 200);
@@ -53,12 +57,12 @@ test('Finance Ops API exposes summary, ledger actions, forecast, target, and ris
   assert.equal(paymentBody.data.collection_status, 'PAID');
   assert.equal(paymentBody.sync_event.status, 'PENDING');
 
-  const targetResponse = await request('/api/v1/finance/ops/target', { method: 'PUT', body: JSON.stringify({ month_year: '2026-08', target_amount: 2900000000 }) });
+  const targetResponse = await request('/api/v1/finance/ops/target', { method: 'PUT', body: JSON.stringify({ target_amount: 2900000000 }) });
   assert.equal(targetResponse.status, 200);
 
   const risksResponse = await request('/api/v1/finance/ops/risks');
   const risks = await risksResponse.json();
-  const resolved = await request(`/api/v1/finance/ops/risks/${risks.data[0].id}/resolve`, { method: 'POST', body: JSON.stringify({ status: 'RESOLVED' }) });
+  const resolved = await request(`/api/v1/finance/ops/risks/${risks.data[0].id}/resolve`, { method: 'POST', body: JSON.stringify({ resolution_notes: 'Control reviewed and remediated.' }) });
   assert.equal(resolved.status, 200);
   assert.equal((await resolved.json()).data.status, 'RESOLVED');
 });
