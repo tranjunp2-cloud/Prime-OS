@@ -161,14 +161,14 @@ export function PrimeRoutes() {
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
     <Route path="/products/categories" element={<ProductCategories />} />
-    <Route path="/products/inventory" element={<Navigate to="/warehouse/stock" replace />} />
+    <Route path="/products/inventory" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/new" element={<ProductCreatePage />} />
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
     <Route path="/products/:id" element={<ProductDetail />} />
     <Route path="/warehouses" element={<Navigate to="/warehouse/mapping" replace />} />
     <Route path="/docs" element={<Docs />} />
     <Route path="/warehouse/mapping" element={<Warehouses />} />
-    <Route path="/warehouse/stock" element={<Warehouses />} />
+    <Route path="/warehouse/stock" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/warehouse/transfers" element={<Warehouses />} />
     <Route path="/warehouse/adjustments" element={<Warehouses />} />
     <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />

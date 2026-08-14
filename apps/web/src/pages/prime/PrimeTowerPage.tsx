@@ -4820,7 +4820,7 @@ function CrmExecutionPanel({ towerId }: { towerId: PrimeTowerId }) {
             aria-current={active ? 'page' : undefined}
             className={[
               'min-w-[180px] rounded-lg border p-3 transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:min-w-0',
-              active ? 'border-primary/40 bg-primary/10 text-foreground ring-1 ring-primary/20' : 'bg-background text-muted-foreground',
+              active ? 'border-primary/40 bg-primary/10 text-primary ring-1 ring-primary/20' : 'bg-background text-muted-foreground',
             ].join(' ')}
           >
             <div className="text-sm font-semibold">{tab.label}</div>

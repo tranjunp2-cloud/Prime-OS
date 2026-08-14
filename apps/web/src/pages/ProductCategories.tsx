@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Check, ChevronRight, CircleAlert, FolderTree, Layers3, Plus, Search,
-  Settings2, Sparkles, Tags,
+  Sparkles, Tags,
 } from 'lucide-react';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,19 @@ interface CategoryRow {
   mappings: Record<'webstore' | 'pos' | 'shopee' | 'tiktok' | 'lazada', MappingStatus>;
 }
 
+interface AttributeDefinition {
+  id: string;
+  name: string;
+  key: string;
+  type: string;
+  categories: number;
+  description: string;
+  options: string;
+  unit: string;
+  validation: string;
+  status: 'Active' | 'Inactive';
+}
+
 const taxonomyDefaults: Record<string, string[]> = {
   Fashion: ['Brand', 'Material', 'Color', 'Size', 'Care instructions', 'Dimensions'],
   Electronics: ['Brand', 'Model', 'Connectivity', 'Dimensions', 'Warranty'],
@@ -44,13 +57,17 @@ const channelLabels = [
   ['webstore', 'WebStore'], ['pos', 'POS'], ['shopee', 'Shopee'], ['tiktok', 'TikTok Shop'], ['lazada', 'Lazada'],
 ] as const;
 
-const attributeSets = [
-  { name: 'Brand', type: 'Single-line text', usage: 'Required', categories: 12, description: 'Canonical manufacturer or house brand.' },
-  { name: 'Material', type: 'Multi-select', usage: 'Required', categories: 8, description: 'Primary materials used to manufacture the product.' },
-  { name: 'Care Instructions', type: 'Rich text', usage: 'Optional', categories: 5, description: 'Handling, cleaning and storage guidance.' },
-  { name: 'Dimensions', type: 'Measurement set', usage: 'Required', categories: 10, description: 'Length, width, height and supported unit.' },
-  { name: 'Country of Origin', type: 'Country selector', usage: 'Optional', categories: 9, description: 'Manufacturing country used for compliance.' },
+const initialAttributes: AttributeDefinition[] = [
+  { id: 'brand', name: 'Brand', key: 'brand', type: 'Single-line text', categories: 12, description: 'Canonical manufacturer or house brand.', options: '', unit: '', validation: 'Maximum 100 characters', status: 'Active' },
+  { id: 'material', name: 'Material', key: 'material', type: 'Multi-select', categories: 8, description: 'Primary materials used to manufacture the product.', options: 'Cotton, Leather, Metal, Plastic, Wood', unit: '', validation: 'At least one value when required by category', status: 'Active' },
+  { id: 'care-instructions', name: 'Care Instructions', key: 'care_instructions', type: 'Rich text', categories: 5, description: 'Handling, cleaning and storage guidance.', options: '', unit: '', validation: 'Maximum 2,000 characters', status: 'Active' },
+  { id: 'dimensions', name: 'Dimensions', key: 'dimensions', type: 'Measurement set', categories: 10, description: 'Length, width, height and supported unit.', options: '', unit: 'cm', validation: 'Values must be greater than zero', status: 'Active' },
+  { id: 'country-of-origin', name: 'Country of Origin', key: 'country_of_origin', type: 'Country selector', categories: 9, description: 'Manufacturing country used for compliance.', options: '', unit: '', validation: 'ISO 3166 country list', status: 'Active' },
 ];
+
+const blankAttribute: AttributeDefinition = {
+  id: '', name: '', key: '', type: 'Single-line text', categories: 0, description: '', options: '', unit: '', validation: '', status: 'Active',
+};
 
 function taxonomyGroup(category: string) {
   if (['Jacket', 'Shoe', 'Hat', 'Bag', 'Watch', 'Sunglasses'].includes(category)) return 'Fashion';
@@ -72,6 +89,10 @@ export default function ProductCategories() {
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('general');
   const [selectedCategory, setSelectedCategory] = useState<CategoryRow | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [attributes, setAttributes] = useState<AttributeDefinition[]>(initialAttributes);
+  const [attributeDrawerOpen, setAttributeDrawerOpen] = useState(false);
+  const [attributeDraft, setAttributeDraft] = useState<AttributeDefinition>(blankAttribute);
+  const [isCreatingAttribute, setIsCreatingAttribute] = useState(false);
   const products = getProducts();
 
   const rows = useMemo<CategoryRow[]>(() => {
@@ -100,7 +121,7 @@ export default function ProductCategories() {
       .sort((a, b) => a.group.localeCompare(b.group) || a.category.localeCompare(b.category));
   }, [products, search]);
 
-  const filteredAttributes = attributeSets.filter(attribute => `${attribute.name} ${attribute.type} ${attribute.description}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const filteredAttributes = attributes.filter(attribute => `${attribute.name} ${attribute.type} ${attribute.description}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   function openCategory(row: CategoryRow) {
     setSelectedCategory(row);
@@ -116,24 +137,49 @@ export default function ProductCategories() {
     setDrawerOpen(true);
   }
 
+  function createAttribute() {
+    setAttributeDraft(blankAttribute);
+    setIsCreatingAttribute(true);
+    setAttributeDrawerOpen(true);
+  }
+
+  function editAttribute(attribute: AttributeDefinition) {
+    setAttributeDraft(attribute);
+    setIsCreatingAttribute(false);
+    setAttributeDrawerOpen(true);
+  }
+
+  function saveAttribute(attribute: AttributeDefinition) {
+    const normalized = {
+      ...attribute,
+      id: attribute.id || slugify(attribute.key || attribute.name),
+      key: attribute.key || slugify(attribute.name).replace(/-/g, '_'),
+    };
+    setAttributes(current => isCreatingAttribute
+      ? [...current, normalized]
+      : current.map(item => item.id === normalized.id ? normalized : item));
+    toast({ title: isCreatingAttribute ? 'Attribute created' : 'Attribute updated', description: `${normalized.name} is ready to assign to product categories.` });
+    setAttributeDrawerOpen(false);
+  }
+
   return <div className="space-y-5 p-4 md:p-6">
     <WorkspacePageHeader
       title="Categories & Attributes"
-      description="Manage the master taxonomy, reusable attribute sets, and marketplace category mappings."
+      description="Organize product categories and maintain reusable product attributes."
       icon={Tags}
-      actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setViewTab('attributes')}><Settings2 className="size-4" />Manage Global Attributes</Button><Button onClick={createCategory}><Plus className="size-4" />Add Category</Button></div>}
+      actions={<Button onClick={viewTab === 'categories' ? createCategory : createAttribute}><Plus className="size-4" />{viewTab === 'categories' ? 'Add Category' : 'Add Attribute'}</Button>}
     />
 
     <Tabs value={viewTab} onValueChange={value => { setViewTab(value as ViewTab); setSearch(''); }}>
       <TabsList className="h-11 w-full justify-start rounded-none border-b bg-transparent p-0">
-        <TabsTrigger value="categories" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"><FolderTree className="size-4" />Master Categories</TabsTrigger>
-        <TabsTrigger value="attributes" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"><Layers3 className="size-4" />Global Attribute Sets</TabsTrigger>
+        <TabsTrigger value="categories" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><FolderTree className="size-4" />Categories</TabsTrigger>
+        <TabsTrigger value="attributes" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><Layers3 className="size-4" />Attributes</TabsTrigger>
       </TabsList>
 
       <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div className="relative max-w-xl flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder={viewTab === 'categories' ? 'Search category paths or required attributes...' : 'Search global attribute definitions...'} className="pl-9" /></div>
-          <p className="text-xs text-slate-500">{viewTab === 'categories' ? `${rows.length} master categories` : `${filteredAttributes.length} reusable attribute sets`}</p>
+          <p className="text-xs text-slate-500">{viewTab === 'categories' ? `${rows.length} categories` : `${filteredAttributes.length} reusable attributes`}</p>
         </div>
 
         <TabsContent value="categories" className="m-0">
@@ -151,13 +197,40 @@ export default function ProductCategories() {
         </TabsContent>
 
         <TabsContent value="attributes" className="m-0">
-          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['ATTRIBUTE SET', 'FIELD TYPE', 'DEFAULT USAGE', 'ASSIGNED CATEGORIES', 'STATUS', ''].map(label => <th key={label} className="px-4 py-3 text-xs font-semibold tracking-wide text-slate-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredAttributes.map(attribute => <tr key={attribute.name} className="hover:bg-slate-50/60"><td className="px-4 py-3"><p className="text-sm font-semibold text-slate-900">{attribute.name}</p><p className="mt-1 max-w-md text-xs text-slate-500">{attribute.description}</p></td><td className="px-4 py-3 text-sm text-slate-700">{attribute.type}</td><td className="px-4 py-3"><Badge variant="outline">{attribute.usage}</Badge></td><td className="px-4 py-3 text-sm font-semibold tabular-nums text-slate-700">{attribute.categories}</td><td className="px-4 py-3"><span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><span className="size-2 rounded-full bg-emerald-500" />Active</span></td><td className="px-4 py-3 text-right"><Button variant="ghost" size="sm" onClick={() => toast({ title: 'Attribute editor', description: `${attribute.name} is ready to configure.` })}>Edit<ChevronRight className="size-4" /></Button></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['ATTRIBUTE', 'FIELD TYPE', 'USED IN', 'STATUS', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredAttributes.map(attribute => <tr key={attribute.id} tabIndex={0} onClick={() => editAttribute(attribute)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editAttribute(attribute); } }} className="cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><td className="px-4 py-3"><p className="text-sm font-semibold text-slate-900">{attribute.name}</p><p className="mt-1 max-w-md text-xs text-slate-500">{attribute.description}</p></td><td className="px-4 py-3 text-sm text-slate-700">{attribute.type}</td><td className="px-4 py-3 text-sm text-slate-700"><span className="font-semibold tabular-nums">{attribute.categories}</span> categories</td><td className="px-4 py-3"><span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', attribute.status === 'Active' ? 'text-emerald-700' : 'text-slate-500')}><span className={cn('size-2 rounded-full', attribute.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-400')} />{attribute.status}</span></td><td className="px-4 py-3 text-right"><Button variant="ghost" size="sm" onClick={event => { event.stopPropagation(); editAttribute(attribute); }}>Edit<ChevronRight className="size-4" /></Button></td></tr>)}</tbody></table></div>
+          {filteredAttributes.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">No attributes match this search.</div> : null}
         </TabsContent>
       </div>
     </Tabs>
 
     <CategoryConfigurationDrawer open={drawerOpen} category={selectedCategory} creating={isCreating} tab={drawerTab} onTabChange={setDrawerTab} onClose={() => setDrawerOpen(false)} onSave={() => { toast({ title: isCreating ? 'Category created' : 'Category configuration saved', description: isCreating ? 'The new master category is ready for attribute assignment.' : `${selectedCategory?.category} mappings and attributes were updated.` }); setDrawerOpen(false); }} />
+    <AttributeConfigurationDrawer open={attributeDrawerOpen} creating={isCreatingAttribute} value={attributeDraft} onChange={setAttributeDraft} onClose={() => setAttributeDrawerOpen(false)} onSave={() => saveAttribute(attributeDraft)} />
   </div>;
+}
+
+function AttributeConfigurationDrawer({ open, creating, value, onChange, onClose, onSave }: { open: boolean; creating: boolean; value: AttributeDefinition; onChange: (value: AttributeDefinition) => void; onClose: () => void; onSave: () => void }) {
+  const needsOptions = value.type === 'Single select' || value.type === 'Multi-select';
+  const needsUnit = value.type === 'Measurement' || value.type === 'Measurement set' || value.type === 'Number';
+
+  return <Sheet open={open} onOpenChange={nextOpen => !nextOpen && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-[560px]">
+    <SheetHeader className="border-b border-slate-200 px-6 py-5"><SheetTitle>{creating ? 'Add Attribute' : 'Edit Attribute'}</SheetTitle><SheetDescription>Define a reusable product field. Required or optional usage is configured separately for each category.</SheetDescription></SheetHeader>
+    <div className="flex-1 space-y-5 overflow-y-auto p-6 pb-28">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2"><Label htmlFor="attribute-name">Attribute Name</Label><Input id="attribute-name" value={value.name} onChange={event => onChange({ ...value, name: event.target.value, key: creating ? slugify(event.target.value).replace(/-/g, '_') : value.key })} placeholder="e.g. Material" /></div>
+        <div className="grid gap-2"><Label htmlFor="attribute-key">Internal Key</Label><Input id="attribute-key" value={value.key} onChange={event => onChange({ ...value, key: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })} placeholder="material" className="font-mono" /></div>
+      </div>
+      <div className="grid gap-2"><Label htmlFor="attribute-description">Description</Label><Textarea id="attribute-description" value={value.description} onChange={event => onChange({ ...value, description: event.target.value })} rows={3} placeholder="Explain what product information this field captures..." /></div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="grid gap-2 text-sm font-medium">Field Type<select value={value.type} onChange={event => onChange({ ...value, type: event.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal"><option>Single-line text</option><option>Rich text</option><option>Number</option><option>Single select</option><option>Multi-select</option><option>Country selector</option><option>Measurement</option><option>Measurement set</option></select></label>
+        <label className="grid gap-2 text-sm font-medium">Status<select value={value.status} onChange={event => onChange({ ...value, status: event.target.value as AttributeDefinition['status'] })} className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal"><option>Active</option><option>Inactive</option></select></label>
+      </div>
+      {needsOptions ? <div className="grid gap-2"><Label htmlFor="attribute-options">Available Values</Label><Textarea id="attribute-options" value={value.options} onChange={event => onChange({ ...value, options: event.target.value })} rows={3} placeholder="Cotton, Leather, Metal — separate values with commas" /><p className="text-xs text-slate-500">These canonical values can later be mapped to each marketplace vocabulary.</p></div> : null}
+      {needsUnit ? <div className="grid gap-2"><Label htmlFor="attribute-unit">Default Unit</Label><Input id="attribute-unit" value={value.unit} onChange={event => onChange({ ...value, unit: event.target.value })} placeholder="e.g. cm, kg, ml" /></div> : null}
+      <div className="grid gap-2"><Label htmlFor="attribute-validation">Validation Rules</Label><Input id="attribute-validation" value={value.validation} onChange={event => onChange({ ...value, validation: event.target.value })} placeholder="e.g. Maximum 100 characters" /></div>
+      {!creating ? <section className="rounded-xl border border-slate-200 p-4"><h3 className="text-sm font-semibold text-slate-900">Category Usage</h3><p className="mt-1 text-xs leading-5 text-slate-500">Used in {value.categories} categories. Open a category to change whether this attribute is required or optional.</p></section> : null}
+    </div>
+    <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={onSave} disabled={!value.name.trim() || !value.key.trim()}>{creating ? 'Create Attribute' : 'Save Attribute'}</Button></div>
+  </SheetContent></Sheet>;
 }
 
 function CategoryConfigurationDrawer({ open, category, creating, tab, onTabChange, onClose, onSave }: { open: boolean; category: CategoryRow | null; creating: boolean; tab: DrawerTab; onTabChange: (tab: DrawerTab) => void; onClose: () => void; onSave: () => void }) {
@@ -166,17 +239,17 @@ function CategoryConfigurationDrawer({ open, category, creating, tab, onTabChang
   const availableAttributes = ['Brand', 'Material', 'Color', 'Size', 'Dimensions', 'Care instructions', 'Country of origin', 'Warranty'];
 
   return <Sheet open={open} onOpenChange={value => !value && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-[650px]">
-    <SheetHeader className="border-b border-slate-200 px-6 py-5"><SheetTitle>{creating ? 'Add Master Category' : 'Configure Category'}</SheetTitle><SheetDescription>{creating ? 'Create a reusable category in the Prime OS master taxonomy.' : `${category?.group} › ${category?.category}`}</SheetDescription></SheetHeader>
+    <SheetHeader className="border-b border-slate-200 px-6 py-5"><SheetTitle>{creating ? 'Add Category' : 'Configure Category'}</SheetTitle><SheetDescription>{creating ? 'Create a category and define the product information it requires.' : `${category?.group} › ${category?.category}`}</SheetDescription></SheetHeader>
     <Tabs value={tab} onValueChange={value => onTabChange(value as DrawerTab)} className="flex min-h-0 flex-1 flex-col">
       <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b bg-white px-4 py-0">
-        <TabsTrigger value="general" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">General & Sub-categories</TabsTrigger>
-        <TabsTrigger value="attributes" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Attributes</TabsTrigger>
-        <TabsTrigger value="mapping" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Marketplace Mapping</TabsTrigger>
+        <TabsTrigger value="general" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">General & Sub-categories</TabsTrigger>
+        <TabsTrigger value="attributes" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">Attributes</TabsTrigger>
+        <TabsTrigger value="mapping" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">Marketplace Mapping</TabsTrigger>
       </TabsList>
       <div className="flex-1 overflow-y-auto p-6 pb-28">
         <TabsContent value="general" className="m-0 space-y-5"><div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-semibold text-slate-700">Parent Category<select defaultValue={group} className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal"><option>None (root category)</option><option>Fashion</option><option>Electronics</option><option>Lifestyle</option><option>Personal Care</option></select></label><label className="grid gap-2 text-sm font-semibold text-slate-700">Status<select defaultValue={category?.status ?? 'Active'} className="h-10 rounded-md border border-input bg-background px-3 text-sm font-normal"><option>Active</option><option>Inactive</option></select></label></div><div className="grid gap-2"><Label htmlFor="category-name">Category Name</Label><Input id="category-name" defaultValue={name} placeholder="e.g. Art Supplies" /></div><div className="grid gap-2"><Label htmlFor="category-slug">Slug</Label><Input id="category-slug" defaultValue={slugify(name)} placeholder="art-supplies" className="font-mono" /></div><div className="grid gap-2"><Label htmlFor="category-description">Description</Label><Textarea id="category-description" rows={4} placeholder="Describe which products belong in this category..." /></div><section className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-900">Sub-categories</h3><p className="mt-1 text-xs text-slate-500">Create child nodes under this master category.</p></div><Button variant="outline" size="sm"><Plus className="size-4" />Add Sub-category</Button></div><div className="mt-4 rounded-lg border border-dashed p-4 text-center text-xs text-slate-500">No sub-categories configured yet.</div></section></TabsContent>
 
-        <TabsContent value="attributes" className="m-0 space-y-5"><div><h3 className="text-sm font-semibold text-slate-900">Mandatory & Optional Attributes</h3><p className="mt-1 text-xs leading-5 text-slate-500">Products in this category inherit these validation requirements.</p></div><div className="space-y-2">{availableAttributes.map((attribute, index) => { const assigned = category?.attributes.includes(attribute) ?? index < 2; return <div key={attribute} className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 p-3"><Checkbox defaultChecked={assigned} aria-label={`Assign ${attribute}`} /><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{attribute}</p><p className="mt-1 text-xs text-slate-500">Global attribute set · reusable across categories</p></div><label className="flex items-center gap-2 text-xs font-semibold text-slate-600"><Switch defaultChecked={assigned && index < 4} aria-label={`Make ${attribute} mandatory`} />Required</label></div>; })}</div></TabsContent>
+        <TabsContent value="attributes" className="m-0 space-y-5"><div><h3 className="text-sm font-semibold text-slate-900">Product Attributes</h3><p className="mt-1 text-xs leading-5 text-slate-500">Assign reusable fields, then decide which ones every product in this category must complete.</p></div><div className="space-y-2">{availableAttributes.map((attribute, index) => { const assigned = category?.attributes.includes(attribute) ?? index < 2; return <div key={attribute} className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 p-3"><Checkbox defaultChecked={assigned} aria-label={`Assign ${attribute}`} /><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{attribute}</p><p className="mt-1 text-xs text-slate-500">Reusable product attribute</p></div><label className="flex items-center gap-2 text-xs font-semibold text-slate-600"><Switch defaultChecked={assigned && index < 4} aria-label={`Make ${attribute} mandatory`} />Required</label></div>; })}</div></TabsContent>
 
         <TabsContent value="mapping" className="m-0 space-y-5"><div className="rounded-xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 size-4 shrink-0 text-primary" /><div><p className="text-sm font-semibold text-slate-900">Auto-recommendation available</p><p className="mt-1 text-xs leading-5 text-slate-600">Prime OS matched this taxonomy path against connected marketplace category trees. Review each recommendation before saving.</p></div></div></div><div className="space-y-3">{[
           ['Shopee', '100630 — Hobbies & Stationery > Art Supplies', '96% match'],

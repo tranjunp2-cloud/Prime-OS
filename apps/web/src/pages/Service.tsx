@@ -432,7 +432,7 @@ function ModeRailButton({ active, label, value, icon: Icon, onClick }: {
       onClick={onClick}
       className={cn(
         'group relative flex min-h-16 items-center justify-center gap-3 border-r border-border px-3 py-2 text-left transition-colors last:border-r-0 lg:min-h-[92px] lg:flex-col lg:border-b lg:border-r-0',
-        active ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       <Icon className="size-4" />

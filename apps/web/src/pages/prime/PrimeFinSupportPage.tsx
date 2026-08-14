@@ -945,7 +945,7 @@ function FinanceTabs({ activeTab, onChange, copy }: { activeTab: FinanceSupportT
                 onClick={() => onChange(tab.id)}
                 className={cn(
                   'rounded-md px-2.5 py-1.5 text-xs font-medium transition',
-                  activeTab === tab.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  activeTab === tab.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 )}
               >
                 {copy.tabs[tab.id]}
@@ -1594,7 +1594,7 @@ function LoanProfileWizard({
                     onClick={() => onStepChange(index)}
                     className={cn(
                       'w-full rounded-lg border px-3 py-2.5 text-left transition-colors',
-                      active ? 'border-primary/35 bg-primary/10 text-foreground shadow-sm ring-2 ring-primary/10' : 'border-transparent text-muted-foreground hover:border-border hover:bg-background',
+                      active ? 'border-primary/35 bg-primary/10 text-primary shadow-sm ring-2 ring-primary/10' : 'border-transparent text-muted-foreground hover:border-border hover:bg-background',
                     )}
                   >
                     <div className="flex min-w-0 items-center gap-2 text-sm font-semibold">

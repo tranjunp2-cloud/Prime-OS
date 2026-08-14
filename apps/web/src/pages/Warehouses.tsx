@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowRightLeft,
+  Boxes,
   Building2,
   Check,
   Info,
@@ -27,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getWarehouses } from '@/lib/warehouse-store';
 
 type MappingTab = 'channel' | 'physical';
 type WarehouseSection = 'mapping' | 'stock' | 'transfers' | 'adjustments';
@@ -51,20 +53,25 @@ type PhysicalWarehouse = {
 };
 
 const channelLocations = [
-  { channel: 'Shopee', mark: 'S', tone: 'text-orange-600', location: 'Shopee HCM Dispatch', linked: 'HCM Central', pickup: true, returns: true },
-  { channel: 'Lazada', mark: 'L', tone: 'text-violet-600', location: 'Lazada South Hub', linked: 'Binh Duong DC', pickup: true, returns: false },
-  { channel: 'PrimeWeb', mark: 'PW', tone: 'text-indigo-600', location: 'PrimeWeb Online Store', linked: 'HCM Central', pickup: true, returns: true },
-  { channel: 'PrimePOS', mark: 'POS', tone: 'text-sky-700', location: 'District 1 Store', linked: 'District 1 Branch', pickup: true, returns: true },
+  { channel: 'Shopee', mark: 'S', tone: 'text-orange-600', location: 'Shopee Malaysia Fulfillment', linked: 'Fulfillment By Shopee Malaysia', pickup: true, returns: true },
+  { channel: 'Lazada', mark: 'L', tone: 'text-violet-600', location: 'Lazada Vietnam Hub', linked: 'Vietnam 3PL Partner', pickup: true, returns: false },
+  { channel: 'PrimeWeb', mark: 'PW', tone: 'text-indigo-600', location: 'PrimeWeb Online Store', linked: 'CyberRecord Japan HQ', pickup: true, returns: true },
+  { channel: 'PrimePOS', mark: 'POS', tone: 'text-sky-700', location: 'Singapore Retail Outlet', linked: 'Reseller Singapore', pickup: true, returns: true },
   { channel: 'Amazon', mark: 'a', tone: 'text-slate-950', location: 'Amazon JP Merchant Node', linked: null, pickup: false, returns: false },
   { channel: 'Rakuten', mark: 'R', tone: 'text-red-600', location: 'Rakuten Tokyo Store', linked: null, pickup: false, returns: true },
 ];
 
-const initialWarehouses: PhysicalWarehouse[] = [
-  { id: 'wh-hcm', name: 'HCM Central Warehouse', code: 'WH-HCM-01', address: '12 Nguyen Van Linh, District 7, Ho Chi Minh City', region: 'South', type: 'Self-managed', skus: 1240, onHand: 52140, reserved: 5840, inTransit: 1860, damaged: 245, safety: 1100, channels: ['PW', 'POS', 'S'], rank: 1, role: 'Primary' },
-  { id: 'wh-bd', name: 'Binh Duong Distribution Center', code: 'WH-BD-02', address: 'VSIP 1, Thuan An, Binh Duong', region: 'South', type: '3PL / Marketplace', skus: 986, onHand: 36720, reserved: 3980, inTransit: 2400, damaged: 184, safety: 900, channels: ['S', 'L'], rank: 2, role: 'Backup' },
-  { id: 'wh-hn', name: 'Hanoi Fulfillment Hub', code: 'WH-HN-01', address: '38 Long Bien, Hanoi', region: 'North', type: 'Self-managed', skus: 742, onHand: 22480, reserved: 2630, inTransit: 970, damaged: 112, safety: 900, channels: ['PW', 'S', 'L'], rank: 3, role: 'Regional' },
-  { id: 'br-d1', name: 'District 1 Branch', code: 'BR-D1-01', address: '84 Nguyen Hue, District 1, Ho Chi Minh City', region: 'South', type: 'Self-managed', skus: 318, onHand: 5480, reserved: 780, inTransit: 340, damaged: 35, safety: 420, channels: ['POS'], rank: 4, role: 'Store' },
+const inventoryMetrics = [
+  { skus: 1240, onHand: 52140, reserved: 5840, inTransit: 1860, damaged: 245, safety: 1100, channels: ['PW', 'A'], role: 'Primary' },
+  { skus: 986, onHand: 36720, reserved: 3980, inTransit: 2400, damaged: 184, safety: 900, channels: ['POS'], role: 'Regional' },
+  { skus: 742, onHand: 22480, reserved: 2630, inTransit: 970, damaged: 112, safety: 900, channels: ['S'], role: 'Marketplace' },
+  { skus: 318, onHand: 5480, reserved: 780, inTransit: 340, damaged: 35, safety: 420, channels: ['L'], role: '3PL' },
+  { skus: 684, onHand: 18940, reserved: 2140, inTransit: 620, damaged: 76, safety: 700, channels: ['A'], role: 'Marketplace' },
 ];
+const initialWarehouses: PhysicalWarehouse[] = getWarehouses().map((warehouse, index) => {
+  const metrics = inventoryMetrics[index] ?? inventoryMetrics[0];
+  return { id: warehouse.id, name: warehouse.name, code: warehouse.code, address: warehouse.address ?? 'Address managed by marketplace', region: warehouse.country, type: warehouse.type === 'internal' ? 'Self-managed' : '3PL / Marketplace', ...metrics, rank: index + 1 };
+});
 
 const stockRows = [
   { sku: 'PRIME-LAMP-001', product: 'Compact Smart Lamp', warehouse: 'HCM Central Warehouse', onHand: 520, reserved: 86, inTransit: 120, damaged: 4, safety: 40 },
@@ -129,16 +136,42 @@ export default function Warehouses() {
 
   const filteredWarehouses = useMemo(() => warehouses.filter((warehouse) => !search || `${warehouse.name} ${warehouse.code} ${warehouse.address} ${warehouse.region} ${warehouse.type}`.toLowerCase().includes(search.toLowerCase())), [search, warehouses]);
   const filteredStock = useMemo(() => stockRows.filter((row) => !search || `${row.sku} ${row.product} ${row.warehouse}`.toLowerCase().includes(search.toLowerCase())), [search]);
+  const header = {
+    mapping: {
+      title: 'Warehouses & Mapping',
+      description: 'Manage physical locations, channel mappings, and fulfillment routing rules.',
+      icon: WarehouseIcon,
+      actions: <Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Add Physical Warehouse</Button>,
+    },
+    stock: {
+      title: 'Inventory Overview',
+      description: 'Monitor sellable and non-sellable stock across every physical location.',
+      icon: Boxes,
+      actions: <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setOperation('adjustment')}><ClipboardCheck className="size-4" />Adjust Stock</Button><Button onClick={() => setOperation('transfer')}><ArrowRightLeft className="size-4" />Transfer Stock</Button></div>,
+    },
+    transfers: {
+      title: 'Stock Transfers',
+      description: 'Move inventory between locations and track every fulfillment milestone.',
+      icon: ArrowRightLeft,
+      actions: undefined,
+    },
+    adjustments: {
+      title: 'Stock Adjustments',
+      description: 'Review auditable inventory changes, reason codes, and operator ownership.',
+      icon: ClipboardCheck,
+      actions: undefined,
+    },
+  }[section];
 
   return <TooltipProvider delayDuration={150}><div className="space-y-5 p-4 md:p-6">
     <WorkspacePageHeader
-      title="Warehouse & Inventory"
-      description="Map fulfillment nodes, monitor sellable stock, and control warehouse movements."
-      icon={WarehouseIcon}
-      actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setOperation('adjustment')}><ClipboardCheck className="size-4" />Adjust Stock</Button><Button onClick={() => setOperation('transfer')}><ArrowRightLeft className="size-4" />Transfer Stock</Button></div>}
+      title={header.title}
+      description={header.description}
+      icon={header.icon}
+      actions={header.actions}
     />
 
-    {section === 'mapping' && <MappingSection mappingTab={mappingTab} setMappingTab={setMappingTab} warehouses={warehouses} filteredWarehouses={filteredWarehouses} search={search} setSearch={setSearch} onAdd={() => setCreateOpen(true)} onOpenWarehouse={setDetailWarehouse} onLink={(locationName) => toast({ title: 'Warehouse linker opened', description: `Select a physical node for ${locationName}.` })} />}
+    {section === 'mapping' && <MappingSection mappingTab={mappingTab} setMappingTab={setMappingTab} warehouses={warehouses} filteredWarehouses={filteredWarehouses} search={search} setSearch={setSearch} onOpenWarehouse={setDetailWarehouse} onLink={(locationName) => toast({ title: 'Warehouse linker opened', description: `Select a physical node for ${locationName}.` })} />}
     {section === 'stock' && <StockLevels search={search} setSearch={setSearch} rows={filteredStock} onOpenWarehouse={(name) => setDetailWarehouse(warehouses.find((item) => item.name === name) ?? null)} />}
     {section === 'transfers' && <TransferList onCreate={() => setOperation('transfer')} />}
     {section === 'adjustments' && <AdjustmentList onCreate={() => setOperation('adjustment')} />}
@@ -153,16 +186,16 @@ export default function Warehouses() {
   </div></TooltipProvider>;
 }
 
-function MappingSection({ mappingTab, setMappingTab, warehouses, filteredWarehouses, search, setSearch, onAdd, onOpenWarehouse, onLink }: { mappingTab: MappingTab; setMappingTab: (tab: MappingTab) => void; warehouses: PhysicalWarehouse[]; filteredWarehouses: PhysicalWarehouse[]; search: string; setSearch: (value: string) => void; onAdd: () => void; onOpenWarehouse: (warehouse: PhysicalWarehouse) => void; onLink: (name: string) => void }) {
+function MappingSection({ mappingTab, setMappingTab, warehouses, filteredWarehouses, search, setSearch, onOpenWarehouse, onLink }: { mappingTab: MappingTab; setMappingTab: (tab: MappingTab) => void; warehouses: PhysicalWarehouse[]; filteredWarehouses: PhysicalWarehouse[]; search: string; setSearch: (value: string) => void; onOpenWarehouse: (warehouse: PhysicalWarehouse) => void; onLink: (name: string) => void }) {
   const [routingRules, setRoutingRules] = useState({ geographic: true, fallback: true, split: false });
   return <div className="space-y-4">
     <div><h2 className="text-lg font-semibold text-slate-900">Warehouse Mapping & Routing</h2><p className="mt-1 text-sm text-slate-500">Connect channel locations to physical nodes and define fulfillment priority.</p></div>
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Warehouse mapping type">
-      {[{ key: 'channel' as const, label: 'Channel Locations', count: channelLocations.length }, { key: 'physical' as const, label: 'Physical Warehouses', count: warehouses.length }].map((item) => <button key={item.key} type="button" onClick={() => setMappingTab(item.key)} className={cn('relative min-h-11 shrink-0 px-4 text-sm font-semibold transition-colors', mappingTab === item.key ? 'text-indigo-700 after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-indigo-600' : 'text-slate-500 hover:text-slate-900')}>{item.label}<span className="ml-2 text-xs tabular-nums text-slate-400">{item.count}</span></button>)}
+      {[{ key: 'channel' as const, label: 'Channel Locations', count: channelLocations.length }, { key: 'physical' as const, label: 'Physical Warehouses', count: warehouses.length }].map((item) => <button key={item.key} type="button" onClick={() => setMappingTab(item.key)} className={cn('relative min-h-11 shrink-0 px-4 text-sm font-semibold transition-colors', mappingTab === item.key ? 'text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-slate-500 hover:text-slate-900')}>{item.label}<span className={cn('ml-2 text-xs tabular-nums', mappingTab === item.key ? 'text-primary/75' : 'text-slate-400')}>{item.count}</span></button>)}
     </nav>
     {mappingTab === 'channel'
       ? <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><SectionHeading title="Channel warehouse mapping" description="Marketplace dispatch and return locations linked to physical stock nodes." /><div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left"><TableHead headers={['Store & Channel', 'Channel Warehouse Name', 'Linked Physical Warehouse', 'Default Pick-up', 'Default Return', 'Actions']} /><tbody className="divide-y divide-slate-100">{channelLocations.map((item) => <tr key={item.location} className="hover:bg-slate-50/60"><td className="px-4 py-3"><span className="inline-flex items-center gap-2"><BrandMark mark={item.mark} tone={item.tone} /><span className="text-sm font-semibold text-slate-900">{item.channel}</span></span></td><td className="px-4 py-3 text-sm font-medium text-slate-700">{item.location}</td><td className="px-4 py-3">{item.linked ? <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><WarehouseIcon className="size-3.5" />{item.linked}</span> : <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700"><AlertTriangle className="size-3.5" />Unmapped</span>}</td><td className="px-4 py-3"><AddressIndicator active={item.pickup} /></td><td className="px-4 py-3"><AddressIndicator active={item.returns} /></td><td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={() => onLink(item.location)}><Link2 className="size-4" />Link Warehouse</Button></td></tr>)}</tbody></table></div></section>
-      : <><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><SearchField value={search} onChange={setSearch} placeholder="Search by warehouse name, code, address, type, or region..." /><Button onClick={onAdd}><Plus className="size-4" />Add Physical Warehouse</Button></div><PhysicalWarehouseTable warehouses={filteredWarehouses} onOpen={onOpenWarehouse} /></>}
+      : <><SearchField value={search} onChange={setSearch} placeholder="Search by warehouse name, code, address, type, or region..." /><PhysicalWarehouseTable warehouses={filteredWarehouses} onOpen={onOpenWarehouse} /></>}
     <section className="rounded-xl border border-slate-200 bg-white">
       <SectionHeading title="Smart routing rules" description="Apply automatic routing after channel-to-warehouse mapping is resolved." />
       <div className="grid divide-y divide-slate-100 lg:grid-cols-3 lg:divide-x lg:divide-y-0">

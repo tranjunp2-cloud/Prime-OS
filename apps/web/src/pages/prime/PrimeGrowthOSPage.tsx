@@ -1785,12 +1785,12 @@ function ScheduledFilter({
           type="button"
           className={cn(
             'flex h-8 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors',
-            value === item.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            value === item.id ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
           )}
           onClick={() => onChange(item.id)}
         >
           {item.label}
-          <span className="text-xs text-muted-foreground">{counts[item.id]}</span>
+          <span className={cn('text-xs', value === item.id ? 'text-primary/80' : 'text-muted-foreground')}>{counts[item.id]}</span>
         </button>
       ))}
     </div>
@@ -2916,7 +2916,7 @@ function CosRailItem({ active = false, label, value, icon: Icon, onClick }: {
       aria-pressed={active}
       className={cn(
         'group flex min-h-[92px] w-full flex-col items-center justify-center gap-3 border-b border-border px-3 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        active ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       <Icon className="size-4" />
@@ -4899,7 +4899,7 @@ function FinanceRailItem({ active = false, label, value, icon: Icon, onClick }: 
       aria-pressed={active}
       className={cn(
         'group flex min-h-[92px] w-full flex-col items-center justify-center gap-3 border-b border-border px-2 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        active ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       <Icon className="size-4" />

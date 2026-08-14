@@ -524,7 +524,7 @@ export default function Account() {
                   key={tab.value}
                   value={tab.value}
                   onClick={() => changeTab(tab.value)}
-                  className="h-11 gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground"
+                  className="h-11 gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
                 >
                   <tab.icon className="size-4" />
                   {tab.label}

@@ -24,7 +24,7 @@ export interface ChannelOverride {
 }
 
 export interface ChannelListing {
-  channel: 'rakuten' | 'shopee' | 'amazon' | 'website';
+  channel: 'website' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
   external_id: string | null;
   status: 'active' | 'inactive' | 'pending';
   listing_url: string | null;
@@ -77,7 +77,7 @@ export interface Product {
   has_variants: boolean;
   // Channels (marketplace listings)
   channels: ChannelListing[];
-  channel_overrides?: Partial<Record<'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social', ChannelOverride>>;
+  channel_overrides?: Partial<Record<'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten', ChannelOverride>>;
   // Workflow
   status: 'draft' | 'review' | 'published' | 'archived';
   created_at: string;
@@ -209,7 +209,7 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '9603400000',
     images: [IMG('B0FQHTSM8B')],
-    inventory: { wh_crjp: 60, wh_rslsg: 15, wh_fbsmy: 10 },
+    inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2 },
     has_variants: false,
     channels: [
       { channel: 'amazon', external_id: 'B0FQHTSM8B', status: 'active', listing_url: null, last_synced_at: null },
@@ -291,7 +291,7 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '9017200000',
     images: [IMG('B0FH6LHSXD')],
-    inventory: { wh_crjp: 80, wh_rslsg: 20 },
+    inventory: { wh_crjp: 0, wh_rslsg: 0 },
     has_variants: false,
     channels: [
       { channel: 'rakuten', external_id: 'R001002002', status: 'active', listing_url: null, last_synced_at: null },

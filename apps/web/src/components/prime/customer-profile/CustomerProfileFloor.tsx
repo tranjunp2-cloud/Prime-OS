@@ -1269,7 +1269,7 @@ function AccountProfileDialog({
                 ['activity', 'Activity & risk'],
                 ['links', 'Future links'],
               ].map(([value, label]) => (
-                <TabsTrigger key={value} value={value} className="h-12 rounded-none border-b-2 border-transparent bg-transparent px-3 data-[state=active]:border-primary data-[state=active]:shadow-none">
+                <TabsTrigger key={value} value={value} className="h-12 rounded-none border-b-2 border-transparent bg-transparent px-3 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">
                   {label}
                 </TabsTrigger>
               ))}

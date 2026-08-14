@@ -70,7 +70,7 @@ Confirm that you have administrator access to the marketplace seller account. Pr
 
 ## Verify the first sync
 
-The connection is ready when the store status is **Connected** and the latest sync shows no errors. Catalog items remain unpublished until you explicitly push them from the Master Catalog.
+The connection is ready when the store status is **Connected** and the latest sync shows no errors. Catalog items remain unpublished until you explicitly push them from Product Master.
 
 ### If authorization fails
 
@@ -124,7 +124,7 @@ Choose **Publish**, enter a short version note, and confirm the target domain. P
 
 ## Validate the live site
 
-Open the storefront in a private browser window and test one product page and the cart. Product data is sourced from the Main Workspace Master Catalog.
+Open the storefront in a private browser window and test one product page and the cart. Product data is sourced from Main Workspace Product Master.
 
 ### Roll back
 

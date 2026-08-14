@@ -17,11 +17,12 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { addProduct, updateProduct, getProductById, getAllSkus, type Product, type ChannelListing, type ProductType } from '@/lib/product-store';
+import { getWarehouses } from '@/lib/warehouse-store';
 import type { AmazonVariant } from '@/lib/amazon-catalog';
-import { ChannelListingPanel } from '@/components/products/ChannelListingPanel';
 import { uploadProductImage, validateImageFile } from '@/lib/product-images';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { formatLocalizedNumber, formatMessage } from '@/lib/i18n/format';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ interface VariantItem {
   image_url: string;
 }
 
-type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social';
+type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
 interface ChannelOverrideForm { enabled: boolean; title: string; price_markup: string; description: string }
 
 interface FormState {
@@ -77,13 +78,7 @@ interface FormState {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const WAREHOUSES = [
-  { id: 'wh_crjp', label: 'CR-JP (Japan)', code: 'JP' },
-  { id: 'wh_rslsg', label: 'RSL-SG (Singapore)', code: 'SG' },
-  { id: 'wh_fbsmy', label: 'FBS-MY (Malaysia)', code: 'MY' },
-  { id: 'wh_3plvn', label: '3PL-VN (Vietnam)', code: 'VN' },
-  { id: 'wh_fbajp', label: 'FBA-JP (Amazon Japan)', code: 'JP' },
-];
+const WAREHOUSES = getWarehouses().map(warehouse => ({ id: warehouse.id, label: warehouse.name, code: warehouse.code }));
 const CONDITIONS = ['new', 'refurbished', 'used_like_new', 'used_acceptable'];
 const CURRENCIES = ['JPY', 'USD', 'SGD', 'MYR', 'VND'];
 const COUNTRIES = ['JP', 'CN', 'KR', 'US', 'SG', 'MY', 'VN', 'TW', 'TH', 'ID'];
@@ -100,8 +95,20 @@ const OVERRIDE_CHANNELS: Array<{
   { key: 'lazada', label: 'Lazada', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-blue-50 text-blue-600' },
   { key: 'tiktok', label: 'TikTok Shop', description: 'Social commerce', icon: MonitorSmartphone, iconClassName: 'bg-slate-100 text-slate-700' },
   { key: 'amazon', label: 'Amazon', description: 'Global marketplace', icon: ShoppingBag, iconClassName: 'bg-amber-50 text-amber-700' },
+  { key: 'rakuten', label: 'Rakuten', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-rose-50 text-rose-700' },
   { key: 'social', label: 'Social Inbox', description: 'Chat-assisted sales', icon: MessageSquare, iconClassName: 'bg-sky-50 text-sky-600' },
 ];
+
+const listingChannelByOverride: Record<OverrideChannel, ChannelListing['channel']> = {
+  webstore: 'website',
+  pos: 'pos',
+  shopee: 'shopee',
+  lazada: 'lazada',
+  tiktok: 'tiktok',
+  amazon: 'amazon',
+  social: 'social',
+  rakuten: 'rakuten',
+};
 const CATEGORIES = [
   'Watch', 'Shoe', 'Bag', 'Hat', 'Jacket', 'Sunglasses',
   'Bicycle', 'Headphones', 'Electronics', 'Food & Beverages',
@@ -156,6 +163,29 @@ function cartesian<T>(arrs: T[][]): T[][] {
     (acc, arr) => acc.flatMap(x => arr.map(v => [...x, v])),
     [[]]
   );
+}
+
+function hydrateExistingVariants(product: Product | null): { groups: VariantGroup[]; items: VariantItem[] } {
+  if (!product?.has_variants || product.skus.length === 0) return { groups: [], items: [] };
+  const parsed = product.skus.map(sku => sku.variation_name.split('/').map(value => value.trim()).filter(Boolean));
+  const optionCount = Math.min(2, Math.max(...parsed.map(values => values.length), 1));
+  const groups = Array.from({ length: optionCount }, (_, index) => ({
+    id: `existing-option-${index + 1}`,
+    name: `Option ${index + 1}`,
+    values: Array.from(new Set(parsed.map(values => values[index]).filter(Boolean))),
+  }));
+  const aggregateStock = Object.values(product.inventory).reduce((total, value) => total + Number(value || 0), 0);
+  const baseStock = Math.floor(aggregateStock / product.skus.length);
+  const remainder = aggregateStock % product.skus.length;
+  const items = product.skus.map((sku, index) => ({
+    key: sku.variation_name || sku.sku_code,
+    sku_code: sku.sku_code,
+    price: String(sku.price ?? product.retail_price),
+    stock: String(sku.stock ?? baseStock + (index < remainder ? 1 : 0)),
+    selected: sku.status === 'active',
+    image_url: sku.image_url ?? '',
+  }));
+  return { groups, items };
 }
 
 // ─── Field Helpers ─────────────────────────────────────────────────────────────
@@ -1084,15 +1114,11 @@ export default function ProductCreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  // Channel listings
-  const [channels, setChannels] = useState<ChannelListing[]>(
-    existingProduct?.channels ?? []
-  );
   const [packageWeightUnit, setPackageWeightUnit] = useState<'g' | 'kg'>('g');
   const [channelOverrides, setChannelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
     const saved = existingProduct?.channel_overrides;
     const make = (key: OverrideChannel): ChannelOverrideForm => ({
-      enabled: saved?.[key]?.enabled ?? false,
+      enabled: saved?.[key]?.enabled ?? Boolean(existingProduct?.channels.some(listing => listing.channel === listingChannelByOverride[key])),
       title: saved?.[key]?.title ?? '',
       price_markup: saved?.[key]?.price_markup ? String(saved[key]?.price_markup) : '',
       description: saved?.[key]?.description ?? '',
@@ -1125,8 +1151,8 @@ export default function ProductCreatePage() {
   );
 
   // Variant state
-  const [variantGroups, setVariantGroups] = useState<VariantGroup[]>([]);
-  const [variantItems, setVariantItems] = useState<VariantItem[]>([]);
+  const [variantGroups, setVariantGroups] = useState<VariantGroup[]>(() => hydrateExistingVariants(existingProduct).groups);
+  const [variantItems, setVariantItems] = useState<VariantItem[]>(() => hydrateExistingVariants(existingProduct).items);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; target: Exclude<ProductType, 'variant'> }>({ open: false, target: 'single' });
 
   function setField<K extends keyof FormState>(k: K, v: FormState[K]) {
@@ -1252,6 +1278,18 @@ export default function ProductCreatePage() {
       }));
 
     const variantRetailPrices = variants.map(variant => variant.price).filter(price => price > 0);
+    const selectedChannels: ChannelListing[] = OVERRIDE_CHANNELS
+      .filter(channel => channelOverrides[channel.key].enabled)
+      .map(channel => {
+        const listingChannel = listingChannelByOverride[channel.key];
+        return existingProduct?.channels.find(listing => listing.channel === listingChannel) ?? {
+          channel: listingChannel,
+          external_id: null,
+          status: 'pending' as const,
+          listing_url: null,
+          last_synced_at: null,
+        };
+      });
     const payload: Product = {
       id: existingProduct?.id ?? genId('prod'),
       sku_code: form.sku_code.trim().toUpperCase(),
@@ -1287,7 +1325,7 @@ export default function ProductCreatePage() {
       specifications: specifications.filter(item => item.name.trim() && item.value.trim()).map(({ name, value }) => ({ name: name.trim(), value: value.trim() })),
       inventory: Object.fromEntries(Object.entries(inventory).map(([k, v]) => [k, num(v)])),
       has_variants: form.has_variants,
-      channels,
+      channels: selectedChannels,
       channel_overrides: Object.fromEntries(Object.entries(channelOverrides).map(([key, value]) => [key, {
         enabled: value.enabled,
         title: value.title.trim(),
@@ -1360,10 +1398,26 @@ export default function ProductCreatePage() {
       detail: !override.enabled ? 'Not selected' : !masterDataReady ? 'Complete the required master product data' : incompleteOverride ? 'Complete or clear the optional overrides' : '100% Ready',
     } as const;
   });
+  const completedSpecifications = specifications.filter(item => item.name.trim() && item.value.trim()).length;
+  const requiredAttributeCount = [
+    form.name.trim().length >= 3,
+    Boolean(form.sku_code.trim()),
+    form.description.trim().length >= 100,
+    Boolean(form.category),
+    pricingAndInventoryReady,
+    logisticsReady,
+    Boolean(form.country_of_origin),
+    images.length >= 3,
+    form.has_variants ? hasGeneratedVariants : true,
+    Object.values(channelOverrides).some(item => item.enabled),
+  ].filter(Boolean).length;
+  const recommendedAttributeCount = [form.gtin, form.mpn, form.model_number, form.brand, form.asin, form.manufacturer, form.original_price, form.prod_length, form.prod_height, form.prod_width, form.prod_weight, form.hs_code, form.slug, form.meta_title, form.meta_description].filter(value => String(value).trim()).length;
+  const completedAttributeCount = requiredAttributeCount + recommendedAttributeCount + completedSpecifications;
+  const totalAttributeCount = 45;
   const selectedCategoryGroup = CATEGORY_TREE.find(item => item.label === categoryLevelOne) ?? CATEGORY_TREE[0];
   const selectedCategorySubgroup = selectedCategoryGroup.children.find(item => item.label === categoryLevelTwo) ?? selectedCategoryGroup.children[0];
   const matchingCategoryPaths = CATEGORY_TREE.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group: group.label, subgroup: subgroup.label, leaf })))).filter(item => !categorySearch.trim() || `${item.group} ${item.subgroup} ${item.leaf}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
-  const currentSnapshot = JSON.stringify({ form, inventory, images, imageAltTexts, variantGroups, variantItems, channels, channelOverrides, specifications });
+  const currentSnapshot = JSON.stringify({ form, inventory, images, imageAltTexts, variantGroups, variantItems, channelOverrides, specifications });
   latestSnapshotRef.current = currentSnapshot;
   const isDirty = dirtyTrackingReady && currentSnapshot !== baselineSnapshotRef.current;
 
@@ -1767,19 +1821,19 @@ export default function ProductCreatePage() {
               </CardContent>
             </Card>
 
-            {/* Show Attributes */}
+            {/* Product data coverage */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">{copy.showAttributes}</CardTitle>
+                <CardTitle className="text-sm">Product Data Coverage</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {[['all', copy.all, 50], ['required', copy.required, 10], ['recommended', copy.recommended, 15]].map(([val, label, count]) => (
-                  <label key={val as string} className="flex items-center gap-2.5 cursor-pointer">
-                    <input type="radio" name="show-attr" defaultChecked={val === 'all'} className="accent-primary" />
-                    <span className="text-sm">{label}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">{formatMessage(copy.showAll, { count: count as number })}</span>
-                  </label>
-                ))}
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">All fields</span><span className="font-semibold tabular-nums">{completedAttributeCount}/{totalAttributeCount}</span></div>
+                <Progress value={(completedAttributeCount / totalAttributeCount) * 100} className="h-1.5" />
+                <div className="space-y-2 border-t pt-3 text-xs">
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Required</span><span className={cn('font-semibold tabular-nums', requiredAttributeCount === 10 ? 'text-emerald-700' : 'text-amber-700')}>{requiredAttributeCount}/10</span></div>
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Recommended</span><span className="font-semibold tabular-nums">{recommendedAttributeCount}/15</span></div>
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Custom specifications</span><span className="font-semibold tabular-nums">{completedSpecifications}/20</span></div>
+                </div>
               </CardContent>
             </Card>
 
@@ -1868,12 +1922,6 @@ export default function ProductCreatePage() {
                 {images.length > 0 ? <div className="space-y-2 border-t pt-3"><p className="text-xs font-medium">Image alt text</p>{images.map((url, index) => <div key={`${url}-alt`} className="flex items-center gap-2"><img src={url} alt="" className="size-8 rounded border object-cover" /><Input value={imageAltTexts[index] ?? ''} maxLength={125} onChange={event => setImageAltTexts(current => { const next = [...current]; next[index] = event.target.value; return next; })} placeholder={`Describe image ${index + 1}`} aria-label={`Alt text for image ${index + 1}`} className="h-8 text-xs" /></div>)}</div> : null}
               </CardContent>
             </Card>
-
-            {/* Channel Listing Panel */}
-            <ChannelListingPanel
-              channels={channels}
-              onChannelsChange={setChannels}
-            />
 
             {/* Inventory Information */}
             <Card>

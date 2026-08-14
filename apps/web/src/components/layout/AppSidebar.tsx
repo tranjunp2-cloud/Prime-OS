@@ -67,14 +67,13 @@ const mainNavigation: NavGroup[] = [
   { id: 'operations', label: 'Operations', items: [
     { id: 'orders', label: 'Orders', href: '/orders', icon: ShoppingBag },
     { id: 'products', label: 'Products', icon: Package, children: [
-      { id: 'master-catalog', label: 'Master Catalog', href: '/products/master-catalog', icon: Boxes },
+      { id: 'master-catalog', label: 'Product Master', href: '/products/master-catalog', icon: Boxes },
       { id: 'product-categories', label: 'Categories & Attributes', href: '/products/categories', icon: Tags },
     ] },
-    { id: 'warehouse', label: 'Warehouse', icon: Warehouse, children: [
-      { id: 'warehouse-mapping', label: 'Warehouse Mapping', href: '/warehouse/mapping', icon: Link2 },
-      { id: 'warehouse-stock', label: 'Stock Levels', href: '/warehouse/stock', icon: Boxes },
+    { id: 'warehouse', label: 'Warehouses', icon: Warehouse, children: [
+      { id: 'warehouse-mapping', label: 'Locations & Mapping', href: '/warehouse/mapping', icon: Link2 },
       { id: 'warehouse-transfers', label: 'Stock Transfers', href: '/warehouse/transfers', icon: ArrowRightLeft },
-      { id: 'warehouse-adjustments', label: 'Adjustments', href: '/warehouse/adjustments', icon: ClipboardCheck },
+      { id: 'warehouse-adjustments', label: 'Stock Adjustments', href: '/warehouse/adjustments', icon: ClipboardCheck },
     ] },
     { id: 'channels', label: 'Sales Channels', icon: Store, children: [
       { id: 'connected-channels', label: 'Connected Channels', href: '/sales-channels/connected-channels', icon: Store },

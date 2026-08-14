@@ -162,7 +162,7 @@ export default function Orders() {
     </section> : null}
 
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Order lifecycle">
-      {statuses.map((item) => <button key={item.key} type="button" onClick={() => setLifecycleStatus(item.key)} className={cn('relative min-h-11 shrink-0 px-3 text-sm font-semibold transition-colors', status === item.key ? 'text-indigo-700 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-indigo-600' : 'text-slate-500 hover:text-slate-900')}>{item.label}<span className={cn('ml-1.5 text-xs tabular-nums', status === item.key ? 'text-indigo-500' : 'text-slate-400')}>{item.count}</span></button>)}
+      {statuses.map((item) => <button key={item.key} type="button" onClick={() => setLifecycleStatus(item.key)} className={cn('relative min-h-11 shrink-0 px-3 text-sm font-semibold transition-colors', status === item.key ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-slate-500 hover:text-slate-900')}>{item.label}<span className={cn('ml-1.5 text-xs tabular-nums', status === item.key ? 'text-primary/75' : 'text-slate-400')}>{item.count}</span></button>)}
     </nav>
 
     <div className="min-w-0 space-y-4">

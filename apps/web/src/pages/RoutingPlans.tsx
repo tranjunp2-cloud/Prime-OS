@@ -52,7 +52,7 @@ export default function RoutingPlans() {
                   <TabsTrigger
                     key={wh.id}
                     value={wh.id}
-                    className="w-full justify-start text-left px-3 py-2 h-auto data-[state=active]:bg-primary/10"
+                    className="h-auto w-full justify-start px-3 py-2 text-left data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
                   >
                     <div className="flex items-center gap-2 w-full">
                       <span className={`size-2 rounded-full flex-shrink-0 ${wh.status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`} />

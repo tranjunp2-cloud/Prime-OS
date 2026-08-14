@@ -161,7 +161,7 @@ export default function ConnectConversationModal({ open, onOpenChange, onLinked 
                   <span className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-indigo-600 text-white' : complete ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
                     {complete ? <Check className="size-4" /> : number}
                   </span>
-                  <span className={`hidden truncate text-xs font-semibold sm:block ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+                  <span className={`hidden truncate text-xs font-semibold sm:block ${active ? 'text-primary' : 'text-muted-foreground'}`}>{label}</span>
                 </li>
               );
             })}

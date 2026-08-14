@@ -71,7 +71,7 @@ export function WorkspaceTabBar({ onNavigate, onOpenProductSettings }: { onNavig
               className={cn(
                 'group flex h-7 items-center gap-2 rounded-md border px-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 tab.pinned ? 'min-w-8 max-w-8 justify-center px-0' : active ? 'min-w-[132px] max-w-[190px]' : 'min-w-[104px] max-w-[160px]',
-                active ? 'border-primary/25 bg-background text-foreground shadow-sm' : 'border-transparent text-muted-foreground hover:bg-background hover:text-foreground',
+                active ? 'border-primary/30 bg-primary/10 text-primary shadow-sm' : 'border-transparent text-muted-foreground hover:bg-background hover:text-foreground',
                 draggingTabId === tab.id && 'opacity-50'
               )}
               onClick={() => {
