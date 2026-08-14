@@ -231,7 +231,7 @@ export default function FinanceOps() {
     { type: 'CONNECTOR_DISCONNECTED', label: 'Payment Connections', description: 'Active findings for disconnected or degraded payment integrations that may delay collection updates.', icon: Network },
   ].map((card) => ({ ...card, count: risks.filter((risk) => risk.risk_type === card.type && risk.status !== 'RESOLVED').length })), [risks]);
 
-  return <main className="min-h-full bg-slate-50/60 p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1720px] space-y-5">
+  return <main className="min-h-full bg-background p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1720px] space-y-5">
     <WorkspacePageHeader title="Finance Ops" description="Operational revenue, collections control, cash forecasting, and financial risk monitoring." icon={WalletCards} actions={<Button variant="outline" disabled={loading} onClick={() => void refreshActiveView()}><RefreshCw className={cn('size-4', loading && 'animate-spin')} />Refresh Data</Button>} />
 
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Finance Ops views">{views.map((item) => <button key={item.value} type="button" onClick={() => setView(item.value)} className={cn('min-h-11 shrink-0 border-b-2 px-4 text-sm font-semibold transition-colors', view === item.value ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800')}>{item.label}{item.value === 'risk' && activeRiskCount ? <span className="ml-2 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] text-rose-700">{activeRiskCount}</span> : null}</button>)}</nav>

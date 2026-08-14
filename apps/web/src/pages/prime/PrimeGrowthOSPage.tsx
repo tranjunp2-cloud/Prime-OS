@@ -1168,8 +1168,8 @@ function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: 
     { name: 'Shopee', revenue: 48600, share: 34, color: '#635bff' },
     { name: 'Lazada', revenue: 32900, share: 23, color: '#818cf8' },
     { name: 'Tiki', revenue: 17200, share: 12, color: '#38bdf8' },
-    { name: 'Prime Web', revenue: 24300, share: 17, color: '#10b981', launch: 'Open Builder', href: '/builder/theme' },
-    { name: 'Prime POS', revenue: 14300, share: 10, color: '#f59e0b', launch: 'Open POS', href: '/pos/register' },
+    { name: 'Prime Web', revenue: 24300, share: 17, color: '#10b981', launch: 'Switch to PrimeWeb', href: '/builder/theme' },
+    { name: 'Prime POS', revenue: 14300, share: 10, color: '#f59e0b', launch: 'Switch to POS', href: '/pos/register' },
     { name: 'Prime CRM', revenue: 5700, share: 4, color: '#f43f5e' },
   ];
   const channelSnapshot = [channels[0], channels[1], channels[3], channels[4]];
@@ -1208,7 +1208,7 @@ function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: 
           <Button asChild variant="outline" size="sm" className="shrink-0"><Link to="/client-reports">View full analytics <ArrowRight className="size-3.5" /></Link></Button>
         </div>
         <div className="grid divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
-          {channelSnapshot.map((channel) => <div key={channel.name} className="min-w-0 p-4 transition-colors hover:bg-slate-50"><div className="flex items-center gap-2"><span className="size-2.5 rounded-full" style={{ backgroundColor: channel.color }} /><span className="truncate text-sm font-semibold text-slate-700">{channel.name}</span><span className="ml-auto text-xs font-semibold text-slate-400">{channel.share}%</span></div><div className="mt-3 text-xl font-semibold text-slate-900">{currency.format(channel.revenue)}</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${Math.min(100, channel.share * 2.4)}%`, backgroundColor: channel.color }} /></div>{channel.launch ? <Button asChild variant="ghost" size="sm" className="mt-2 h-7 px-0 text-xs text-primary hover:bg-transparent"><a href={channel.href} target="_blank" rel="noreferrer">{channel.launch}<ExternalLink className="size-3" /></a></Button> : null}</div>)}
+          {channelSnapshot.map((channel) => <div key={channel.name} className="min-w-0 p-4 transition-colors hover:bg-slate-50"><div className="flex items-center gap-2"><span className="size-2.5 rounded-full" style={{ backgroundColor: channel.color }} /><span className="truncate text-sm font-semibold text-slate-700">{channel.name}</span><span className="ml-auto text-xs font-semibold text-slate-400">{channel.share}%</span></div><div className="mt-3 text-xl font-semibold text-slate-900">{currency.format(channel.revenue)}</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${Math.min(100, channel.share * 2.4)}%`, backgroundColor: channel.color }} /></div>{channel.launch ? <Button asChild variant="ghost" size="sm" className="mt-2 h-7 px-0 text-xs text-primary hover:bg-transparent"><Link to={channel.href} aria-label={`${channel.launch} workspace`}>{channel.launch}<ArrowRight className="size-3" /></Link></Button> : null}</div>)}
         </div>
       </section>
 

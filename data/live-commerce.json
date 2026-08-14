@@ -1,0 +1,221 @@
+{
+  "channels": [
+    {
+      "id": "tiktok_vn_01",
+      "name": "TikTok Shop",
+      "account_name": "Prime Live Store"
+    },
+    {
+      "id": "shopee_vn_01",
+      "name": "Shopee Live",
+      "account_name": "Prime Beauty Official"
+    },
+    {
+      "id": "primeweb_vn_01",
+      "name": "PrimeWeb",
+      "account_name": "primebeauty.vn"
+    }
+  ],
+  "warehouses": [
+    {
+      "id": "wh_hcm_01",
+      "name": "HCM Central Warehouse"
+    },
+    {
+      "id": "wh_hanoi_01",
+      "name": "Hanoi Fulfillment Hub"
+    },
+    {
+      "id": "wh_d1_01",
+      "name": "District 1 Flagship"
+    }
+  ],
+  "inventory": {
+    "wh_hcm_01": [
+      {
+        "sku_id": "PRM-SRM-01",
+        "title": "Prime Renewal Serum",
+        "variant": "30 ml",
+        "available_atp": 920,
+        "reserved_live": 0,
+        "base_price": 349000
+      },
+      {
+        "sku_id": "PRM-LIP-02",
+        "title": "Velvet Tint",
+        "variant": "Rose 02",
+        "available_atp": 680,
+        "reserved_live": 0,
+        "base_price": 189000
+      },
+      {
+        "sku_id": "PRM-SPF-50",
+        "title": "Daily Defense Sunscreen",
+        "variant": "SPF 50 · 50 ml",
+        "available_atp": 740,
+        "reserved_live": 0,
+        "base_price": 279000
+      },
+      {
+        "sku_id": "PRM-MSK-05",
+        "title": "Hydra Sheet Mask",
+        "variant": "5 pack",
+        "available_atp": 480,
+        "reserved_live": 0,
+        "base_price": 129000
+      }
+    ],
+    "wh_hanoi_01": [
+      {
+        "sku_id": "PRM-SRM-01",
+        "title": "Prime Renewal Serum",
+        "variant": "30 ml",
+        "available_atp": 510,
+        "reserved_live": 0,
+        "base_price": 349000
+      },
+      {
+        "sku_id": "PRM-LIP-02",
+        "title": "Velvet Tint",
+        "variant": "Rose 02",
+        "available_atp": 420,
+        "reserved_live": 0,
+        "base_price": 189000
+      },
+      {
+        "sku_id": "PRM-CLN-01",
+        "title": "Gentle Gel Cleanser",
+        "variant": "150 ml",
+        "available_atp": 360,
+        "reserved_live": 0,
+        "base_price": 239000
+      }
+    ],
+    "wh_d1_01": [
+      {
+        "sku_id": "PRM-SRM-01",
+        "title": "Prime Renewal Serum",
+        "variant": "30 ml",
+        "available_atp": 180,
+        "reserved_live": 0,
+        "base_price": 349000
+      },
+      {
+        "sku_id": "PRM-LIP-02",
+        "title": "Velvet Tint",
+        "variant": "Rose 02",
+        "available_atp": 260,
+        "reserved_live": 0,
+        "base_price": 189000
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "id": "live_88_beauty",
+      "title": "8.8 Beauty Mega Live",
+      "channel_id": "tiktok_vn_01",
+      "host_name": "Linh Nguyen",
+      "warehouse_id": "wh_hcm_01",
+      "scheduled_start_at": "2026-08-14T06:27:52.421Z",
+      "duration_hours": 4,
+      "auto_release_policy": "IMMEDIATE_ON_END",
+      "enable_safety_buffer": true,
+      "status": "LIVE",
+      "allocated_qty": 800,
+      "sold_qty": 612,
+      "orders_count": 284,
+      "attributed_revenue": 48620000,
+      "allocated_items": [
+        {
+          "sku_id": "PRM-SRM-01",
+          "title": "Prime Renewal Serum",
+          "variant": "30 ml",
+          "allocated_qty": 500,
+          "sold_qty": 394,
+          "live_price": 299000
+        },
+        {
+          "sku_id": "PRM-LIP-02",
+          "title": "Velvet Tint",
+          "variant": "Rose 02",
+          "allocated_qty": 300,
+          "sold_qty": 218,
+          "live_price": 159000
+        }
+      ],
+      "created_at": "2026-08-13T07:27:52.421Z",
+      "updated_at": "2026-08-14T07:26:40.421Z",
+      "ended_at": null,
+      "release_status": "RESERVED"
+    },
+    {
+      "id": "live_shopee_payday",
+      "title": "Shopee Payday Showcase",
+      "channel_id": "shopee_vn_01",
+      "host_name": "Mai Anh",
+      "warehouse_id": "wh_hanoi_01",
+      "scheduled_start_at": "2026-08-14T08:27:52.421Z",
+      "duration_hours": 3,
+      "auto_release_policy": "HOLD_2_HOURS",
+      "enable_safety_buffer": true,
+      "status": "SCHEDULED",
+      "allocated_qty": 540,
+      "sold_qty": 318,
+      "orders_count": 126,
+      "attributed_revenue": 22440000,
+      "allocated_items": [
+        {
+          "sku_id": "PRM-SRM-01",
+          "title": "Prime Renewal Serum",
+          "variant": "30 ml",
+          "allocated_qty": 300,
+          "sold_qty": 184,
+          "live_price": 309000
+        },
+        {
+          "sku_id": "PRM-LIP-02",
+          "title": "Velvet Tint",
+          "variant": "Rose 02",
+          "allocated_qty": 240,
+          "sold_qty": 134,
+          "live_price": 169000
+        }
+      ],
+      "created_at": "2026-08-13T21:27:52.421Z",
+      "updated_at": "2026-08-14T06:27:52.421Z",
+      "ended_at": null,
+      "release_status": "RESERVED"
+    },
+    {
+      "id": "live_primeweb_drop",
+      "title": "PrimeWeb Product Drop",
+      "channel_id": "primeweb_vn_01",
+      "host_name": "Brand Team",
+      "warehouse_id": "wh_hcm_01",
+      "scheduled_start_at": "2026-08-15T10:27:52.421Z",
+      "duration_hours": 2,
+      "auto_release_policy": "IMMEDIATE_ON_END",
+      "enable_safety_buffer": true,
+      "status": "SCHEDULED",
+      "allocated_qty": 320,
+      "sold_qty": 0,
+      "orders_count": 0,
+      "attributed_revenue": 0,
+      "allocated_items": [
+        {
+          "sku_id": "PRM-SPF-50",
+          "title": "Daily Defense Sunscreen",
+          "variant": "SPF 50 · 50 ml",
+          "allocated_qty": 320,
+          "sold_qty": 0,
+          "live_price": 249000
+        }
+      ],
+      "created_at": "2026-08-14T01:27:52.421Z",
+      "updated_at": "2026-08-14T05:27:52.421Z",
+      "ended_at": null,
+      "release_status": "RESERVED"
+    }
+  ]
+}

@@ -8,8 +8,13 @@ PrimeOS is organized as a small monorepo for the Phase 1 commerce operating syst
 - `apps/admin/` - admin control room for curated data operations.
 - `apps/api/` - local file-backed Express API used by the web and admin apps.
 - `packages/mock-data/` - linked mock-data contracts shared by the prototype.
-- `docs/` - active product, migration, operations, and research documentation.
+- `docs/` - product, engineering, management, QA, and delivery documentation.
+- `research/` - technical research, evaluations, and generated evidence.
+- `presentations/` - self-contained presentation and demo assets.
+- `tools/primeos-tts/` - standalone Python toolkit for local voice generation.
 - `references/` - supporting prototypes, reports, screenshots, and archived legacy docs.
+
+See [`docs/repository-structure.md`](docs/repository-structure.md) for ownership and placement rules.
 
 ## Local Development
 
@@ -34,13 +39,8 @@ npm run dev:5177 -- --host 127.0.0.1
 ## Verification
 
 ```bash
-cd apps/web
-npm run lint
-npm run test
-npm run build
-
-cd ../api
-npm test
+npm ci
+npm run check
 ```
 
 ## CI/CD

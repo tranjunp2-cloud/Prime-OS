@@ -1,16 +1,7 @@
-import { BarChart3, CheckCircle2, Link2, MessageSquareText, PlugZap, Search, Settings2 } from 'lucide-react';
+import { BarChart3, CheckCircle2, MessageSquareText, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
-
-export function ConversationChannelsPage() {
-  const rows = [
-    { name: 'Facebook Messenger', account: 'Prime Beauty VN', status: 'Connected', sync: 'Real-time' },
-    { name: 'Zalo OA', account: 'Prime Official Account', status: 'Connected', sync: 'Real-time' },
-    { name: 'Shopee Chat', account: 'Shopee Flagship', status: 'Needs review', sync: 'Delayed 8m' },
-  ];
-  return <div className="space-y-5 p-4 md:p-6"><WorkspacePageHeader title="Conversation Channels" description="Connect chat and comment sources used by Prime Inbox. Commerce store synchronization is managed in Connected Channels." icon={PlugZap} /><section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="border-b border-slate-200 p-4"><h2 className="font-semibold text-slate-900">Prime Inbox sources</h2></div><div className="divide-y divide-slate-100">{rows.map((row) => <div key={row.name} className="flex items-center gap-4 p-4"><span className="grid size-10 place-items-center rounded-lg bg-indigo-50 font-bold text-indigo-700">{row.name.charAt(0)}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900">{row.name}</p><p className="mt-1 text-xs text-slate-500">{row.account} · {row.sync}</p></div><span className={row.status === 'Connected' ? 'text-xs font-semibold text-emerald-700' : 'text-xs font-semibold text-amber-700'}>{row.status}</span><Button variant="outline" size="sm"><Settings2 className="size-4" />Configure</Button></div>)}</div><div className="border-t border-slate-200 p-4"><Button><Link2 className="size-4" />Connect Conversation Channel</Button></div></section></div>;
-}
 
 export function QuickRepliesPage() {
   const replies = [['Product availability', 'This item is currently available at {{warehouse}}.'], ['Shipping ETA', 'Delivery is estimated within {{eta}} business days.'], ['Order confirmation', 'Your order {{order_id}} has been confirmed.']];

@@ -1,0 +1,98 @@
+{
+  "tasks": [
+    {
+      "id": "task_daily-customer-follow-up",
+      "title": "Daily Customer Follow-up Agent",
+      "description": "Scan unanswered Prime Inbox conversations older than 12 hours and draft contextual responses.",
+      "cron_expression": "0 10 * * *",
+      "human_schedule": "Daily at 10:00 AM",
+      "owner_id": "agent_customer_success",
+      "owner_name": "Customer Success AI",
+      "channel_ids": [
+        "prime_inbox",
+        "inbox_facebook",
+        "inbox_zalo"
+      ],
+      "system_prompt": "Review unanswered customer conversations older than 12 hours. Draft a concise, helpful response using customer and order context. Never send automatically; save each response as a draft for agent review.",
+      "status": "RUNNING",
+      "next_run_at": "2026-08-15T03:00:00.000Z",
+      "last_run_at": "2026-08-13T09:31:31.537Z",
+      "last_run_status": "SUCCESS",
+      "created_at": "2026-08-02T07:31:31.537Z",
+      "updated_at": "2026-08-14T07:31:31.537Z"
+    },
+    {
+      "id": "task_nightly-stock-audit",
+      "title": "Nightly Stock Audit & Alert",
+      "description": "Check low-stock SKUs across physical warehouses and alert the operations team.",
+      "cron_expression": "0 0 * * *",
+      "human_schedule": "Daily at 12:00 AM",
+      "owner_id": "agent_inventory",
+      "owner_name": "Inventory Agent",
+      "channel_ids": [
+        "warehouse",
+        "slack",
+        "email"
+      ],
+      "system_prompt": "Audit ATP across every physical warehouse. Identify SKUs below their reorder point, group them by warehouse and severity, then send a concise alert through Slack and email.",
+      "status": "RUNNING",
+      "next_run_at": "2026-08-14T17:00:00.000Z",
+      "last_run_at": "2026-08-13T20:31:31.537Z",
+      "last_run_status": "FAILED",
+      "created_at": "2026-08-03T07:31:31.537Z",
+      "updated_at": "2026-08-14T07:31:31.537Z"
+    },
+    {
+      "id": "task_weekly-abandoned-cart-digest",
+      "title": "Weekly Abandoned Cart Digest",
+      "description": "Compile abandoned PrimeWeb checkouts and assign qualified opportunities to sales agents.",
+      "cron_expression": "0 9 * * 1",
+      "human_schedule": "Every Monday at 09:00 AM",
+      "owner_id": "agent_sales_ops",
+      "owner_name": "Sales Operations AI",
+      "channel_ids": [
+        "primeweb",
+        "crm"
+      ],
+      "system_prompt": "Find abandoned PrimeWeb checkouts from the previous seven days. Rank by customer value and purchase intent, summarize likely blockers, and assign follow-up tasks to the appropriate sales owner.",
+      "status": "PAUSED",
+      "next_run_at": null,
+      "last_run_at": null,
+      "last_run_status": null,
+      "created_at": "2026-08-04T07:31:31.537Z",
+      "updated_at": "2026-08-14T07:31:31.537Z"
+    }
+  ],
+  "logs": [
+    {
+      "id": "b82393c5-822d-4c87-a181-83f162b0eabc",
+      "task_id": "task_daily-customer-follow-up",
+      "trigger_type": "SCHEDULED",
+      "status": "SUCCESS",
+      "executed_at": "2026-08-13T09:31:31.537Z",
+      "duration_ms": 1842,
+      "result_summary": "Reviewed 28 conversations and created 8 response drafts.",
+      "error_message": null,
+      "execution_payload": {
+        "scanned": 28,
+        "drafted": 8,
+        "skipped": 20
+      }
+    },
+    {
+      "id": "606c2904-1fbd-49cc-91d1-49d54624e0c8",
+      "task_id": "task_nightly-stock-audit",
+      "trigger_type": "SCHEDULED",
+      "status": "FAILED",
+      "executed_at": "2026-08-13T20:31:31.537Z",
+      "duration_ms": 934,
+      "result_summary": "Stock audit stopped before notifications were delivered.",
+      "error_message": "Slack connection token requires renewal.",
+      "execution_payload": {
+        "scanned_warehouses": 4,
+        "low_stock_skus": 15,
+        "notification": "failed"
+      }
+    }
+  ]
+}

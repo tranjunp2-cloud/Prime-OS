@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
+import { WebSocketServer } from 'ws';
 import {
   authenticatePassword,
   createSessionToken,
@@ -93,6 +96,26 @@ import {
 } from './finance-ops.js';
 import { createFeedback } from './feedbacks.js';
 import { getOnboardingStatus, updateOnboardingPreferences } from './onboarding.js';
+import {
+  connectChannel,
+  getChannelPlatform,
+  getChannelSyncStatus,
+  listAvailablePlatforms,
+  listChannelWarehouses,
+  listConnectedChannels,
+} from './channel-integrations.js';
+import {
+  createLiveSession,
+  endLiveSession,
+  getLiveCommerceOptions,
+  getLiveSession,
+  getLiveSessionEvents,
+  getLiveSessionSummary,
+  listLiveSessions,
+  topUpLiveSession,
+  updateLiveSession,
+} from './live-commerce.js';
+import { connectConversationChannel, deleteConversationChannel, listConversationChannels, listQuickLinkableStores, reauthorizeConversationChannel, testConversationPing, toggleConversationPause, updateConversationChannel } from './conversation-channels.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8180);
@@ -557,7 +580,11 @@ app.post('/api/auth/logout', async (request, response) => {
   response.json({ ok: true });
 });
 
-app.use('/api', requireAuthenticatedSession);
+app.use('/api', (request, response, next) => {
+  const isChannelAuthorizationRedirect = request.method === 'GET' && /^\/v1\/channels\/[^/]+\/authorize$/.test(request.path);
+  if (isChannelAuthorizationRedirect) return next();
+  return requireAuthenticatedSession(request, response, next);
+});
 
 app.get('/api/session', async (request, response) => {
   response.json(buildSession(request.primeAccount));
@@ -1249,6 +1276,82 @@ app.delete('/api/v1/scheduled-tasks/:id', (request, response) => {
   response.json({ ok: true, removed: task });
 });
 
+function requireLiveCommerceWrite(request, response) {
+  const session = buildSession(request.primeAccount);
+  if (!session.canWrite) {
+    response.status(403).json({ message: `${session.roleLabel} cannot modify live commerce sessions.` });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/v1/live-sessions/summary', (_request, response) => {
+  response.json({ data: getLiveSessionSummary() });
+});
+
+app.get('/api/v1/live-sessions/options', (request, response) => {
+  response.json({ data: getLiveCommerceOptions(request.query.warehouse_id) });
+});
+
+app.get('/api/v1/live-sessions', (request, response) => {
+  response.json(listLiveSessions(request.query));
+});
+
+app.post('/api/v1/live-sessions', (request, response, next) => {
+  if (!requireLiveCommerceWrite(request, response)) return;
+  try { response.status(201).json({ data: createLiveSession(request.body ?? {}) }); } catch (error) { next(error); }
+});
+
+app.get('/api/v1/live-sessions/:id/events', (request, response) => {
+  const events = getLiveSessionEvents(request.params.id);
+  if (!events) return response.status(404).json({ message: 'Live session not found.' });
+  response.json({ data: events });
+});
+
+app.get('/api/v1/live-sessions/:id', (request, response) => {
+  const session = getLiveSession(request.params.id);
+  if (!session) return response.status(404).json({ message: 'Live session not found.' });
+  response.json({ data: session });
+});
+
+app.put('/api/v1/live-sessions/:id', (request, response, next) => {
+  if (!requireLiveCommerceWrite(request, response)) return;
+  try {
+    const session = updateLiveSession(request.params.id, request.body ?? {});
+    if (!session) return response.status(404).json({ message: 'Live session not found.' });
+    response.json({ data: session });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/v1/live-sessions/:id/top-up-stock', (request, response, next) => {
+  if (!requireLiveCommerceWrite(request, response)) return;
+  try {
+    const session = topUpLiveSession(request.params.id, request.body ?? {});
+    if (!session) return response.status(404).json({ message: 'Live session not found.' });
+    response.json({ data: session });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/v1/live-sessions/:id/end-session', (request, response, next) => {
+  if (!requireLiveCommerceWrite(request, response)) return;
+  try {
+    const session = endLiveSession(request.params.id);
+    if (!session) return response.status(404).json({ message: 'Live session not found.' });
+    response.json({ data: session });
+  } catch (error) { next(error); }
+});
+
+function requireConversationWrite(request,response){const session=buildSession(request.primeAccount);if(!session.canWrite){response.status(403).json({message:`${session.roleLabel} cannot modify conversation channels.`});return false;}return true;}
+app.get('/api/v1/conversation-channels',(_request,response)=>response.json({data:listConversationChannels()}));
+app.get('/api/v1/conversation-channels/quick-linkable-stores',(_request,response)=>response.json({data:listQuickLinkableStores()}));
+app.post('/api/v1/conversation-channels/connect',(request,response,next)=>{if(!requireConversationWrite(request,response))return;try{response.status(201).json({data:connectConversationChannel(request.body||{})});}catch(error){next(error);}});
+app.put('/api/v1/conversation-channels/:id',(request,response,next)=>{if(!requireConversationWrite(request,response))return;try{const data=updateConversationChannel(request.params.id,request.body||{});return data?response.json({data}):response.status(404).json({message:'Conversation channel not found.'});}catch(error){next(error);}});
+app.post('/api/v1/conversation-channels/:id/test-ping',(request,response)=>{if(!requireConversationWrite(request,response))return;const data=testConversationPing(request.params.id);return data?response.json({data}):response.status(404).json({message:'Conversation channel not found.'});});
+app.post('/api/v1/conversation-channels/:id/test-webhook',(request,response)=>{if(!requireConversationWrite(request,response))return;const data=testConversationPing(request.params.id);return data?response.json({data}):response.status(404).json({message:'Conversation channel not found.'});});
+app.post('/api/v1/conversation-channels/:id/reauthorize',(request,response)=>{if(!requireConversationWrite(request,response))return;const data=reauthorizeConversationChannel(request.params.id);return data?response.json({data}):response.status(404).json({message:'Conversation channel not found.'});});
+app.post('/api/v1/conversation-channels/:id/toggle-pause',(request,response)=>{if(!requireConversationWrite(request,response))return;const data=toggleConversationPause(request.params.id);return data?response.json({data}):response.status(404).json({message:'Conversation channel not found.'});});
+app.delete('/api/v1/conversation-channels/:id',(request,response)=>{if(!requireConversationWrite(request,response))return;const removed=deleteConversationChannel(request.params.id);return removed?response.json({ok:true,removed}):response.status(404).json({message:'Conversation channel not found.'});});
+
 function requireFinanceOpsWrite(request, response) {
   const session = buildSession(request.primeAccount);
   if (!session.canWrite) {
@@ -1332,6 +1435,52 @@ app.post('/api/v1/finance/ops/risks/:id/resolve', (request, response, next) => {
     if (!item) return response.status(404).json({ message: 'Finance risk not found.' });
     response.json({ data: item });
   } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/channels', (_request, response) => {
+  response.json({ data: listConnectedChannels() });
+});
+
+app.get('/api/v1/channels/connected-stores', (_request, response) => {
+  response.json({ data: listConnectedChannels() });
+});
+
+app.get('/api/v1/channels/available-platforms', (_request, response) => {
+  response.json({ data: listAvailablePlatforms() });
+});
+
+app.get('/api/v1/warehouses', (_request, response) => {
+  response.json({ data: listChannelWarehouses() });
+});
+
+app.get('/api/v1/channels/:id/sync-status', (request, response) => {
+  const status = getChannelSyncStatus(request.params.id);
+  if (!status) return response.status(404).json({ message: 'Connected channel not found.' });
+  response.json(status);
+});
+
+app.get('/api/v1/channels/:platform/authorize', (request, response) => {
+  const platform = getChannelPlatform(request.params.platform);
+  if (!platform) return response.status(404).json({ message: 'Channel platform not found.' });
+  const region = String(request.query.region || 'VN');
+  if (!platform.regions.includes(region)) return response.status(400).json({ message: 'Region is not supported for this platform.' });
+  const requestedOrigin = String(request.query.return_origin || 'http://127.0.0.1:5188');
+  const returnOrigin = allowedOrigins.has(requestedOrigin) ? requestedOrigin : 'http://127.0.0.1:5188';
+  const callback = new URL('/channels/callback', returnOrigin);
+  callback.searchParams.set('platform', platform.id);
+  callback.searchParams.set('auth_code', `oauth_code_${platform.id}_${Date.now()}`);
+  response.redirect(302, callback.toString());
+});
+
+app.post('/api/v1/channels/connect', (request, response, next) => {
+  const session = buildSession(request.primeAccount);
+  if (!session.canWrite) return response.status(403).json({ message: `${session.roleLabel} cannot connect stores.` });
+  try {
+    response.status(201).json({ data: connectChannel(request.body || {}) });
+  } catch (error) {
+    if (error.statusCode) return response.status(error.statusCode).json({ message: error.message });
     next(error);
   }
 });
@@ -1448,8 +1597,32 @@ app.use((error, _request, response, _next) => {
   });
 });
 
+function attachLiveCommerceWebSocket(server) {
+  const socketServer = new WebSocketServer({ noServer: true });
+  server.on('upgrade', (request, socket, head) => {
+    const url = new URL(request.url || '/', 'http://primeos.local');
+    const match = url.pathname.match(/^\/api\/v1\/live-sessions\/([^/]+)\/stream$/);
+    if (!match) return socket.destroy();
+    const account = verifySessionToken(url.searchParams.get('token'));
+    const session = account ? getLiveSession(decodeURIComponent(match[1])) : null;
+    if (!account || !session || session.status !== 'LIVE') return socket.destroy();
+    socketServer.handleUpgrade(request, socket, head, (client) => socketServer.emit('connection', client, request, session));
+  });
+  socketServer.on('connection', (client, _request, session) => {
+    client.send(JSON.stringify({ type: 'CONNECTED', session_id: session.id, occurred_at: new Date().toISOString() }));
+    const timer = setInterval(() => {
+      if (client.readyState !== client.OPEN) return;
+      const units = 1 + Math.floor(Math.random() * 3);
+      client.send(JSON.stringify({ id: `evt_${randomUUID()}`, type: 'ORDER_CAPTURED', message: `Order #LIVE-${2800 + Math.floor(Math.random() * 900)} captured`, units, amount: units * 159000, occurred_at: new Date().toISOString() }));
+    }, 5000);
+    client.on('close', () => clearInterval(timer));
+  });
+}
+
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, host, () => {
+  const server = createServer(app);
+  attachLiveCommerceWebSocket(server);
+  server.listen(port, host, () => {
     console.log(`Prime OS backend listening on http://${host}:${port}`);
 
     startWorkerQueue();

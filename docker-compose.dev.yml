@@ -3,7 +3,7 @@ services:
     image: node:20-alpine
     container_name: prime-local-api
     working_dir: /app
-    command: sh -c "npm ci && node src/server.js"
+    command: sh -c "test -d node_modules/express || npm ci; exec node src/server.js"
     environment:
       HOST: 0.0.0.0
       PORT: 8280
@@ -22,7 +22,7 @@ services:
     image: node:20-alpine
     container_name: prime-local-web
     working_dir: /app
-    command: sh -c "npm install --workspaces=false && npm run dev -- --host 0.0.0.0 --port 5188 --strictPort"
+    command: sh -c "test -d node_modules/vite || npm install --workspaces=false; exec npm run dev -- --host 0.0.0.0 --port 5188 --strictPort"
     depends_on:
       - api
     environment:

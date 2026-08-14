@@ -15,7 +15,7 @@ The Kokoro model page identifies the model and weights as Apache-2.0 licensed. R
 ## First-time setup on this Mac
 
 ```bash
-cd /Users/thanhnguyenxuan/Documents/MyProject/PrimeOS/Kokoro
+cd tools/primeos-tts
 ./scripts/setup-macos.sh
 uv run kokoro-tts doctor
 ```
@@ -69,7 +69,7 @@ uv sync --extra mandarin
 ## Project layout
 
 ```text
-Kokoro/
+tools/primeos-tts/
 ├── src/primeos_tts/       # Engine, Markdown cleanup, audio export, CLI
 ├── tools/tts/              # Direct Python entrypoints requested for future work
 ├── examples/               # Small smoke-test scripts

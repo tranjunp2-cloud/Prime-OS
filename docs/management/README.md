@@ -26,8 +26,8 @@ The pack is grounded in the active PrimeOS source documents:
 - `docs/05-demo-flows.md`
 - `docs/operations/service-layout.md`
 - `docs/operations/ci-cd.md`
-- `PrimeOS-roadmap.csv`
-- `PrimeOS-plan.md`
-- `Revenue-Plan.csv`
+- [`data/primeos-roadmap.csv`](data/primeos-roadmap.csv)
+- [`plans/primeos-plan.md`](plans/primeos-plan.md)
+- [`data/revenue-plan.csv`](data/revenue-plan.csv)
 
 The package is a working baseline dated **August 10, 2026**. Live delivery status belongs in the chosen project tracker; binding scope, risk, decision, UAT and release updates must be reflected in the relevant artifact.

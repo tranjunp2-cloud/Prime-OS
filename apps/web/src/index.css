@@ -284,6 +284,25 @@
     background-attachment: fixed;
   }
 
+  /*
+   * Canonical table surfaces for every workspace screen.
+   * This also normalizes legacy native tables that have not yet migrated to
+   * the shared Table primitive, while preserving row-level status/selection
+   * backgrounds declared by individual modules.
+   */
+  #main-content table {
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+  }
+
+  #main-content table > thead {
+    background-color: hsl(var(--muted) / 0.6);
+  }
+
+  #main-content table > tbody {
+    background-color: transparent;
+  }
+
   h1,
   h2,
   h3,

@@ -19,8 +19,11 @@ import Warehouses from "@/pages/Warehouses";
 import PrimeInboxWorkspace from "@/pages/PrimeInboxWorkspace";
 import FaqHub from "@/pages/FaqHub";
 import FaqArticle from "@/pages/FaqArticle";
-import { ConversationChannelsPage, CsAnalyticsPage, QuickRepliesPage } from "@/pages/CrmManagementTools";
-import { ConnectedChannelsPage, LiveCommercePage } from "@/pages/SalesChannels";
+import { CsAnalyticsPage, QuickRepliesPage } from "@/pages/CrmManagementTools";
+import ConversationChannelsPage from "@/pages/ConversationChannels";
+import { ConnectedChannelsPage } from "@/pages/SalesChannels";
+import LiveCommercePage from "@/pages/LiveCommerce";
+import { ChannelAuthCallback } from "@/pages/ChannelAuthCallback";
 import BusinessSettings from "@/pages/BusinessSettings";
 import InvoiceManagement from "@/pages/InvoiceManagement";
 import PromotionsManagement from "@/pages/PromotionsManagement";
@@ -107,8 +110,11 @@ export function PrimeRoutes() {
     <Route path="/crm/cs-analytics" element={<CsAnalyticsPage />} />
     <Route path="/sales-channels" element={<Navigate to="/sales-channels/connected-channels" replace />} />
     <Route path="/sales-channels/connected-channels" element={<ConnectedChannelsPage />} />
+    <Route path="/channels" element={<ConnectedChannelsPage />} />
+    <Route path="/channels/callback" element={<ChannelAuthCallback />} />
     <Route path="/sales-channels/live-commerce" element={<LiveCommercePage />} />
     <Route path="/sales-channels/conversation-channels" element={<ConversationChannelsPage />} />
+    <Route path="/settings/conversation-channels" element={<Navigate to="/sales-channels/conversation-channels" replace />} />
     <Route path="/channels/:channel/connect" element={<ConnectedChannelsPage />} />
     <Route path="/channels/social-integrations" element={<Navigate to="/sales-channels/conversation-channels" replace />} />
     <Route path="/inbox/conversation" element={<PrimeInboxWorkspace />} />

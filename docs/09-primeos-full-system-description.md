@@ -1115,7 +1115,7 @@ Test surface gom:
 
 ## 17. Roadmap và commercial framing
 
-Roadmap chinh theo `PrimeOS-roadmap.csv`:
+Roadmap chinh theo `docs/management/data/primeos-roadmap.csv`:
 
 | Thang | Phase | Focus | Output |
 | --- | --- | --- | --- |

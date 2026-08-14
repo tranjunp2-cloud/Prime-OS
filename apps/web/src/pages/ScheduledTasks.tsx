@@ -171,7 +171,7 @@ export default function ScheduledTasksPage() {
   const bulkToggle = async (status: TaskStatus) => { try { await scheduledTasksApi.bulkToggle(selectedIds, status); setSelectedIds([]); await load(); toast.success(`${status === 'RUNNING' ? 'Resumed' : 'Paused'} selected tasks`); } catch (error) { toast.error(error instanceof Error ? error.message : 'Bulk action failed.'); } };
   const bulkDelete = async () => { if (!window.confirm(`Delete ${selectedIds.length} selected tasks and their logs?`)) return; try { await scheduledTasksApi.bulkDelete(selectedIds); setSelectedIds([]); await load(); toast.success('Selected tasks deleted'); } catch (error) { toast.error(error instanceof Error ? error.message : 'Bulk delete failed.'); } };
 
-  return <div className="min-h-full bg-slate-50/60 p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1700px] space-y-5">
+  return <div className="min-h-full bg-background p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1700px] space-y-5">
     <WorkspacePageHeader title="Scheduled Tasks" description="Schedule recurring operational jobs, review upcoming runs, and monitor execution history." icon={CalendarClock} actions={<><Button variant="outline" onClick={() => setTemplateOpen(true)}><Zap className="size-4" />Create from Template</Button><Button onClick={openCreate}><Plus className="size-4" />New Scheduled Task</Button></>} />
 
     <div className="flex flex-col gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">

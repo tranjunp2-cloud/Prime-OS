@@ -15,6 +15,7 @@ test-results/
 outputs/
 tmp/
 .cache/
+.logs/
 
 # Local secrets and credentials
 .secrets/

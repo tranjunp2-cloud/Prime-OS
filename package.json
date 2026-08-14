@@ -19,6 +19,10 @@
     "test:web": "npm run test --workspace @primeos/web",
     "test:web:smoke": "npm run test:smoke --workspace @primeos/web",
     "test:api": "npm run test --workspace @primeos/api",
-    "lint:web": "npm run lint --workspace @primeos/web"
+    "lint:web": "npm run lint --workspace @primeos/web",
+    "lint": "npm run lint:web",
+    "test": "npm run test:web && npm run test:api",
+    "build": "npm run build:web:dev && npm run build:admin",
+    "check": "npm run lint && npm run test && npm run build"
   }
 }

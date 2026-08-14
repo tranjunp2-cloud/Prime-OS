@@ -19,21 +19,21 @@ const variantClassMap: Record<TableVariant, {
 }> = {
   index: {
     wrapper: "",
-    table: "text-sm",
+    table: "bg-card text-card-foreground text-sm",
     head: "h-10 px-4 align-middle",
     row: "hover:bg-muted/50",
     cell: "p-4 align-middle",
   },
   embedded: {
     wrapper: "",
-    table: "text-sm",
+    table: "bg-card text-card-foreground text-sm",
     head: "h-10 px-4 align-middle",
     row: "hover:bg-muted/50",
     cell: "p-4 align-middle",
   },
   compact: {
     wrapper: "",
-    table: "text-xs",
+    table: "bg-card text-card-foreground text-xs",
     head: "h-8 px-3 align-middle",
     row: "hover:bg-muted/50",
     cell: "px-3 py-2 align-middle",

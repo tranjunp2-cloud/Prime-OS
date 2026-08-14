@@ -1,0 +1,165 @@
+{
+  "channels": [
+    {
+      "id": "channel_primeweb",
+      "platform": "primeweb",
+      "name": "PrimeWeb",
+      "store_name": "primebeauty.vn",
+      "region": "VN",
+      "type": "E-Commerce/Web",
+      "status": "CONNECTED",
+      "synced_listings": 1240,
+      "sync_progress": 100,
+      "physical_warehouse_id": "wh_hcm_01",
+      "sync_services": {
+        "price": true,
+        "stock": true,
+        "orders": true
+      },
+      "is_default_pickup": true,
+      "is_default_return": true,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 0,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_shopee",
+      "platform": "shopee",
+      "name": "Shopee",
+      "store_name": "Prime Beauty Official",
+      "region": "VN",
+      "type": "Marketplace",
+      "status": "CONNECTED",
+      "synced_listings": 1186,
+      "sync_progress": 100,
+      "physical_warehouse_id": "wh_hcm_01",
+      "sync_services": {
+        "price": true,
+        "stock": true,
+        "orders": true
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 0,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_lazada",
+      "platform": "lazada",
+      "name": "Lazada",
+      "store_name": "Prime Flagship Store",
+      "region": "VN",
+      "type": "Marketplace",
+      "status": "EXPIRED",
+      "synced_listings": 972,
+      "sync_progress": 0,
+      "physical_warehouse_id": "wh_hn_01",
+      "sync_services": {
+        "price": false,
+        "stock": false,
+        "orders": false
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 3,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_amazon",
+      "platform": "amazon",
+      "name": "Amazon",
+      "store_name": "Prime Beauty US",
+      "region": "US",
+      "type": "Marketplace",
+      "status": "SYNC_ERROR",
+      "synced_listings": 684,
+      "sync_progress": 0,
+      "physical_warehouse_id": "wh_crossborder_01",
+      "sync_services": {
+        "price": true,
+        "stock": false,
+        "orders": true
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 5,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_rakuten",
+      "platform": "rakuten",
+      "name": "Rakuten",
+      "store_name": "Prime Beauty JP",
+      "region": "VN",
+      "type": "Marketplace",
+      "status": "CONNECTED",
+      "synced_listings": 416,
+      "sync_progress": 100,
+      "physical_warehouse_id": "wh_crossborder_01",
+      "sync_services": {
+        "price": true,
+        "stock": true,
+        "orders": true
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 0,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_primepos",
+      "platform": "primepos",
+      "name": "PrimePOS",
+      "store_name": "District 1 Flagship",
+      "region": "VN",
+      "type": "Retail POS",
+      "status": "CONNECTED",
+      "synced_listings": 1240,
+      "sync_progress": 100,
+      "physical_warehouse_id": "wh_d1_01",
+      "sync_services": {
+        "price": true,
+        "stock": true,
+        "orders": true
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 0,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_tiktok_shop",
+      "platform": "tiktok_shop",
+      "name": "TikTok Shop",
+      "store_name": "Prime Live Store",
+      "region": "VN",
+      "type": "Marketplace",
+      "status": "SYNC_ERROR",
+      "synced_listings": 803,
+      "sync_progress": 0,
+      "physical_warehouse_id": null,
+      "sync_services": {
+        "price": true,
+        "stock": false,
+        "orders": true
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "AUTO_MATCH_SKU",
+      "errors": 4,
+      "last_sync_at": "2026-08-14T07:00:00.000Z",
+      "poll_count": 0
+    }
+  ]
+}

@@ -1,17 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Boxes,
   CheckCircle2,
   CircleAlert,
-  Clock3,
   DollarSign,
   Download,
   Link2,
   ListRestart,
   Package,
   Plus,
-  RadioTower,
   RefreshCw,
   Search,
   Settings2,
@@ -21,6 +19,7 @@ import {
   Unplug,
   Warehouse,
   XCircle,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -33,14 +32,17 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { cn } from '@/lib/utils';
+import { ConnectStoreWizardModal } from '@/components/channels/ConnectStoreWizardModal';
+import { channelIntegrationsApi, type ConnectedChannelRecord } from '@/lib/channel-integrations-api';
 
 type ChannelType = 'E-Commerce/Web' | 'Marketplace' | 'Retail POS';
-type ConnectionStatus = 'Connected' | 'Expired' | 'Sync Error';
+type ConnectionStatus = 'Connected' | 'Expired' | 'Sync Error' | 'Initial Syncing';
 type DirectoryFilter = 'All' | ChannelType;
 type DrawerTab = 'connection' | 'warehouse' | 'rules' | 'logs';
 
 type StoreChannel = {
   id: string;
+  platform?: string;
   name: string;
   account: string;
   avatar: string;
@@ -55,6 +57,7 @@ type StoreChannel = {
   token: string;
   lastSync: string;
   errors: number;
+  syncProgress?: number;
 };
 
 const initialChannels: StoreChannel[] = [
@@ -81,13 +84,20 @@ const statusStyles: Record<ConnectionStatus, string> = {
   Connected: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   Expired: 'border-rose-200 bg-rose-50 text-rose-700',
   'Sync Error': 'border-amber-200 bg-amber-50 text-amber-700',
+  'Initial Syncing': 'border-indigo-200 bg-indigo-50 text-indigo-700',
 };
 
 const statusIcons: Record<ConnectionStatus, LucideIcon> = {
   Connected: CheckCircle2,
   Expired: XCircle,
   'Sync Error': AlertTriangle,
+  'Initial Syncing': Loader2,
 };
+
+function toStoreChannel(channel: ConnectedChannelRecord): StoreChannel {
+  const statusMap = { CONNECTED: 'Connected', EXPIRED: 'Expired', SYNC_ERROR: 'Sync Error', INITIAL_SYNCING: 'Initial Syncing' } as const;
+  return { id: channel.id, platform: channel.platform, name: channel.name, account: channel.store_name, avatar: channel.name.slice(0, 2).toUpperCase(), avatarClass: 'bg-indigo-600 text-white', type: channel.type === 'Social' ? 'E-Commerce/Web' : channel.type, status: statusMap[channel.status], listings: channel.synced_listings, warehouse: channel.warehouse?.name ?? null, priceSync: channel.sync_services.price, inventorySync: channel.sync_services.stock, orderSync: channel.sync_services.orders, token: 'Secure credential stored', lastSync: channel.status === 'INITIAL_SYNCING' ? `Initial sync · ${channel.sync_progress}%` : 'Just now', errors: channel.errors, syncProgress: channel.sync_progress };
+}
 
 function KpiCard({ label, value, detail, icon: Icon, tone = 'indigo', active, onClick }: { label: string; value: string; detail: string; icon: LucideIcon; tone?: 'indigo' | 'emerald' | 'amber' | 'rose'; active?: boolean; onClick?: () => void }) {
   const tones = { indigo: 'bg-indigo-50 text-indigo-700', emerald: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-700', rose: 'bg-rose-50 text-rose-700' };
@@ -131,6 +141,37 @@ export function ConnectedChannelsPage() {
   const [priceMarkup, setPriceMarkup] = useState('0');
   const [showErrorStores, setShowErrorStores] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  const loadChannels = useCallback(async () => {
+    try {
+      const response = await channelIntegrationsApi.channels();
+      setChannels(response.data.map(toStoreChannel));
+    } catch {
+      // Keep the seeded local directory visible when the API is temporarily unavailable.
+    }
+  }, []);
+
+  useEffect(() => { void loadChannels(); }, [loadChannels]);
+
+  const pollNewChannel = useCallback((id: string) => {
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      attempts += 1;
+      try {
+        const sync = await channelIntegrationsApi.syncStatus(id);
+        setChannels((current) => current.map((channel) => channel.id === id ? { ...channel, status: sync.status === 'CONNECTED' ? 'Connected' : 'Initial Syncing', listings: sync.synced_listings, syncProgress: sync.sync_progress, lastSync: sync.status === 'CONNECTED' ? 'Just now' : `Initial sync · ${sync.sync_progress}%` } : channel));
+        if (sync.status === 'CONNECTED') { window.clearInterval(timer); toast.success('Initial catalog sync completed'); void loadChannels(); }
+      } catch { if (attempts >= 10) window.clearInterval(timer); }
+      if (attempts >= 20) window.clearInterval(timer);
+    }, 3000);
+  }, [loadChannels]);
+
+  const handleConnected = (record: ConnectedChannelRecord) => {
+    setChannels((current) => [toStoreChannel(record), ...current.filter((item) => item.id !== record.id)]);
+    toast.success('Store successfully connected!');
+    pollNewChannel(record.id);
+  };
 
   const pendingErrors = channels.reduce((total, channel) => total + channel.errors, 0);
   const healthyCount = channels.filter((channel) => channel.status === 'Connected').length;
@@ -163,9 +204,9 @@ export function ConnectedChannelsPage() {
   };
 
   return (
-    <div className="min-h-full bg-slate-50/60 p-4 md:p-6">
+    <div className="min-h-full bg-background p-4 md:p-6">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <WorkspacePageHeader title="Connected Channels" description="Manage every connected storefront, marketplace store, and retail location from one directory." icon={Store} actions={<Button type="button" onClick={() => toast.info('Connect Store setup opened')}><Plus className="size-4" />Connect Store</Button>} />
+        <WorkspacePageHeader title="Connected Channels" description="Manage every connected storefront, marketplace store, and retail location from one directory." icon={Store} actions={<Button type="button" onClick={() => setWizardOpen(true)}><Plus className="size-4" />Connect Store</Button>} />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Channel summary">
           <KpiCard label="Connected Stores" value={String(channels.length)} detail={`${healthyCount} healthy connections`} icon={Store} />
@@ -192,7 +233,7 @@ export function ConnectedChannelsPage() {
                 {visibleChannels.map((channel) => {
                   const StatusIcon = statusIcons[channel.status];
                   const rowSelected = selectedIds.includes(channel.id);
-                  return <tr key={channel.id} className={cn('hover:bg-slate-50/70', rowSelected && 'bg-indigo-50/40')}><td className="px-4 py-3"><Checkbox checked={rowSelected} onCheckedChange={(checked) => setSelectedIds((current) => checked === true ? [...current, channel.id] : current.filter((id) => id !== channel.id))} aria-label={`Select ${channel.name}`} /></td><td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white"><BrandLogo id={channel.id} name={channel.name} /></span><div><p className="text-sm font-semibold text-slate-900">{channel.name}</p><p className="mt-0.5 text-xs text-slate-500">{channel.account}</p></div></div></td><td className="px-4 py-3"><span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">{channel.type}</span></td><td className="px-4 py-3"><span className={cn('inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold', statusStyles[channel.status])}><StatusIcon className="size-3.5" />{channel.status}</span><p className="mt-1 text-xs text-slate-400">{channel.lastSync}</p></td><td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-900">{channel.listings.toLocaleString('en-US')}</td><td className="px-4 py-3">{channel.warehouse ? <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700"><Warehouse className="size-4 text-slate-400" />{channel.warehouse}</span> : <Select value="" onValueChange={(value) => { updateChannel(channel.id, { warehouse: value }); toast.success(`${channel.name} mapped to ${value}`); }}><SelectTrigger className="h-9 w-[180px] border-amber-300 bg-amber-50 text-xs text-amber-800" aria-label={`Map warehouse for ${channel.name}`}><SelectValue placeholder="Map warehouse..." /></SelectTrigger><SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>)}</SelectContent></Select>}</td><td className="px-4 py-3"><SyncServices channel={channel} /></td><td className="px-4 py-3"><div className="flex justify-end gap-2">{channel.status === 'Expired' ? <Button size="sm" onClick={() => openDrawer(channel, 'connection')}><RefreshCw className="size-4" />Reconnect</Button> : channel.status === 'Sync Error' ? <Button size="sm" variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => openDrawer(channel, 'logs')}><AlertTriangle className="size-4" />Fix Errors</Button> : <Button size="sm" variant="outline" onClick={() => openDrawer(channel)}><Settings2 className="size-4" />Configure</Button>}</div></td></tr>;
+                  return <tr key={channel.id} className={cn('hover:bg-slate-50/70', rowSelected && 'bg-indigo-50/40')}><td className="px-4 py-3"><Checkbox checked={rowSelected} onCheckedChange={(checked) => setSelectedIds((current) => checked === true ? [...current, channel.id] : current.filter((id) => id !== channel.id))} aria-label={`Select ${channel.name}`} /></td><td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white"><BrandLogo id={channel.platform ?? channel.id} name={channel.name} /></span><div><p className="text-sm font-semibold text-slate-900">{channel.name}</p><p className="mt-0.5 text-xs text-slate-500">{channel.account}</p></div></div></td><td className="px-4 py-3"><span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">{channel.type}</span></td><td className="px-4 py-3"><span className={cn('inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold', statusStyles[channel.status])}><StatusIcon className={cn('size-3.5', channel.status === 'Initial Syncing' && 'animate-spin')} />{channel.status}</span><p className="mt-1 text-xs text-slate-400">{channel.lastSync}</p>{channel.status === 'Initial Syncing' ? <div className="mt-2 h-1 w-28 overflow-hidden rounded-full bg-indigo-100"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${channel.syncProgress ?? 0}%` }} /></div> : null}</td><td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-900">{channel.listings.toLocaleString('en-US')}</td><td className="px-4 py-3">{channel.warehouse ? <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700"><Warehouse className="size-4 text-slate-400" />{channel.warehouse}</span> : <Select value="" onValueChange={(value) => { updateChannel(channel.id, { warehouse: value }); toast.success(`${channel.name} mapped to ${value}`); }}><SelectTrigger className="h-9 w-[180px] border-amber-300 bg-amber-50 text-xs text-amber-800" aria-label={`Map warehouse for ${channel.name}`}><SelectValue placeholder="Map warehouse..." /></SelectTrigger><SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>)}</SelectContent></Select>}</td><td className="px-4 py-3"><SyncServices channel={channel} /></td><td className="px-4 py-3"><div className="flex justify-end gap-2">{channel.status === 'Expired' ? <Button size="sm" onClick={() => openDrawer(channel, 'connection')}><RefreshCw className="size-4" />Reconnect</Button> : channel.status === 'Sync Error' ? <Button size="sm" variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => openDrawer(channel, 'logs')}><AlertTriangle className="size-4" />Fix Errors</Button> : channel.status === 'Initial Syncing' ? <Button size="sm" variant="outline" disabled><Loader2 className="size-4 animate-spin" />Syncing</Button> : <Button size="sm" variant="outline" onClick={() => openDrawer(channel)}><Settings2 className="size-4" />Configure</Button>}</div></td></tr>;
                 })}
               </tbody>
             </table>
@@ -219,17 +260,8 @@ export function ConnectedChannelsPage() {
           </> : null}
         </SheetContent>
       </Sheet>
+      <ConnectStoreWizardModal open={wizardOpen} onOpenChange={setWizardOpen} onConnected={handleConnected} />
       {selectedIds.length ? <div className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-white shadow-2xl"><span className="px-2 text-xs font-semibold tabular-nums">{selectedIds.length} selected</span><span className="h-6 w-px bg-slate-700" /><Button type="button" size="sm" variant="ghost" className="text-white hover:bg-slate-800 hover:text-white" onClick={() => toast.success(`${selectedIds.length} stores queued for re-sync`)}><RefreshCw className="size-4" />Bulk Re-sync</Button><Button type="button" size="sm" variant="ghost" className="text-white hover:bg-slate-800 hover:text-white" onClick={() => toast.success(`${selectedIds.length} stores queued for reconnect`)}><Link2 className="size-4" />Bulk Reconnect</Button><Button type="button" size="sm" variant="ghost" className="text-white hover:bg-slate-800 hover:text-white" onClick={() => toast.success('Store logs export prepared')}><Download className="size-4" />Export Store Logs</Button><button type="button" className="grid size-8 place-items-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white" onClick={() => setSelectedIds([])} aria-label="Clear store selection"><XCircle className="size-4" /></button></div> : null}
     </div>
   );
-}
-
-const liveSessions = [
-  { name: '8.8 Beauty Mega Live', channel: 'TikTok Shop', host: 'Linh Nguyen', allocated: 800, reserved: 612, orders: 284, status: 'Live now' },
-  { name: 'Shopee Payday Showcase', channel: 'Shopee Live', host: 'Mai Anh', allocated: 540, reserved: 318, orders: 126, status: 'Starts in 1h' },
-  { name: 'PrimeWeb Product Drop', channel: 'PrimeWeb', host: 'Brand Team', allocated: 320, reserved: 0, orders: 0, status: 'Scheduled' },
-];
-
-export function LiveCommercePage() {
-  return <div className="min-h-full bg-slate-50/60 p-4 md:p-6"><div className="mx-auto max-w-[1600px] space-y-5"><WorkspacePageHeader title="Live Commerce" description="Plan livestream sessions, reserve sellable stock, and monitor real-time order capture." icon={RadioTower} actions={<Button><RadioTower className="size-4" />Create Live Session</Button>} /><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><KpiCard label="Active Sessions" value="1" detail="2 sessions scheduled today" icon={RadioTower} tone="rose" /><KpiCard label="Allocated Stock" value="1,660" detail="Across active and scheduled sessions" icon={Boxes} /><KpiCard label="Reserved / Sold" value="930" detail="56% of allocated live stock" icon={Clock3} tone="amber" /><KpiCard label="Live Orders" value="410" detail="$48,620 attributed revenue" icon={Store} tone="emerald" /></section><section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Session operations</h2><p className="mt-1 text-xs text-slate-500">Stock reservation, host ownership, and live order capture by session.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[900px]"><thead className="bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Session</th><th className="px-4 py-3">Channel / Host</th><th className="px-4 py-3 text-right">Allocated</th><th className="px-4 py-3 text-right">Reserved</th><th className="px-4 py-3 text-right">Orders</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{liveSessions.map((session) => <tr key={session.name} className="hover:bg-slate-50/70"><td className="px-5 py-4 text-sm font-semibold text-slate-900">{session.name}</td><td className="px-4 py-4"><p className="text-sm font-medium text-slate-700">{session.channel}</p><p className="mt-0.5 text-xs text-slate-500">Host: {session.host}</p></td><td className="px-4 py-4 text-right text-sm font-semibold tabular-nums">{session.allocated}</td><td className="px-4 py-4 text-right text-sm font-semibold tabular-nums">{session.reserved}</td><td className="px-4 py-4 text-right text-sm font-semibold tabular-nums">{session.orders}</td><td className="px-5 py-4"><span className={cn('rounded-md border px-2 py-1 text-xs font-semibold', session.status === 'Live now' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600')}>{session.status}</span></td></tr>)}</tbody></table></div></section></div></div>;
 }
