@@ -14,7 +14,6 @@ import Products from "@/pages/Products";
 import ProductCreatePage from "@/pages/ProductCreatePage";
 import ProductDetail from "@/pages/ProductDetail";
 import ProductCategories from "@/pages/ProductCategories";
-import Inventory from "@/pages/Inventory";
 import Warehouses from "@/pages/Warehouses";
 import PrimeInboxWorkspace from "@/pages/PrimeInboxWorkspace";
 import FaqHub from "@/pages/FaqHub";
@@ -162,7 +161,7 @@ export function PrimeRoutes() {
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
     <Route path="/products/categories" element={<ProductCategories />} />
-    <Route path="/products/inventory" element={<Inventory />} />
+    <Route path="/products/inventory" element={<Navigate to="/warehouse/stock" replace />} />
     <Route path="/products/new" element={<ProductCreatePage />} />
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
     <Route path="/products/:id" element={<ProductDetail />} />
@@ -174,8 +173,8 @@ export function PrimeRoutes() {
     <Route path="/warehouse/adjustments" element={<Warehouses />} />
     <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />
     <Route path="/orders" element={<Orders />} />
-    <Route path="/orders/fulfillment" element={<Orders view="fulfillment" />} />
-    <Route path="/orders/returns" element={<Orders view="returns" />} />
+    <Route path="/orders/fulfillment" element={<Navigate to="/orders?view=fulfillment" replace />} />
+    <Route path="/orders/returns" element={<Navigate to="/orders?view=returns" replace />} />
     <Route path="/fulfillment/*" element={<Navigate to={cosFulfillmentHref} replace />} />
     <Route path="/returns/*" element={<Navigate to={cosFulfillmentHref} replace />} />
     <Route path="/sla-policies" element={<Navigate to={cosFulfillmentHref} replace />} />

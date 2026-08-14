@@ -65,15 +65,10 @@ const mainNavigation: NavGroup[] = [
     { id: 'analytics', label: 'Analytics', href: '/client-reports', icon: BarChart3 },
   ] },
   { id: 'operations', label: 'Operations', items: [
-    { id: 'orders', label: 'Orders', icon: ShoppingBag, children: [
-      { id: 'all-orders', label: 'All Orders', href: '/orders', icon: ShoppingBag },
-      { id: 'fulfillment-shipping', label: 'Fulfillment & Shipping', href: '/orders/fulfillment', icon: Truck },
-      { id: 'returns-exchanges', label: 'Returns & Exchanges', href: '/orders/returns', icon: Undo2 },
-    ] },
+    { id: 'orders', label: 'Orders', href: '/orders', icon: ShoppingBag },
     { id: 'products', label: 'Products', icon: Package, children: [
       { id: 'master-catalog', label: 'Master Catalog', href: '/products/master-catalog', icon: Boxes },
-      { id: 'product-categories', label: 'Categories', href: '/products/categories', icon: Tags },
-      { id: 'product-inventory', label: 'Inventory', href: '/products/inventory', icon: Warehouse },
+      { id: 'product-categories', label: 'Categories & Attributes', href: '/products/categories', icon: Tags },
     ] },
     { id: 'warehouse', label: 'Warehouse', icon: Warehouse, children: [
       { id: 'warehouse-mapping', label: 'Warehouse Mapping', href: '/warehouse/mapping', icon: Link2 },
