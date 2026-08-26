@@ -1,5 +1,4 @@
 import { Navigate, Route, useLocation } from "react-router-dom";
-import Account from "@/pages/Account";
 import Service from "@/pages/Service";
 import { PrimeFinSupportPage } from "@/pages/prime/PrimeFinSupportPage";
 import { PrimeMdecPage } from "@/pages/prime/PrimeMdecPage";
@@ -73,7 +72,7 @@ export function PrimeRoutes() {
     <Route path="/workspaces/pos" element={<Navigate to="/pos/register" replace />} />
     <Route path="/client-reports" element={<PrimeClientReportsPage />} />
     <Route path="/reports" element={<Navigate to="/client-reports" replace />} />
-    <Route path="/account" element={<Account />} />
+    <Route path="/account" element={<Navigate to="/settings/team-access?tab=my-account" replace />} />
     <Route path="/system/invoices" element={<InvoiceManagement />} />
     <Route path="/finance/invoices" element={<InvoiceManagement />} />
     <Route path="/finance/ops" element={<FinanceOps />} />

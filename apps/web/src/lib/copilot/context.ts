@@ -232,6 +232,22 @@ function createProductsSummary(): CopilotContextSummary {
   };
 }
 
+function createCategoriesAttributesSummary(): CopilotContextSummary {
+  return {
+    domain: 'product',
+    title: 'Categories & Attributes',
+    description: 'Organize the product taxonomy, reusable attributes, category requirements, and marketplace mappings.',
+    insight: 'Categories define which reusable product attributes are required or optional before publishing.',
+    citations: ['Current route: /products/categories', 'Knowledge: Prime OS product glossary'],
+    quickPrompts: [
+      { label: 'Explain Attributes', prompt: 'What are product attributes?' },
+      { label: 'Explain Categories', prompt: 'What are product categories used for?' },
+      { label: 'Attribute vs Variant', prompt: 'What is the difference between an attribute and a variant?' },
+      { label: 'Category Mapping', prompt: 'How does marketplace category mapping work?' },
+    ],
+  };
+}
+
 function createProductDetailSummary(productId: string): CopilotContextSummary {
   const product = getProductById(productId);
 
@@ -490,15 +506,30 @@ function createSettingsSummary(): CopilotContextSummary {
 function createAccountSummary(): CopilotContextSummary {
   return {
     domain: 'settings',
-    title: 'Account Center',
-    description: 'Identity, members, roles, security posture and IAM audit trail.',
-    insight: 'Admin AI can explain risky access and draft safer IAM changes, but identity/security actions still require confirmation.',
-    citations: ['Current route: /account', 'Guardrail: IAM actions require user confirmation'],
+    title: 'My Account',
+    description: 'Your personal profile, sign-in security, active sessions, and preferences.',
+    insight: 'Organization members, roles, audit logs, SSO, and API keys are managed centrally in Team & Access.',
+    citations: ['Current route: /account', 'Scope: current user only'],
     quickPrompts: [
-      { label: 'Full admin access', prompt: 'Who has full admin access?' },
-      { label: 'Recent role changes', prompt: 'Show recent role changes.' },
-      { label: 'Risky permissions', prompt: 'Find risky permissions.' },
-      { label: 'Safer operator role', prompt: 'Draft a safer role for Inventory operators.' },
+      { label: 'Explain This Page', prompt: 'What can I manage in My Account?' },
+      { label: 'Account Security', prompt: 'How can I secure my personal account?' },
+      { label: 'Open Team & Access', prompt: 'Open Team & Access' },
+    ],
+  };
+}
+
+function createTeamAccessSummary(): CopilotContextSummary {
+  return {
+    domain: 'settings',
+    title: 'Team & Access',
+    description: 'Organization members, roles, security policies, audit logs, and API keys.',
+    insight: 'This is the authoritative administration surface for access across all Prime OS workspaces.',
+    citations: ['Current route: /settings/team-access', 'Guardrail: IAM changes require confirmation'],
+    quickPrompts: [
+      { label: 'Full Admin Access', prompt: 'Who has full admin access?' },
+      { label: 'Recent Role Changes', prompt: 'Show recent role changes.' },
+      { label: 'Risky Permissions', prompt: 'Find risky permissions.' },
+      { label: 'Safer Operator Role', prompt: 'Draft a safer role for Inventory operators.' },
     ],
   };
 }
@@ -510,6 +541,10 @@ export function normalizeCopilotInput(value: string) {
 export function resolveCopilotContext(pathname: string): CopilotContextSummary {
   if (pathname === '/account') {
     return createAccountSummary();
+  }
+
+  if (pathname === '/settings/team-access') {
+    return createTeamAccessSummary();
   }
 
   if (pathname === '/overview') {
@@ -541,6 +576,18 @@ export function resolveCopilotContext(pathname: string): CopilotContextSummary {
         { label: 'Open Products', prompt: 'Open Products' },
         { label: 'Safety Model', prompt: 'What safety model does the assistant use?' },
       ],
+    };
+  }
+
+  if (pathname === '/products/categories') {
+    return createCategoriesAttributesSummary();
+  }
+
+  if (pathname === '/products/master-catalog') {
+    return {
+      ...createProductsSummary(),
+      title: 'Product Master',
+      citations: ['Current route: /products/master-catalog', 'Source: product-store'],
     };
   }
 
@@ -938,6 +985,7 @@ export function resolveNavigationResponse(message: string): CopilotResponse | nu
   }
 
   const routeMatchers: Array<{ keywords: string[]; domain: CopilotDomain; label: string; url: string }> = [
+    { keywords: ['team & access', 'team and access', 'phan quyen', 'quan ly nhan vien'], domain: 'settings', label: 'Team & Access', url: '/settings/team-access' },
     { keywords: ['product', 'san pham', 'products'], domain: 'product', label: 'Products', url: '/products' },
     { keywords: ['listing', 'listings'], domain: 'listing', label: 'Listings', url: '/listings' },
     { keywords: ['warehouse', 'kho', 'warehouses'], domain: 'warehouse', label: 'Warehouses', url: '/warehouses' },
@@ -1676,7 +1724,7 @@ export function buildWelcomeMessage(context: CopilotContextSummary): CopilotResp
       confidenceBucket: 'high',
     }),
     followUpPrompts: takePrompts(context.quickPrompts),
-    content: `I am reviewing the context of ${context.title} to recommend the right customers, campaigns, and marketing channels for the seller.`,
+    content: `You are in **${context.title}**. ${context.description}${context.insight ? ` Current context: ${context.insight}` : ''}`,
   }, context);
 }
 
@@ -1714,6 +1762,7 @@ export function resolveCopilotResponse(
   const candidates: CandidateResponse[] = [];
   const navigationHeavyIntent = wantsExplicitNavigation(normalized) || wantsListNavigation(normalized);
   const summaryLikeIntent = hasAnyKeyword(normalized, ['tom tat', 'bao nhieu', 'snapshot', 'hien tai']);
+  const explanationIntent = hasAnyKeyword(normalized, ['la gi', 'what is', 'what are', 'what does', 'explain', 'dung de lam gi', 'khac nhau', 'difference between', 'how does']);
   const contextualScore = summaryLikeIntent ? 92 : (navigationHeavyIntent ? 80 : 88);
   const navigationScore = summaryLikeIntent ? 80 : (navigationHeavyIntent ? 93 : 84);
 
@@ -1735,7 +1784,7 @@ export function resolveCopilotResponse(
   addCandidate('entity-lookup', 95, resolveEntityLookupResponse(message));
   addCandidate('contextual', contextualScore, resolveContextualResponse(message, pathname));
   addCandidate('navigation', navigationScore, resolveNavigationResponse(message));
-  addCandidate('knowledge', 72, getKnowledgeResponse(message));
+  addCandidate('knowledge', explanationIntent ? 99 : 82, getKnowledgeResponse(message, pathname));
 
   if (!candidates.length) {
     if (normalized.length <= 16 || hasAnyKeyword(normalized, ['giup minh', 'xem ho', 'check ho'])) {
@@ -1753,6 +1802,7 @@ export function resolveCopilotResponse(
     && top.score < 92
     && top.score - runnerUp.score <= 6
     && top.key !== runnerUp.key
+    && (top.response.domain !== runnerUp.response.domain || top.response.intent !== runnerUp.response.intent)
   ) {
     return finalizeCopilotResponse(buildClarifyResponse(context, [
       { label: 'Explain This Page', prompt: 'What is this page used for?' },

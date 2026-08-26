@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Check, ChevronRight, CircleAlert, FolderTree, Layers3, Plus, Search,
   Sparkles, Tags,
@@ -83,7 +84,8 @@ function slugify(value: string) {
 
 export default function ProductCategories() {
   const { toast } = useToast();
-  const [viewTab, setViewTab] = useState<ViewTab>('categories');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewTab: ViewTab = searchParams.get('tab') === 'attributes' ? 'attributes' : 'categories';
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('general');
@@ -170,7 +172,7 @@ export default function ProductCategories() {
       actions={<Button onClick={viewTab === 'categories' ? createCategory : createAttribute}><Plus className="size-4" />{viewTab === 'categories' ? 'Add Category' : 'Add Attribute'}</Button>}
     />
 
-    <Tabs value={viewTab} onValueChange={value => { setViewTab(value as ViewTab); setSearch(''); }}>
+    <Tabs value={viewTab} onValueChange={value => { setSearchParams({ tab: value }, { replace: true }); setSearch(''); }}>
       <TabsList className="h-11 w-full justify-start rounded-none border-b bg-transparent p-0">
         <TabsTrigger value="categories" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><FolderTree className="size-4" />Categories</TabsTrigger>
         <TabsTrigger value="attributes" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><Layers3 className="size-4" />Attributes</TabsTrigger>

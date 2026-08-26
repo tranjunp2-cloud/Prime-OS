@@ -17,6 +17,7 @@ export type CopilotDomain =
 
 export type CopilotIntent =
   | 'read'
+  | 'explain_concept'
   | 'navigate'
   | 'write_draft'
   | 'write_commit_request'

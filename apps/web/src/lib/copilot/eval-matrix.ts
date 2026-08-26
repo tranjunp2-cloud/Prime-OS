@@ -47,4 +47,22 @@ export const COPILOT_EVAL_MATRIX: CopilotEvalCase[] = [
     expectedIntent: 'read',
     requiredPolicyTag: 'no-mutation',
   },
+  {
+    id: 'vi-product-attributes-explanation',
+    locale: 'vi-VN',
+    pathname: '/products/categories',
+    prompt: 'attributes là gì?',
+    expectedDomain: 'product',
+    expectedIntent: 'explain_concept',
+    requiredPolicyTag: 'no-mutation',
+  },
+  {
+    id: 'en-product-category-explanation',
+    locale: 'en-US',
+    pathname: '/products/categories',
+    prompt: 'What are product categories used for?',
+    expectedDomain: 'product',
+    expectedIntent: 'explain_concept',
+    requiredPolicyTag: 'no-mutation',
+  },
 ];

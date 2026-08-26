@@ -39,11 +39,11 @@ const settingsDefinitions: Record<SettingsKey, SettingsDefinition> = {
   },
   'team-access': {
     title: 'Team & Access', icon: UsersRound,
-    description: 'Staff accounts, granular RBAC roles, and activity audit logs across all workspaces.',
+    description: 'The single administration center for organization members, permissions, security policies, audit, and machine access.',
     features: [
       { title: 'Staff management', description: 'Members, invitations, seats, and workspace access.', status: 'IAM connected' },
       { title: 'RBAC permission matrix', description: 'Admin, POS Cashier, CRM Sales, Warehouse Manager, and Web Editor.', status: '5 roles' },
-      { title: 'Activity audit logs', description: 'Track price edits, deleted orders, and cancelled promotions.', status: 'Recording' },
+      { title: 'Security & machine access', description: 'Admin MFA, enterprise SSO, audit logs, and organization API keys.', status: 'Centralized' },
     ],
   },
   payments: {
@@ -156,5 +156,5 @@ export default function BusinessSettings() {
   if (!page) return <Navigate to="/settings/general" replace />;
   const definition = settingsDefinitions[page];
   const headerActions = page === 'team-access' ? undefined : <Button onClick={() => toast.success(`${definition.title} settings saved`)}><Check className="size-4" />Save changes</Button>;
-  return <main className="min-h-full bg-[hsl(var(--surface-stage))] p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1600px] space-y-5"><WorkspacePageHeader title={definition.title} description={definition.description} icon={definition.icon} actions={headerActions} /><FeatureSummary features={definition.features} /><ConfigurationSurface page={page} /></div></main>;
+  return <main className="min-h-full bg-[hsl(var(--surface-stage))] p-4 pb-24 md:p-6"><div className="mx-auto max-w-[1600px] space-y-5"><WorkspacePageHeader title={definition.title} description={definition.description} icon={definition.icon} actions={headerActions} />{page !== 'team-access' ? <FeatureSummary features={definition.features} /> : null}<ConfigurationSurface page={page} /></div></main>;
 }

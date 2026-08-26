@@ -3,6 +3,7 @@ import type { CopilotResponse } from '@/components/copilot/types';
 interface KnowledgeEntry {
   id: string;
   keywords: string[];
+  routes?: string[];
   response: CopilotResponse;
 }
 
@@ -10,6 +11,8 @@ function normalizeText(value: string) {
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
     .toLowerCase()
     .trim();
 }
@@ -78,6 +81,118 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
     },
   },
   {
+    id: 'product-attributes',
+    keywords: ['attribute', 'attributes', 'product attribute', 'thuoc tinh', 'truong thong tin san pham'],
+    routes: ['/products/categories'],
+    response: {
+      domain: 'product',
+      intent: 'explain_concept',
+      citations: ['Knowledge: Prime OS product glossary · Product Attributes'],
+      actions: [
+        { type: 'navigate', label: 'Open Attributes', description: 'Open the reusable product attribute library', url: '/products/categories?tab=attributes', emphasis: 'primary' },
+        { type: 'navigate', label: 'View Categories', description: 'See how attributes are assigned to categories', url: '/products/categories?tab=categories' },
+      ],
+      followUpPrompts: [
+        { label: 'Category Requirements', prompt: 'How do categories use required and optional attributes?' },
+        { label: 'Attribute vs Variant', prompt: 'What is the difference between an attribute and a variant?' },
+      ],
+      content: [
+        '**What it is**',
+        'Attributes are reusable fields that describe product characteristics, such as Brand, Material, Dimensions, or Country of Origin.',
+        '',
+        '**How it works in Prime OS**',
+        'Create an attribute once, assign it to one or more categories, and decide whether it is required or optional in each category. Products then inherit the appropriate fields from their selected category.',
+        '',
+        '**Example**',
+        'If Material is required for Art Supplies, every product in that category must provide a Material value before it is ready for publishing.',
+      ].join('\n'),
+    },
+  },
+  {
+    id: 'product-categories',
+    keywords: ['category', 'categories', 'product category', 'danh muc', 'danh muc san pham'],
+    routes: ['/products/categories'],
+    response: {
+      domain: 'product',
+      intent: 'explain_concept',
+      citations: ['Knowledge: Prime OS product glossary · Categories'],
+      actions: [
+        { type: 'navigate', label: 'Open Categories', description: 'Open the product category hierarchy', url: '/products/categories?tab=categories', emphasis: 'primary' },
+      ],
+      followUpPrompts: [
+        { label: 'Product Attributes', prompt: 'What are product attributes?' },
+        { label: 'Channel Mapping', prompt: 'How does marketplace category mapping work?' },
+      ],
+      content: [
+        '**What it is**',
+        'Categories organize Product Master records into a shared taxonomy and define which product information belongs to each product type.',
+        '',
+        '**How it works in Prime OS**',
+        'A category controls its parent path, assigned attributes, required fields, and marketplace category mappings. Selecting a category on a product determines which fields must be completed.',
+      ].join('\n'),
+    },
+  },
+  {
+    id: 'product-variants',
+    keywords: ['difference between an attribute and a variant', 'attribute vs variant', 'attribute and a variant', 'variant', 'variants', 'bien the', 'phan loai san pham', 'color size'],
+    routes: ['/products/new', '/products/master-catalog', '/products/categories'],
+    response: {
+      domain: 'product',
+      intent: 'explain_concept',
+      citations: ['Knowledge: Prime OS product glossary · Variants'],
+      actions: [
+        { type: 'navigate', label: 'Open Product Master', description: 'Review products and their variants', url: '/products/master-catalog', emphasis: 'primary' },
+      ],
+      content: [
+        '**What it is**',
+        'A variant is a sellable version of a product created from option values such as Color and Size. Each variant can have its own SKU, price, image, and stock.',
+        '',
+        '**Attribute vs variant**',
+        'Attributes describe a product. Variants create separate sellable SKU combinations. Material may be descriptive, while Blue / Large can identify a specific variant.',
+      ].join('\n'),
+    },
+  },
+  {
+    id: 'channel-readiness',
+    keywords: ['channel readiness', 'readiness', 'ready for publishing', 'publish readiness', 'do san sang kenh', 'san sang xuat ban'],
+    routes: ['/products/new', '/products/master-catalog'],
+    response: {
+      domain: 'product',
+      intent: 'explain_concept',
+      citations: ['Knowledge: Prime OS product glossary · Channel Readiness'],
+      actions: [
+        { type: 'navigate', label: 'Open Product Master', description: 'Review publishing status by channel', url: '/products/master-catalog', emphasis: 'primary' },
+      ],
+      content: [
+        '**What it is**',
+        'Channel Readiness checks whether a product has all master, logistics, and channel-specific information required for publishing.',
+        '',
+        '**Status meaning**',
+        '- Ready: all required information is complete\n- Needs attention: channel-specific attributes are missing\n- Blocked: mandatory product or logistics data is missing',
+      ].join('\n'),
+    },
+  },
+  {
+    id: 'marketplace-category-mapping',
+    keywords: ['marketplace category mapping', 'marketplace mapping', 'category mapping', 'channel mapping', 'map category', 'mapping danh muc', 'anh xa danh muc'],
+    routes: ['/products/categories'],
+    response: {
+      domain: 'product',
+      intent: 'explain_concept',
+      citations: ['Knowledge: Prime OS product glossary · Marketplace Category Mapping'],
+      actions: [
+        { type: 'navigate', label: 'Open Categories', description: 'Configure marketplace category mappings', url: '/products/categories?tab=categories', emphasis: 'primary' },
+      ],
+      content: [
+        '**What it is**',
+        'Marketplace Category Mapping connects one Prime OS category to the corresponding category ID used by each sales channel.',
+        '',
+        '**Why it matters**',
+        'Each marketplace has a different taxonomy and required fields. Mapping lets Prime OS validate and translate product data correctly before publishing.',
+      ].join('\n'),
+    },
+  },
+  {
     id: 'warehouse-types',
     keywords: ['warehouse type', 'virtual warehouse', 'fba', '3pl', 'warehouse la gi'],
     response: {
@@ -142,15 +257,16 @@ const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
   },
 ];
 
-export function getKnowledgeResponse(message: string): CopilotResponse | null {
+export function getKnowledgeResponse(message: string, pathname?: string): CopilotResponse | null {
   const normalized = normalizeText(message);
 
-  const scoredEntries = KNOWLEDGE_ENTRIES.map((entry) => ({
-    entry,
-    score: entry.keywords.reduce((total, keyword) => (
+  const scoredEntries = KNOWLEDGE_ENTRIES.map((entry) => {
+    const keywordScore = entry.keywords.reduce((total, keyword) => (
       normalized.includes(keyword) ? total + 1 : total
-    ), 0),
-  })).filter((item) => item.score > 0);
+    ), 0);
+    const routeBonus = pathname && entry.routes?.some((route) => pathname === route || pathname.startsWith(`${route}/`)) ? 2 : 0;
+    return { entry, keywordScore, score: keywordScore + routeBonus };
+  }).filter((item) => item.keywordScore > 0);
 
   if (scoredEntries.length === 0) {
     if (/(pricing|price|goi|growth|enterprise|essential|plan)/.test(normalized)) {

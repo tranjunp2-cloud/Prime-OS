@@ -23,6 +23,27 @@ describe('copilot context resolver', () => {
     expect(context.quickPrompts.some((prompt) => prompt.label === 'Create Product')).toBe(true);
   });
 
+  it('does not classify product system routes as missing product detail records', () => {
+    const categoriesContext = resolveCopilotContext('/products/categories');
+    const masterContext = resolveCopilotContext('/products/master-catalog');
+
+    expect(categoriesContext.title).toBe('Categories & Attributes');
+    expect(masterContext.title).toBe('Product Master');
+    expect(categoriesContext.description).toContain('reusable attributes');
+  });
+
+  it('explains a known feature from the route-scoped product glossary', () => {
+    const response = resolveCopilotResponse('attributes là gì?', '/products/categories');
+
+    expect(response.intent).toBe('explain_concept');
+    expect(response.domain).toBe('product');
+    expect(response.content).toContain('**What it is**');
+    expect(response.content).toContain('reusable fields');
+    expect(response.content).not.toContain('**Recommendation**');
+    expect(response.actions?.[0]?.url).toBe('/products/categories?tab=attributes');
+    expect(response.debug?.selectedStrategy).toBe('knowledge');
+  });
+
   it('maps pending-order navigation requests to filtered order routes', () => {
     const response = resolveNavigationResponse('Mở order đang pending');
 

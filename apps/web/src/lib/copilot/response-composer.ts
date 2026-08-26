@@ -11,6 +11,10 @@ export interface CopilotComposer {
 
 export const deterministicCopilotComposer: CopilotComposer = {
   compose({ response, context }) {
+    if (response.intent === 'explain_concept') {
+      return response.content.trim();
+    }
+
     const insight = response.content.trim();
     const recommendation = summarizeRecommendationLine(response, context);
     const action = summarizeActionLine(response, context);

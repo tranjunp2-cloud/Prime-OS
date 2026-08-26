@@ -26,4 +26,18 @@ describe('copilot response composer', () => {
     expect(content).toContain('**Action**');
     expect(content).toContain('Mở pending');
   });
+
+  it('keeps feature explanations educational instead of forcing recommendation sections', () => {
+    const response: CopilotResponse = {
+      domain: 'product',
+      intent: 'explain_concept',
+      content: '**What it is**\nAttributes are reusable product fields.',
+    };
+
+    const content = deterministicCopilotComposer.compose({ response, context });
+
+    expect(content).toContain('**What it is**');
+    expect(content).not.toContain('**Recommendation**');
+    expect(content).not.toContain('**Action**');
+  });
 });

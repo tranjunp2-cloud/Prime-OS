@@ -26,7 +26,7 @@ export function GlobalCopilotSurface({
   onSend,
   onClose,
 }: GlobalCopilotSurfaceProps) {
-  const isAccountContext = context.title === 'Account Center';
+  const isAccountContext = context.title === 'Team & Access';
   const isOperatingHomeContext = context.title === 'Operating Home';
   const assistantLabel = isAccountContext ? 'Admin AI' : 'Prime AI';
   const assistantBadge = isAccountContext ? 'IAM Guardrail' : isOperatingHomeContext ? 'Mission Control' : 'Growth Advisor';

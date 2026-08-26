@@ -15,6 +15,12 @@ interface GlobalCopilotChatThreadProps {
 
 function getAssistantMessageTone(intent: GlobalCopilotMessage['intent']) {
   switch (intent) {
+    case 'explain_concept':
+      return {
+        label: 'Explanation',
+        bubbleClassName: 'border-primary/20 bg-primary/5',
+        badgeClassName: 'border-primary/20 bg-primary/10 text-primary',
+      };
     case 'clarify':
       return {
         label: 'Needs clarification',
