@@ -256,6 +256,7 @@ export type CustomerAccountFilters = {
   ownerId: string;
   lifecycle: string;
   customerType: string;
+  channel?: string;
 };
 
 const owners: CustomerOwner[] = [
@@ -1146,8 +1147,10 @@ export function filterCustomerAccounts(accounts: CustomerAccount[], tags: Custom
     const matchesOwner = filters.ownerId === 'all' || account.ownerId === filters.ownerId;
     const matchesLifecycle = filters.lifecycle === 'all' || account.lifecycle === filters.lifecycle;
     const matchesType = filters.customerType === 'all' || account.customerType === filters.customerType;
+    const accountChannel = account.profile?.primaryEcomChannel || account.source;
+    const matchesChannel = !filters.channel || filters.channel === 'all' || accountChannel === filters.channel;
 
-    return matchesQuery && matchesTag && matchesOwner && matchesLifecycle && matchesType;
+    return matchesQuery && matchesTag && matchesOwner && matchesLifecycle && matchesType && matchesChannel;
   });
 }
 

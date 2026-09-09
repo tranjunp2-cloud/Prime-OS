@@ -1,4 +1,4 @@
-import { Bot, X } from 'lucide-react';
+import { Bot, Maximize2, X } from 'lucide-react';
 import type { CopilotContextSummary, CopilotQuickPrompt, CopilotTelemetry, GlobalCopilotMessage } from './types';
 import { Button } from '@/components/ui/button';
 import { GlobalCopilotQuickPrompts } from './GlobalCopilotQuickPrompts';
@@ -14,6 +14,7 @@ interface GlobalCopilotSurfaceProps {
   onPromptSelect: (prompt: string) => void;
   onSend: (message: string) => void;
   onClose: () => void;
+  onExpand?: () => void;
 }
 
 export function GlobalCopilotSurface({
@@ -25,6 +26,7 @@ export function GlobalCopilotSurface({
   onPromptSelect,
   onSend,
   onClose,
+  onExpand,
 }: GlobalCopilotSurfaceProps) {
   const isAccountContext = context.title === 'Team & Access';
   const isOperatingHomeContext = context.title === 'Operating Home';
@@ -62,6 +64,19 @@ export function GlobalCopilotSurface({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {onExpand ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9"
+                onClick={onExpand}
+                aria-label="Expand to full workspace"
+                title="Expand to full workspace"
+              >
+                <Maximize2 className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"

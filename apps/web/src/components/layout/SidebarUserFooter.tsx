@@ -95,7 +95,7 @@ export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
           </div>
 
           <div className="border-t border-slate-200 p-2 dark:border-zinc-800">
-            <NavLink to="/account?section=billing&plan=enterprise" onClick={close} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"><Sparkles className="size-4" />Upgrade to Enterprise / Pro</NavLink>
+            <NavLink to="/billing?tab=plans" onClick={close} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"><Sparkles className="size-4" />View plans & pricing</NavLink>
             <button type="button" onClick={() => void signOut()} className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-[13px] font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:text-zinc-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"><LogOut className="size-4" />Log Out</button>
           </div>
 

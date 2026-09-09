@@ -11,9 +11,11 @@ import {
   Phone,
   Plus,
   ReceiptText,
+  RotateCcw,
   Search,
   ShieldCheck,
   ShoppingBag,
+  SlidersHorizontal,
   Tag,
   Truck,
   UserRoundCheck,
@@ -31,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -155,6 +158,7 @@ const defaultFilters: CustomerAccountFilters = {
   ownerId: 'all',
   lifecycle: 'all',
   customerType: 'all',
+  channel: 'all',
 };
 
 const customerSubFloors: Array<{ id: CustomerSubFloor; label: string; detail: string }> = [
@@ -328,10 +332,11 @@ const customerProfileCopy = {
   },
 } as Record<Locale, any>;
 
-function resolveSubFloor(value: string | null): CustomerSubFloor {
+function resolveSubFloor(value: string | null, fallback: CustomerSubFloor = 'overview'): CustomerSubFloor {
   if (value === 'account' || value === 'contact' || value === 'tags') return 'account';
   if (value === 'identity') return value;
-  return 'overview';
+  if (value === 'overview') return value;
+  return fallback;
 }
 
 function humanize(value: string) {
@@ -471,14 +476,14 @@ function resolveAccountIdFromCustomerParam(accounts: CustomerAccount[], customer
     ?? '';
 }
 
-export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) {
+export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }: { snapshot: PrimeSnapshot; defaultSubFloor?: CustomerSubFloor }) {
   const { locale } = useI18n();
   const copy = customerProfileCopy[locale];
   const seed = useMemo(() => buildCustomerProfileFloor(snapshot), [snapshot]);
   const normalizedSeedAccounts = useMemo(() => seed.accounts.map(normalizeCustomerAccount), [seed.accounts]);
   const [searchParams, setSearchParams] = useSearchParams();
   const customerParam = searchParams.get('customer');
-  const activeSubFloor = resolveSubFloor(searchParams.get('floor'));
+  const activeSubFloor = resolveSubFloor(searchParams.get('floor'), defaultSubFloor);
   const { toast } = useToast();
   const [accounts, setAccounts] = useState(normalizedSeedAccounts);
   const [contacts, setContacts] = useState(seed.contacts);
@@ -516,6 +521,14 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
   const atRiskCount = accounts.filter((account) => account.lifecycle === 'at_risk' || account.status === 'watch').length;
   const ownerCoverage = accounts.length ? Math.round((accounts.filter((account) => Boolean(account.ownerId)).length / accounts.length) * 100) : 0;
   const primaryContactCoverage = accounts.length ? Math.round((accounts.filter((account) => contacts.some((contact) => contact.accountId === account.id && contact.isPrimary)).length / accounts.length) * 100) : 0;
+  const availableChannels = useMemo(() => Array.from(new Set(accounts.map((account) => account.profile?.primaryEcomChannel || account.source))).filter(Boolean).sort(), [accounts]);
+  const advancedFilterCount = [filters.tagId, filters.ownerId, filters.customerType].filter((value) => value !== 'all').length;
+  const hasActiveFilters = Boolean(filters.query.trim())
+    || filters.tagId !== 'all'
+    || filters.ownerId !== 'all'
+    || filters.lifecycle !== 'all'
+    || filters.customerType !== 'all'
+    || (filters.channel ?? 'all') !== 'all';
 
   useEffect(() => {
     if (!customerParam) return;
@@ -681,55 +694,89 @@ export function CustomerProfileFloor({ snapshot }: { snapshot: PrimeSnapshot }) 
             openAccountProfile(selectedAccountRecord);
           }}
         />
-      ) : (
-        <SubFloorPageHeader activeSubFloor={activeSubFloor} copy={copy} />
-      )}
+      ) : null}
 
       {activeSubFloor === 'account' ? (
       <section data-testid="account-subfloor">
         <Card className="rounded-lg border">
-          <CardHeader className="space-y-3">
+          <CardHeader className="space-y-4 p-4 md:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <CardTitle>{copy.account.title}</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.account.body}</p>
               </div>
-              <Button onClick={openCreateAccount}>
+              <Button onClick={openCreateAccount} className="h-10 shrink-0">
                 <Plus className="size-4" />
                 {copy.account.create}
               </Button>
             </div>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-              <div className="relative xl:col-span-2">
-                <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={filters.query}
                   onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
                   placeholder={copy.account.search}
-                  className="pl-9"
+                  className="h-10 pl-9"
                 />
               </div>
-              <FilterSelect label={copy.account.tag} value={filters.tagId} onValueChange={(tagId) => setFilters((current) => ({ ...current, tagId }))}>
-                <SelectItem value="all">{copy.account.allTags}</SelectItem>
-                {tags.map((tag) => <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>)}
-              </FilterSelect>
-              <FilterSelect label={copy.account.owner} value={filters.ownerId} onValueChange={(ownerId) => setFilters((current) => ({ ...current, ownerId }))}>
-                <SelectItem value="all">{copy.account.allOwners}</SelectItem>
-                {seed.owners.map((owner) => <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>)}
-              </FilterSelect>
-              <FilterSelect label={copy.account.lifecycle} value={filters.lifecycle} onValueChange={(lifecycle) => setFilters((current) => ({ ...current, lifecycle }))}>
-                <SelectItem value="all">{copy.account.allLifecycle}</SelectItem>
-                {lifecycleOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-              </FilterSelect>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              <FilterSelect label={copy.account.customerType} value={filters.customerType} onValueChange={(customerType) => setFilters((current) => ({ ...current, customerType }))}>
-                <SelectItem value="all">{copy.account.allCustomerTypes}</SelectItem>
-                {customerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-              </FilterSelect>
-              <Button variant="outline" onClick={() => setFilters(defaultFilters)}>
-                {copy.account.reset}
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:shrink-0">
+                <div className="lg:w-44">
+                  <FilterSelect label={copy.account.lifecycle} value={filters.lifecycle} onValueChange={(lifecycle) => setFilters((current) => ({ ...current, lifecycle }))}>
+                    <SelectItem value="all">{copy.account.allLifecycle}</SelectItem>
+                    {lifecycleOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                  </FilterSelect>
+                </div>
+                <div className="lg:w-48">
+                  <FilterSelect label="Sales channel" value={filters.channel ?? 'all'} onValueChange={(channel) => setFilters((current) => ({ ...current, channel }))}>
+                    <SelectItem value="all">All sales channels</SelectItem>
+                    {availableChannels.map((channel) => <SelectItem key={channel} value={channel}>{channel}</SelectItem>)}
+                  </FilterSelect>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-10 flex-1 gap-2 lg:flex-none" aria-label={`More filters${advancedFilterCount ? `, ${advancedFilterCount} active` : ''}`}>
+                      <SlidersHorizontal className="size-4" />
+                      More filters
+                      {advancedFilterCount ? <Badge variant="secondary" className="h-5 min-w-5 justify-center rounded-full px-1.5 text-[11px]">{advancedFilterCount}</Badge> : null}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-[min(340px,calc(100vw-2rem))] space-y-4 p-4">
+                    <div>
+                      <div className="font-medium">More filters</div>
+                      <p className="mt-1 text-xs text-muted-foreground">Narrow the customer list by ownership and profile classification.</p>
+                    </div>
+                    <div className="grid gap-3">
+                      <FilterField label={copy.account.tag}>
+                        <FilterSelect label={copy.account.tag} value={filters.tagId} onValueChange={(tagId) => setFilters((current) => ({ ...current, tagId }))}>
+                          <SelectItem value="all">{copy.account.allTags}</SelectItem>
+                          {tags.map((tag) => <SelectItem key={tag.id} value={tag.id}>{tag.label}</SelectItem>)}
+                        </FilterSelect>
+                      </FilterField>
+                      <FilterField label={copy.account.owner}>
+                        <FilterSelect label={copy.account.owner} value={filters.ownerId} onValueChange={(ownerId) => setFilters((current) => ({ ...current, ownerId }))}>
+                          <SelectItem value="all">{copy.account.allOwners}</SelectItem>
+                          {seed.owners.map((owner) => <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>)}
+                        </FilterSelect>
+                      </FilterField>
+                      <FilterField label={copy.account.customerType}>
+                        <FilterSelect label={copy.account.customerType} value={filters.customerType} onValueChange={(customerType) => setFilters((current) => ({ ...current, customerType }))}>
+                          <SelectItem value="all">{copy.account.allCustomerTypes}</SelectItem>
+                          {customerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                        </FilterSelect>
+                      </FilterField>
+                    </div>
+                    {advancedFilterCount ? <Button variant="ghost" size="sm" className="w-full" onClick={() => setFilters((current) => ({ ...current, tagId: 'all', ownerId: 'all', customerType: 'all' }))}>Clear additional filters</Button> : null}
+                  </PopoverContent>
+                </Popover>
+                {hasActiveFilters ? (
+                  <Button variant="ghost" size="icon" className="size-10 shrink-0" onClick={() => setFilters(defaultFilters)} aria-label={copy.account.reset} title={copy.account.reset}>
+                    <RotateCcw className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -937,13 +984,22 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger aria-label={label}>
+      <SelectTrigger aria-label={label} className="h-10 w-full">
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>
         {children}
       </SelectContent>
     </Select>
+  );
+}
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      {children}
+    </div>
   );
 }
 
@@ -1072,21 +1128,6 @@ function CustomerRelationshipOverview({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function SubFloorPageHeader({ activeSubFloor, copy }: { activeSubFloor: Exclude<CustomerSubFloor, 'overview'>; copy: (typeof customerProfileCopy)[Locale] }) {
-  return (
-    <section className="rounded-lg border bg-card p-4" data-testid="customer-subfloor-page-header">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{copy.floor}</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-normal">{copy.nav[activeSubFloor][0]}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{copy.nav[activeSubFloor][1]}</p>
-        </div>
-        <Badge variant="outline">{copy.subPage}</Badge>
-      </div>
-    </section>
   );
 }
 

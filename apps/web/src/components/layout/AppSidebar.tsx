@@ -8,20 +8,19 @@ import {
   BarChart3,
   Building2,
   Boxes,
-  CalendarClock,
   ChevronRight,
   CircleHelp,
-  Clock3,
   ClipboardCheck,
   CreditCard,
   FilePlus2,
-  Gift,
   Globe2,
   Home,
   Image,
   LayoutGrid,
+  Layers3,
   Link2,
   Menu,
+  Megaphone,
   MessageSquare,
   MonitorSmartphone,
   Package,
@@ -39,7 +38,6 @@ import {
   Undo2,
   UsersRound,
   Warehouse,
-  WalletCards,
   type LucideIcon,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -62,16 +60,19 @@ type SearchResult = NavItem & { trail: string[]; parentIds: string[] };
 const mainNavigation: NavGroup[] = [
   { id: 'overview', label: 'Overview', items: [
     { id: 'home', label: 'Home', href: '/admin/dashboard', icon: Home },
+    { id: 'prime-ai', label: 'Prime AI', href: '/prime-ai', icon: Sparkles },
     { id: 'analytics', label: 'Analytics', href: '/client-reports', icon: BarChart3 },
   ] },
   { id: 'operations', label: 'Operations', items: [
     { id: 'orders', label: 'Orders', href: '/orders', icon: ShoppingBag },
     { id: 'products', label: 'Products', icon: Package, children: [
       { id: 'master-catalog', label: 'Product Master', href: '/products/master-catalog', icon: Boxes },
+      { id: 'channel-listings', label: 'Channel Listings', href: '/products/channel-listings', icon: Layers3 },
       { id: 'product-categories', label: 'Categories & Attributes', href: '/products/categories', icon: Tags },
     ] },
     { id: 'warehouse', label: 'Warehouses', icon: Warehouse, children: [
       { id: 'warehouse-mapping', label: 'Locations & Mapping', href: '/warehouse/mapping', icon: Link2 },
+      { id: 'warehouse-stock', label: 'Stock Levels', href: '/warehouse/stock', icon: Boxes },
       { id: 'warehouse-transfers', label: 'Stock Transfers', href: '/warehouse/transfers', icon: ArrowRightLeft },
       { id: 'warehouse-adjustments', label: 'Stock Adjustments', href: '/warehouse/adjustments', icon: ClipboardCheck },
     ] },
@@ -82,27 +83,12 @@ const mainNavigation: NavGroup[] = [
     ] },
   ] },
   { id: 'growth', label: 'Growth & Engagement', items: [
-    { id: 'customers', label: 'Customers', icon: UsersRound, children: [
-      { id: 'customer-directory', label: 'Customer Directory', href: '/crm/customers', icon: UsersRound },
-      { id: 'contact-leads', label: 'Contact Leads', href: '/crm/contact-leads', icon: MessageSquare },
-      { id: 'segments-tags', label: 'Segments & Tags', href: '/crm/segments', icon: Tags },
-      { id: 'quick-replies', label: 'Quick Replies', href: '/crm/quick-replies', icon: MessageSquare },
-      { id: 'cs-analytics', label: 'CS Analytics', href: '/crm/cs-analytics', icon: BarChart3 },
-    ] },
-    { id: 'promotions', label: 'Promotions', icon: BadgePercent, children: [
-      { id: 'discount-codes', label: 'Discount Codes', href: '/promotions/discount-codes', icon: BadgePercent },
-      { id: 'automatic-discounts', label: 'Automatic Discounts', href: '/promotions/automatic', icon: Sparkles },
-      { id: 'flash-sale', label: 'Flash Sale', href: '/promotions/flash-sale', icon: Clock3 },
-      { id: 'loyalty', label: 'Loyalty & Membership', href: '/promotions/loyalty', icon: Gift },
-      { id: 'promotion-analytics', label: 'Promotion Analytics', href: '/promotions/analytics', icon: BarChart3 },
-    ] },
+    { id: 'customers', label: 'Customers', href: '/customers', icon: UsersRound },
+    { id: 'marketing', label: 'Marketing', href: '/marketing', icon: Megaphone },
+    { id: 'promotions', label: 'Promotions', href: '/promotions', icon: BadgePercent },
   ] },
-  { id: 'automation', label: 'Automation', items: [
-    { id: 'scheduled-tasks', label: 'Scheduled Tasks', href: '/automation/scheduled-tasks', icon: CalendarClock },
-  ] },
-  { id: 'finance-billing', label: 'Finance & Billing', items: [
-    { id: 'finance-ops', label: 'Finance Ops', href: '/finance/ops', icon: WalletCards },
-    { id: 'billing', label: 'Invoice Management', href: '/finance/invoices', icon: CreditCard },
+  { id: 'plan-billing', label: 'Billing', items: [
+    { id: 'plan-billing', label: 'Plan & Billing', href: '/billing', icon: CreditCard },
   ] },
   { id: 'system', label: 'System', items: [
     { id: 'settings', label: 'Settings', icon: Settings2, children: [
@@ -137,7 +123,7 @@ const posNavigation: NavGroup[] = [{ id: 'pos', label: 'Point of Sale', items: [
 function hrefIsActive(href: string | undefined, pathname: string, search: string) {
   if (!href) return false;
   const [hrefPath, hrefSearch = ''] = href.split('?');
-  const reservedProductRoutes = new Set(['master-catalog', 'categories', 'inventory', 'new']);
+  const reservedProductRoutes = new Set(['master-catalog', 'channel-listings', 'categories', 'inventory', 'new']);
   const productSegments = pathname.split('/').filter(Boolean);
   const isProductEditorRoute = pathname === '/products/new'
     || (productSegments[0] === 'products' && productSegments.length >= 2 && !reservedProductRoutes.has(productSegments[1]) && (productSegments.length === 2 || (productSegments.length === 3 && productSegments[2] === 'edit')));

@@ -2,8 +2,8 @@
 
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalCopilotWorkspace } from './GlobalCopilotWorkspace';
 
@@ -63,17 +63,21 @@ vi.mock('@/components/ui/tooltip', () => ({
 }));
 
 vi.mock('./GlobalCopilotSurface', () => ({
-  GlobalCopilotSurface: ({ context, onClose }: { context: { title: string }; onClose: () => void }) => (
+  GlobalCopilotSurface: ({ context, onClose, onExpand }: { context: { title: string }; onClose: () => void; onExpand: () => void }) => (
     <div data-testid="assistant-surface">
       {context.title}
+      <button type="button" onClick={onExpand}>Expand to full workspace</button>
       <button type="button" onClick={onClose}>Close Prime AI</button>
     </div>
   ),
 }));
 
 vi.mock('./GlobalCopilotDrawer', () => ({
-  GlobalCopilotDrawer: ({ open }: { open: boolean }) => (
-    <div data-testid="assistant-drawer">{open ? 'open' : 'closed'}</div>
+  GlobalCopilotDrawer: ({ open, onExpand }: { open: boolean; onExpand: () => void }) => (
+    <div data-testid="assistant-drawer">
+      {open ? 'open' : 'closed'}
+      {open ? <button type="button" onClick={onExpand}>Expand to full workspace</button> : null}
+    </div>
   ),
 }));
 
@@ -85,11 +89,15 @@ vi.mock('./GlobalCopilotFAB', () => ({
   ),
 }));
 
+function LocationProbe() {
+  return <span data-testid="location">{useLocation().pathname}</span>;
+}
+
 function renderWorkspace() {
   return render(
     <MemoryRouter initialEntries={['/orders']}>
       <GlobalCopilotWorkspace>
-        <div>main content</div>
+        <div>main content<LocationProbe /></div>
       </GlobalCopilotWorkspace>
     </MemoryRouter>,
   );
@@ -129,43 +137,45 @@ describe('GlobalCopilotWorkspace', () => {
     mockEngine.initialize.mockClear();
   });
 
-  it('initializes the engine and opens the desktop assistant when toggled', () => {
+  it('initializes the engine and opens the contextual desktop panel from the header event', () => {
     renderWorkspace();
 
     expect(screen.getByText('main content')).toBeInTheDocument();
     expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTestId('assistant-fab'));
+    act(() => window.dispatchEvent(new CustomEvent('prime-ai:open')));
     expect(screen.getByTestId('assistant-surface')).toHaveTextContent('Orders');
   });
 
-  it('persists desktop assistant preference in local storage', () => {
+  it('expands the contextual panel into the full Prime AI workspace', () => {
     renderWorkspace();
 
-    expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('closed');
-
-    fireEvent.click(screen.getByTestId('assistant-fab'));
-    expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('open');
+    act(() => window.dispatchEvent(new CustomEvent('prime-ai:open')));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand to full workspace' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/prime-ai');
+    expect(screen.queryByTestId('assistant-surface')).not.toBeInTheDocument();
   });
 
   it('closes the desktop assistant without clearing the conversation', () => {
     renderWorkspace();
 
-    fireEvent.click(screen.getByTestId('assistant-fab'));
+    act(() => window.dispatchEvent(new CustomEvent('prime-ai:open')));
     fireEvent.click(screen.getByRole('button', { name: 'Close Prime AI' }));
 
     expect(screen.queryByTestId('assistant-surface')).not.toBeInTheDocument();
     expect(mockEngine.clearMessages).not.toHaveBeenCalled();
-    expect(window.localStorage.getItem('prime.assistant.floating-open')).toBe('closed');
   });
 
-  it('falls back to FAB + drawer on mobile and opens the drawer on click', () => {
+  it('uses an overlay drawer on mobile and can expand it to the workspace', () => {
     desktopMode = false;
 
     renderWorkspace();
 
     expect(screen.getByTestId('assistant-drawer')).toHaveTextContent('closed');
-    fireEvent.click(screen.getByTestId('assistant-fab'));
+    act(() => window.dispatchEvent(new CustomEvent('prime-ai:open')));
     expect(screen.getByTestId('assistant-drawer')).toHaveTextContent('open');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand to full workspace' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/prime-ai');
+    expect(screen.getByTestId('assistant-drawer')).toHaveTextContent('closed');
   });
 });

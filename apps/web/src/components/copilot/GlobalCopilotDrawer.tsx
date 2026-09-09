@@ -13,6 +13,7 @@ interface GlobalCopilotDrawerProps {
   onPromptSelect: (prompt: string) => void;
   onSend: (message: string) => void;
   onClear: () => void;
+  onExpand: () => void;
 }
 
 export function GlobalCopilotDrawer({
@@ -26,12 +27,13 @@ export function GlobalCopilotDrawer({
   onPromptSelect,
   onSend,
   onClear,
+  onExpand,
 }: GlobalCopilotDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col p-0 sm:w-[480px]"
+        className="flex w-full flex-col p-0 sm:w-[460px] sm:max-w-[460px]"
       >
         <SheetHeader className="sr-only">
           <SheetTitle>Prime AI</SheetTitle>
@@ -46,6 +48,7 @@ export function GlobalCopilotDrawer({
           onPromptSelect={onPromptSelect}
           onSend={onSend}
           onClear={onClear}
+          onExpand={onExpand}
         />
       </SheetContent>
     </Sheet>

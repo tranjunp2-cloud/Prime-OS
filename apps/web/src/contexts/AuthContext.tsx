@@ -21,11 +21,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const prototypeAccount: PrimeAccount = {
+  id: 'prototype-admin',
+  role: 'admin',
+  fullName: 'PrimeOS Admin',
+  email: 'admin@primeos.local',
+  workspace: 'Main Workspace',
+  seatType: 'full_admin',
+};
+
+const prototypeSession: PrimeSession = {
+  role: 'admin',
+  roleLabel: 'Admin',
+  description: 'Prototype administrator',
+  canReset: true,
+  canWrite: true,
+  visibleResources: ['*'],
+  writableResources: ['*'],
+  hiddenResources: [],
+  resourcePermissions: {},
+  account: prototypeAccount,
+  token: 'primeos-prototype-token',
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<PrimeAccount | null>(null);
-  const [session, setSession] = useState<PrimeSession | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const prototypeMode = import.meta.env.VITE_PRIME_PROTOTYPE === 'true';
+  const [user, setUser] = useState<PrimeAccount | null>(prototypeMode ? prototypeAccount : null);
+  const [session, setSession] = useState<PrimeSession | null>(prototypeMode ? prototypeSession : null);
+  const [token, setToken] = useState<string | null>(prototypeMode ? 'primeos-prototype-token' : null);
+  const [loading, setLoading] = useState(!prototypeMode);
 
   const applySession = useCallback((nextToken: string, nextSession: PrimeSession) => {
     setPrimeAuthToken(nextToken);
@@ -42,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (prototypeMode) return;
     const restoreSession = async () => {
       const storedToken = getPrimeAuthToken();
       if (!storedToken) {
@@ -64,9 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     void restoreSession();
-  }, [applySession, clearSession]);
+  }, [applySession, clearSession, prototypeMode]);
 
   const signIn = async (email: string, password: string) => {
+    if (prototypeMode) return { error: null, session: prototypeSession };
     try {
       const response = await fetch(`${resolvePrimeBackendBase()}/api/auth/login`, {
         method: 'POST',
@@ -86,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (prototypeMode) return;
     const currentToken = token || getPrimeAuthToken();
     if (currentToken) {
       await fetch(`${resolvePrimeBackendBase()}/api/auth/logout`, {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useGlobalCopilotEngine } from '@/hooks/use-global-copilot-engine';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { GlobalCopilotDrawer } from './GlobalCopilotDrawer';
@@ -9,6 +10,8 @@ interface GlobalCopilotWorkspaceProps {
 }
 
 export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const isDesktopAssistant = useMediaQuery('(min-width: 1280px)');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -46,6 +49,15 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
     };
   }, [isDesktopAssistant]);
 
+  const expandToWorkspace = () => {
+    if (location.pathname !== '/prime-ai') {
+      window.sessionStorage.setItem('prime-ai.return-location', `${location.pathname}${location.search}${location.hash}`);
+    }
+    setMobileOpen(false);
+    setIsAssistantOpen(false);
+    navigate('/prime-ai');
+  };
+
   if (!isDesktopAssistant) {
     return (
       <>
@@ -60,6 +72,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
           onPromptSelect={sendMessage}
           onSend={sendMessage}
           onClear={clearMessages}
+          onExpand={expandToWorkspace}
         />
       </>
     );
@@ -81,6 +94,7 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
             onPromptSelect={sendMessage}
             onSend={sendMessage}
             onClose={() => setIsAssistantOpen(false)}
+            onExpand={expandToWorkspace}
           />
         </aside>
       ) : null}

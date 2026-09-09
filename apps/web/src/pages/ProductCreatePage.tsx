@@ -1127,6 +1127,12 @@ export default function ProductCreatePage() {
   });
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishPercent, setPublishPercent] = useState(0);
+  const [readinessStatus, setReadinessStatus] = useState<'unchecked' | 'checking' | 'blocked' | 'ready' | 'published'>(
+    existingProduct?.status === 'published' ? 'published' : 'unchecked',
+  );
+  const [readinessReviewOpen, setReadinessReviewOpen] = useState(false);
+  const [publishConfirmationOpen, setPublishConfirmationOpen] = useState(false);
+  const [, setDraftSaveGeneration] = useState(0);
   const [dirtyTrackingReady, setDirtyTrackingReady] = useState(false);
   const [hasScrolledFromTop, setHasScrolledFromTop] = useState(false);
   const baselineSnapshotRef = useRef('');
@@ -1228,14 +1234,14 @@ export default function ProductCreatePage() {
     setConfirmDialog({ open: false, target: 'single' });
   }
 
-  function handleSave(statusOverride?: Product['status']) {
+  function handleSave(statusOverride?: Product['status'], options: { navigateAfter?: boolean } = {}) {
     if (uploadingImageCount > 0) {
       toast({
         title: copy.imagesStillUploading,
         description: copy.waitForUploads,
         variant: 'destructive',
       });
-      return;
+      return false;
     }
 
     const e: Record<string, string> = {};
@@ -1257,7 +1263,7 @@ export default function ProductCreatePage() {
     if (Object.keys(e).length > 0) {
       setErrors(e);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+      return false;
     }
 
     const now = new Date().toISOString();
@@ -1347,7 +1353,13 @@ export default function ProductCreatePage() {
       toast({ title: copy.created, description: formatMessage(copy.createdDescription, { name: payload.name }) });
     }
 
-    navigate('/products/master-catalog');
+    baselineSnapshotRef.current = latestSnapshotRef.current;
+    setDraftSaveGeneration(value => value + 1);
+    if (statusOverride === 'published') setReadinessStatus('published');
+    else setReadinessStatus('unchecked');
+    if (options.navigateAfter !== false) navigate('/products/master-catalog');
+    else if (!existingProduct) navigate(`/products/${payload.id}/edit`, { replace: true });
+    return true;
   }
 
   const totalStock = Object.values(inventory).reduce((s, v) => s + num(v), 0);
@@ -1438,18 +1450,54 @@ export default function ProductCreatePage() {
     return () => target.removeEventListener('scroll', updateScrollState);
   }, []);
 
-  function beginPublish() {
-    if (!form.sku_code.trim() || !form.name.trim() || !form.category) {
-      handleSave();
-      return;
+  useEffect(() => {
+    if (isDirty && readinessStatus !== 'unchecked' && readinessStatus !== 'checking') {
+      setReadinessStatus('unchecked');
     }
+  }, [isDirty, readinessStatus]);
+
+  function checkReadiness() {
+    if (isDirty) return;
+    setReadinessStatus('checking');
+    window.setTimeout(() => {
+      const nextStatus = completionChecks.every(check => check.done) ? 'ready' : 'blocked';
+      setReadinessStatus(nextStatus);
+      if (nextStatus === 'blocked') setReadinessReviewOpen(true);
+      toast({
+        title: nextStatus === 'ready' ? 'Product is ready to publish' : 'Product needs attention',
+        description: nextStatus === 'ready'
+          ? 'The saved draft passed all prototype readiness checks.'
+          : 'Review the incomplete requirements before publishing.',
+        variant: nextStatus === 'ready' ? undefined : 'destructive',
+      });
+    }, 650);
+  }
+
+  function beginPublish() {
+    if (readinessStatus !== 'ready' || isDirty) return;
+    setPublishConfirmationOpen(false);
     setPublishOpen(true);
     setPublishPercent(8);
     [24, 42, 68, 86, 100].forEach((value, index) => {
-      window.setTimeout(() => setPublishPercent(value), 600 * (index + 1));
+      window.setTimeout(() => setPublishPercent(value), 360 * (index + 1));
     });
-    window.setTimeout(() => handleSave('published'), 3900);
+    window.setTimeout(() => {
+      handleSave('published', { navigateAfter: false });
+      toast({ title: 'Product revision published', description: 'Channel listings remain separate and ready for submission.' });
+    }, 2200);
   }
+
+  const primaryAction = isDirty
+    ? 'save'
+    : readinessStatus === 'checking'
+      ? 'checking'
+      : readinessStatus === 'blocked'
+        ? 'review'
+        : readinessStatus === 'ready'
+          ? 'publish'
+          : readinessStatus === 'published'
+            ? 'published'
+            : 'check';
 
   if (editId && !existingProduct) return null;
 
@@ -1474,14 +1522,34 @@ export default function ProductCreatePage() {
           </div> : null}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Button variant="ghost" className="text-primary hover:bg-primary/5 hover:text-primary" onClick={() => handleSave('draft')} disabled={uploadingImageCount > 0 || !isDirty}>
+          <Button variant="ghost" className="text-primary hover:bg-primary/5 hover:text-primary" onClick={() => handleSave('draft', { navigateAfter: false })} disabled={uploadingImageCount > 0 || !isDirty}>
             {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             Save Draft
           </Button>
-          <Button onClick={beginPublish} disabled={uploadingImageCount > 0 || publishOpen}>
-            {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : <CloudUpload className="size-4" />}
-            Save & Publish
+          <Button
+            onClick={() => {
+              if (primaryAction === 'save') handleSave('draft', { navigateAfter: false });
+              if (primaryAction === 'check') checkReadiness();
+              if (primaryAction === 'review') setReadinessReviewOpen(true);
+              if (primaryAction === 'publish') setPublishConfirmationOpen(true);
+            }}
+            disabled={uploadingImageCount > 0 || publishOpen || primaryAction === 'checking' || primaryAction === 'published'}
+          >
+            {uploadingImageCount > 0 || primaryAction === 'checking' ? <Loader2 className="size-4 animate-spin" /> : primaryAction === 'publish' || primaryAction === 'published' ? <CloudUpload className="size-4" /> : primaryAction === 'review' ? <CircleAlert className="size-4" /> : primaryAction === 'check' ? <PackageCheck className="size-4" /> : <Save className="size-4" />}
+            {primaryAction === 'save' ? 'Save changes' : primaryAction === 'checking' ? 'Checking readiness…' : primaryAction === 'review' ? 'Review issues' : primaryAction === 'publish' ? 'Publish changes' : primaryAction === 'published' ? 'Published' : 'Check readiness'}
           </Button>
+        </div>
+      </div>
+
+      <div className="border-b bg-muted/20 px-4 py-2 sm:px-6" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+          <span className="font-semibold text-foreground">Prototype workflow</span>
+          {[
+            { id: 'draft', label: 'Draft saved', done: !isDirty },
+            { id: 'readiness', label: 'Readiness checked', done: readinessStatus === 'ready' || readinessStatus === 'published' },
+            { id: 'published', label: 'Revision published', done: readinessStatus === 'published' },
+          ].map((step, index) => <div key={step.id} className="flex items-center gap-2"><span className={`grid size-5 place-items-center rounded-full border text-[10px] font-bold ${step.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-border bg-background text-muted-foreground'}`}>{step.done ? <Check className="size-3" /> : index + 1}</span><span className={step.done ? 'font-medium text-foreground' : 'text-muted-foreground'}>{step.label}</span></div>)}
+          {isDirty ? <span className="ml-auto font-medium text-amber-700">Unsaved changes</span> : null}
         </div>
       </div>
 
@@ -1987,18 +2055,38 @@ export default function ProductCreatePage() {
         cancelText={copy.keepVariants}
         variant="destructive"
       />
+      <Dialog open={readinessReviewOpen} onOpenChange={setReadinessReviewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Review product readiness</DialogTitle><DialogDescription>Complete these master-data requirements, save the draft, then run the check again.</DialogDescription></DialogHeader>
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto py-2" role="status">
+            {completionChecks.map(check => <button key={check.id} type="button" onClick={() => { setReadinessReviewOpen(false); scrollToSection(check.id === 'identity' || check.id === 'content' || check.id === 'category' ? 'basic' : check.id === 'media' ? 'more' : check.id === 'price' || check.id === 'variants' ? 'pricing' : check.id === 'shipping' ? 'shipping' : 'channels'); }} className="flex min-h-12 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              {check.done ? <CircleCheck className="size-5 shrink-0 text-emerald-600" /> : <CircleAlert className="size-5 shrink-0 text-amber-600" />}
+              <span className={`text-sm ${check.done ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>{check.label}</span>
+              <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+            </button>)}
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-4"><Button variant="outline" onClick={() => setReadinessReviewOpen(false)}>Close</Button><Button disabled={isDirty || !completionChecks.every(check => check.done)} onClick={() => { setReadinessReviewOpen(false); checkReadiness(); }}>Run check again</Button></div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={publishConfirmationOpen} onOpenChange={setPublishConfirmationOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Publish this Product revision?</DialogTitle><DialogDescription>The saved master data becomes the current canonical revision. Marketplace listings will not be submitted automatically.</DialogDescription></DialogHeader>
+          <div className="rounded-lg border bg-muted/30 p-4 text-sm"><div className="flex items-center justify-between"><span className="text-muted-foreground">Master SKU</span><strong className="font-mono">{form.sku_code}</strong></div><div className="mt-2 flex items-center justify-between"><span className="text-muted-foreground">Ready channels</span><strong>{readiness.filter(channel => channel.state === 'ready').length}</strong></div></div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPublishConfirmationOpen(false)}>Cancel</Button><Button onClick={beginPublish}><CloudUpload className="size-4" />Publish revision</Button></div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={publishOpen} onOpenChange={open => { if (publishPercent >= 100) setPublishOpen(open); }}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Publishing product</DialogTitle><DialogDescription>Prime OS is saving master data and synchronizing every enabled channel.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{publishPercent >= 100 ? 'Product revision published' : 'Publishing Product revision'}</DialogTitle><DialogDescription>{publishPercent >= 100 ? 'The canonical master record is current. Channel listings are ready for their own submission flow.' : 'Prime OS is freezing the reviewed master data into a canonical revision.'}</DialogDescription></DialogHeader>
           <div className="space-y-5 py-2">
             <div><div className="mb-2 flex items-center justify-between text-sm font-semibold"><span>Overall sync progress</span><span className="tabular-nums text-primary">{publishPercent}%</span></div><Progress value={publishPercent} className="h-2.5" /></div>
             <div className="space-y-2">
               {[
-                { label: 'Master DB Saved', threshold: 24 },
-                { label: 'Media Uploaded', threshold: 42 },
-                { label: 'Shopee Synced', threshold: 68 },
-                { label: 'TikTok Synced', threshold: 86 },
-                { label: 'WebStore Published', threshold: 100 },
+                { label: 'Draft snapshot saved', threshold: 24 },
+                { label: 'Readiness evidence verified', threshold: 42 },
+                { label: 'Product facts frozen', threshold: 68 },
+                { label: 'Canonical revision activated', threshold: 86 },
+                { label: 'Channel listings queued', threshold: 100 },
               ].map((step, index) => {
                 const complete = publishPercent >= step.threshold;
                 const active = !complete && (index === 0 || publishPercent >= [0, 24, 42, 68, 86][index]);
@@ -2009,6 +2097,7 @@ export default function ProductCreatePage() {
                 </div>;
               })}
             </div>
+            {publishPercent >= 100 ? <div className="flex justify-end"><Button onClick={() => { setPublishOpen(false); navigate('/products/master-catalog'); }}>Return to Product Master</Button></div> : null}
           </div>
         </DialogContent>
       </Dialog>

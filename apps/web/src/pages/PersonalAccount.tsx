@@ -31,6 +31,14 @@ export function PersonalAccountPanel({ embedded = false }: { embedded?: boolean 
   const [securityAlerts, setSecurityAlerts] = useState(true);
 
   const request = useMemo(() => async <T,>(path: string, init?: RequestInit) => {
+    if (import.meta.env.VITE_PRIME_PROTOTYPE === 'true' && path === '/api/v1/me') {
+      const nextName = init?.body ? (JSON.parse(String(init.body)) as { display_name?: string }).display_name : undefined;
+      return { data: {
+        principal: { email: 'admin@primeos.local', display_name: nextName || 'PrimeOS Admin', auth_methods: ['Password'] },
+        membership: { role_key: 'admin', seat_type: 'full_admin', last_active_at: new Date().toISOString() },
+        workspace: { name: 'Main Workspace' },
+      } } as T;
+    }
     const headers = createPrimeAuthHeaders(token);
     if (init?.body) headers.set('Content-Type', 'application/json');
     const response = await fetch(`${resolvePrimeBackendBase()}${path}`, { ...init, headers });

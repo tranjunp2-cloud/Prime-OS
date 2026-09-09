@@ -2,22 +2,24 @@ import { Navigate, Route, useLocation } from "react-router-dom";
 import Service from "@/pages/Service";
 import { PrimeFinSupportPage } from "@/pages/prime/PrimeFinSupportPage";
 import { PrimeMdecPage } from "@/pages/prime/PrimeMdecPage";
-import { PrimeCrmSourcesPage, PrimeTowerPage } from "@/pages/prime/PrimeTowerPage";
+import { PrimeTowerPage } from "@/pages/prime/PrimeTowerPage";
 import { CommerceSurfacePage } from "@/pages/prime/CommerceSurfacePage";
 import { PrimeGrowthOSPage } from "@/pages/prime/PrimeGrowthOSPage";
 import { PrimeClientReportsPage } from "@/pages/prime/PrimeClientReportsPage";
 import PrimeCrmOperatorDashboard from "@/pages/PrimeCrmOperatorDashboard";
-import { PrimeCrmOverviewPage } from "@/pages/prime/PrimeCrmOverviewPage";
+import { PrimeCrmCustomersPage } from "@/pages/prime/PrimeCrmCustomersPage";
+import { PrimeMarketingPage } from "@/pages/prime/PrimeMarketingPage";
 import Orders from "@/pages/Orders";
 import Products from "@/pages/Products";
 import ProductCreatePage from "@/pages/ProductCreatePage";
 import ProductDetail from "@/pages/ProductDetail";
+import AmazonListingDetail from "@/pages/AmazonListingDetail";
+import ChannelListingDetail from "@/pages/ChannelListingDetail";
 import ProductCategories from "@/pages/ProductCategories";
 import Warehouses from "@/pages/Warehouses";
 import PrimeInboxWorkspace from "@/pages/PrimeInboxWorkspace";
 import FaqHub from "@/pages/FaqHub";
 import FaqArticle from "@/pages/FaqArticle";
-import { CsAnalyticsPage, QuickRepliesPage } from "@/pages/CrmManagementTools";
 import ConversationChannelsPage from "@/pages/ConversationChannels";
 import { ConnectedChannelsPage } from "@/pages/SalesChannels";
 import LiveCommercePage from "@/pages/LiveCommerce";
@@ -28,14 +30,9 @@ import PromotionsManagement from "@/pages/PromotionsManagement";
 import { TouchpointWorkspace } from "@/pages/TouchpointWorkspace";
 import ScheduledTasksPage from "@/pages/ScheduledTasks";
 import FinanceOps from "@/pages/FinanceOps";
+import PrimeAiWorkspacePage from "@/pages/prime/PrimeAiWorkspacePage";
 import Docs from "@/pages/Docs";
-import {
-  PrimeCrmCampaignsSimplePage,
-  PrimeCrmCustomersSimplePage,
-  PrimeCrmLeadsSimplePage,
-  PrimeCrmReengagementSimplePage,
-  PrimeCrmSourcesSimplePage,
-} from "@/pages/prime/PrimeCrmJourneyPages";
+import PlanBillingPage from "@/pages/PlanBillingPage";
 
 const cosOverviewHref = "/overview?module=cos";
 const cosCatalogHref = `${cosOverviewHref}&view=pim`;
@@ -71,8 +68,10 @@ export function PrimeRoutes() {
     <Route path="/workspaces/primeweb" element={<Navigate to="/builder/theme" replace />} />
     <Route path="/workspaces/pos" element={<Navigate to="/pos/register" replace />} />
     <Route path="/client-reports" element={<PrimeClientReportsPage />} />
+    <Route path="/prime-ai" element={<PrimeAiWorkspacePage />} />
     <Route path="/reports" element={<Navigate to="/client-reports" replace />} />
     <Route path="/account" element={<Navigate to="/settings/team-access?tab=my-account" replace />} />
+    <Route path="/billing" element={<PlanBillingPage />} />
     <Route path="/system/invoices" element={<InvoiceManagement />} />
     <Route path="/finance/invoices" element={<InvoiceManagement />} />
     <Route path="/finance/ops" element={<FinanceOps />} />
@@ -91,21 +90,23 @@ export function PrimeRoutes() {
     <Route path="/settings/templates-hardware" element={<Navigate to="/settings/templates-notifications" replace />} />
     <Route path="/settings/*" element={<BusinessSettings />} />
     
-    <Route path="/crm" element={<Navigate to="/customer/service" replace />} />
-    <Route path="/crm/overview" element={<PrimeCrmOverviewPage />} />
+    <Route path="/customers" element={<PrimeCrmCustomersPage />} />
+    <Route path="/marketing" element={<PrimeMarketingPage />} />
+    <Route path="/crm" element={<Navigate to="/marketing" replace />} />
+    <Route path="/crm/overview" element={<Navigate to="/marketing?view=overview" replace />} />
     <Route path="/crm/hub" element={<Navigate to="/customer/service" replace />} />
     <Route path="/crm/chat" element={<Navigate to="/customer/service" replace />} />
     <Route path="/crm/operator" element={<PrimeCrmOperatorDashboard />} />
     <Route path="/crm/mdec" element={<PrimeMdecPage />} />
-    <Route path="/crm/sources" element={<PrimeCrmSourcesSimplePage />} />
-    <Route path="/crm/campaigns" element={<PrimeCrmCampaignsSimplePage />} />
-    <Route path="/crm/content-social" element={<PrimeTowerPage towerId="content-creator-ops" />} />
-    <Route path="/crm/leads-rfqs" element={<PrimeCrmLeadsSimplePage />} />
-    <Route path="/crm/contact-leads" element={<PrimeCrmLeadsSimplePage />} />
-    <Route path="/crm/customers" element={<PrimeCrmCustomersSimplePage />} />
-    <Route path="/crm/segments" element={<PrimeCrmCustomersSimplePage mode="segments" />} />
-    <Route path="/crm/quick-replies" element={<QuickRepliesPage />} />
-    <Route path="/crm/cs-analytics" element={<CsAnalyticsPage />} />
+    <Route path="/crm/sources" element={<Navigate to="/marketing?view=sources" replace />} />
+    <Route path="/crm/campaigns" element={<Navigate to="/marketing?view=campaigns" replace />} />
+    <Route path="/crm/content-social" element={<Navigate to="/marketing?view=content" replace />} />
+    <Route path="/crm/leads-rfqs" element={<Navigate to="/marketing?view=campaigns" replace />} />
+    <Route path="/crm/contact-leads" element={<Navigate to="/marketing?view=campaigns" replace />} />
+    <Route path="/crm/customers" element={<Navigate to="/customers" replace />} />
+    <Route path="/crm/segments" element={<Navigate to="/customers" replace />} />
+    <Route path="/crm/quick-replies" element={<Navigate to="/customer/service" replace />} />
+    <Route path="/crm/cs-analytics" element={<Navigate to="/marketing?view=analytics" replace />} />
     <Route path="/sales-channels" element={<Navigate to="/sales-channels/connected-channels" replace />} />
     <Route path="/sales-channels/connected-channels" element={<ConnectedChannelsPage />} />
     <Route path="/channels" element={<ConnectedChannelsPage />} />
@@ -118,15 +119,15 @@ export function PrimeRoutes() {
     <Route path="/inbox/conversation" element={<PrimeInboxWorkspace />} />
     <Route path="/faq" element={<FaqHub />} />
     <Route path="/faq/:slug" element={<FaqArticle />} />
-    <Route path="/crm/re-engage" element={<PrimeCrmReengagementSimplePage />} />
-    <Route path="/crm/campaign-ops" element={<LegacyCrmRedirect to="/crm/campaigns" />} />
-    <Route path="/crm/content-creator-ops" element={<LegacyCrmRedirect to="/crm/content-social" defaultSearch="view=creator-proof" />} />
-    <Route path="/crm/lead-response-capture" element={<LegacyCrmRedirect to="/crm/leads-rfqs" />} />
-    <Route path="/crm/retargeting-outreach" element={<LegacyCrmRedirect to="/crm/re-engage" />} />
-    <Route path="/crm/acquisition" element={<LegacyCrmRedirect to="/crm/sources" />} />
-    <Route path="/crm/campaign" element={<LegacyCrmRedirect to="/crm/campaigns" />} />
-    <Route path="/crm/lead-capture" element={<LegacyCrmRedirect to="/crm/leads-rfqs" />} />
-    <Route path="/crm/retargeting" element={<LegacyCrmRedirect to="/crm/re-engage" />} />
+    <Route path="/crm/re-engage" element={<Navigate to="/marketing?view=audiences" replace />} />
+    <Route path="/crm/campaign-ops" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=campaigns" />} />
+    <Route path="/crm/content-creator-ops" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=content" />} />
+    <Route path="/crm/lead-response-capture" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=campaigns" />} />
+    <Route path="/crm/retargeting-outreach" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=audiences" />} />
+    <Route path="/crm/acquisition" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=sources" />} />
+    <Route path="/crm/campaign" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=campaigns" />} />
+    <Route path="/crm/lead-capture" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=campaigns" />} />
+    <Route path="/crm/retargeting" element={<LegacyCrmRedirect to="/marketing" defaultSearch="view=audiences" />} />
     
     <Route path="/customer/crm-compact" element={<PrimeTowerPage towerId="crm-compact" />} />
     <Route path="/customer/service" element={<Service />} />
@@ -159,15 +160,18 @@ export function PrimeRoutes() {
     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
+    <Route path="/products/channel-listings" element={<Products />} />
     <Route path="/products/categories" element={<ProductCategories />} />
     <Route path="/products/inventory" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/new" element={<ProductCreatePage />} />
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
+    <Route path="/products/:productId/channels/amazon" element={<AmazonListingDetail />} />
+    <Route path="/products/:productId/channels/:channelKey" element={<ChannelListingDetail />} />
     <Route path="/products/:id" element={<ProductDetail />} />
     <Route path="/warehouses" element={<Navigate to="/warehouse/mapping" replace />} />
     <Route path="/docs" element={<Docs />} />
     <Route path="/warehouse/mapping" element={<Warehouses />} />
-    <Route path="/warehouse/stock" element={<Navigate to="/products/master-catalog" replace />} />
+    <Route path="/warehouse/stock" element={<Warehouses />} />
     <Route path="/warehouse/transfers" element={<Warehouses />} />
     <Route path="/warehouse/adjustments" element={<Warehouses />} />
     <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />

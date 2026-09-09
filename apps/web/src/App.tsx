@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
@@ -41,6 +41,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 const App = () => {
+  const Router = import.meta.env.VITE_PRIME_PROTOTYPE === "true" ? HashRouter : BrowserRouter;
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="prime-os-genesis-theme">
@@ -48,7 +50,7 @@ const App = () => {
           <AuthProvider>
             <TooltipProvider>
               <Sonner position="bottom-right" offset={{ right: 16, bottom: 16 }} mobileOffset={{ right: 12, bottom: 96 }} />
-              <BrowserRouter>
+              <Router>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
@@ -64,7 +66,7 @@ const App = () => {
                   </Route>
                   <Route path="*" element={<Navigate to="/overview" replace />} />
                 </Routes>
-              </BrowserRouter>
+              </Router>
             </TooltipProvider>
           </AuthProvider>
         </I18nProvider>
