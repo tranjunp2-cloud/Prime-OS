@@ -5,6 +5,7 @@ export type AmazonListingSyncStatus = 'draft' | 'queued' | 'syncing' | 'synced' 
 
 export interface AmazonListingDraft {
   productId: string;
+  listingSku: string;
   title: string;
   bulletPoints: string[];
   searchTerms: string;
@@ -42,6 +43,7 @@ export function createAmazonListingDraft(product: Product): AmazonListingDraft {
   const available = Object.values(product.inventory ?? {}).reduce((sum, value) => sum + Number(value || 0), 0);
   return {
     productId: product.id,
+    listingSku: `AMZ-${product.sku_code}`,
     title: amazonOverride?.title || product.name,
     bulletPoints: [
       product.description.slice(0, 180),
@@ -65,7 +67,8 @@ export function createAmazonListingDraft(product: Product): AmazonListingDraft {
 }
 
 export function getAmazonListing(product: Product): AmazonListingDraft {
-  return readAll()[product.id] ?? createAmazonListingDraft(product);
+  const inherited = createAmazonListingDraft(product);
+  return { ...inherited, ...readAll()[product.id], listingSku: readAll()[product.id]?.listingSku || inherited.listingSku };
 }
 
 export function getSavedAmazonListing(productId: string): AmazonListingDraft | null {

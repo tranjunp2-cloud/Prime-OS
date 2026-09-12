@@ -1,3 +1,4 @@
+import Orders from '@/pages/Orders';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -2627,52 +2628,7 @@ function CosView({ snapshot }: { snapshot: GrowthOsSnapshot }) {
           </div>
         ) : null}
 
-        {activeCosMode === 'oms' ? (
-          <div className="grid gap-4">
-            <section className="grid gap-3 md:grid-cols-4">
-              <CosKpiCard label="Order value" value={formatOrderValue(totalOrderValue)} detail={`${numberFormat.format(activeOrders)} active orders`} icon={ShoppingCart} tone="violet" />
-              <CosKpiCard label="Open payments" value={String(openPayments)} detail={currency.format(paymentExposure)} icon={WalletCards} tone={openPayments ? 'amber' : 'emerald'} />
-              <CosKpiCard label="Risk flags" value={String(orderRiskCount)} detail={`${orders.length || snapshot.commerceOrders.length} total orders`} icon={AlertTriangle} tone={orderRiskCount ? 'rose' : 'emerald'} />
-              <CosKpiCard label="Paid proof" value={currency.format(paidOrderValue)} detail="confirmed payment value" icon={ShieldCheck} tone="emerald" />
-            </section>
-
-            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <Surface title="Latest OMS Orders" subtitle="Recent order lifecycle and risk flags.">
-                <div className="divide-y divide-border">
-                  {(latestOrders.length ? latestOrders : snapshot.commerceOrders).slice(0, 7).map((order) => (
-                    'customer_name' in order ? (
-                      <CosOrderRow
-                        key={order.id}
-                        title={order.order_id}
-                        detail={`${order.customer_name} - ${order.channel}`}
-                        value={formatOrderValue(order.total_amount)}
-                        status={order.lifecycle_stage}
-                        risk={order.risk_flags.length ? order.risk_flags.join(', ') : 'No risk flag'}
-                      />
-                    ) : (
-                      <CosOrderRow
-                        key={order.id}
-                        title={order.customer}
-                        detail={`${order.type} - ${order.paymentStatus}`}
-                        value={currency.format(order.value)}
-                        status={order.status}
-                        risk={order.owner}
-                      />
-                    )
-                  ))}
-                </div>
-              </Surface>
-
-              <Surface title="OMS Queue" subtitle="Payment and order blockers.">
-                <div className="divide-y divide-border">
-                  {(orderActions.length ? orderActions : [clearAction]).map((action) => (
-                    <CosActionRow key={action.title} action={action} onSelect={selectCosMode} />
-                  ))}
-                </div>
-              </Surface>
-            </div>
-          </div>
-        ) : null}
+        {activeCosMode === 'oms' ? <Orders /> : null}
 
         {activeCosMode === 'ship' ? (
           <div className="grid gap-4">

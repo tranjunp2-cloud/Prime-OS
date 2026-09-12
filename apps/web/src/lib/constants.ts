@@ -74,13 +74,11 @@ export const PRODUCT_STATUS_LABELS: Record<string, string> = {
 export const PRODUCT_TYPE_COLORS: Record<string, string> = {
   single:  'bg-muted text-muted-foreground',
   variant: 'bg-sky-500/14 text-sky-700 dark:bg-sky-500/18 dark:text-sky-300',
-  bundle:  'bg-violet-500/14 text-violet-700 dark:bg-violet-500/18 dark:text-violet-300',
 };
 
 export const PRODUCT_TYPE_LABELS: Record<string, string> = {
   single:  'Single',
   variant: 'Variant',
-  bundle:  'Bundle',
 };
 
 // ─── Fulfillment / OMS ──────────────────────────────────────────────────────────

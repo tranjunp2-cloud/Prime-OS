@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
-  Check, ChevronRight, CircleAlert, FolderTree, Layers3, Plus, Search,
+  Award, Check, ChevronRight, CircleAlert, FolderTree, Layers3, Plus, Search,
   Sparkles, Tags,
 } from 'lucide-react';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
@@ -19,7 +19,7 @@ import { getProducts } from '@/lib/product-store';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type ViewTab = 'categories' | 'attributes';
+type ViewTab = 'categories' | 'attributes' | 'brands';
 type DrawerTab = 'general' | 'attributes' | 'mapping';
 type MappingStatus = 'mapped' | 'unmapped';
 
@@ -46,6 +46,20 @@ interface AttributeDefinition {
   status: 'Active' | 'Inactive';
 }
 
+interface BrandDefinition {
+  id: string;
+  name: string;
+  code: string;
+  manufacturer: string;
+  country: string;
+  website: string;
+  productCount: number;
+  status: 'Verified' | 'Unverified' | 'Inactive';
+  amazonId: string;
+  shopeeId: string;
+  lazadaId: string;
+}
+
 const taxonomyDefaults: Record<string, string[]> = {
   Fashion: ['Brand', 'Material', 'Color', 'Size', 'Care instructions', 'Dimensions'],
   Electronics: ['Brand', 'Model', 'Connectivity', 'Dimensions', 'Warranty'],
@@ -70,6 +84,13 @@ const blankAttribute: AttributeDefinition = {
   id: '', name: '', key: '', type: 'Single-line text', categories: 0, description: '', options: '', unit: '', validation: '', status: 'Active',
 };
 
+const initialBrands: BrandDefinition[] = [
+  { id: 'cyber-records', name: 'CYBER-RECORDS', code: 'CYBR', manufacturer: 'CyberRecord Japan Co.', country: 'Japan', website: 'https://cyber-records.example', productCount: 5, status: 'Verified', amazonId: 'CYBER RECORDS', shopeeId: '1009234', lazadaId: 'BR-20418' },
+  { id: 'prime-essentials', name: 'Prime Essentials', code: 'PRME', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 12, status: 'Verified', amazonId: '', shopeeId: '1008871', lazadaId: '' },
+  { id: 'no-brand', name: 'No Brand', code: 'GENERIC', manufacturer: '', country: '', website: '', productCount: 8, status: 'Unverified', amazonId: 'Generic', shopeeId: '0', lazadaId: 'No Brand' },
+];
+const blankBrand: BrandDefinition = { id: '', name: '', code: '', manufacturer: '', country: '', website: '', productCount: 0, status: 'Unverified', amazonId: '', shopeeId: '', lazadaId: '' };
+
 function taxonomyGroup(category: string) {
   if (['Jacket', 'Shoe', 'Hat', 'Bag', 'Watch', 'Sunglasses'].includes(category)) return 'Fashion';
   if (['Electronics', 'Headphones'].includes(category)) return 'Electronics';
@@ -84,8 +105,8 @@ function slugify(value: string) {
 
 export default function ProductCategories() {
   const { toast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const viewTab: ViewTab = searchParams.get('tab') === 'attributes' ? 'attributes' : 'categories';
+  const { pathname } = useLocation();
+  const viewTab: ViewTab = pathname.endsWith('/attributes') ? 'attributes' : pathname.endsWith('/brands') ? 'brands' : 'categories';
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('general');
@@ -95,6 +116,10 @@ export default function ProductCategories() {
   const [attributeDrawerOpen, setAttributeDrawerOpen] = useState(false);
   const [attributeDraft, setAttributeDraft] = useState<AttributeDefinition>(blankAttribute);
   const [isCreatingAttribute, setIsCreatingAttribute] = useState(false);
+  const [brands, setBrands] = useState<BrandDefinition[]>(initialBrands);
+  const [brandDrawerOpen, setBrandDrawerOpen] = useState(false);
+  const [brandDraft, setBrandDraft] = useState<BrandDefinition>(blankBrand);
+  const [isCreatingBrand, setIsCreatingBrand] = useState(false);
   const products = getProducts();
 
   const rows = useMemo<CategoryRow[]>(() => {
@@ -124,6 +149,7 @@ export default function ProductCategories() {
   }, [products, search]);
 
   const filteredAttributes = attributes.filter(attribute => `${attribute.name} ${attribute.type} ${attribute.description}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const filteredBrands = brands.filter(brand => `${brand.name} ${brand.code} ${brand.manufacturer} ${brand.country}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   function openCategory(row: CategoryRow) {
     setSelectedCategory(row);
@@ -164,24 +190,34 @@ export default function ProductCategories() {
     setAttributeDrawerOpen(false);
   }
 
+  function createBrand() { setBrandDraft(blankBrand); setIsCreatingBrand(true); setBrandDrawerOpen(true); }
+  function editBrand(brand: BrandDefinition) { setBrandDraft(brand); setIsCreatingBrand(false); setBrandDrawerOpen(true); }
+  function saveBrand(brand: BrandDefinition) {
+    const normalized = { ...brand, id: brand.id || slugify(brand.name), code: brand.code.trim().toUpperCase() };
+    setBrands(current => isCreatingBrand ? [...current, normalized] : current.map(item => item.id === normalized.id ? normalized : item));
+    toast({ title: isCreatingBrand ? 'Brand created' : 'Brand updated', description: `${normalized.name} is available for Product Master selection.` });
+    setBrandDrawerOpen(false);
+  }
+
+  const pageMeta = viewTab === 'categories'
+    ? { title: 'Categories', description: 'Manage the master taxonomy, required attributes and marketplace category mappings.', icon: FolderTree, action: 'Add Category' }
+    : viewTab === 'attributes'
+      ? { title: 'Attributes', description: 'Maintain reusable product fields, allowed values and validation rules.', icon: Layers3, action: 'Add Attribute' }
+      : { title: 'Brands', description: 'Maintain canonical product brands and map them to marketplace brand identifiers.', icon: Award, action: 'Add Brand' };
+
   return <div className="space-y-5 p-4 md:p-6">
     <WorkspacePageHeader
-      title="Categories & Attributes"
-      description="Organize product categories and maintain reusable product attributes."
-      icon={Tags}
-      actions={<Button onClick={viewTab === 'categories' ? createCategory : createAttribute}><Plus className="size-4" />{viewTab === 'categories' ? 'Add Category' : 'Add Attribute'}</Button>}
+      title={pageMeta.title}
+      description={pageMeta.description}
+      icon={pageMeta.icon}
+      actions={<Button onClick={viewTab === 'categories' ? createCategory : viewTab === 'attributes' ? createAttribute : createBrand}><Plus className="size-4" />{pageMeta.action}</Button>}
     />
 
-    <Tabs value={viewTab} onValueChange={value => { setSearchParams({ tab: value }, { replace: true }); setSearch(''); }}>
-      <TabsList className="h-11 w-full justify-start rounded-none border-b bg-transparent p-0">
-        <TabsTrigger value="categories" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><FolderTree className="size-4" />Categories</TabsTrigger>
-        <TabsTrigger value="attributes" className="h-11 rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><Layers3 className="size-4" />Attributes</TabsTrigger>
-      </TabsList>
-
-      <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <Tabs value={viewTab}>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
-          <div className="relative max-w-xl flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder={viewTab === 'categories' ? 'Search category paths or required attributes...' : 'Search global attribute definitions...'} className="pl-9" /></div>
-          <p className="text-xs text-slate-500">{viewTab === 'categories' ? `${rows.length} categories` : `${filteredAttributes.length} reusable attributes`}</p>
+          <div className="relative max-w-xl flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder={viewTab === 'categories' ? 'Search category paths or required attributes...' : viewTab === 'attributes' ? 'Search global attribute definitions...' : 'Search brand, code, manufacturer or country...'} className="pl-9" /></div>
+          <p className="text-xs text-slate-500">{viewTab === 'categories' ? `${rows.length} categories` : viewTab === 'attributes' ? `${filteredAttributes.length} reusable attributes` : `${filteredBrands.length} brands`}</p>
         </div>
 
         <TabsContent value="categories" className="m-0">
@@ -202,12 +238,22 @@ export default function ProductCategories() {
           <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['ATTRIBUTE', 'FIELD TYPE', 'USED IN', 'STATUS', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredAttributes.map(attribute => <tr key={attribute.id} tabIndex={0} onClick={() => editAttribute(attribute)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editAttribute(attribute); } }} className="cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><td className="px-4 py-3"><p className="text-sm font-semibold text-slate-900">{attribute.name}</p><p className="mt-1 max-w-md text-xs text-slate-500">{attribute.description}</p></td><td className="px-4 py-3 text-sm text-slate-700">{attribute.type}</td><td className="px-4 py-3 text-sm text-slate-700"><span className="font-semibold tabular-nums">{attribute.categories}</span> categories</td><td className="px-4 py-3"><span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', attribute.status === 'Active' ? 'text-emerald-700' : 'text-slate-500')}><span className={cn('size-2 rounded-full', attribute.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-400')} />{attribute.status}</span></td><td className="px-4 py-3 text-right"><Button variant="ghost" size="sm" onClick={event => { event.stopPropagation(); editAttribute(attribute); }}>Edit<ChevronRight className="size-4" /></Button></td></tr>)}</tbody></table></div>
           {filteredAttributes.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">No attributes match this search.</div> : null}
         </TabsContent>
+
+        <TabsContent value="brands" className="m-0">
+          <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['BRAND', 'MANUFACTURER', 'COUNTRY', 'PRODUCTS', 'CHANNEL MAPPING', 'STATUS', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredBrands.map(brand => <tr key={brand.id} tabIndex={0} onClick={() => editBrand(brand)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editBrand(brand); } }} className="cursor-pointer hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{brand.name.slice(0, 1)}</span><div><p className="text-sm font-semibold text-slate-900">{brand.name}</p><p className="mt-0.5 font-mono text-xs text-slate-500">{brand.code}</p></div></div></td><td className="px-4 py-3 text-sm text-slate-700">{brand.manufacturer || '—'}</td><td className="px-4 py-3 text-sm text-slate-700">{brand.country || '—'}</td><td className="px-4 py-3 text-sm font-semibold tabular-nums">{brand.productCount}</td><td className="px-4 py-3"><div className="flex gap-1.5">{[['AMZ', brand.amazonId], ['SHP', brand.shopeeId], ['LAZ', brand.lazadaId]].map(([label, value]) => <Badge key={label} variant="outline" className={value ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'text-slate-400'}>{label} {value ? 'Mapped' : '—'}</Badge>)}</div></td><td className="px-4 py-3"><Badge className={brand.status === 'Verified' ? 'bg-emerald-50 text-emerald-700' : brand.status === 'Inactive' ? 'bg-slate-100 text-slate-500' : 'bg-amber-50 text-amber-700'}>{brand.status}</Badge></td><td className="px-4 py-3 text-right"><Button variant="ghost" size="sm" onClick={event => { event.stopPropagation(); editBrand(brand); }}>Edit<ChevronRight className="size-4" /></Button></td></tr>)}</tbody></table></div>
+          {filteredBrands.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">No brands match this search.</div> : null}
+        </TabsContent>
       </div>
     </Tabs>
 
     <CategoryConfigurationDrawer open={drawerOpen} category={selectedCategory} creating={isCreating} tab={drawerTab} onTabChange={setDrawerTab} onClose={() => setDrawerOpen(false)} onSave={() => { toast({ title: isCreating ? 'Category created' : 'Category configuration saved', description: isCreating ? 'The new master category is ready for attribute assignment.' : `${selectedCategory?.category} mappings and attributes were updated.` }); setDrawerOpen(false); }} />
     <AttributeConfigurationDrawer open={attributeDrawerOpen} creating={isCreatingAttribute} value={attributeDraft} onChange={setAttributeDraft} onClose={() => setAttributeDrawerOpen(false)} onSave={() => saveAttribute(attributeDraft)} />
+    <BrandConfigurationDrawer open={brandDrawerOpen} creating={isCreatingBrand} value={brandDraft} onChange={setBrandDraft} onClose={() => setBrandDrawerOpen(false)} onSave={() => saveBrand(brandDraft)} />
   </div>;
+}
+
+function BrandConfigurationDrawer({ open, creating, value, onChange, onClose, onSave }: { open: boolean; creating: boolean; value: BrandDefinition; onChange: (value: BrandDefinition) => void; onClose: () => void; onSave: () => void }) {
+  return <Sheet open={open} onOpenChange={next => !next && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-[600px]"><SheetHeader className="border-b border-slate-200 px-6 py-5"><SheetTitle>{creating ? 'Add Brand' : 'Edit Brand'}</SheetTitle><SheetDescription>Canonical product identity and marketplace brand mapping.</SheetDescription></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-6 pb-28"><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="brand-name">Brand Name</Label><Input id="brand-name" value={value.name} onChange={event => onChange({ ...value, name: event.target.value, code: creating ? event.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase() : value.code })} /></div><div className="grid gap-2"><Label htmlFor="brand-code">Brand Code</Label><Input id="brand-code" className="font-mono uppercase" value={value.code} onChange={event => onChange({ ...value, code: event.target.value.toUpperCase() })} /></div></div><div className="grid gap-2"><Label htmlFor="brand-manufacturer">Manufacturer / Owner</Label><Input id="brand-manufacturer" value={value.manufacturer} onChange={event => onChange({ ...value, manufacturer: event.target.value })} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="brand-country">Country</Label><Input id="brand-country" value={value.country} onChange={event => onChange({ ...value, country: event.target.value })} /></div><label className="grid gap-2 text-sm font-medium">Status<select className="h-10 rounded-md border bg-background px-3" value={value.status} onChange={event => onChange({ ...value, status: event.target.value as BrandDefinition['status'] })}><option>Verified</option><option>Unverified</option><option>Inactive</option></select></label></div><div className="grid gap-2"><Label htmlFor="brand-website">Website</Label><Input id="brand-website" type="url" value={value.website} onChange={event => onChange({ ...value, website: event.target.value })} /></div><section className="space-y-4 rounded-xl border p-4"><div><h3 className="text-sm font-semibold">Marketplace Brand Mapping</h3><p className="mt-1 text-xs text-slate-500">Map the canonical brand to identifiers recognized by each provider.</p></div><div className="grid gap-2"><Label>Amazon Brand</Label><Input value={value.amazonId} onChange={event => onChange({ ...value, amazonId: event.target.value })} /></div><div className="grid gap-2"><Label>Shopee Brand ID</Label><Input value={value.shopeeId} onChange={event => onChange({ ...value, shopeeId: event.target.value })} /></div><div className="grid gap-2"><Label>Lazada Brand ID</Label><Input value={value.lazadaId} onChange={event => onChange({ ...value, lazadaId: event.target.value })} /></div></section></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t bg-white/95 p-4"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={onSave} disabled={!value.name.trim() || !value.code.trim()}>{creating ? 'Create Brand' : 'Save Brand'}</Button></div></SheetContent></Sheet>;
 }
 
 function AttributeConfigurationDrawer({ open, creating, value, onChange, onClose, onSave }: { open: boolean; creating: boolean; value: AttributeDefinition; onChange: (value: AttributeDefinition) => void; onClose: () => void; onSave: () => void }) {

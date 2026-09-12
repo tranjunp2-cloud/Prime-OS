@@ -1,4 +1,4 @@
-import { Navigate, Route, useLocation } from "react-router-dom";
+import { Navigate, Route, useLocation, useParams } from "react-router-dom";
 import Service from "@/pages/Service";
 import { PrimeFinSupportPage } from "@/pages/prime/PrimeFinSupportPage";
 import { PrimeMdecPage } from "@/pages/prime/PrimeMdecPage";
@@ -15,6 +15,7 @@ import ProductCreatePage from "@/pages/ProductCreatePage";
 import ProductDetail from "@/pages/ProductDetail";
 import AmazonListingDetail from "@/pages/AmazonListingDetail";
 import ChannelListingDetail from "@/pages/ChannelListingDetail";
+import CreateChannelListingsPage from "@/pages/CreateChannelListingsPage";
 import ProductCategories from "@/pages/ProductCategories";
 import Warehouses from "@/pages/Warehouses";
 import PrimeInboxWorkspace from "@/pages/PrimeInboxWorkspace";
@@ -37,7 +38,7 @@ import PlanBillingPage from "@/pages/PlanBillingPage";
 const cosOverviewHref = "/overview?module=cos";
 const cosCatalogHref = `${cosOverviewHref}&view=pim`;
 const cosInventoryHref = `${cosOverviewHref}&view=pim`;
-const cosOrdersHref = `${cosOverviewHref}&view=oms`;
+
 const cosFulfillmentHref = `${cosOverviewHref}&view=ship`;
 const cosChannelHref = `${cosOverviewHref}&view=pim`;
 
@@ -53,6 +54,19 @@ function LegacyCrmRedirect({ to, defaultSearch = "" }: { to: string; defaultSear
   const nextSearch = params.toString();
 
   return <Navigate to={`${to}${nextSearch ? `?${nextSearch}` : ""}`} replace />;
+}
+
+function LegacyOrderDetailRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/orders?order=${encodeURIComponent(id || '')}`} replace />;
+}
+
+function LegacyOrdersRedirect() {
+  const { '*': id } = useParams();
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  if (id) params.set('order', id);
+  return <Navigate to={`/orders${params.size ? `?${params}` : ''}`} replace />;
 }
 
 export function PrimeRoutes() {
@@ -148,7 +162,7 @@ export function PrimeRoutes() {
     <Route path="/ecom/cos/listings" element={<Navigate to={cosChannelHref} replace />} />
     <Route path="/ecom/cos/inventory-brain/*" element={<Navigate to={cosInventoryHref} replace />} />
     <Route path="/ecom/cos/warehouses/*" element={<Navigate to={cosInventoryHref} replace />} />
-    <Route path="/ecom/cos/oms/*" element={<Navigate to={cosOrdersHref} replace />} />
+    <Route path="/ecom/cos/oms/*" element={<LegacyOrdersRedirect />} />
     <Route path="/ecom/cos/fulfillment/*" element={<Navigate to={cosFulfillmentHref} replace />} />
     <Route path="/ecom/cos/returns/*" element={<Navigate to={cosFulfillmentHref} replace />} />
     <Route path="/ecom/cos/policy-rule/*" element={<Navigate to={cosFulfillmentHref} replace />} />
@@ -160,11 +174,14 @@ export function PrimeRoutes() {
     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
-    <Route path="/products/channel-listings" element={<Products />} />
+    <Route path="/products/channel-listings" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/categories" element={<ProductCategories />} />
+    <Route path="/products/attributes" element={<ProductCategories />} />
+    <Route path="/products/brands" element={<ProductCategories />} />
     <Route path="/products/inventory" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/new" element={<ProductCreatePage />} />
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
+    <Route path="/products/:id/channel-listings/new" element={<CreateChannelListingsPage />} />
     <Route path="/products/:productId/channels/amazon" element={<AmazonListingDetail />} />
     <Route path="/products/:productId/channels/:channelKey" element={<ChannelListingDetail />} />
     <Route path="/products/:id" element={<ProductDetail />} />
@@ -176,6 +193,7 @@ export function PrimeRoutes() {
     <Route path="/warehouse/adjustments" element={<Warehouses />} />
     <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />
     <Route path="/orders" element={<Orders />} />
+    <Route path="/orders/:id" element={<LegacyOrderDetailRedirect />} />
     <Route path="/orders/fulfillment" element={<Navigate to="/orders?view=fulfillment" replace />} />
     <Route path="/orders/returns" element={<Navigate to="/orders?view=returns" replace />} />
     <Route path="/fulfillment/*" element={<Navigate to={cosFulfillmentHref} replace />} />

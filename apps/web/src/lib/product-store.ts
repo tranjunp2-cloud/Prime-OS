@@ -2,7 +2,7 @@
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
 
-export type ProductType = 'single' | 'variant' | 'bundle';
+export type ProductType = 'single' | 'variant';
 
 export interface Sku {
   id: string;
@@ -21,6 +21,34 @@ export interface ChannelOverride {
   title: string;
   price_markup: number;
   description: string;
+  listing_sku?: string;
+  category?: string;
+  fulfillment?: string;
+  variant_scope?: string;
+  listing_mode?: string;
+  identifier?: string;
+  condition?: string;
+  stock_quantity?: string;
+  warehouse?: string;
+  brand?: string;
+  shipping_option?: string;
+  bullet_points?: string;
+  search_terms?: string;
+  preorder_days?: string;
+  warranty?: string;
+  certification?: string;
+  video_url?: string;
+  web_slug?: string;
+  pos_barcode?: string;
+  visibility?: string;
+  sync_policy?: string;
+  safety_buffer?: string;
+  allocation_cap?: string;
+  media_scope?: string;
+  compliance_notes?: string;
+  tax_code?: string;
+  attribute_material?: string;
+  attribute_color?: string;
 }
 
 export interface ChannelListing {
@@ -306,8 +334,38 @@ const SEED_PRODUCTS: Product[] = [
   },
 ];
 
-// Singleton store
-let _products: Product[] = [...SEED_PRODUCTS];
+// Singleton store backed by localStorage so prototype-created Product Masters
+// survive reloads and direct navigation to their detail/edit routes.
+const PRODUCT_STORAGE_KEY = 'primeos-product-master-v1';
+
+function loadStoredProducts(): Product[] {
+  if (typeof window === 'undefined') return [...SEED_PRODUCTS];
+  try {
+    const raw = window.localStorage.getItem(PRODUCT_STORAGE_KEY);
+    if (!raw) return [...SEED_PRODUCTS];
+    const stored = JSON.parse(raw) as unknown;
+    if (!Array.isArray(stored)) return [...SEED_PRODUCTS];
+    const valid = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
+    const migrated = valid.map(product => (product as Product & { product_type?: string }).product_type === 'bundle'
+      ? { ...product, product_type: product.has_variants ? 'variant' as const : 'single' as const }
+      : product);
+    const storedIds = new Set(migrated.map(product => product.id));
+    return [...migrated, ...SEED_PRODUCTS.filter(product => !storedIds.has(product.id))];
+  } catch {
+    return [...SEED_PRODUCTS];
+  }
+}
+
+function persistProducts(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(_products));
+  } catch {
+    // Keep the in-memory prototype usable if storage is unavailable or full.
+  }
+}
+
+let _products: Product[] = loadStoredProducts();
 
 export function getProducts(): Product[] {
   return _products;
@@ -315,14 +373,17 @@ export function getProducts(): Product[] {
 
 export function addProduct(p: Product): void {
   _products = [p, ..._products];
+  persistProducts();
 }
 
 export function updateProduct(id: string, p: Partial<Product> & { id: string }): void {
   _products = _products.map(x => x.id === id ? { ...x, ...p, updated_at: new Date().toISOString() } : x);
+  persistProducts();
 }
 
 export function deleteProduct(id: string): void {
   _products = _products.filter(x => x.id !== id);
+  persistProducts();
 }
 
 export function getProductById(id: string): Product | undefined {

@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Info, Image, Package, Truck, Layers, Check,
+  ArrowLeft, Info, Image, Package, Truck, Layers, Check, Lock,
   Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes, PackageCheck,
-  Globe2, CircleCheck, CircleAlert, CloudUpload, Search, ChevronRight, Save,
+  Globe2, CircleCheck, CircleAlert, CloudUpload, Search, ChevronDown, ChevronRight, Save,
   ShoppingBag, Store, MonitorSmartphone, MessageSquare, Radio,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
@@ -23,6 +23,7 @@ import { uploadProductImage, validateImageFile } from '@/lib/product-images';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { formatLocalizedNumber, formatMessage } from '@/lib/i18n/format';
 import { cn } from '@/lib/utils';
+import type { ChannelWizardDraft } from '@/components/products/ChannelListingWizard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ interface VariantItem {
 }
 
 type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
-interface ChannelOverrideForm { enabled: boolean; title: string; price_markup: string; description: string }
+interface ChannelOverrideForm extends ChannelWizardDraft {}
 
 interface FormState {
   gtin: string;
@@ -53,7 +54,7 @@ interface FormState {
   manufacturer: string;
   sku_code: string;
   name: string;                   // ← was: title
-  product_type: ProductType;     // ← NEW: single | variant | bundle
+  product_type: ProductType;     // single | configurable variants
   description: string;
   category: string;
   condition: string;
@@ -109,6 +110,16 @@ const listingChannelByOverride: Record<OverrideChannel, ChannelListing['channel'
   social: 'social',
   rakuten: 'rakuten',
 };
+function channelSetupComplete(key: OverrideChannel, value: ChannelOverrideForm) {
+  if (!value.listing_sku.trim()) return false;
+  if (key === 'webstore') return Boolean(value.web_slug.trim());
+  if (key === 'pos') return Boolean(value.pos_barcode.trim());
+  if (key === 'social') return Boolean(value.visibility);
+  if (key === 'amazon') return Boolean(value.identifier.trim() && value.condition && value.fulfillment);
+  if (key === 'tiktok') return Boolean(value.category.trim() && value.stock_quantity && value.warehouse);
+  if (key === 'rakuten') return Boolean(value.category.trim() && value.stock_quantity && value.identifier.trim());
+  return Boolean(value.category.trim() && value.stock_quantity && value.shipping_option);
+}
 const CATEGORIES = [
   'Watch', 'Shoe', 'Bag', 'Hat', 'Jacket', 'Sunglasses',
   'Bicycle', 'Headphones', 'Electronics', 'Food & Beverages',
@@ -133,7 +144,6 @@ const CATEGORY_TREE = [
 const PRODUCT_TYPE_ICONS = {
   single: Package,
   variant: Layers,
-  bundle: Boxes,
 } satisfies Record<ProductType, typeof PackageCheck>;
 
 const EMPTY_FORM: FormState = {
@@ -232,12 +242,11 @@ interface VariantSectionProps {
   items: VariantItem[];
   onItemsChange: (i: VariantItem[]) => void;
   parentSku: string;
-  parentTitle: string;
   basePrice: string;
+  currency: string;
   existingSkus: string[];
   copy: {
     duplicateAttribute: string;
-    variantGroups: string;
     addValuePlaceholder: string;
     add: string;
     addGroupPlaceholder: string;
@@ -256,7 +265,7 @@ interface VariantSectionProps {
 
 function VariantSection({
   groups, onGroupsChange, items, onItemsChange,
-  parentSku, parentTitle, basePrice, existingSkus, copy,
+  parentSku, basePrice, currency, existingSkus, copy,
 }: VariantSectionProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [groupInput, setGroupInput] = useState<Record<string, string>>({});
@@ -364,14 +373,7 @@ function VariantSection({
   const totalCombinations = variantKeys.length;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Layers className="size-4 text-primary" />
-          {copy.variantGroups}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
 
         {/* Existing Groups */}
         {groups.map(group => (
@@ -473,14 +475,14 @@ function VariantSection({
                 <Button type="button" size="sm" className="self-end" disabled={!bulkPrice && !bulkStock && !bulkSku.trim()} onClick={applyBulkValues}>Apply to all</Button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs" aria-label="Variant pricing matrix">
                   <thead>
                     <tr className="bg-muted/50 border-b">
                       <th className="w-8 p-2"></th>
                       <th className="text-left p-2 font-medium">{copy.variant}</th>
                       <th className="text-left p-2 font-medium w-16">Image</th>
                       <th className="text-left p-2 font-medium w-40">{copy.skuCode}</th>
-                      <th className="text-right p-2 font-medium w-28">{copy.price} ({basePrice ? 'JPY' : '—'})</th>
+                      <th className="text-right p-2 font-medium w-28">{copy.price} ({currency})</th>
                       <th className="text-right p-2 font-medium w-24">{copy.stock}</th>
                     </tr>
                   </thead>
@@ -549,8 +551,7 @@ function VariantSection({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -628,7 +629,6 @@ export default function ProductCreatePage() {
       productType: 'Product Type',
       productTypeSingle: 'Single',
       productTypeVariant: 'Variant',
-      productTypeBundle: 'Bundle',
       hasVariations: 'This product has multiple variations',
       family: 'Family',
       variants: 'Variants',
@@ -728,7 +728,6 @@ export default function ProductCreatePage() {
       productType: '商品タイプ',
       productTypeSingle: '単品',
       productTypeVariant: 'バリエーション',
-      productTypeBundle: 'セット',
       hasVariations: 'この商品は複数バリエーションを持ちます',
       family: 'ファミリー',
       variants: 'バリエーション',
@@ -828,7 +827,6 @@ export default function ProductCreatePage() {
       productType: 'Loại sản phẩm',
       productTypeSingle: 'Đơn',
       productTypeVariant: 'Biến thể',
-      productTypeBundle: 'Combo',
       hasVariations: 'Sản phẩm này có nhiều biến thể',
       family: 'Nhóm',
       variants: 'Biến thể',
@@ -928,7 +926,6 @@ export default function ProductCreatePage() {
     productType: 'Product Type',
     productTypeSingle: 'Single',
     productTypeVariant: 'Variant',
-    productTypeBundle: 'Bundle',
     hasVariations: 'This product has multiple variations',
     family: 'Family',
     variants: 'Variants',
@@ -1045,6 +1042,9 @@ export default function ProductCreatePage() {
   };
 
   const [form, setForm] = useState<FormState>(initForm);
+  const [advancedIdentityOpen, setAdvancedIdentityOpen] = useState(() => Boolean(
+    existingProduct?.mpn || existingProduct?.model_number || existingProduct?.manufacturer,
+  ));
 
   // Sync form fields when URL params change (e.g. after navigating from CreateProductDialog)
   useEffect(() => {
@@ -1115,13 +1115,41 @@ export default function ProductCreatePage() {
   }, [location.search]);
 
   const [packageWeightUnit, setPackageWeightUnit] = useState<'g' | 'kg'>('g');
-  const [channelOverrides, setChannelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
+  const [channelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
     const saved = existingProduct?.channel_overrides;
     const make = (key: OverrideChannel): ChannelOverrideForm => ({
       enabled: saved?.[key]?.enabled ?? Boolean(existingProduct?.channels.some(listing => listing.channel === listingChannelByOverride[key])),
       title: saved?.[key]?.title ?? '',
       price_markup: saved?.[key]?.price_markup ? String(saved[key]?.price_markup) : '',
       description: saved?.[key]?.description ?? '',
+      listing_sku: saved?.[key]?.listing_sku ?? '',
+      category: saved?.[key]?.category ?? '',
+      fulfillment: saved?.[key]?.fulfillment ?? '',
+      variant_scope: saved?.[key]?.variant_scope ?? 'all',
+      listing_mode: saved?.[key]?.listing_mode ?? 'master',
+      identifier: saved?.[key]?.identifier ?? (key === 'amazon' ? existingProduct?.asin ?? '' : existingProduct?.gtin ?? ''),
+      condition: saved?.[key]?.condition ?? (key === 'amazon' ? 'new_new' : ''),
+      stock_quantity: saved?.[key]?.stock_quantity ?? '',
+      warehouse: saved?.[key]?.warehouse ?? '',
+      brand: saved?.[key]?.brand ?? existingProduct?.brand ?? '',
+      shipping_option: saved?.[key]?.shipping_option ?? '',
+      bullet_points: saved?.[key]?.bullet_points ?? '',
+      search_terms: saved?.[key]?.search_terms ?? '',
+      preorder_days: saved?.[key]?.preorder_days ?? '',
+      warranty: saved?.[key]?.warranty ?? '',
+      certification: saved?.[key]?.certification ?? '',
+      video_url: saved?.[key]?.video_url ?? '',
+      web_slug: saved?.[key]?.web_slug ?? '',
+      pos_barcode: saved?.[key]?.pos_barcode ?? existingProduct?.gtin ?? '',
+      visibility: saved?.[key]?.visibility ?? (key === 'webstore' ? 'public' : key === 'social' ? 'agents' : ''),
+      sync_policy: saved?.[key]?.sync_policy ?? 'automatic',
+      safety_buffer: saved?.[key]?.safety_buffer ?? '0',
+      allocation_cap: saved?.[key]?.allocation_cap ?? '',
+      media_scope: saved?.[key]?.media_scope ?? 'all',
+      compliance_notes: saved?.[key]?.compliance_notes ?? '',
+      tax_code: saved?.[key]?.tax_code ?? '',
+      attribute_material: saved?.[key]?.attribute_material ?? '',
+      attribute_color: saved?.[key]?.attribute_color ?? '',
     });
     return Object.fromEntries(OVERRIDE_CHANNELS.map(channel => [channel.key, make(channel.key)])) as Record<OverrideChannel, ChannelOverrideForm>;
   });
@@ -1132,6 +1160,10 @@ export default function ProductCreatePage() {
   );
   const [readinessReviewOpen, setReadinessReviewOpen] = useState(false);
   const [publishConfirmationOpen, setPublishConfirmationOpen] = useState(false);
+  const [skuChangeOpen, setSkuChangeOpen] = useState(false);
+  const [pendingMasterSku, setPendingMasterSku] = useState('');
+  const [skuChangeConfirmed, setSkuChangeConfirmed] = useState(false);
+  const [skuChangeError, setSkuChangeError] = useState('');
   const [, setDraftSaveGeneration] = useState(0);
   const [dirtyTrackingReady, setDirtyTrackingReady] = useState(false);
   const [hasScrolledFromTop, setHasScrolledFromTop] = useState(false);
@@ -1151,7 +1183,7 @@ export default function ProductCreatePage() {
   const [categoryLevelOne, setCategoryLevelOne] = useState(CATEGORY_TREE[0].label);
   const [categoryLevelTwo, setCategoryLevelTwo] = useState(CATEGORY_TREE[0].children[0].label);
   const [pendingCategory, setPendingCategory] = useState(form.category);
-  const [activeSection, setActiveSection] = useState('channels');
+  const [activeSection, setActiveSection] = useState('basic');
   const [specifications, setSpecifications] = useState<Array<{ id: string; name: string; value: string }>>(
     existingProduct?.specifications?.map(item => ({ ...item, id: genId('spec') })) ?? [{ id: genId('spec'), name: '', value: '' }]
   );
@@ -1175,6 +1207,35 @@ export default function ProductCreatePage() {
     if (errors.name) setErrors(current => ({ ...current, name: '' }));
   }
 
+  function openMasterSkuChange() {
+    setPendingMasterSku(form.sku_code);
+    setSkuChangeConfirmed(false);
+    setSkuChangeError('');
+    setSkuChangeOpen(true);
+  }
+
+  function stageMasterSkuChange() {
+    const normalizedSku = pendingMasterSku.trim().toUpperCase();
+    if (!normalizedSku) {
+      setSkuChangeError('Enter a new Master SKU.');
+      return;
+    }
+    if (normalizedSku === form.sku_code.trim().toUpperCase()) {
+      setSkuChangeError('The new Master SKU must be different from the current SKU.');
+      return;
+    }
+    if (existingSkuList.some(sku => sku.toUpperCase() === normalizedSku && sku.toUpperCase() !== existingProduct?.sku_code.toUpperCase())) {
+      setSkuChangeError('This Master SKU is already in use.');
+      return;
+    }
+    setField('sku_code', normalizedSku);
+    setSkuChangeOpen(false);
+    toast({
+      title: 'Master SKU change staged',
+      description: 'Channel SKUs remain unchanged. Save the product to apply this change.',
+    });
+  }
+
   function scrollToSection(id: string) {
     document.getElementById(`product-section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setActiveSection(id);
@@ -1189,10 +1250,6 @@ export default function ProductCreatePage() {
     ids.forEach(id => { const element = document.getElementById(`product-section-${id}`); if (element) observer.observe(element); });
     return () => observer.disconnect();
   }, []);
-
-  function updateChannelOverride(channel: OverrideChannel, patch: Partial<ChannelOverrideForm>) {
-    setChannelOverrides(current => ({ ...current, [channel]: { ...current[channel], ...patch } }));
-  }
 
   async function handleImageUpload(file: File, mode: 'primary' | 'gallery') {
     const validation = validateImageFile(file);
@@ -1246,6 +1303,9 @@ export default function ProductCreatePage() {
 
     const e: Record<string, string> = {};
     if (!form.sku_code.trim()) e.sku_code = copy.skuRequired;
+    else if (existingSkuList.some(sku => sku.toUpperCase() === form.sku_code.trim().toUpperCase() && sku.toUpperCase() !== existingProduct?.sku_code.toUpperCase())) {
+      e.sku_code = 'This Master SKU is already in use.';
+    }
     if (!form.name.trim()) e.name = copy.nameRequired;
     if (!form.category) e.category = copy.categoryRequired;
 
@@ -1288,9 +1348,13 @@ export default function ProductCreatePage() {
       .filter(channel => channelOverrides[channel.key].enabled)
       .map(channel => {
         const listingChannel = listingChannelByOverride[channel.key];
-        return existingProduct?.channels.find(listing => listing.channel === listingChannel) ?? {
+        const existingListing = existingProduct?.channels.find(listing => listing.channel === listingChannel);
+        return existingListing ? {
+          ...existingListing,
+          external_id: channelOverrides[channel.key].listing_sku.trim() || existingListing.external_id,
+        } : {
           channel: listingChannel,
-          external_id: null,
+          external_id: channelOverrides[channel.key].listing_sku.trim() || null,
           status: 'pending' as const,
           listing_url: null,
           last_synced_at: null,
@@ -1337,6 +1401,34 @@ export default function ProductCreatePage() {
         title: value.title.trim(),
         price_markup: num(value.price_markup),
         description: value.description.trim(),
+        listing_sku: value.listing_sku.trim(),
+        category: value.category.trim(),
+        fulfillment: value.fulfillment,
+        variant_scope: value.variant_scope,
+        listing_mode: value.listing_mode,
+        identifier: value.identifier.trim(),
+        condition: value.condition,
+        stock_quantity: value.stock_quantity,
+        warehouse: value.warehouse,
+        brand: value.brand.trim(),
+        shipping_option: value.shipping_option,
+        bullet_points: value.bullet_points.trim(),
+        search_terms: value.search_terms.trim(),
+        preorder_days: value.preorder_days,
+        warranty: value.warranty.trim(),
+        certification: value.certification.trim(),
+        video_url: value.video_url.trim(),
+        web_slug: value.web_slug.trim(),
+        pos_barcode: value.pos_barcode.trim(),
+        visibility: value.visibility,
+        sync_policy: value.sync_policy,
+        safety_buffer: value.safety_buffer,
+        allocation_cap: value.allocation_cap,
+        media_scope: value.media_scope,
+        compliance_notes: value.compliance_notes.trim(),
+        tax_code: value.tax_code.trim(),
+        attribute_material: value.attribute_material.trim(),
+        attribute_color: value.attribute_color.trim(),
       }])),
       status: statusOverride ?? existingProduct?.status ?? 'draft',
       created_at: existingProduct?.created_at ?? now,
@@ -1363,6 +1455,9 @@ export default function ProductCreatePage() {
   }
 
   const totalStock = Object.values(inventory).reduce((s, v) => s + num(v), 0);
+  const masterSkuLocked = Boolean(existingProduct && (
+    existingProduct.status !== 'draft' || existingProduct.channels.length > 0 || totalStock > 0
+  ));
   const selectedVariantItems = variantItems.filter(item => item.selected);
   const hasGeneratedVariants = form.has_variants && selectedVariantItems.length > 0;
   const variantPricingReady = hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim() && num(item.price) > 0) && selectedVariantItems.reduce((sum, item) => sum + num(item.stock), 0) > 0;
@@ -1398,16 +1493,25 @@ export default function ProductCreatePage() {
     return checks;
   }, [channelOverrides, form, hasGeneratedVariants, images.length, logisticsReady, pricingAndInventoryReady, selectedVariantItems, variantGroups.length]);
   const completion = Math.round((completionChecks.filter(check => check.done).length / completionChecks.length) * 100);
+  const completedIdentityFields = [form.brand, form.gtin, form.manufacturer, form.mpn, form.model_number]
+    .filter(value => value.trim()).length;
+  const completedProductDetails = [
+    Boolean(form.sku_code.trim()),
+    form.name.trim().length >= 3,
+    Boolean(form.category),
+    form.description.trim().length >= 100,
+  ].filter(Boolean).length;
   const readiness = (Object.entries(channelOverrides) as Array<[OverrideChannel, ChannelOverrideForm]>).map(([key, override]) => {
     const masterDataReady = form.name.trim().length >= 3 && form.description.trim().length >= 100 && Boolean(form.category) && images.length >= 3 && pricingAndInventoryReady && logisticsReady;
     const overrideStarted = Boolean(override.title.trim() || override.description.trim() || override.price_markup);
     const incompleteOverride = overrideStarted && (!override.title.trim() || !override.description.trim());
+    const listingSetupIncomplete = !channelSetupComplete(key, override);
     const channel = OVERRIDE_CHANNELS.find(item => item.key === key);
     return {
       key,
       label: channel?.label ?? key,
-      state: !override.enabled ? 'inactive' : !masterDataReady ? 'blocked' : incompleteOverride ? 'warning' : 'ready',
-      detail: !override.enabled ? 'Not selected' : !masterDataReady ? 'Complete the required master product data' : incompleteOverride ? 'Complete or clear the optional overrides' : '100% Ready',
+      state: !override.enabled ? 'inactive' : !masterDataReady ? 'blocked' : listingSetupIncomplete || incompleteOverride ? 'warning' : 'ready',
+      detail: !override.enabled ? 'Not selected' : !masterDataReady ? 'Complete the required master product data' : listingSetupIncomplete ? 'Complete channel SKU, category and fulfillment' : incompleteOverride ? 'Complete or clear the optional overrides' : '100% Ready',
     } as const;
   });
   const completedSpecifications = specifications.filter(item => item.name.trim() && item.value.trim()).length;
@@ -1574,11 +1678,11 @@ export default function ProductCreatePage() {
 
       <nav className="sticky top-[104px] z-30 flex min-h-12 gap-1 overflow-x-auto border-b bg-background/95 px-6 backdrop-blur sm:top-14" aria-label="Product form sections">
         {[
-          ['channels', 'Sales Channels'],
-          ['basic', 'Basic Info'],
-          ['pricing', 'Pricing & Variants'],
+          ['basic', 'Basic & Classification'],
+          ['pricing', 'Structure & Pricing'],
           ['shipping', 'Shipping & Inventory'],
           ['more', 'More Information'],
+          ['channels', 'Channel Handoff'],
         ].map(([id, label]) => <button key={id} type="button" onClick={() => scrollToSection(id)} aria-current={activeSection === id ? 'step' : undefined} className={`relative min-h-12 shrink-0 px-3 text-sm font-medium transition-colors ${activeSection === id ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-muted-foreground hover:text-foreground'}`}>{label}</button>)}
       </nav>
 
@@ -1587,219 +1691,186 @@ export default function ProductCreatePage() {
         <div className="grid w-full grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_300px]">
 
           {/* Left Column */}
-          <div className="space-y-5">
+          <div className="flex flex-col gap-5">
 
             {/* Sales Channels */}
-            <Card id="product-section-channels" className="scroll-mt-28 border-primary/20">
+            <Card id="product-section-channels" className="order-5 scroll-mt-28 border-primary/20">
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Sales Channels</CardTitle>
-                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground">Choose where this product will be published. You can configure channel-specific content later.</p>
-                  </div>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{Object.values(channelOverrides).filter(channel => channel.enabled).length} selected</span>
+                  <div><CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Sales Channels</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">Create and configure channel listings directly from this Product Master. Every channel keeps its own SKU, category, fulfillment and overrides.</p></div>
+                  <Button type="button" onClick={() => existingProduct ? navigate(`/products/${existingProduct.id}/channel-listings/new`) : handleSave('draft', { navigateAfter: false })}><Plus className="size-4" />{existingProduct ? 'Create channel listings' : 'Save master to continue'}</Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {OVERRIDE_CHANNELS.map(channel => {
-                    const override = channelOverrides[channel.key];
-                    const ChannelIcon = channel.icon;
-                    return <label key={channel.key} className={`flex min-h-16 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${override.enabled ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
-                      <Checkbox checked={override.enabled} onCheckedChange={value => updateChannelOverride(channel.key, { enabled: Boolean(value) })} aria-label={`Publish to ${channel.label}`} />
-                      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${channel.iconClassName}`}><ChannelIcon className="size-4" /></span>
-                      <span className="min-w-0"><span className="block truncate text-sm font-semibold">{channel.label}</span><span className="block truncate text-[11px] text-muted-foreground">{channel.description}</span></span>
-                    </label>;
-                  })}
-                </div>
-
-                <div className="border-t pt-4">
-                  <div className="mb-3">
-                    <Label>Channel-specific overrides</Label>
-                    <p className="mt-1 text-xs text-muted-foreground">Optional. Leave fields empty to use the master product title, price and description.</p>
-                  </div>
-                  {Object.values(channelOverrides).every(channel => !channel.enabled) ? (
-                    <div className="flex min-h-20 items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20 px-4 text-center text-xs text-muted-foreground"><Radio className="size-4" />Select at least one sales channel to configure publishing details.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {OVERRIDE_CHANNELS.filter(channel => channelOverrides[channel.key].enabled).map(channel => {
-                        const override = channelOverrides[channel.key];
-                        const ChannelIcon = channel.icon;
-                        return <details key={channel.key} className="group rounded-lg border bg-background open:border-primary/25">
-                          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                            <span className={`grid size-8 shrink-0 place-items-center rounded-md ${channel.iconClassName}`}><ChannelIcon className="size-4" /></span>
-                            <span className="text-sm font-semibold">{channel.label}</span>
-                            <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Optional overrides</span>
-                            <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
-                          </summary>
-                          <div className="grid gap-3 border-t bg-muted/10 p-3 sm:grid-cols-[minmax(0,1fr)_140px]">
-                            <Field label="Custom Title"><Input value={override.title} onChange={event => updateChannelOverride(channel.key, { title: event.target.value })} placeholder={form.name || `${channel.label} product title`} /></Field>
-                            <Field label="Price Markup %"><Input type="number" value={override.price_markup} onChange={event => updateChannelOverride(channel.key, { price_markup: event.target.value })} placeholder="0" /></Field>
-                            <div className="sm:col-span-2"><Field label="Custom Description"><Textarea rows={2} value={override.description} onChange={event => updateChannelOverride(channel.key, { description: event.target.value })} placeholder={`Description optimized for ${channel.label}`} /></Field></div>
-                          </div>
-                        </details>;
-                      })}
-                    </div>
-                  )}
-                </div>
+              <CardContent>
+                {Object.values(channelOverrides).every(channel => !channel.enabled) ? <div className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground"><Radio className="size-5" /><span><strong className="block text-foreground">No channel listings configured</strong><span className="mt-1 block text-xs">Save this Product Master, then create listings in the dedicated channel workspace.</span></span></div> : <div className="space-y-3">{OVERRIDE_CHANNELS.filter(channel => channelOverrides[channel.key].enabled).map(channel => { const override = channelOverrides[channel.key]; const ChannelIcon = channel.icon; const complete = channelSetupComplete(channel.key, override); return <button key={channel.key} type="button" onClick={() => existingProduct && navigate(`/products/${existingProduct.id}/channel-listings/new`)} className="flex min-h-16 w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className={cn('grid size-9 place-items-center rounded-lg', channel.iconClassName)}><ChannelIcon className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{channel.label}</strong><span className="block truncate font-mono text-xs text-muted-foreground">{override.listing_sku || 'Channel SKU not configured'}</span></span><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', complete ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>{complete ? 'Ready' : 'Needs setup'}</span><ChevronRight className="size-4 text-muted-foreground" /></button>; })}</div>}
               </CardContent>
             </Card>
 
             {/* Product Identity */}
-            <Card id="product-section-basic" className="scroll-mt-28">
+            <Card id="product-section-basic" className="order-1 scroll-mt-28">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Layers className="size-4 text-primary" />
-                  {copy.productIdentity}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {([
-                    { label: 'GTIN', key: 'gtin', placeholder: copy.gtinPlaceholder },
-                    { label: 'MPN', key: 'mpn', placeholder: copy.mpnPlaceholder },
-                    { label: 'Model Number', key: 'model_number', placeholder: copy.modelPlaceholder },
-                    { label: 'Brand Name', key: 'brand', placeholder: copy.brandPlaceholder },
-                    { label: 'ASIN', key: 'asin', placeholder: copy.asinPlaceholder },
-                    { label: 'Manufacturer Name', key: 'manufacturer', placeholder: copy.manufacturerPlaceholder },
-                  ] as const).map(f => (
-                    <Field key={f.key} label={f.label}>
-                      <Input value={form[f.key]} onChange={e => setField(f.key, e.target.value)} placeholder={f.placeholder} />
-                    </Field>
-                  ))}
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Layers className="size-4 text-primary" />
+                    {copy.productIdentity}
+                  </CardTitle>
+                  <span className="text-xs tabular-nums text-muted-foreground">{completedIdentityFields} of 5 completed</span>
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Brand">
+                    <Input value={form.brand} onChange={e => setField('brand', e.target.value)} placeholder={copy.brandPlaceholder} />
+                  </Field>
+                  <Field label="GTIN / Barcode">
+                    <Input value={form.gtin} onChange={e => setField('gtin', e.target.value)} placeholder={copy.gtinPlaceholder} inputMode="numeric" />
+                  </Field>
+                </div>
+                <div className="overflow-hidden rounded-lg border">
+                  <button type="button" aria-expanded={advancedIdentityOpen} onClick={() => setAdvancedIdentityOpen(open => !open)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                    <ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', advancedIdentityOpen ? 'rotate-180' : '')} />
+                    <span>Advanced identifiers</span>
+                    <span className="ml-auto text-xs font-normal text-muted-foreground">MPN, model and manufacturer</span>
+                  </button>
+                  {advancedIdentityOpen ? <div className="grid grid-cols-1 gap-4 border-t bg-muted/10 p-4 md:grid-cols-3">
+                    <Field label="Manufacturer">
+                      <Input value={form.manufacturer} onChange={e => setField('manufacturer', e.target.value)} placeholder={copy.manufacturerPlaceholder} />
+                    </Field>
+                    <Field label="MPN">
+                      <Input value={form.mpn} onChange={e => setField('mpn', e.target.value)} placeholder={copy.mpnPlaceholder} />
+                    </Field>
+                    <Field label="Model Number">
+                      <Input value={form.model_number} onChange={e => setField('model_number', e.target.value)} placeholder={copy.modelPlaceholder} />
+                    </Field>
+                  </div> : null}
+                </div>
+                <p className="text-xs text-muted-foreground">Amazon ASIN is managed in the Amazon channel listing.</p>
               </CardContent>
             </Card>
 
             {/* Product Details */}
-            <Card>
+            <Card className="order-1">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Package className="size-4 text-primary" />
-                  {copy.productDetails}
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Package className="size-4 text-primary" />
+                    {copy.productDetails}
+                  </CardTitle>
+                  <span className="text-xs tabular-nums text-muted-foreground">{completedProductDetails} of 4 completed</span>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label={copy.skuCode} required error={errors.sku_code}>
-                    <Input value={form.sku_code} onChange={e => setField('sku_code', e.target.value.toUpperCase())} placeholder={copy.skuPlaceholder} className="font-mono uppercase" />
-                  </Field>
-                  <Field label={copy.productName} required error={errors.name}>
-                    <Input value={form.name} onChange={e => updateProductName(e.target.value)} placeholder={copy.namePlaceholder} minLength={3} maxLength={120} />
-                  </Field>
-                  <div className="sm:col-span-2">
-                    <Field label={copy.description}>
-                      <Textarea value={form.description} onChange={e => setField('description', e.target.value)} placeholder={copy.descriptionPlaceholder} rows={2} />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                  <div className="sm:col-span-6">
+                    <Field label={copy.skuCode} required error={errors.sku_code}>
+                      <div className="relative">
+                        <Input value={form.sku_code} onChange={e => setField('sku_code', e.target.value.toUpperCase())} placeholder={copy.skuPlaceholder} className={cn('font-mono uppercase', masterSkuLocked && 'pr-9 bg-muted/30')} readOnly={masterSkuLocked} aria-readonly={masterSkuLocked} aria-describedby={masterSkuLocked ? 'master-sku-lock-reason' : undefined} />
+                        {masterSkuLocked ? <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /> : null}
+                      </div>
+                      {masterSkuLocked ? <div id="master-sku-lock-reason" className="flex flex-wrap items-center justify-between gap-1.5 text-xs"><span className="text-muted-foreground">Locked because linked records must be reviewed before changing it.</span><button type="button" onClick={openMasterSkuChange} className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Change Master SKU</button></div> : existingProduct ? <p className="text-xs text-muted-foreground">Editable while this draft has no inventory or channel listings.</p> : null}
                     </Field>
                   </div>
-                  <Field label={copy.category} required error={errors.category}>
-                    <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(form.category); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
-                  </Field>
-                  <Field label={copy.condition}>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.condition} onChange={e => setField('condition', e.target.value)}>
-                      {CONDITIONS.map(c => <option key={c} value={c}>{conditionLabels[c as keyof typeof conditionLabels]}</option>)}
-                    </select>
-                  </Field>
+                  <div className="sm:col-span-6">
+                    <Field label={copy.productName} required error={errors.name}>
+                    <Input value={form.name} onChange={e => updateProductName(e.target.value)} placeholder={copy.namePlaceholder} minLength={3} maxLength={120} />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-6">
+                    <Field label={copy.category} required error={errors.category}>
+                      <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(form.category); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-6">
+                    <Field label={copy.condition}>
+                      <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" value={form.condition} onChange={e => setField('condition', e.target.value)}>
+                        {CONDITIONS.map(c => <option key={c} value={c}>{conditionLabels[c as keyof typeof conditionLabels]}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-12">
+                    <Field label={copy.description}>
+                      <Textarea value={form.description} onChange={e => setField('description', e.target.value)} placeholder={copy.descriptionPlaceholder} rows={2} className="min-h-16 resize-y" />
+                    </Field>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Product Structure */}
-            <Card id="product-section-pricing" className="scroll-mt-28">
+            <Card id="product-section-pricing" className="order-2 scroll-mt-28">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />Product Structure</CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">Choose how this product is sold. Selecting Variants opens the attribute and SKU matrix builder below.</p>
+                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />Structure &amp; Pricing</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">Choose the selling structure, then configure the pricing and variant data that belong to it.</p>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Product structure">
+              <CardContent className="space-y-5">
+                <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Product structure">
                   {([
                     { type: 'single', title: 'Single product', description: 'One SKU with one price and stock record.' },
                     { type: 'variant', title: 'Product with variants', description: 'Multiple SKUs by Color, Size or other options.' },
-                    { type: 'bundle', title: 'Product bundle', description: 'A set of products sold together.' },
                   ] as const).map(option => {
                     const TypeIcon = PRODUCT_TYPE_ICONS[option.type];
                     const selected = form.product_type === option.type;
-                    return <button key={option.type} type="button" role="radio" aria-checked={selected} onClick={() => handleProductTypeChange(option.type)} className={`min-h-28 rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
+                    return <button key={option.type} type="button" role="radio" aria-checked={selected} onClick={() => handleProductTypeChange(option.type)} className={`min-h-20 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
                       <span className="flex items-start gap-3">
-                        <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}><TypeIcon className="size-4" /></span>
+                        <span className={`grid size-8 shrink-0 place-items-center rounded-md ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}><TypeIcon className="size-4" /></span>
                         <span><span className="flex items-center gap-2 text-sm font-semibold">{option.title}{selected ? <Check className="size-4 text-primary" /> : null}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span></span>
                       </span>
                     </button>;
                   })}
                 </div>
-                {form.product_type === 'variant' ? <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-primary"><CircleCheck className="size-4 shrink-0" /><span><strong>Variant builder enabled.</strong> Add up to two attributes below to generate the SKU matrix.</span></div> : null}
-              </CardContent>
-            </Card>
+                {form.has_variants ? <section className="space-y-4 border-t pt-5" aria-labelledby="variant-attributes-title">
+                  <div className="flex items-start justify-between gap-3"><div><h3 id="variant-attributes-title" className="text-sm font-semibold">Variant attributes</h3><p className="mt-1 text-xs text-muted-foreground">Add up to two attributes, such as Color × Size, to generate the SKU matrix.</p></div><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{variantGroups.length} of 2</span></div>
+                  <VariantSection
+                    groups={variantGroups}
+                    onGroupsChange={setVariantGroups}
+                    items={variantItems}
+                    onItemsChange={setVariantItems}
+                    parentSku={form.sku_code}
+                    basePrice={form.retail_price}
+                    currency={form.price_currency}
+                    existingSkus={existingSkuList}
+                    copy={{
+                      duplicateAttribute: copy.duplicateAttribute,
+                      addValuePlaceholder: copy.addValuePlaceholder,
+                      add: copy.add,
+                      addGroupPlaceholder: copy.addGroupPlaceholder,
+                      addAttribute: copy.addAttribute,
+                      cancel: copy.cancel,
+                      addVariantAttribute: copy.addVariantAttribute,
+                      variantsWillBeCreated: copy.variantsWillBeCreated,
+                      selectAll: copy.selectAll,
+                      variant: copy.variant,
+                      skuCode: copy.skuCode,
+                      price: copy.price,
+                      stock: copy.stock,
+                      skuExists: copy.skuExists,
+                    }}
+                  />
+                </section> : null}
 
-            {/* Variant Groups — only if has_variants */}
-            {form.has_variants && (
-              <VariantSection
-                groups={variantGroups}
-                onGroupsChange={setVariantGroups}
-                items={variantItems}
-                onItemsChange={setVariantItems}
-                parentSku={form.sku_code}
-                parentTitle={form.name}
-                basePrice={form.retail_price}
-                existingSkus={existingSkuList}
-                copy={{
-                  duplicateAttribute: copy.duplicateAttribute,
-                  variantGroups: copy.variantGroups,
-                  addValuePlaceholder: copy.addValuePlaceholder,
-                  add: copy.add,
-                  addGroupPlaceholder: copy.addGroupPlaceholder,
-                  addAttribute: copy.addAttribute,
-                  cancel: copy.cancel,
-                  addVariantAttribute: copy.addVariantAttribute,
-                  variantsWillBeCreated: copy.variantsWillBeCreated,
-                  selectAll: copy.selectAll,
-                  variant: copy.variant,
-                  skuCode: copy.skuCode,
-                  price: copy.price,
-                  stock: copy.stock,
-                  skuExists: copy.skuExists,
-                }}
-              />
-            )}
-
-            {/* Base/default price is replaced by the variant matrix once variants exist. */}
-            {!hasGeneratedVariants && <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Info className="size-4 text-primary" />
-                  {form.has_variants ? 'Default Pricing' : copy.price}
-                </CardTitle>
-                {form.has_variants ? <p className="text-xs leading-5 text-muted-foreground">Used as the starting price for newly generated variants. Once the variant matrix exists, manage pricing directly in the matrix.</p> : null}
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {!hasGeneratedVariants ? <section className="space-y-4 border-t pt-5" aria-labelledby="product-pricing-title">
+                  <div><h3 id="product-pricing-title" className="text-sm font-semibold">{form.has_variants ? 'Default variant pricing' : 'Pricing'}</h3>{form.has_variants ? <p className="mt-1 text-xs leading-5 text-muted-foreground">Used only to initialize new variants. After the matrix is generated, manage prices per SKU.</p> : null}</div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                  <div className="sm:col-span-4">
                   <Field label={copy.originalPrice}>
-                    <div className="flex gap-2">
-                      <Input value={form.original_price} onChange={e => setField('original_price', e.target.value)} placeholder="0" type="number" className="flex-1" />
-                      <select className="w-20 h-10 rounded-md border border-input bg-background px-2 py-1 text-sm" value={form.price_currency} onChange={e => setField('price_currency', e.target.value)}>
-                        {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
+                    <Input value={form.original_price} onChange={e => setField('original_price', e.target.value)} placeholder="0" type="number" />
                   </Field>
+                  </div>
+                  <div className="sm:col-span-4">
                   <Field label={copy.retailPrice}>
                     <Input value={form.retail_price} onChange={e => setField('retail_price', e.target.value)} placeholder="0" type="number" />
                   </Field>
-                  <div className="flex items-end">
-                    <p className="text-xs text-muted-foreground">
-                      {copy.margin}:{' '}
-                      {(() => {
-                        const r = num(form.retail_price);
-                        const o = num(form.original_price);
-                        return r > 0 ? `${(((r - o) / r) * 100).toFixed(1)}%` : '—';
-                      })()}
-                    </p>
                   </div>
-                </div>
+                  <div className="sm:col-span-2"><Field label="Currency"><select className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" value={form.price_currency} onChange={e => setField('price_currency', e.target.value)}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field></div>
+                  <div className="flex items-end sm:col-span-2"><div className="flex h-9 w-full items-center justify-between rounded-md bg-muted/40 px-3 text-xs"><span className="text-muted-foreground">{copy.margin}</span><strong className="tabular-nums">{(() => { const retail = num(form.retail_price); const original = num(form.original_price); return retail > 0 ? `${(((retail - original) / retail) * 100).toFixed(1)}%` : '—'; })()}</strong></div></div>
+                  </div>
+                  {num(form.retail_price) > 0 ? <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-muted/30 px-3 py-2 text-xs"><span className="text-muted-foreground">Estimated profit</span><strong className="tabular-nums">{formatLocalizedNumber(locale, Math.max(0, num(form.retail_price) - num(form.original_price)))} {form.price_currency}</strong><span className="text-muted-foreground">before fees and channel adjustments</span></div> : null}
+                </section> : <div className="flex items-center justify-between gap-3 border-t pt-4 text-xs"><span className="text-muted-foreground">Pricing is managed per SKU in the variant matrix above.</span><Button type="button" variant="outline" size="sm" onClick={() => document.querySelector('[aria-label="Variant pricing matrix"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Manage variant pricing</Button></div>}
               </CardContent>
-            </Card>}
+            </Card>
 
             {/* Shipping & Logistics */}
-            <Card id="product-section-shipping" className="scroll-mt-28">
+            <Card id="product-section-shipping" className="order-3 scroll-mt-28">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Truck className="size-4 text-primary" />
@@ -1827,7 +1898,7 @@ export default function ProductCreatePage() {
             </Card>
 
             {/* Others */}
-            <Card id="product-section-more" className="scroll-mt-28">
+            <Card id="product-section-more" className="order-4 scroll-mt-28">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Info className="size-4 text-primary" />
@@ -2031,6 +2102,37 @@ export default function ProductCreatePage() {
       </div>
 
       {/* Confirm Dialog */}
+      <Dialog open={skuChangeOpen} onOpenChange={setSkuChangeOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Change Master SKU</DialogTitle>
+            <DialogDescription>Review linked records before staging a new canonical SKU. Channel-specific SKUs will not be changed.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+              <div><span className="block text-xs text-muted-foreground">Current Master SKU</span><strong className="mt-1 block font-mono">{form.sku_code}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Product status</span><strong className="mt-1 block capitalize">{existingProduct?.status ?? 'draft'}</strong></div>
+            </div>
+            <Field label="New Master SKU" required error={skuChangeError}>
+              <Input autoFocus value={pendingMasterSku} onChange={event => { setPendingMasterSku(event.target.value.toUpperCase()); setSkuChangeError(''); }} placeholder="e.g. SKU-0002" className="font-mono uppercase" maxLength={30} />
+            </Field>
+            <section className="rounded-lg border p-3" aria-labelledby="sku-impact-title">
+              <h3 id="sku-impact-title" className="text-sm font-semibold">Linked records to preserve</h3>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-md bg-muted/40 p-2"><strong className="block text-base tabular-nums">{existingProduct?.channels.length ?? 0}</strong><span className="text-[11px] text-muted-foreground">Channels</span></div>
+                <div className="rounded-md bg-muted/40 p-2"><strong className="block text-base tabular-nums">{Object.values(inventory).filter(value => num(value) > 0).length}</strong><span className="text-[11px] text-muted-foreground">Warehouses</span></div>
+                <div className="rounded-md bg-muted/40 p-2"><strong className="block text-base tabular-nums">{existingProduct?.skus.length ?? 0}</strong><span className="text-[11px] text-muted-foreground">Variants</span></div>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">Inventory links and variants remain attached to this Product Master. Amazon, Shopee, Lazada and other Channel SKUs keep their current values.</p>
+            </section>
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm">
+              <Checkbox checked={skuChangeConfirmed} onCheckedChange={checked => setSkuChangeConfirmed(checked === true)} className="mt-0.5" />
+              <span><strong className="block">I reviewed the affected records</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">The change is staged first and is applied when this Product Master is saved.</span></span>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-4"><Button variant="outline" onClick={() => setSkuChangeOpen(false)}>Cancel</Button><Button disabled={!skuChangeConfirmed || !pendingMasterSku.trim()} onClick={stageMasterSkuChange}>Stage SKU change</Button></div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={categoryOpen} onOpenChange={setCategoryOpen}>
         <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-3xl">
           <DialogHeader className="border-b p-5"><DialogTitle>Select product category</DialogTitle><DialogDescription>Choose the most accurate master category. Channel mappings can be configured during publishing.</DialogDescription></DialogHeader>

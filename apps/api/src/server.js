@@ -1,4 +1,5 @@
 import express from 'express';
+import { createOrderStore } from './orders.js';
 import cors from 'cors';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -1499,6 +1500,24 @@ app.post('/api/admin/worker-queue/dead-letters/requeue', async (request, respons
     const count = drainDeadLetters();
     response.json({ ok: true, requeued: count });
   }
+});
+
+const orderStore = createOrderStore();
+app.get('/api/v1/orders', (request, response, next) => {
+  const session = buildSession(request.primeAccount);
+  if (!session.visibleResources.includes('omsOrders')) return response.status(403).json({ message: 'Order access required.' });
+  try { response.json({ data: orderStore.list(), canWrite: session.writableResources.includes('omsOrders'), currentUserName: request.primeAccount.fullName }); }
+  catch (error) { next(error); }
+});
+app.post('/api/v1/orders', (request, response, next) => {
+  if (!buildSession(request.primeAccount).writableResources.includes('omsOrders')) return response.status(403).json({ message: 'Order write access required.' });
+  try { response.status(201).json({ data: orderStore.create(request.body || {}, request.primeAccount.id) }); }
+  catch (error) { if (error.statusCode) return response.status(error.statusCode).json({ message: error.message }); next(error); }
+});
+app.post('/api/v1/orders/:id/actions', (request, response, next) => {
+  if (!buildSession(request.primeAccount).writableResources.includes('omsOrders')) return response.status(403).json({ message: 'Order write access required.' });
+  try { response.json({ data: orderStore.command(request.params.id, request.body || {}, request.primeAccount.id) }); }
+  catch (error) { if (error.statusCode) return response.status(error.statusCode).json({ message: error.message }); next(error); }
 });
 
 app.get('/api/:resource', async (request, response, next) => {

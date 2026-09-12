@@ -33,11 +33,11 @@ describe('Warehouse & Inventory workspace', () => {
 
     expect(screen.getByText('Available to Promise')).toBeInTheDocument();
     expect(screen.getByText('Damaged / Quarantine')).toBeInTheDocument();
-    expect(screen.getByText('Compact Smart Lamp')).toBeInTheDocument();
+    expect(screen.getAllByText('Black Hardcover Notebook — Japanese Craft Paper').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'What does Available to Promise mean?' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'What does ATP mean?' }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'HCM Central Warehouse' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'CyberRecord Japan HQ' })[0]);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Stock breakdown')).toBeInTheDocument();
     expect(screen.getByText('Recent inventory activity')).toBeInTheDocument();

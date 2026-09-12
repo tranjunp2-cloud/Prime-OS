@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRightLeft,
+  Award,
   BadgePercent,
   BarChart3,
   Building2,
@@ -30,6 +31,7 @@ import {
   RadioTower,
   Search,
   Settings2,
+  SlidersHorizontal,
   ShoppingBag,
   Sparkles,
   Store,
@@ -60,15 +62,15 @@ type SearchResult = NavItem & { trail: string[]; parentIds: string[] };
 const mainNavigation: NavGroup[] = [
   { id: 'overview', label: 'Overview', items: [
     { id: 'home', label: 'Home', href: '/admin/dashboard', icon: Home },
-    { id: 'prime-ai', label: 'Prime AI', href: '/prime-ai', icon: Sparkles },
     { id: 'analytics', label: 'Analytics', href: '/client-reports', icon: BarChart3 },
   ] },
   { id: 'operations', label: 'Operations', items: [
     { id: 'orders', label: 'Orders', href: '/orders', icon: ShoppingBag },
     { id: 'products', label: 'Products', icon: Package, children: [
       { id: 'master-catalog', label: 'Product Master', href: '/products/master-catalog', icon: Boxes },
-      { id: 'channel-listings', label: 'Channel Listings', href: '/products/channel-listings', icon: Layers3 },
-      { id: 'product-categories', label: 'Categories & Attributes', href: '/products/categories', icon: Tags },
+      { id: 'product-categories', label: 'Categories', href: '/products/categories', icon: Tags },
+      { id: 'product-attributes', label: 'Attributes', href: '/products/attributes', icon: SlidersHorizontal },
+      { id: 'product-brands', label: 'Brands', href: '/products/brands', icon: Award },
     ] },
     { id: 'warehouse', label: 'Warehouses', icon: Warehouse, children: [
       { id: 'warehouse-mapping', label: 'Locations & Mapping', href: '/warehouse/mapping', icon: Link2 },
@@ -87,9 +89,6 @@ const mainNavigation: NavGroup[] = [
     { id: 'marketing', label: 'Marketing', href: '/marketing', icon: Megaphone },
     { id: 'promotions', label: 'Promotions', href: '/promotions', icon: BadgePercent },
   ] },
-  { id: 'plan-billing', label: 'Billing', items: [
-    { id: 'plan-billing', label: 'Plan & Billing', href: '/billing', icon: CreditCard },
-  ] },
   { id: 'system', label: 'System', items: [
     { id: 'settings', label: 'Settings', icon: Settings2, children: [
       { id: 'general-business-settings', label: 'General & Business', href: '/settings/general', icon: Building2 },
@@ -99,6 +98,7 @@ const mainNavigation: NavGroup[] = [
       { id: 'customer-data-settings', label: 'Customer Data & Privacy', href: '/settings/customer-data', icon: UsersRound },
       { id: 'template-notification-settings', label: 'Templates & Notifications', href: '/settings/templates-notifications', icon: Printer },
     ] },
+    { id: 'plan-billing', label: 'Plan & Billing', href: '/billing', icon: CreditCard },
     { id: 'faq', label: 'Help Center', href: '/faq', icon: CircleHelp },
   ] },
 ];
@@ -123,7 +123,7 @@ const posNavigation: NavGroup[] = [{ id: 'pos', label: 'Point of Sale', items: [
 function hrefIsActive(href: string | undefined, pathname: string, search: string) {
   if (!href) return false;
   const [hrefPath, hrefSearch = ''] = href.split('?');
-  const reservedProductRoutes = new Set(['master-catalog', 'channel-listings', 'categories', 'inventory', 'new']);
+  const reservedProductRoutes = new Set(['master-catalog', 'categories', 'attributes', 'brands', 'inventory', 'new']);
   const productSegments = pathname.split('/').filter(Boolean);
   const isProductEditorRoute = pathname === '/products/new'
     || (productSegments[0] === 'products' && productSegments.length >= 2 && !reservedProductRoutes.has(productSegments[1]) && (productSegments.length === 2 || (productSegments.length === 3 && productSegments[2] === 'edit')));

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Image as ImageIcon, ExternalLink } from 'lucide-react';
@@ -92,6 +92,11 @@ export default function ProductDetail() {
   const [imgError, setImgError] = useState<Record<number, boolean>>({});
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const { backLabel, goBack } = useDetailNavigation('/products', t('products.pageTitle'));
+
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'channels') return;
+    window.requestAnimationFrame(() => document.getElementById('product-channel-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [searchParams]);
 
   const localProduct = id ? getProductById(id) : undefined;
   const { data: remoteProduct, isLoading: isRemoteLoading } = useQuery({
@@ -187,8 +192,8 @@ export default function ProductDetail() {
             >
               <Pencil className="size-4 mr-2" />{t('products.edit')}
             </Button>
-            <Button onClick={() => navigate(`/products/${product.id}/channels/amazon`)}>
-              <ExternalLink className="size-4 mr-2" />Edit Amazon listing
+            <Button onClick={() => document.getElementById('product-channel-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              <ExternalLink className="size-4 mr-2" />Manage channel listings
             </Button>
           </div>
         }
@@ -414,6 +419,17 @@ export default function ProductDetail() {
           </CardContent>
         </Card>
       )}
+
+      <Card id="product-channel-workspace" className="scroll-mt-20 border-primary/20">
+        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-base">Channel Listings</CardTitle><p className="mt-1 text-sm text-muted-foreground">Review channel SKU and edit channel-owned content without leaving this Product Master workspace.</p></div><Badge variant="outline">{product.channels.length} channels</Badge></div></CardHeader>
+        <CardContent>
+          {product.channels.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{product.channels.map((channel) => {
+            const routeKey = channel.channel === 'website' ? 'primeweb' : channel.channel;
+            const listingSku = channel.external_id || `${routeKey.toUpperCase()}-${product.sku_code}`;
+            return <div key={channel.channel} className="rounded-xl border bg-card p-4"><div className="flex items-start justify-between gap-3"><ChannelBadge channel={channel.channel} /><StatusBadge status={channel.status} domain="listing" /></div><dl className="mt-4 space-y-2 text-sm"><div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Master SKU</dt><dd className="truncate font-mono text-xs">{product.sku_code}</dd></div><div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Channel SKU</dt><dd className="truncate font-mono text-xs font-semibold">{listingSku}</dd></div></dl><Button variant="outline" className="mt-4 w-full" onClick={() => navigate(`/products/${product.id}/channels/${routeKey}`)}><Pencil className="size-4" />Edit {channel.channel === 'website' ? 'PrimeWeb' : channel.channel} listing</Button></div>;
+          })}</div> : <div className="rounded-xl border border-dashed p-8 text-center"><p className="font-semibold">No channel listings yet</p><p className="mt-1 text-sm text-muted-foreground">Choose stores, configure channel fields and review each channel SKU before submission.</p><Button className="mt-4" onClick={() => navigate(`/products/${product.id}/channel-listings/new`)}>Create channel listings</Button></div>}
+        </CardContent>
+      </Card>
 
       {/* Channel Listings */}
       {productListings.length > 0 && (
