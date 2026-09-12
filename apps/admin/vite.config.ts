@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
-      '/api': 'http://localhost:8180'
+      '/api': process.env.PRIME_ADMIN_PROXY_TARGET || 'http://127.0.0.1:8280'
     }
   }
 });

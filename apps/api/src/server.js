@@ -1638,7 +1638,7 @@ function attachLiveCommerceWebSocket(server) {
   });
 }
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   const server = createServer(app);
   attachLiveCommerceWebSocket(server);
   server.listen(port, host, () => {

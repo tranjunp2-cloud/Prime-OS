@@ -1968,6 +1968,7 @@ class RequestError extends Error {
 
 async function requestJson<T>(path: string, token: string | null, init?: RequestInit) {
   const headers = new Headers(init?.headers);
+  const apiBase = String(import.meta.env.VITE_PRIME_ADMIN_API_BASE || '').replace(/\/$/, '');
 
   if (init?.body) {
     headers.set('Content-Type', 'application/json');
@@ -1977,7 +1978,7 @@ async function requestJson<T>(path: string, token: string | null, init?: Request
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(`${apiBase}${path}`, {
     ...init,
     headers
   });

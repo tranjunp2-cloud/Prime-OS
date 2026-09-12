@@ -39,3 +39,5 @@ kilo.jsonc
 *.log
 .idea/
 .vscode/
+.vercel
+.env*
