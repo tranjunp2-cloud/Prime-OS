@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build --workspace @primeos/admin",
-  "outputDirectory": "apps/admin/dist",
+  "buildCommand": "npm run build:dev --workspace @primeos/web",
+  "outputDirectory": "apps/web/dist",
   "installCommand": "npm install",
   "functions": {
     "api/index.js": {
@@ -11,6 +11,10 @@
     {
       "source": "/api/(.*)",
       "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
