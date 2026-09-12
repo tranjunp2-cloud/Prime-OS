@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:dev --workspace @primeos/web",
+  "buildCommand": "VITE_PRIME_STAGING_DEMO=true npm run build:dev --workspace @primeos/web",
   "outputDirectory": "apps/web/dist",
   "installCommand": "npm install",
   "functions": {

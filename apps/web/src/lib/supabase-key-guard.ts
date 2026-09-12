@@ -22,8 +22,8 @@ export function requirePublicFrontendEnv(name: string, value: string | undefined
   const normalized = value?.trim();
 
   if (!normalized) {
-    if (import.meta.env.DEV) {
-      return name.endsWith('_URL') ? 'http://127.0.0.1:54321' : 'local-demo-anon-key';
+    if (import.meta.env.DEV || import.meta.env.VITE_PRIME_STAGING_DEMO === 'true') {
+      return name.endsWith('_URL') ? 'https://prototype.invalid' : 'primeos-staging-demo-key';
     }
 
     throw new Error(`${name} is required before building PrimeOS for staging.`);
