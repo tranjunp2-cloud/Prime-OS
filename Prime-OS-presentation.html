@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Prime OS executive product brief, target user flows, and next design delivery plan." />
+  <title>Prime OS — Executive Product Brief</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --primary: #4f46e5;
+      --primary-soft: #eef2ff;
+      --success: #047857;
+      --success-soft: #ecfdf5;
+      --warning: #b45309;
+      --warning-soft: #fffbeb;
+      --danger: #be123c;
+      --danger-soft: #fff1f2;
+      --shadow: 0 14px 38px rgba(15, 23, 42, .07);
+    }
+    html.dark {
+      color-scheme: dark;
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-2: #27272a;
+      --ink: #f8fafc;
+      --muted: #a1a1aa;
+      --line: #3f3f46;
+      --primary: #818cf8;
+      --primary-soft: rgba(79, 70, 229, .18);
+      --success: #6ee7b7;
+      --success-soft: rgba(5, 150, 105, .15);
+      --warning: #fbbf24;
+      --warning-soft: rgba(217, 119, 6, .15);
+      --danger: #fda4af;
+      --danger-soft: rgba(225, 29, 72, .15);
+      --shadow: 0 18px 48px rgba(0, 0, 0, .3);
+    }
+    * { box-sizing: border-box; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(99, 102, 241, .35);
+      outline-offset: 2px;
+    }
+    .app-shell { min-height: 100vh; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(16px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border-radius: 11px;
+      background: #312e81;
+      color: white;
+      box-shadow: 0 8px 20px rgba(49, 46, 129, .22);
+    }
+    .brand-mark svg { width: 21px; height: 21px; }
+    .brand-copy strong { display: block; font-size: 15px; letter-spacing: -.01em; }
+    .brand-copy span { display: block; margin-top: 1px; color: var(--muted); font-size: 11px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .audit-label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .icon-button {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--ink);
+      transition: background .2s ease, border-color .2s ease;
+    }
+    .icon-button:hover { background: var(--surface-2); border-color: #cbd5e1; }
+    .icon-button svg { width: 17px; height: 17px; }
+    .layout { display: grid; grid-template-columns: 252px minmax(0, 1fr); min-height: calc(100vh - 68px); }
+    .sidebar {
+      position: sticky;
+      top: 68px;
+      align-self: start;
+      height: calc(100vh - 68px);
+      padding: 24px 18px;
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .eyebrow {
+      margin: 0;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .sidebar-intro { margin: 7px 8px 22px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .nav-list { display: grid; gap: 7px; }
+    .nav-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+      text-align: left;
+      transition: background .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .nav-button svg { width: 17px; height: 17px; flex: 0 0 auto; }
+    .nav-button:hover { background: var(--surface-2); color: var(--ink); }
+    .nav-button.active { border-color: #c7d2fe; background: var(--primary-soft); color: var(--primary); }
+    .source-note {
+      position: absolute;
+      right: 18px;
+      bottom: 20px;
+      left: 18px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    .source-note strong { color: var(--ink); }
+    .mobile-nav { display: none; overflow-x: auto; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+    .main { min-width: 0; padding: 34px clamp(20px, 4vw, 56px) 72px; }
+    .panel { width: 100%; max-width: 1480px; margin: 0 auto; }
+    .panel[hidden] { display: none !important; }
+    .panel-enter { animation: panelIn .32s ease both; }
+    @keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+    .section-head h1, .section-head h2 { margin: 6px 0 0; letter-spacing: -.035em; line-height: 1.08; }
+    .section-head h1 { font-size: clamp(29px, 3vw, 46px); }
+    .section-head h2 { font-size: clamp(25px, 2.3vw, 34px); }
+    .section-head p:not(.eyebrow) { max-width: 720px; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .status-badge, .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      width: fit-content;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+    .status-badge { padding: 7px 10px; border: 1px solid #a7f3d0; background: var(--success-soft); color: var(--success); }
+    .status-badge::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr);
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .hero-main, .hero-side, .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+    }
+    .hero-main { position: relative; overflow: hidden; padding: clamp(28px, 4vw, 54px); }
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      top: -70px;
+      right: -70px;
+      width: 210px;
+      height: 210px;
+      border: 44px solid var(--primary-soft);
+      border-radius: 50%;
+      opacity: .8;
+      pointer-events: none;
+    }
+    .hero-main h1 { position: relative; z-index: 1; max-width: 820px; margin: 20px 0 0; font-size: clamp(36px, 4.4vw, 66px); line-height: .99; letter-spacing: -.055em; }
+    .hero-main .lead { position: relative; z-index: 1; max-width: 750px; margin: 22px 0 0; color: var(--muted); font-size: clamp(15px, 1.4vw, 18px); line-height: 1.65; }
+    .hero-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 15px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 750;
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
+    }
+    .button:hover { transform: translateY(-1px); background: var(--surface-2); }
+    .button.primary { border-color: #4338ca; background: #4f46e5; color: white; }
+    .button.primary:hover { background: #4338ca; }
+    .button svg { width: 16px; height: 16px; }
+    .hero-side { padding: 24px; }
+    .hero-side h2 { margin: 8px 0 0; font-size: 18px; }
+    .value-list { display: grid; gap: 0; margin-top: 18px; }
+    .value-item { display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+    .value-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: var(--primary-soft); color: var(--primary); }
+    .value-icon svg { width: 16px; height: 16px; }
+    .value-item strong { display: block; font-size: 13px; }
+    .value-item span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .transformation { padding: clamp(22px, 3vw, 30px); }
+    .transformation-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+    .transformation-head h2 { margin: 7px 0 0; font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -.035em; }
+    .transformation-head p:not(.eyebrow) { max-width: 680px; margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .transformation-tag { padding: 7px 10px; border: 1px solid #c7d2fe; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .evolution-grid { display: grid; grid-template-columns: 1fr 44px 1fr 44px 1fr; align-items: stretch; margin-top: 20px; }
+    .evolution-stage { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+    .evolution-stage.current { border-color: #a5b4fc; background: var(--primary-soft); }
+    .stage-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .stage-index { color: var(--primary); font-size: 10px; font-weight: 850; letter-spacing: .1em; }
+    .stage-state { color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; }
+    .evolution-stage h3 { margin: 12px 0 0; font-size: 14px; }
+    .evolution-stage p { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .product-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
+    .product-chip { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 9px; font-weight: 750; }
+    .evolution-arrow { display: grid; place-items: center; color: var(--primary); }
+    .evolution-arrow svg { width: 20px; height: 20px; }
+    .workspace-map { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 16px; margin-top: 16px; }
+    .workspace-main, .workspace-specialized { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+    .workspace-main { border-color: #a5b4fc; box-shadow: inset 0 3px 0 var(--primary); }
+    .workspace-kicker { color: var(--primary); font-size: 10px; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
+    .workspace-title-row { display: flex; align-items: start; justify-content: space-between; gap: 14px; margin-top: 8px; }
+    .workspace-title-row h3 { margin: 0; font-size: 18px; letter-spacing: -.025em; }
+    .workspace-title-row p { max-width: 620px; margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .workspace-badge { padding: 6px 9px; border-radius: 8px; background: var(--success-soft); color: var(--success); font-size: 9px; font-weight: 800; white-space: nowrap; }
+    .domain-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 17px; }
+    .domain-item { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--ink); font-size: 10px; font-weight: 700; }
+    .domain-item::before { content: ""; width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: var(--primary); }
+    .specialized-list { display: grid; gap: 9px; margin-top: 15px; }
+    .specialized-item { padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--bg); }
+    .specialized-item strong { display: block; font-size: 11px; }
+    .specialized-item span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .shared-foundation { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; margin-top: 14px; padding: 14px 16px; border: 1px dashed #a5b4fc; border-radius: 12px; background: var(--primary-soft); }
+    .shared-foundation strong { color: var(--primary); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .shared-foundation span { color: var(--ink); font-size: 11px; line-height: 1.55; }
+    .experience-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+    .experience-step { padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .experience-step span { color: var(--primary); font-size: 9px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .experience-step strong { display: block; margin-top: 8px; font-size: 11px; }
+    .experience-step p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .card { padding: 22px; }
+    .card h3 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
+    .card p { color: var(--muted); font-size: 13px; line-height: 1.62; }
+    .capability-chain { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; }
+    .capability-step { position: relative; min-height: 120px; padding: 19px; border-right: 1px solid var(--line); background: var(--surface); }
+    .capability-step:last-child { border-right: 0; }
+    .capability-step span { color: var(--primary); font-size: 11px; font-weight: 800; }
+    .capability-step strong { display: block; margin-top: 11px; font-size: 14px; }
+    .capability-step p { margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .persona { display: grid; grid-template-columns: 40px 1fr; gap: 13px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .persona-avatar { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 12px; background: var(--surface-2); color: var(--primary); font-size: 12px; font-weight: 850; }
+    .persona strong { font-size: 13px; }
+    .persona p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .section-block { margin-top: 18px; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
+    .section-title h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .section-title p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .comparison { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .comparison-row { display: grid; grid-template-columns: 1fr 42px 1fr; align-items: center; gap: 14px; padding: 16px 18px; border-top: 1px solid var(--line); }
+    .comparison-row:first-child { border-top: 0; }
+    .comparison-row strong { display: block; font-size: 13px; }
+    .comparison-row span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .comparison-arrow { color: var(--primary); text-align: center; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .search-wrap { position: relative; flex: 1 1 280px; }
+    .search-wrap svg { position: absolute; top: 50%; left: 13px; width: 16px; height: 16px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
+    .search {
+      width: 100%;
+      height: 42px;
+      padding: 0 14px 0 39px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--ink);
+      outline: 0;
+    }
+    .search::placeholder { color: var(--muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .chip { min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 750; }
+    .chip:hover { background: var(--surface-2); color: var(--ink); }
+    .chip.active { border-color: #c7d2fe; background: var(--primary-soft); color: var(--primary); }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .feature-card { display: flex; min-height: 250px; flex-direction: column; padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+    .feature-card:hover { transform: translateY(-2px); border-color: #c7d2fe; box-shadow: var(--shadow); }
+    .feature-top { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+    .feature-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; background: var(--primary-soft); color: var(--primary); }
+    .feature-icon svg { width: 18px; height: 18px; }
+    .tag { padding: 5px 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); }
+    .tag.api { border-color: #a7f3d0; background: var(--success-soft); color: var(--success); }
+    .tag.prototype { border-color: #fde68a; background: var(--warning-soft); color: var(--warning); }
+    .feature-card h3 { margin: 18px 0 0; font-size: 15px; }
+    .feature-card > p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .benefit { margin-top: 13px; padding: 11px 12px; border-left: 3px solid var(--primary); background: var(--primary-soft); color: var(--ink); font-size: 11px; line-height: 1.55; }
+    .source-ref { margin-top: auto; padding-top: 14px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; line-height: 1.45; word-break: break-word; }
+    .empty { grid-column: 1 / -1; padding: 50px 20px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); text-align: center; }
+    .flow-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; }
+    .flow-menu {
+      position: sticky;
+      top: 84px;
+      display: grid;
+      max-height: calc(100vh - 100px);
+      align-self: start;
+      align-content: start;
+      gap: 7px;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
+    }
+    .flow-button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 700; text-align: left; }
+    .flow-button:hover { background: var(--surface-2); color: var(--ink); }
+    .flow-button.active { border-color: #c7d2fe; background: var(--primary-soft); color: var(--primary); }
+    .flow-button span:last-child { font-variant-numeric: tabular-nums; }
+    .flow-content { min-width: 0; }
+    .flow-summary { padding: 21px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); }
+    .flow-title-row { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .flow-title-row h2 { min-width: 0; flex: 1 1 auto; }
+    .flow-summary h2 { margin: 0; font-size: 21px; letter-spacing: -.025em; }
+    .flow-summary p { width: 100%; max-width: none; margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .flow-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .flow-status { display: inline-flex; min-height: 28px; align-items: center; gap: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .flow-status::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+    .flow-status.target { border-color: #c7d2fe; background: var(--primary-soft); color: var(--primary); }
+    .flow-status.api { border-color: #a7f3d0; background: var(--success-soft); color: var(--success); }
+    .flow-status.prototype { border-color: #fde68a; background: var(--warning-soft); color: var(--warning); }
+    .flow-outcome { padding: 8px 10px; border-radius: 9px; background: var(--success-soft); color: var(--success); font-size: 11px; font-weight: 750; white-space: nowrap; }
+    .flow-scope-note { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; margin-bottom: 16px; padding: 13px 15px; border: 1px solid #c7d2fe; border-radius: 12px; background: var(--primary-soft); color: var(--ink); }
+    .flow-scope-note svg { width: 17px; height: 17px; color: var(--primary); }
+    .flow-scope-note strong { display: block; font-size: 11px; }
+    .flow-scope-note p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .flow-steps { display: grid; gap: 10px; margin-top: 12px; }
+    .flow-step { display: grid; grid-template-columns: 42px minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, .85fr); align-items: stretch; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .step-number { display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 850; }
+    .step-cell { padding: 14px; border-left: 1px solid var(--line); }
+    .step-label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .step-cell strong { font-size: 12px; line-height: 1.45; }
+    .step-cell p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .diagram-card { margin-top: 12px; overflow: hidden; border: 1px solid #c7d2fe; border-radius: 15px; background: var(--surface); box-shadow: 0 10px 26px rgba(79, 70, 229, .07); }
+    .diagram-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; padding: 12px 14px 12px 16px; border-bottom: 1px solid var(--line); }
+    .diagram-heading { display: flex; min-width: 0; align-items: center; gap: 11px; }
+    .diagram-heading > span { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: var(--primary-soft); color: var(--primary); }
+    .diagram-heading svg { width: 18px; height: 18px; }
+    .diagram-heading h3 { margin: 0; color: var(--ink); font-size: 13px; }
+    .diagram-heading p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .diagram-expand { display: inline-flex; min-height: 40px; flex: 0 0 auto; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 10px; font-weight: 750; }
+    .diagram-expand:hover { border-color: #c7d2fe; background: var(--primary-soft); color: var(--primary); }
+    .diagram-expand:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .diagram-expand svg { width: 15px; height: 15px; }
+    .diagram-context { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+    .diagram-context > div { min-width: 0; padding: 11px 13px; border-right: 1px solid var(--line); }
+    .diagram-context > div:last-child { border-right: 0; }
+    .diagram-context span { display: block; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .diagram-context strong { display: block; margin-top: 4px; color: var(--ink); font-size: 10px; line-height: 1.45; }
+    .diagram-body { overflow-x: auto; padding: 22px; background: var(--bg); }
+    .diagram-card .diagram-body { min-height: 330px; }
+    .mermaid { min-width: 760px; text-align: center; }
+    .diagram-fallback { min-width: 760px; }
+    .diagram-fallback[hidden] { display: none; }
+    .fallback-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .fallback-heading strong { color: var(--ink); font-size: 12px; }
+    .fallback-heading span { color: var(--muted); font-size: 10px; }
+    .fallback-flow { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px; }
+    .fallback-node { position: relative; min-height: 82px; padding: 13px 13px 13px 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 11px; font-weight: 700; line-height: 1.45; }
+    .fallback-node::after { content: "→"; position: absolute; top: 50%; right: -9px; z-index: 1; display: grid; width: 18px; height: 18px; place-items: center; transform: translateY(-50%); border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-size: 10px; }
+    .fallback-node:last-child::after { display: none; }
+    .fallback-index { position: absolute; top: 12px; left: 12px; display: grid; width: 23px; height: 23px; place-items: center; border-radius: 7px; background: var(--primary-soft); color: var(--primary); font-size: 9px; font-weight: 850; }
+    .diagram-modal { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(15, 23, 42, .72); backdrop-filter: blur(8px); }
+    .diagram-modal[hidden] { display: none; }
+    .diagram-modal-panel { display: flex; width: min(1500px, 96vw); height: min(900px, 92vh); flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 30px 90px rgba(0, 0, 0, .3); }
+    .diagram-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .diagram-modal-header h2 { margin: 0; font-size: 17px; }
+    .diagram-modal-header p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+    .diagram-close { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink); }
+    .diagram-close:hover { background: var(--primary-soft); color: var(--primary); }
+    .diagram-close:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .diagram-close svg { width: 18px; height: 18px; }
+    .diagram-modal-context { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+    .diagram-modal-context > div { padding: 13px 18px; border-right: 1px solid var(--line); }
+    .diagram-modal-context > div:last-child { border-right: 0; }
+    .diagram-modal-context span { display: block; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .diagram-modal-context strong { display: block; margin-top: 5px; color: var(--ink); font-size: 11px; line-height: 1.45; }
+    .diagram-modal-body { min-height: 0; flex: 1; overflow: auto; padding: 30px; background: var(--bg); }
+    .diagram-modal-body .mermaid { display: grid; min-width: 1050px; min-height: 560px; place-items: center; }
+    .diagram-modal-body .diagram-fallback { min-width: 1050px; }
+    body.diagram-open { overflow: hidden; }
+    .architecture-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(310px, .75fr); gap: 16px; }
+    .diagram-shell { overflow-x: auto; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+    .diagram-shell .mermaid { display: grid; min-height: 430px; place-items: center; }
+    .pillar-list { display: grid; gap: 10px; }
+    .pillar { padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .pillar strong { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .pillar strong::before { content: ""; width: 8px; height: 8px; border-radius: 3px; background: var(--primary); }
+    .pillar p { margin: 6px 0 0 16px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .readiness { margin-top: 18px; }
+    .readiness-summary { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+    .score-ring { position: relative; display: grid; width: 170px; height: 170px; place-items: center; margin: auto; }
+    .score-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .score-ring circle { fill: none; stroke-width: 10; }
+    .score-ring .track { stroke: var(--surface-2); }
+    .score-ring .progress { stroke: var(--primary); stroke-linecap: round; stroke-dasharray: 339.3; stroke-dashoffset: 88.2; }
+    .score-ring strong { font-size: 36px; letter-spacing: -.04em; }
+    .score-ring span { display: block; margin-top: -2px; color: var(--muted); font-size: 10px; text-align: center; }
+    .methodology h3 { margin: 0; font-size: 16px; }
+    .methodology p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+    .legend i { width: 8px; height: 8px; border-radius: 50%; }
+    .readiness-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; margin-top: 14px; }
+    .readiness-item { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .readiness-item header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .readiness-item strong { font-size: 11px; }
+    .readiness-item span { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .bar { height: 7px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: var(--surface-2); }
+    .bar > i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+    .evidence-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .evidence-table th { padding: 11px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 9px; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
+    .evidence-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
+    .evidence-table tr:last-child td { border-bottom: 0; }
+    .risk-list { display: grid; gap: 9px; margin-top: 13px; }
+    .risk { display: grid; grid-template-columns: 8px 1fr; gap: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+    .risk i { width: 8px; height: 8px; margin-top: 4px; border-radius: 50%; background: var(--warning); }
+    .risk strong { display: block; font-size: 11px; }
+    .risk span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .plan-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .plan-metric { padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .plan-metric span { display: block; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .plan-metric strong { display: block; margin-top: 7px; color: var(--ink); font-size: 24px; letter-spacing: -.035em; }
+    .plan-metric p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .plan-section { margin-top: 18px; }
+    .plan-section-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
+    .plan-section-head h2 { margin: 6px 0 0; font-size: 18px; letter-spacing: -.025em; }
+    .plan-section-head p { max-width: 720px; margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .design-process { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); }
+    .process-step { position: relative; min-height: 155px; padding: 17px 16px; border-right: 1px solid var(--line); }
+    .process-step:last-child { border-right: 0; }
+    .process-step::after { content: "→"; position: absolute; top: 18px; right: -8px; z-index: 2; display: grid; width: 16px; height: 16px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--primary); font-size: 10px; }
+    .process-step:last-child::after { display: none; }
+    .process-index { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 8px; background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 850; }
+    .process-step strong { display: block; margin-top: 12px; font-size: 11px; }
+    .process-step p { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .roadmap { display: grid; gap: 9px; }
+    .roadmap-phase { display: grid; grid-template-columns: 92px minmax(180px, .55fr) minmax(0, 1.15fr) minmax(180px, .7fr); overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .roadmap-phase > div { padding: 13px 14px; border-left: 1px solid var(--line); }
+    .roadmap-phase > div:first-child { display: flex; align-items: center; border-left: 0; background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 850; }
+    .roadmap-phase span { display: block; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .roadmap-phase strong { display: block; margin-top: 4px; font-size: 11px; line-height: 1.45; }
+    .roadmap-phase p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .workspace-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .workspace-plan { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); }
+    .workspace-plan header { padding: 17px; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, var(--primary-soft), var(--surface)); }
+    .workspace-plan header span { color: var(--primary); font-size: 8px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .workspace-plan header h3 { margin: 7px 0 0; font-size: 16px; }
+    .workspace-plan header p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .workspace-plan-body { padding: 16px; }
+    .workspace-plan-body h4 { margin: 0 0 7px; color: var(--muted); font-size: 8px; letter-spacing: .09em; text-transform: uppercase; }
+    .workspace-plan-body h4:not(:first-child) { margin-top: 14px; }
+    .settings-plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .settings-plan-card { padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .settings-plan-card > span { color: var(--primary); font-size: 8px; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+    .settings-plan-card h3 { margin: 7px 0 0; font-size: 13px; }
+    .settings-plan-card > p { margin: 5px 0 11px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .settings-plan-card footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; line-height: 1.45; }
+    .compact-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .compact-list li { position: relative; padding-left: 13px; color: var(--ink); font-size: 10px; line-height: 1.45; }
+    .compact-list li::before { content: ""; position: absolute; top: .55em; left: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+    .compact-list.edge li::before { background: var(--warning); }
+    .contract-table { width: 100%; overflow: hidden; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-size: 10px; }
+    .contract-table th { padding: 11px 13px; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 8px; letter-spacing: .09em; text-align: left; text-transform: uppercase; }
+    .contract-table td { padding: 13px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
+    .contract-table tr:last-child td { border-bottom: 0; }
+    .contract-table strong { display: block; margin-bottom: 3px; font-size: 11px; }
+    .contract-table span { color: var(--muted); }
+    .design-backlog-table { table-layout: fixed; }
+    .design-backlog-table th:nth-child(1) { width: 8%; }
+    .design-backlog-table th:nth-child(2) { width: 18%; }
+    .design-backlog-table th:nth-child(3) { width: 32%; }
+    .design-backlog-table th:nth-child(4) { width: 30%; }
+    .design-backlog-table th:nth-child(5) { width: 12%; }
+    .design-backlog-table .estimate { display: inline-flex; align-items: center; width: fit-content; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent-2); font-size: 9px; font-weight: 800; line-height: 1.25; }
+    .total-estimate { display: grid; grid-template-columns: 20% 40% 40%; min-height: 88px; gap: 0; margin-top: 12px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+    .total-estimate > div { display: flex; min-width: 0; flex-direction: column; justify-content: center; padding: 16px 20px; border-left: 1px solid var(--line); }
+    .total-estimate > div:first-child { width: auto; border-left: 0; background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); color: var(--accent-2); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .total-estimate span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .total-estimate strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 20px; line-height: 1.1; }
+    .total-estimate p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .dod-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    .dod-item { display: flex; align-items: flex-start; gap: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); font-size: 10px; line-height: 1.45; }
+    .dod-item::before { content: "✓"; display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; border-radius: 6px; background: var(--success-soft); color: var(--success); font-size: 10px; font-weight: 900; }
+    .plan-note { margin-top: 14px; padding: 13px 15px; border: 1px solid #fde68a; border-radius: 12px; background: var(--warning-soft); color: var(--ink); font-size: 10px; line-height: 1.55; }
+    .plan-note strong { color: var(--warning); }
+    .footer { max-width: 1480px; margin: 36px auto 0; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.6; }
+    @media (max-width: 1120px) {
+      .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .capability-chain { grid-template-columns: repeat(3, 1fr); }
+      .capability-step { border-bottom: 1px solid var(--line); }
+      .architecture-grid { grid-template-columns: 1fr; }
+      .workspace-map { grid-template-columns: 1fr; }
+      .domain-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .experience-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .plan-metrics, .dod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .design-process { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .process-step { border-bottom: 1px solid var(--line); }
+      .workspace-plan-grid { grid-template-columns: 1fr; }
+      .settings-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 860px) {
+      .layout { display: block; }
+      .sidebar { display: none; }
+      .mobile-nav { position: sticky; top: 68px; z-index: 45; display: flex; }
+      .mobile-nav .nav-button { width: auto; min-width: max-content; }
+      .main { padding-top: 24px; }
+      .hero { grid-template-columns: 1fr; }
+      .flow-layout { grid-template-columns: 1fr; }
+      .flow-menu { position: static; display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; padding-right: 0; }
+      .fallback-flow { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+      .flow-button { min-width: 190px; }
+      .readiness-summary { grid-template-columns: 1fr; }
+      .roadmap-phase { grid-template-columns: 74px 1fr; }
+      .roadmap-phase > div:nth-child(3), .roadmap-phase > div:nth-child(4) { grid-column: 2; }
+      .evolution-grid { grid-template-columns: 1fr; gap: 8px; }
+      .evolution-arrow { min-height: 28px; transform: rotate(90deg); }
+    }
+    @media (max-width: 620px) {
+      .topbar { padding: 0 16px; }
+      .audit-label, .brand-copy span { display: none; }
+      .feature-grid, .grid-2, .grid-3, .readiness-grid { grid-template-columns: 1fr; }
+      .plan-metrics, .dod-grid, .design-process { grid-template-columns: 1fr; }
+      .settings-plan-grid { grid-template-columns: 1fr; }
+      .process-step { border-right: 0; }
+      .process-step::after { display: none; }
+      .plan-section-head { align-items: flex-start; flex-direction: column; }
+      .roadmap-phase { grid-template-columns: 1fr; }
+      .roadmap-phase > div, .roadmap-phase > div:nth-child(3), .roadmap-phase > div:nth-child(4) { grid-column: 1; border-left: 0; border-top: 1px solid var(--line); }
+      .roadmap-phase > div:first-child { border-top: 0; }
+      .contract-table { display: block; overflow-x: auto; white-space: normal; }
+      .total-estimate { grid-template-columns: 1fr; }
+      .total-estimate > div, .total-estimate > div:first-child { width: auto; border-top: 1px solid var(--line); border-left: 0; }
+      .total-estimate > div:first-child { border-top: 0; }
+      .capability-chain { grid-template-columns: 1fr; }
+      .capability-step { border-right: 0; }
+      .section-head { align-items: start; flex-direction: column; }
+      .flow-step { grid-template-columns: 38px 1fr; }
+      .step-number { grid-column: 1; grid-row: 1 / span 3; }
+      .step-cell { grid-column: 2; border-bottom: 1px solid var(--line); }
+      .step-cell:last-child { border-bottom: 0; }
+      .comparison-row { grid-template-columns: 1fr; }
+      .comparison-arrow { transform: rotate(90deg); }
+      .flow-title-row { flex-direction: column; }
+      .diagram-header { align-items: flex-start; }
+      .diagram-expand span { display: none; }
+      .diagram-context, .diagram-modal-context { grid-template-columns: 1fr; }
+      .diagram-context > div, .diagram-modal-context > div { border-right: 0; border-bottom: 1px solid var(--line); }
+      .diagram-context > div:last-child, .diagram-modal-context > div:last-child { border-bottom: 0; }
+      .diagram-modal { padding: 10px; }
+      .diagram-modal-panel { width: 100%; height: 96vh; border-radius: 14px; }
+      .diagram-modal-body { padding: 18px; }
+      .transformation-head, .workspace-title-row { align-items: start; flex-direction: column; }
+      .domain-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .shared-foundation { grid-template-columns: 1fr; }
+      .experience-grid { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+    @media print {
+      .topbar, .sidebar, .mobile-nav, .hero-actions, .toolbar, .flow-menu { display: none !important; }
+      .layout { display: block; }
+      .main { padding: 0; }
+      .panel[hidden] { display: block !important; break-before: page; }
+      .panel { margin-bottom: 32px; }
+      .feature-grid { grid-template-columns: repeat(2, 1fr); }
+      .card, .feature-card, .hero-main, .hero-side { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="7" height="7" rx="2"/><rect x="14" y="4" width="7" height="7" rx="2"/><rect x="3" y="15" width="7" height="5" rx="2"/><rect x="14" y="15" width="7" height="5" rx="2"/><path d="M10 7.5h4M6.5 11v4M17.5 11v4"/></svg>
+        </span>
+        <span class="brand-copy"><strong>Prime OS · Executive Brief</strong><span>Omnichannel Commerce Operating System</span></span>
+      </div>
+      <div class="top-actions">
+        <span class="audit-label">Source snapshot · 11 Sep 2026</span>
+        <button id="theme-button" class="icon-button" type="button" aria-label="Đổi giao diện sáng tối" title="Toggle theme">
+          <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="mobile-nav" aria-label="Điều hướng trình bày">
+      <button class="nav-button active" type="button" data-tab="overview" aria-controls="panel-overview" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Tổng quan</span></button>
+      <button class="nav-button" type="button" data-tab="features" aria-controls="panel-features" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="8" cy="5" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="19" r="2"/></svg><span>Tính năng</span></button>
+      <button class="nav-button" type="button" data-tab="flows" aria-controls="panel-flows" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h5a4 4 0 0 1 4 4v2M17 16l2 2 2-2M5 8v8a2 2 0 0 0 2 2h8"/></svg><span>User Flows</span></button>
+      <button class="nav-button" type="button" data-tab="architecture" aria-controls="panel-architecture" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/><rect x="14" y="16" width="7" height="5" rx="1"/><path d="M12 8v4M6.5 16v-4h11v4"/></svg><span>Kế hoạch Design</span></button>
+    </nav>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <p class="eyebrow">Stakeholder View</p>
+        <p class="sidebar-intro">Bản đọc sản phẩm từ source code hiện tại, chuyển ngôn ngữ kỹ thuật thành tác động kinh doanh.</p>
+        <nav class="nav-list" aria-label="Điều hướng trình bày">
+          <button class="nav-button active" type="button" data-tab="overview" aria-controls="panel-overview" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Tổng quan</span></button>
+          <button class="nav-button" type="button" data-tab="features" aria-controls="panel-features" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="8" cy="5" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="19" r="2"/></svg><span>Tính năng</span></button>
+          <button class="nav-button" type="button" data-tab="flows" aria-controls="panel-flows" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h5a4 4 0 0 1 4 4v2M17 16l2 2 2-2M5 8v8a2 2 0 0 0 2 2h8"/></svg><span>User Flows</span></button>
+          <button class="nav-button" type="button" data-tab="architecture" aria-controls="panel-architecture" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/><rect x="14" y="16" width="7" height="5" rx="1"/><path d="M12 8v4M6.5 16v-4h11v4"/></svg><span>Kế hoạch Design</span></button>
+        </nav>
+        <div class="source-note"><strong>Phạm vi đánh giá</strong><br/>apps/web, apps/api, apps/admin, shared mock contracts, routes, tests và tài liệu kiến trúc. Điểm readiness là ước lượng từ bằng chứng source, không phải chứng nhận production.</div>
+      </aside>
+
+      <main class="main">
+        <section id="panel-overview" class="panel panel-enter" data-panel="overview">
+          <div class="hero">
+            <article class="hero-main">
+              <span class="status-badge">Phase 1 · Functional prototype</span>
+              <h1>From Five Products to One Prime OS.</h1>
+              <p class="lead">Prime OS là sản phẩm hợp nhất từ SSO, Distribution, PrimeWeb, POS và CRM. Thay vì buộc doanh nghiệp vận hành qua nhiều hệ thống, Prime OS đưa toàn bộ năng lực dùng chung vào một Main Workspace xuyên suốt; chỉ những tác vụ cần không gian chuyên biệt mới mở sang workspace riêng.</p>
+              <div class="hero-actions">
+                <button class="button primary" type="button" data-go="features">Xem bản đồ tính năng
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </button>
+                <button class="button" type="button" data-go="flows">Theo dõi hành trình người dùng</button>
+              </div>
+            </article>
+            <aside class="hero-side">
+              <p class="eyebrow">Investment thesis</p>
+              <h2>Một sản phẩm, một mô hình dữ liệu, nhiều chế độ làm việc.</h2>
+              <div class="value-list">
+                <div class="value-item"><span class="value-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h7"/><circle cx="18" cy="16" r="3"/></svg></span><div><strong>Một nguồn sự thật</strong><span>Identity, master product, ATP, order state, payment và customer context cùng tham chiếu.</span></div></div>
+                <div class="value-item"><span class="value-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M15 7l5 5-5 5"/><circle cx="7" cy="7" r="3"/></svg></span><div><strong>Một luồng vận hành</strong><span>Team xử lý công việc từ analytics đến fulfillment mà không phải ghép dữ liệu thủ công.</span></div></div>
+                <div class="value-item"><span class="value-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M5 8h14M5 16h14"/></svg></span><div><strong>Chuyên biệt khi cần thiết</strong><span>Inbox, Builder và Register có không gian riêng nhưng vẫn thuộc cùng Prime OS.</span></div></div>
+              </div>
+            </aside>
+          </div>
+
+          <section class="card section-block transformation">
+            <div class="transformation-head">
+              <div>
+                <p class="eyebrow">Product transformation</p>
+                <h2>Điều gì đã thay đổi?</h2>
+                <p>Đây không chỉ là gom menu hay dùng chung đăng nhập. Thay đổi cốt lõi là chuyển từ một bộ sản phẩm có ranh giới riêng sang một operating system duy nhất, nơi dữ liệu và quy trình thương mại được quản trị xuyên suốt.</p>
+              </div>
+              <span class="transformation-tag">5 products → 1 operating system</span>
+            </div>
+            <div class="evolution-grid" aria-label="Quá trình hợp nhất Prime OS">
+              <article class="evolution-stage">
+                <div class="stage-top"><span class="stage-index">01 · BEFORE</span><span class="stage-state">Fragmented suite</span></div>
+                <h3>Năm sản phẩm hoạt động theo ranh giới riêng</h3>
+                <p>User phải chuyển hệ thống, đối chiếu dữ liệu và hiểu nhiều cấu trúc điều hướng khác nhau.</p>
+                <div class="product-chips"><span class="product-chip">SSO</span><span class="product-chip">Distribution</span><span class="product-chip">PrimeWeb</span><span class="product-chip">POS</span><span class="product-chip">CRM</span></div>
+              </article>
+              <div class="evolution-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+              <article class="evolution-stage">
+                <div class="stage-top"><span class="stage-index">02 · UNIFY</span><span class="stage-state">Shared foundation</span></div>
+                <h3>Hợp nhất identity, master data và quy tắc vận hành</h3>
+                <p>SSO trở thành lớp truy cập chung; dữ liệu Distribution, Web, POS và CRM được tổ chức lại theo các domain dùng chung.</p>
+                <div class="product-chips"><span class="product-chip">One identity</span><span class="product-chip">One tenant</span><span class="product-chip">Shared contracts</span><span class="product-chip">Unified events</span></div>
+              </article>
+              <div class="evolution-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+              <article class="evolution-stage current">
+                <div class="stage-top"><span class="stage-index">03 · NOW</span><span class="stage-state">Unified product</span></div>
+                <h3>Prime OS trở thành điểm vận hành duy nhất</h3>
+                <p>Một Main Workspace điều phối end-to-end; workspace chuyên biệt chỉ phục vụ các tác vụ cần tập trung toàn màn hình.</p>
+                <div class="product-chips"><span class="product-chip">Main Operations</span><span class="product-chip">Prime Inbox</span><span class="product-chip">PrimeWeb Studio</span><span class="product-chip">POS Register</span></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="section-block">
+            <div class="section-title"><div><p class="eyebrow">Workspace architecture</p><h2>Một sản phẩm, phân chia theo bản chất công việc</h2><p>Main Workspace giữ toàn bộ nghiệp vụ dùng chung; specialized workspaces tối ưu cho các tác vụ có mật độ tương tác và yêu cầu không gian khác biệt.</p></div></div>
+            <div class="workspace-map">
+              <article class="workspace-main">
+                <span class="workspace-kicker">Primary operating surface</span>
+                <div class="workspace-title-row">
+                  <div><h3>Main Workspace</h3><p>Màn hình back-office xuyên suốt để quản trị, điều phối và kiểm soát toàn bộ commerce lifecycle. Đây là nơi user bắt đầu và quay lại sau mỗi tác vụ chuyên biệt.</p></div>
+                  <span class="workspace-badge">Shared operations</span>
+                </div>
+                <div class="domain-grid" aria-label="Các năng lực trong Main Workspace">
+                  <span class="domain-item">Analytics</span><span class="domain-item">Order Master</span><span class="domain-item">Product Master</span>
+                  <span class="domain-item">Inventory & Warehouses</span><span class="domain-item">Sales Channels</span><span class="domain-item">Customers</span>
+                  <span class="domain-item">Promotions</span><span class="domain-item">Team & Access</span><span class="domain-item">Plan & Billing</span>
+                  <span class="domain-item">Shipping & Delivery</span><span class="domain-item">Automation</span><span class="domain-item">Settings & Audit</span>
+                  <span class="domain-item">Help & Documentation</span>
+                </div>
+              </article>
+              <article class="workspace-specialized">
+                <span class="workspace-kicker">Focused execution surfaces</span>
+                <div class="workspace-title-row"><div><h3>Specialized Workspaces</h3><p>Tách riêng vì cần toàn bộ không gian và nhịp tương tác chuyên dụng, không phải vì thuộc sản phẩm khác.</p></div></div>
+                <div class="specialized-list">
+                  <div class="specialized-item"><strong>Prime Inbox · Conversation Desk</strong><span>Hội thoại CRM/social realtime, routing, SLA và assisted order trong bố cục ba cột.</span></div>
+                  <div class="specialized-item"><strong>PrimeWeb Studio · Storefront Builder</strong><span>Thiết kế, preview và publish storefront trong canvas chuyên biệt.</span></div>
+                  <div class="specialized-item"><strong>POS Register · Checkout</strong><span>Bán hàng trực tiếp, scan sản phẩm và thanh toán tốc độ cao tại cửa hàng.</span></div>
+                </div>
+              </article>
+            </div>
+            <div class="shared-foundation"><strong>Shared foundation</strong><span>Cả bốn workspace dùng chung account, tenant, role & permission, product/customer/order master, inventory state và audit trail. Tác vụ có thể mở ở workspace chuyên biệt nhưng kết quả luôn quay về hệ thống vận hành chung.</span></div>
+            <div class="experience-grid" aria-label="Trải nghiệm vận hành sau hợp nhất">
+              <article class="experience-step"><span>01 · Access</span><strong>Đăng nhập một lần</strong><p>Một identity và tenant scope thay cho nhiều tài khoản sản phẩm.</p></article>
+              <article class="experience-step"><span>02 · Operate</span><strong>Quản trị dữ liệu một lần</strong><p>Product, order, customer và inventory được dùng xuyên kênh.</p></article>
+              <article class="experience-step"><span>03 · Focus</span><strong>Mở đúng workspace khi cần</strong><p>Conversation, design hoặc checkout có giao diện tối ưu cho tác vụ.</p></article>
+              <article class="experience-step"><span>04 · Return</span><strong>Kết quả quay về Main</strong><p>Order, payment, customer event và audit trail tiếp tục cùng một lifecycle.</p></article>
+            </div>
+          </section>
+
+          <section class="card section-block">
+            <p class="eyebrow">Operating model</p>
+            <h3 style="margin-top:7px">Một luồng giá trị xuyên suốt trong Main Workspace</h3>
+            <div class="capability-chain">
+              <div class="capability-step"><span>01 · ATTRACT</span><strong>Marketing & Channels</strong><p>Kết nối nguồn, audience, campaign, marketplace, web, POS và hội thoại.</p></div>
+              <div class="capability-step"><span>02 · MERCHANDISE</span><strong>Product Master</strong><p>Tạo và duyệt canonical revision trước; sau đó publish listing có chọn lọc theo từng kênh.</p></div>
+              <div class="capability-step"><span>03 · EXECUTE</span><strong>Order & Fulfillment</strong><p>Nhận đơn, giữ tồn, phân kho, giao hàng và xử lý ngoại lệ.</p></div>
+              <div class="capability-step"><span>04 · RETAIN</span><strong>Customer System of Record</strong><p>Quản trị hồ sơ, identity, lifecycle và timeline; Inbox xử lý hội thoại riêng.</p></div>
+              <div class="capability-step"><span>05 · OPTIMIZE</span><strong>Analytics & Billing</strong><p>Đo hiệu suất, quản lý subscription, nhận diện rủi ro và tự động hóa.</p></div>
+            </div>
+          </section>
+
+          <section class="section-block">
+            <div class="section-title"><div><h2>Người dùng mục tiêu</h2><p>Các vai trò được phản ánh trực tiếp trong IAM và luồng màn hình.</p></div></div>
+            <div class="grid-3">
+              <article class="persona"><span class="persona-avatar">COO</span><div><strong>Operations Director</strong><p>Cần một bức tranh xuyên kênh, cảnh báo bottleneck và accountability theo đội.</p></div></article>
+              <article class="persona"><span class="persona-avatar">EC</span><div><strong>E-commerce Manager</strong><p>Quản lý catalog, listing, giá, tồn và đơn từ nhiều marketplace/storefront.</p></div></article>
+              <article class="persona"><span class="persona-avatar">WH</span><div><strong>Warehouse Manager</strong><p>Phân kho, ATP, reserved stock, transfer, adjustment và fulfillment SLA.</p></div></article>
+              <article class="persona"><span class="persona-avatar">CX</span><div><strong>Customer & Service Manager</strong><p>Quản trị customer record, owner, lifecycle, identity quality và hội thoại có ngữ cảnh.</p></div></article>
+              <article class="persona"><span class="persona-avatar">GM</span><div><strong>Growth Manager</strong><p>Quản lý acquisition sources, campaigns, audiences, promotions và hiệu quả tăng trưởng.</p></div></article>
+              <article class="persona"><span class="persona-avatar">AD</span><div><strong>Workspace Admin</strong><p>Quản trị thành viên, vai trò, quyền, subscription plan, cấu hình, audit và kết nối nền tảng.</p></div></article>
+            </div>
+          </section>
+
+        </section>
+
+        <section id="panel-features" class="panel" data-panel="features" hidden>
+          <header class="section-head">
+            <div><p class="eyebrow">Core feature matrix</p><h1>Bản đồ năng lực sản phẩm</h1><p>Mỗi module được diễn giải theo công việc kinh doanh, lợi ích người dùng và bằng chứng source thực tế. Dùng bộ lọc để tập trung vào domain cần thảo luận.</p></div>
+            <span class="status-badge">14 capability groups</span>
+          </header>
+          <div class="toolbar">
+            <label class="search-wrap"><span class="sr-only">Tìm tính năng</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="feature-search" class="search" type="search" placeholder="Tìm module, lợi ích hoặc source file..." /></label>
+            <div id="feature-filters" class="chips" aria-label="Lọc tính năng"></div>
+          </div>
+          <div id="feature-grid" class="feature-grid" aria-live="polite"></div>
+          <div class="footer">Maturity label phản ánh loại bằng chứng tìm thấy: <strong>UI + API</strong> có màn hình và write/read contract; <strong>UI + Data</strong> có trải nghiệm hoàn chỉnh nhưng backend domain còn dùng generic/local state; <strong>Prototype</strong> ưu tiên demo và cần hardening trước production.</div>
+        </section>
+
+        <section id="panel-flows" class="panel" data-panel="flows" hidden>
+          <header class="section-head">
+            <div><p class="eyebrow">Target operating journeys</p><h1>10 luồng người dùng chuẩn của Prime OS</h1><p>Mỗi hành trình mô tả trải nghiệm end-to-end mà sản phẩm hướng tới, tách rõ Action → System Response → Business Outcome. Nhãn hiện trạng cho biết phần nào đã có UI/API và phần nào sẽ tiếp tục được hoàn thiện.</p></div>
+            <span class="tag api">10 target-state flows</span>
+          </header>
+          <div class="flow-scope-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg>
+            <div><strong>Phạm vi & cách đọc 10 user flow</strong><p>Flow hiện tại mới đủ để giải thích happy path, chưa đủ làm flow chuẩn hoặc làm specification triển khai. Vì vậy từng flow sẽ được mở rộng dần với precondition, permission, validation, alternate path, failure/retry, partial success, rollback và recovery. Các sơ đồ vẫn mô tả target operating model để stakeholder hiểu đích đến; Home và Analytics là lớp quan sát/điều phối xuyên suốt, còn IAM, Scheduled Tasks, Help và Documentation hỗ trợ cả 10 hành trình. Marketing và Promotions được trình bày thành hai lifecycle riêng vì một bên tạo nhu cầu, một bên kiểm soát chính sách ưu đãi tại giao dịch.</p></div>
+          </div>
+          <div class="flow-layout">
+            <div id="flow-menu" class="flow-menu" role="tablist" aria-label="Các luồng người dùng"></div>
+            <div id="flow-content" class="flow-content"></div>
+          </div>
+        </section>
+
+        <section id="panel-architecture" class="panel" data-panel="architecture" hidden>
+          <header class="section-head">
+            <div><p class="eyebrow">Next design delivery plan</p><h1>Từ product map đến specification có thể triển khai.</h1><p>Giai đoạn tiếp theo không mở rộng thêm bề mặt UI theo chiều ngang. Design Team sẽ đi sâu từng tính năng, hoàn thiện user flow, decision rule, edge case, trạng thái màn hình và prototype kiểm thử được — trước khi bàn giao cho Engineering.</p></div>
+            <span class="tag prototype">Đề xuất · 8 tuần</span>
+          </header>
+
+          <div class="plan-metrics">
+            <article class="plan-metric"><span>Target journeys đã lập bản đồ</span><strong>10</strong><p>Đủ để trình bày operating model; chưa thay thế feature specification.</p></article>
+            <article class="plan-metric"><span>Design workstream cần đào sâu</span><strong>13</strong><p>Một backlog chung, từ Product Master ở P0 đến ba workspace chuyên biệt ở P3.</p></article>
+            <article class="plan-metric"><span>Dedicated workspaces</span><strong>P3</strong><p>PrimeWeb Studio, POS Workspace và Prime Inbox được triển khai sau operational core.</p></article>
+            <article class="plan-metric"><span>Definition of Done</span><strong>8 gates</strong><p>Mỗi feature chỉ hoàn tất khi đủ state, edge case, prototype và handoff.</p></article>
+          </div>
+
+          <section class="plan-section">
+            <div class="plan-section-head"><div><p class="eyebrow">Design operating model</p><h2>Một quy trình chung cho mọi feature</h2><p>Mỗi hạng mục được xử lý từ mục tiêu kinh doanh đến hành vi màn hình, giúp Product, Design và Engineering cùng hiểu một phiên bản sự thật.</p></div></div>
+            <div class="design-process">
+              <article class="process-step"><span class="process-index">01</span><strong>Scope & ownership</strong><p>Xác định persona, mục tiêu, precondition, quyền, dữ liệu sở hữu và điểm bắt đầu/kết thúc.</p></article>
+              <article class="process-step"><span class="process-index">02</span><strong>Flow & decision rules</strong><p>Vẽ happy path, alternate path, điểm quyết định và quy tắc nghiệp vụ theo từng vai trò.</p></article>
+              <article class="process-step"><span class="process-index">03</span><strong>State & edge-case matrix</strong><p>Định nghĩa loading, empty, blocked, partial, error, retry, rollback, offline và permission state.</p></article>
+              <article class="process-step"><span class="process-index">04</span><strong>Prototype & validation</strong><p>Tạo prototype high-fidelity, walkthrough theo scenario và kiểm thử với user đại diện.</p></article>
+              <article class="process-step"><span class="process-index">05</span><strong>Handoff & design QA</strong><p>Bàn giao acceptance criteria, responsive states, analytics events; kiểm tra bản build trước khi đóng.</p></article>
+            </div>
+          </section>
+
+          <section class="plan-section">
+            <div class="plan-section-head"><div><p class="eyebrow">Proposed delivery sequence</p><h2>Roadmap 8 tuần cho một designer thực hiện toàn bộ scope</h2><p>Một designer xử lý tuần tự theo mức ưu tiên P0 → P3, đồng thời giữ xuyên suốt kiến trúc thông tin, tiêu chuẩn trạng thái và các điểm bàn giao giữa workspace. Mục tiêu là specification đủ rõ để Engineering ước lượng, không phải hoàn thiện mọi màn hình production.</p></div><span class="tag api">1 designer · 40 ngày</span></div>
+            <div class="roadmap">
+              <article class="roadmap-phase"><div>Tuần 1–2</div><div><span>P0 · Operational core</span><strong>Product Master → Order</strong></div><div><span>Deliverables</span><p>Product revision/listing rules; channel impact và recovery; order-payment-fulfillment-return state machine; prototype critical path và handoff contract.</p></div><div><span>Exit gate</span><p>Product và Order có flow, state matrix, permission, acceptance criteria và prototype đủ để review.</p></div></article>
+              <article class="roadmap-phase"><div>Tuần 3–4</div><div><span>P0 → P1 · Foundation</span><strong>Inventory → Onboarding → Settings</strong></div><div><span>Deliverables</span><p>Warehouse ledger và Master Stock; channel-sync opt-in; workspace activation; channel onboarding; Settings IA và permission/impact rules.</p></div><div><span>Exit gate</span><p>Authority boundary của stock và các blocker cấu hình xuyên flow đã được Product/Engineering duyệt.</p></div></article>
+              <article class="roadmap-phase"><div>Tuần 5–6</div><div><span>P1 → P2 · Experience & commercial</span><strong>Live → Customer → Billing → Marketing</strong></div><div><span>Deliverables</span><p>Live Commerce, Customer 360 và conversation handoff; subscription/billing; Marketing campaign lifecycle và reporting. Promotion policy chuyển tiếp sang đầu tuần 7.</p></div><div><span>Exit gate</span><p>Các flow service và commercial có prototype critical path, limit, approval và reporting handoff rõ ràng.</p></div></article>
+              <article class="roadmap-phase"><div>Tuần 7–8</div><div><span>P2 → P3 · Policy & dedicated workspaces</span><strong>Promotion → PrimeWeb → POS → Prime Inbox → Validation</strong></div><div><span>Deliverables</span><p>Promotion policy/redemption prototype; core prototype cho ba workspace chuyên biệt; kiểm thử handoff xuyên workspace; accessibility/responsive; analytics events và đóng gói backlog bàn giao.</p></div><div><span>Exit gate</span><p>Stakeholder sign-off và handoff package của cả 13 workstream sẵn sàng cho Engineering planning.</p></div></article>
+            </div>
+          </section>
+
+          <section class="plan-section">
+            <div class="plan-section-head"><div><p class="eyebrow">Unified design backlog</p><h2>13 workstream theo một thứ tự ưu tiên thống nhất</h2><p>Product Master là ưu tiên cao nhất; Order được tách thành đầu mục riêng ngay sau đó. Marketing và Promotions là hai lifecycle độc lập; ba workspace chuyên biệt được gộp vào cùng backlog ở P3.</p></div><span class="tag api">Estimate · 8 tuần</span></div>
+            <table class="contract-table design-backlog-table"><thead><tr><th>Ưu tiên</th><th>Workstream</th><th>Phạm vi thiết kế tiếp theo</th><th>Đầu ra</th><th>Estimate timeline</th></tr></thead><tbody>
+              <tr><td><strong>P0</strong><span>#01 · Flow 02</span></td><td><strong>Product Master revision & channel listings</strong></td><td>Quick-create draft, product structure, Master SKU, readiness, approval/revision, variant/media/pricing, nội dung theo kênh và inventory-sync policy.</td><td>Product/revision state machine, channel listing wizard, impact preview, partial-result recovery, version history và rollback rule.</td><td><span class="estimate">Tuần 1<br>5 ngày</span></td></tr>
+              <tr><td><strong>P0</strong><span>#02 · Flow 03</span></td><td><strong>Order, Payment, Fulfillment & Return</strong></td><td>Order từ channel/manual, validation, confirmation, payment evidence, fulfillment ownership, ATP reservation, multi-package shipping, cancellation, RMA, refund và COD settlement.</td><td>Order state machine; payment, fulfillment và return subflow; permission matrix, exception recovery và service handoff contract.</td><td><span class="estimate">Tuần 2<br>5 ngày</span></td></tr>
+              <tr><td><strong>P0</strong><span>#03 · Flow 10</span></td><td><strong>Warehouse, Master Stock & optional channel sync</strong></td><td>Warehouse Stock mutation, Master Stock roll-up, reservation, transfer, adjustment, cycle count và opt-in inventory policy theo từng channel listing.</td><td>Inventory ledger flow, quantity glossary, authority matrix, channel-sync boundary và exception recovery.</td><td><span class="estimate">Tuần 3<br>4 ngày</span></td></tr>
+              <tr><td><strong>P1</strong><span>#04 · Flow 01</span></td><td><strong>Workspace activation & channel onboarding</strong></td><td>Đăng nhập, business context, tạo/chọn kho, kết nối store, cấp quyền, mapping location, chọn sync services, initial sync và readiness handoff.</td><td>Onboarding state machine, resume/recovery flow, readiness checklist, channel capability matrix và deep link tới blocker.</td><td><span class="estimate">Tuần 3–4<br>3 ngày</span></td></tr>
+              <tr><td><strong>P1</strong><span>#05 · Cross-cutting</span></td><td><strong>Settings & operational configuration</strong></td><td>General & Business, Team & Access, Payments và Shipping & Delivery; cấu hình toàn cục, theo workspace và theo store/branch.</td><td>Settings IA, permission matrix, impact preview, validation và recovery states.</td><td><span class="estimate">Tuần 4–5<br>4 ngày</span></td></tr>
+              <tr><td><strong>P1</strong><span>#06 · Flow 04</span></td><td><strong>Live Commerce</strong></td><td>Session setup, SKU allocation, live monitoring, top-up, end session và release stock.</td><td>War-room prototype, real-time states và recovery playbook.</td><td><span class="estimate">Tuần 5<br>2 ngày</span></td></tr>
+              <tr><td><strong>P1</strong><span>#07 · Flow 05–06</span></td><td><strong>Customer 360 & conversation handoff</strong></td><td>Identity resolution, merge review, consent, ownership, activity timeline và deep link sang Inbox.</td><td>Identity state machine, review queue, handoff and return pattern.</td><td><span class="estimate">Tuần 5–6<br>3 ngày</span></td></tr>
+              <tr><td><strong>P2</strong><span>#08 · Flow 07</span></td><td><strong>Subscription, entitlement & billing</strong></td><td>Plan selection, trial, upgrade/downgrade, limits, invoice, payment recovery và cancellation.</td><td>Billing lifecycle, entitlement messaging và recovery prototype.</td><td><span class="estimate">Tuần 6<br>2 ngày</span></td></tr>
+              <tr><td><strong>P2</strong><span>#09 · Flow 08</span></td><td><strong>Marketing campaign lifecycle</strong></td><td>Audience/source selection, campaign creation, content, approval, channel distribution, demand capture, attribution và performance reporting.</td><td>Campaign wizard, approval/publish states, channel handoff, attribution model và performance dashboard.</td><td><span class="estimate">Tuần 6<br>2 ngày</span></td></tr>
+              <tr><td><strong>P2</strong><span>#10 · Flow 09</span></td><td><strong>Promotion policy & redemption</strong></td><td>Promotion creation, eligibility, discount rule, quota, stacking policy, approval, activation, redemption, refund reversal và outcome reporting.</td><td>Promotion builder, policy explanation, validation states, redemption lifecycle và commercial outcome report.</td><td><span class="estimate">Tuần 7<br>1 ngày</span></td></tr>
+              <tr><td><strong>P3</strong><span>#11 · Workspace</span></td><td><strong>PrimeWeb Studio</strong></td><td>Theme/page/component, Product/Collection binding, responsive preview, domain/SEO, publish, version và rollback.</td><td>Builder IA, interaction model, publish state machine, clickable prototype và component/state inventory.</td><td><span class="estimate">Tuần 7<br>3 ngày</span></td></tr>
+              <tr><td><strong>P3</strong><span>#12 · Workspace</span></td><td><strong>POS Workspace</strong></td><td>Mở ca/thiết bị, scan/search, cart, customer/promotion, split payment, receipt, suspend/resume, return/exchange và close shift.</td><td>Register flow, offline/payment state matrix, hardware recovery prototype và QA scenarios.</td><td><span class="estimate">Tuần 7–8<br>3 ngày</span></td></tr>
+              <tr><td><strong>P3</strong><span>#13 · Workspace</span></td><td><strong>Prime Inbox</strong></td><td>Queue/routing, claim, identify customer, conversation, tra order/SKU/ATP, ticket, draft order, secure checkout, resolve và writeback.</td><td>Queue/conversation interaction model, identity/ownership state machine, assisted-commerce prototype và escalation rules.</td><td><span class="estimate">Tuần 8<br>3 ngày</span></td></tr>
+            </tbody></table>
+            <div class="total-estimate" aria-label="Tổng estimate hoàn thành prototype">
+              <div>Tổng estimate</div>
+              <div><span>Tổng thời gian thiết kế</span><strong>40 ngày làm việc</strong><p>1 designer × 40 ngày để hoàn thành 13 workstream, bao gồm flow, edge cases, prototype critical path và handoff package.</p></div>
+              <div><span>Thời gian hoàn thành dự kiến</span><strong>8 tuần</strong><p>Với 1 designer thực hiện tuần tự 40 ngày làm việc và review trong tối đa 1 ngày.</p></div>
+            </div>
+          </section>
+
+          <section class="plan-section">
+            <div class="plan-section-head"><div><p class="eyebrow">Settings as an operating foundation</p><h2>Settings không phải một flow độc lập — mà là điều kiện để các flow chạy đúng</h2><p>Design sẽ không gom bốn mục thành một form dài. Mỗi nhóm có lifecycle cấu hình, validation, quyền và impact riêng; các flow nghiệp vụ sẽ deep-link về đúng cấu hình khi phát hiện blocker.</p></div><span class="tag prototype">Cross-cutting workstream</span></div>
+            <div class="settings-plan-grid">
+              <article class="settings-plan-card"><span>01 · Business foundation</span><h3>General & Business</h3><p>Thông tin pháp nhân, locale, currency, timezone, tax/VAT, invoice identity và chính sách mặc định.</p><ul class="compact-list edge"><li>Đổi currency/timezone khi đã có order</li><li>Thiếu legal/tax data hoặc region không hỗ trợ</li><li>Preview phạm vi ảnh hưởng trước khi lưu</li></ul><footer>Liên kết: Onboarding · Orders · Billing · Analytics</footer></article>
+              <article class="settings-plan-card"><span>02 · Governance</span><h3>Team & Access</h3><p>Mời nhân sự, role template, quyền theo module, workspace, store/branch và audit access.</p><ul class="compact-list edge"><li>Invite hết hạn hoặc email đã tồn tại</li><li>Không cho xoá/hạ quyền admin cuối cùng</li><li>Role thay đổi khi user đang thao tác</li></ul><footer>Liên kết: Toàn bộ workspace · Approval · Audit</footer></article>
+              <article class="settings-plan-card"><span>03 · Money movement</span><h3>Payments</h3><p>Kết nối provider, phương thức thanh toán, settlement account, COD, test/live mode và webhook health.</p><ul class="compact-list edge"><li>Token hết hạn hoặc provider mất kết nối</li><li>Payment timeout, duplicate webhook</li><li>Không trộn test transaction với live data</li></ul><footer>Liên kết: Orders · POS · PrimeWeb · Billing</footer></article>
+              <article class="settings-plan-card"><span>04 · Delivery network</span><h3>Shipping & Delivery</h3><p>Carrier, service level, pickup/return address, fee rule, coverage, COD support và fallback routing.</p><ul class="compact-list edge"><li>Địa chỉ không map được với carrier</li><li>Dịch vụ tạm ngừng hoặc ngoài vùng giao</li><li>Rate lỗi, pickup missed, fallback không khả dụng</li></ul><footer>Liên kết: Warehouse · Orders · Returns · COD</footer></article>
+            </div>
+          </section>
+
+          <section class="plan-section">
+            <div class="plan-section-head"><div><p class="eyebrow">Cross-workspace contracts</p><h2>Không tách rời dữ liệu khi tách không gian thao tác</h2><p>Design specification phải chỉ rõ dữ liệu nào được đọc, hành động nào được ghi ngược và user quay lại Main Workspace ở đâu.</p></div></div>
+            <table class="contract-table"><thead><tr><th>Workspace</th><th>Đọc từ Main Workspace</th><th>Ghi ngược về Main Workspace</th><th>Handoff UX cần thiết kế</th></tr></thead><tbody>
+              <tr><td><strong>PrimeWeb Studio</strong><span>Storefront creation</span></td><td>Product revision, listing, price, ATP, promotion, customer policy</td><td>Publish version, domain status, storefront events, checkout attribution</td><td>Workspace switcher, unsaved-change guard, preview link, lỗi publish quay đúng cấu hình</td></tr>
+              <tr><td><strong>POS Workspace</strong><span>In-store checkout</span></td><td>Catalog, store price, promotion, customer, branch ATP, staff permission</td><td>Order, payment evidence, stock movement, receipt, shift reconciliation</td><td>Open register, branch/device context, offline indicator, resume back-office task</td></tr>
+              <tr><td><strong>Prime Inbox</strong><span>Conversation desk</span></td><td>Customer 360, order, SKU, ATP, promotion, conversation source health</td><td>Conversation, identity link, ticket, draft order, attribution, resolution</td><td>Deep link giữ customer/thread context, ownership notice và return-to-record</td></tr>
+            </tbody></table>
+          </section>
+
+          <section class="plan-section">
+            <div class="plan-section-head"><div><p class="eyebrow">Definition of Done</p><h2>Một feature chỉ “design complete” khi đủ 8 điều kiện</h2></div></div>
+            <div class="dod-grid"><div class="dod-item">Persona, mục tiêu, precondition và quyền truy cập đã rõ.</div><div class="dod-item">Happy, alternate và failure paths đã được mô tả.</div><div class="dod-item">Loading, empty, error, partial, offline và retry states đầy đủ.</div><div class="dod-item">State transition và hành động hợp lệ theo từng vai trò đã khóa.</div><div class="dod-item">Cross-workspace handoff giữ đúng context và có đường quay lại.</div><div class="dod-item">Responsive, dark mode, i18n và accessibility được kiểm tra.</div><div class="dod-item">Analytics event, audit evidence và success metric được định nghĩa.</div><div class="dod-item">Prototype đã test; acceptance criteria được Product/Engineering duyệt.</div></div>
+            <div class="plan-note"><strong>Capacity & dependency:</strong> Estimate được tính cho 1 designer thực hiện toàn bộ scope theo thứ tự ưu tiên, tổng cộng 40 ngày làm việc tương đương 8 tuần. Timeline giả định Product Owner và Engineering reviewer phản hồi trong 1 ngày làm việc, có SME cho payment, warehouse và channel integration, đồng thời không mở rộng thêm scope. Phạm vi bàn giao là flow, state/edge-case matrix, prototype critical path và backlog ưu tiên; high-fidelity cho toàn bộ màn hình tiếp tục theo từng release.</div>
+          </section>
+
+          <div class="footer">Đây là kế hoạch thực thi Design được đề xuất, không phải cam kết release của Engineering. Thứ tự ưu tiên: Product Master → Order → Inventory → onboarding và cấu hình → Customer/commercial controls → ba workspace P3 → kiểm thử xuyên hệ thống.</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="diagram-modal" class="diagram-modal" role="dialog" aria-modal="true" aria-labelledby="diagram-modal-title" hidden>
+    <div class="diagram-modal-panel">
+      <header class="diagram-modal-header">
+        <div><h2 id="diagram-modal-title">Sơ đồ luồng hệ thống</h2><p id="diagram-modal-subtitle">Target-state end-to-end operating model</p></div>
+        <button id="diagram-close" class="diagram-close" type="button" aria-label="Đóng sơ đồ phóng to"></button>
+      </header>
+      <div id="diagram-modal-context" class="diagram-modal-context"></div>
+      <div id="diagram-modal-body" class="diagram-modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    const icons = {
+      overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>',
+      features: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="8" cy="5" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="19" r="2"/></svg>',
+      flows: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h5a4 4 0 0 1 4 4v2M17 16l2 2 2-2M5 8v8a2 2 0 0 0 2 2h8"/></svg>',
+      architecture: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/><rect x="14" y="16" width="7" height="5" rx="1"/><path d="M12 8v4M6.5 16v-4h11v4"/></svg>',
+      cube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>',
+      diagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M9 5.5h3a4 4 0 0 1 4 4V16M13 13l3 3 3-3"/></svg>',
+      expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5"/><path d="m3 8 6-6M21 8l-6-6M3 16l6 6M21 16l-6 6"/></svg>',
+      close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18"/></svg>'
+    };
+
+    const tabs = [
+      { id: 'overview', label: 'Tổng quan', icon: icons.overview },
+      { id: 'features', label: 'Tính năng', icon: icons.features },
+      { id: 'flows', label: 'User Flows', icon: icons.flows },
+      { id: 'architecture', label: 'Kế hoạch Design', icon: icons.architecture }
+    ];
+
+    const features = [
+      { category:'Control', title:'Home Operations Cockpit', maturity:'UI + Data', copy:'Tổng hợp pipeline, doanh thu theo kênh, việc cần xử lý, sản phẩm bán chạy và sức khỏe kết nối.', benefit:'Giúp quản lý thấy bottleneck và đi thẳng tới hành động thay vì đọc nhiều dashboard rời.', source:'PrimeGrowthOSPage.tsx · onboarding API · growth-os API' },
+      { category:'Insight', title:'Unified Analytics Hub', maturity:'UI + Data', copy:'KPI tương tác, một biểu đồ xu hướng, distribution widgets và master data table theo store, product, region, customer.', benefit:'Một ngôn ngữ hiệu suất chung cho commercial, operations và leadership.', source:'PrimeClientReportsPage.tsx · Recharts' },
+      { category:'Commerce', title:'Product Master & Per-product Channel Listings', maturity:'UI + Data', copy:'Một Product Master workspace hợp nhất toàn bộ vòng đời: quick-create draft theo Single, Configurable hoặc Bundle; hoàn thiện master facts, variants, media, pricing và logistics; Save Draft → Check Readiness → Publish Product Revision; sau đó tạo listing bằng wizard 5 bước ngay trong từng sản phẩm. Mỗi kênh có Channel SKU, taxonomy, content, fulfillment và inventory-sync policy riêng.', benefit:'User bắt đầu từ một sản phẩm gốc rồi phân phối sang đúng kênh mà không phải chuyển qua một catalog listing rời; thay đổi riêng trên Amazon, Shopee, POS hoặc PrimeWeb không ghi đè Product Master.', source:'Products.tsx · CreateProductDialog.tsx · ProductCreatePage.tsx · ProductDetail.tsx · ChannelListingWizard.tsx · ChannelListingDetail.tsx · product-store.ts' },
+      { category:'Commerce', title:'Order, Payment, Fulfillment & Return Command Center', maturity:'UI + API', copy:'Một workspace cho channel orders và manual orders với canonical lifecycle Draft → Confirmation → Fulfillment → Shipping → Delivered/Completed; operational queues, exact-status/payment/store/warehouse/carrier filters, payment evidence, ownership, notes, exceptions và detail tabs cho Items, Payment, Delivery, Returns, Activity. API bảo vệ idempotency, transition hợp lệ và stale update.', benefit:'Đưa đúng đơn cần xử lý lên trước, ngăn thao tác sai trạng thái và giữ payment, stock, giao hàng, hủy/hoàn trong cùng một lịch sử có thể kiểm tra.', source:'Orders.tsx · ManualOrderDialog.tsx · OrderWorkspaceDetail.tsx · order-detail-flow.ts · orders-api.ts · orders.js · orders.test.js' },
+      { category:'Supply', title:'Warehouse & Inventory', maturity:'UI + Data', copy:'Mapping kho kênh-vật lý, ATP/reserved/safety stock, transfer, adjustments, stock details và fulfillment priority.', benefit:'Giảm oversell, chọn sai kho và thời gian xử lý thủ công giữa nhiều điểm hàng.', source:'Warehouses.tsx · inventory components · warehouses/inventoryBrain API resources' },
+      { category:'Channels', title:'Connected Sales Channels', maturity:'UI + API', copy:'Connect-store wizard, OAuth callback, warehouse mapping, sync services, health, error state và catalog strategy.', benefit:'Thêm kênh mới theo quy trình chuẩn hóa và thấy rõ lỗi giá, tồn hoặc đơn trên từng store.', source:'SalesChannels.tsx · channel-integrations.js · channel-integrations-api.ts' },
+      { category:'Channels', title:'Live Commerce Reservation', maturity:'UI + API', copy:'Tạo live session, chọn SKU/kho, giới hạn ATP, live price, auto-release, top-up, end-session và WebSocket event stream.', benefit:'Bảo vệ tồn khả dụng trong campaign live và trả hàng chưa bán về pool đúng chính sách.', source:'LiveCommerce.tsx · CreateLiveSessionWizard.tsx · live-commerce.js · WebSocket' },
+      { category:'Customer', title:'Prime Inbox & Conversation Channels', maturity:'UI + API', copy:'Quick-link store token hoặc OAuth độc lập, routing/SLA, automation/AI, webhook diagnostics và 3-column conversation desk.', benefit:'CS xử lý chat đa nguồn, tra khách/SKU/kho và tạo đơn ngay trong cuộc hội thoại.', source:'ConversationChannels.tsx · PrimeInboxWorkspace.tsx · conversation-channels.js' },
+      { category:'Customer', title:'Customer System of Record', maturity:'UI + Data', copy:'Dedicated /customers directory với account/contact CRUD, owner, lifecycle, customer type, tags/segments, channel filter, identity completeness, cross-domain timeline và duplicate review.', benefit:'Tạo một hồ sơ khách được quản trị rõ ràng, tách khỏi campaign execution và conversation handling nhưng vẫn giữ ngữ cảnh từ Commerce, Service và Intelligence.', source:'PrimeCrmCustomersPage.tsx · CustomerProfileFloor.tsx · customer-profile-floor.ts' },
+      { category:'Growth', title:'Marketing Workspace', maturity:'UI + Data', copy:'Dedicated /marketing surface hợp nhất overview, acquisition sources, campaigns, content, audiences/re-engagement và performance analytics.', benefit:'Tách công việc tạo nhu cầu khỏi Customer master data để mỗi module có ownership và mục tiêu đo lường rõ ràng.', source:'PrimeMarketingPage.tsx · /crm/* compatibility redirects · PrimeRoutes.tsx' },
+      { category:'Growth', title:'Omnichannel Promotions', maturity:'Prototype', copy:'Discount codes, automatic discounts, flash sales, loyalty benefits, channel eligibility, usage limits, scheduling và promotion analytics trên cùng một policy surface.', benefit:'Cho phép Growth kiểm soát ưu đãi xuyên PrimeWeb, PrimePOS và Inbox mà vẫn bảo vệ biên lợi nhuận, giới hạn sử dụng và khả năng truy vết về đơn hàng.', source:'PromotionsManagement.tsx · PromotionWizard · /promotions/* routes' },
+      { category:'Platform', title:'Plan & Billing', maturity:'Prototype', copy:'Dedicated /billing workspace với current subscription, renewal window, plan history, four-tier comparison, upgrade/downgrade/termination confirmation và searchable request history.', benefit:'Cho Workspace Admin tự đánh giá giới hạn gói, hiểu thời điểm thay đổi có hiệu lực và theo dõi mọi subscription request mà không phụ thuộc trao đổi ngoài hệ thống.', source:'PlanBillingPage.tsx · plan-billing.ts · PlanBillingPage.test.tsx' },
+      { category:'Automation', title:'Scheduled Tasks & Safe Actions', maturity:'UI + API', copy:'Template, recurrence/cron, owner, system instructions, run-now, pause/resume, bulk action và execution logs.', benefit:'Giảm tác vụ lặp nhưng vẫn giữ ownership, lịch sử chạy và human approval cho thay đổi nhạy cảm.', source:'ScheduledTasks.tsx · scheduled-tasks.js · worker-queue.js' },
+      { category:'Platform', title:'Workspace, IAM, Help & Documentation', maturity:'UI + API', copy:'Workspace switcher, five role definitions, member invitations, audit events, theme/i18n, FAQ deep links và product docs.', benefit:'Cho phép nhiều đội dùng cùng nền tảng với quyền phù hợp và tự phục vụ khi gặp vấn đề.', source:'AppLayout.tsx · team access APIs · FaqHub.tsx · Docs.tsx · auth.js' }
+    ];
+
+    const flows = [
+      {
+        id:'onboarding', title:'01 · Workspace activation & channel onboarding', outcome:'Commerce foundation ready', summary:'Đưa một doanh nghiệp từ lần đăng nhập đầu tiên hoặc một setup còn dang dở tới trạng thái có đúng quyền, business context, kho hợp lệ, channel được authorize và đồng bộ đủ an toàn để vận hành.', actors:'Workspace Admin · IAM · Business Settings · Warehouse · Channel Gateway · Sync Worker', decision:'Session và quyền có hợp lệ; kho/channel/mapping có operational; initial sync Healthy, Partial hay Failed?', control:'Session expiry · role permission · OAuth state/scopes · mapping eligibility · readiness gate · continuous health monitoring', maturity:'Happy-path foundation', maturityClass:'api', delivery:'Source hiện đã có login error, rate limit/inactive-account handling, session restore, checklist có resume/collapse/dismiss, unsupported-region validation, popup-blocked recovery, callback origin/platform check, warehouse mapping, catalog strategy và progress polling. Các gap chính: Business Settings chưa nằm trong completion rule; API-key channels vẫn đi qua auth-code flow; chưa xử lý duplicate store, OAuth cancel/timeout/missing scopes; mapping completion chưa gắn đúng channel location; initial sync chưa có Partial/Failed transition; setup đã dismiss chưa tự mở lại khi token hoặc mapping bị hỏng.',
+        steps:[
+          ['Khôi phục session hoặc đăng nhập','Prime OS kiểm tra token hiện có; nếu hết hạn thì yêu cầu đăng nhập và trả lỗi cụ thể cho invalid credential, inactive account, rate limit hoặc backend unavailable.','Chỉ người dùng đăng nhập hợp lệ mới có thể bắt đầu thiết lập.'],
+          ['Kiểm tra workspace và quyền thiết lập','IAM nạp tenant scope và permission; user thiếu quyền được chuyển sang view-only hoặc gửi yêu cầu cho Workspace Admin.','Chỉ người có quyền mới có thể thay đổi kho và kênh bán.'],
+          ['Nạp trạng thái onboarding','Hệ thống phân biệt workspace mới, setup đang dở hoặc setup từng hoàn tất; checklist mở đúng bước chưa hoàn thành.','Người dùng tiếp tục đúng bước đang làm dở, không phải thiết lập lại từ đầu.'],
+          ['Xác nhận business context','Admin kiểm tra business identity, timezone, currency, tax và owner; lỗi validation/save được giữ tại đúng field.','Mọi đơn hàng và báo cáo dùng chung thông tin doanh nghiệp, tiền tệ và thuế.'],
+          ['Tìm hoặc tạo warehouse hợp lệ','Prime OS cho dùng kho có sẵn hoặc tạo mới, kiểm tra code trùng, địa chỉ, region, trạng thái active và fulfillment eligibility.','Doanh nghiệp có một kho hợp lệ để giữ hàng và xử lý đơn.'],
+          ['Chọn và authorize sales channel','Hệ thống kiểm tra platform/region, duplicate store và auth method; OAuth/API-key flow xử lý popup blocked, cancel, timeout, wrong account và missing scopes.','Đúng cửa hàng được kết nối với đầy đủ quyền cần thiết.'],
+          ['Mapping channel location và sync services','User nối pickup/return location với physical warehouse, xác nhận region và bật Price, Stock, Orders theo nhu cầu.','Hệ thống xác định đúng kho lấy hàng và nhận hàng trả trước khi bắt đầu đồng bộ đơn.'],
+          ['Chọn catalog reconciliation strategy','User chọn auto-match SKU, tạo Master Product mới hoặc review thủ công; hệ thống phát hiện unmatched/duplicate SKU và taxonomy gaps.','Sản phẩm từ kênh được ghép đúng với danh mục chung, tránh tạo dữ liệu trùng.'],
+          ['Chạy initial sync và recovery','Sync Worker báo Healthy, Partial hoặc Failed theo từng service/item; user sửa credential, mapping hoặc catalog error rồi retry từ checkpoint.','Người dùng thấy phần nào đã đồng bộ, phần nào lỗi và cần sửa gì.'],
+          ['Đánh giá readiness và handoff','Gate xác nhận business context, warehouse, authorization, mapping, critical sync services và error threshold trước khi hoàn tất checklist.','Trang Home chỉ báo sẵn sàng khi hệ thống thực sự có thể vận hành; lỗi phát sinh sau đó sẽ được đưa lại vào danh sách cần xử lý.']
+        ],
+        diagram:'flowchart TD\n  subgraph ENTRY ["1 · ĐĂNG NHẬP VÀ QUYỀN TRUY CẬP"]\n    A["Mở Prime OS"] --> B{"Phiên đăng nhập còn hiệu lực?"}\n    B -->|"Không"| C["Đăng nhập"]\n    C --> D{"Kết quả đăng nhập?"}\n    D -->|"Sai thông tin tài khoản bị khóa hoặc thử quá nhiều"| E["Giải thích lỗi và hướng dẫn xử lý"]\n    E --> C\n    D -->|"Thành công"| F{"Có quyền thiết lập hệ thống?"}\n    B -->|"Có"| F\n    F -->|"Không"| G["Chỉ xem hoặc yêu cầu quản trị viên cấp quyền"]\n  end\n  subgraph FOUNDATION ["2 · THIẾT LẬP WORKSPACE"]\n    F -->|"Có"| H["Tải trạng thái thiết lập"]\n    H --> I{"Doanh nghiệp đang ở trạng thái nào?"}\n    I -->|"Đang làm dở"| J["Tiếp tục bước chưa hoàn thành"]\n    I -->|"Chưa thiết lập"| K["Kiểm tra thông tin doanh nghiệp"]\n    I -->|"Đã hoàn tất"| L{"Cấu hình vẫn hoạt động tốt?"}\n    L -->|"Không"| J\n    K --> M{"Thông tin doanh nghiệp hợp lệ?"}\n    M -->|"Không"| K\n    M -->|"Có"| N{"Đã có kho phù hợp?"}\n    J --> N\n    N -->|"Chưa"| O["Tạo và kiểm tra kho"]\n    O --> N\n  end\n  subgraph CONNECT ["3 · KẾT NỐI KÊNH BÁN"]\n    N -->|"Có"| P["Chọn kênh bán hàng"]\n    P --> Q{"Kênh khu vực và cửa hàng hợp lệ?"}\n    Q -->|"Không hợp lệ"| P\n    Q -->|"Hợp lệ"| R["Cấp quyền kết nối qua cửa sổ cấp quyền hoặc khóa kết nối"]\n    R --> S{"Kết nối thành công?"}\n    S -->|"Hủy bị chặn hoặc hết thời gian"| T["Thử lại hoặc chọn kênh khác"]\n    T --> R\n    S -->|"Thiếu quyền cần thiết"| U["Yêu cầu cấp đủ quyền"]\n    U --> R\n    S -->|"Thành công"| V["Nối địa điểm và chọn dữ liệu cần đồng bộ"]\n    V --> W{"Thiết lập liên kết đã hợp lệ?"}\n    W -->|"Chưa"| V\n    W -->|"Rồi"| X["Chọn cách xử lý dữ liệu sản phẩm ban đầu"]\n  end\n  subgraph READINESS ["4 · KIỂM TRA VÀ BÀN GIAO VẬN HÀNH"]\n    X --> Y["Chạy đồng bộ thử theo từng loại dữ liệu"]\n    Y --> Z{"Kết quả đồng bộ?"}\n    Z -->|"Thất bại"| AA["Sửa thông tin kết nối liên kết kho hoặc lỗi từ nhà cung cấp"]\n    AA --> Y\n    Z -->|"Thành công một phần"| AB["Xem các mục còn lỗi"]\n    AB --> AC{"Có lỗi nghiêm trọng?"}\n    AC -->|"Có"| AA\n    AC -->|"Không"| AD["Tiếp tục với phạm vi hoạt động giới hạn"]\n    Z -->|"Ổn định"| AE["Kiểm tra mức sẵn sàng của workspace"]\n    AD --> AE\n    AE --> AF{"Đủ điều kiện vận hành?"}\n    AF -->|"Chưa"| J\n    AF -->|"Đủ"| AG["Hoàn tất thiết lập và mở Trang chủ"]\n    L -->|"Có"| AG\n    AG --> AH["Theo dõi sức khỏe kết nối liên tục"]\n    AH -->|"Token hết hạn mất liên kết hoặc đồng bộ lỗi"| J\n  end'
+      },
+      {
+        id:'catalog', title:'02 · Product Master draft → canonical revision → per-product channel listings', outcome:'One governed product truth, many independently operated listings', summary:'Bắt đầu bằng một Product Master draft có identity rõ ràng, hoàn thiện dữ liệu dùng chung và kiểm tra readiness trước khi publish canonical revision. Từ chính sản phẩm đó, user chọn kênh, cấu hình Channel SKU và yêu cầu riêng theo provider, review toàn bộ listing rồi submit độc lập mà không làm thay đổi Product Master.', actors:'Merchandiser · Catalog Manager · Reviewer/Approver · Product Master · Readiness Engine · Listing Orchestrator · Channel Providers · Warehouse/Inventory', decision:'Product structure và Master SKU có hợp lệ; canonical data đã đủ readiness; từng channel listing đã đủ identity, taxonomy, fulfillment và stock policy; submit thành công, partial hay failed; thay đổi có ảnh hưởng dependency đang vận hành?', control:'Permission · Master SKU uniqueness · draft persistence · readiness gate · immutable revision · maker-checker · per-channel ownership · idempotency · external ID · impact analysis · audit/rollback', maturity:'Unified guided workflow prototype', maturityClass:'prototype', delivery:'Prototype hiện đã có quick-create modal cho Single, Configurable và Bundle; kiểm tra trùng Master SKU; draft được lưu localStorage và mở thẳng Product Editor; luồng Save Draft → Check Readiness → Publish Product Revision; Channel Listings được quản lý ngay trong từng product bằng wizard Choose channels → Channel setup → Review → Submit → Done và detail cards theo kênh. Route Channel Listings cũ đã redirect về Product Master. Các phần còn thiếu để production gồm permission và duplicate resolution đầy đủ, bundle composition, approval/revision backend, inventory ledger handoff, provider adapters, partial-result recovery, drift detection và rollback.',
+        steps:[
+          ['Mở Product Master và bắt đầu draft','User chọn Add Master Product ngay tại master catalog; hệ thống mở quick-create thay vì đưa user vào một form dài ngay lập tức.','Người dùng bắt đầu nhanh và luôn hiểu mình đang tạo dữ liệu gốc, không phải một listing riêng.'],
+          ['Chọn product structure và identity','User chọn Single, Configurable hoặc Bundle, nhập Master SKU và Product Family; hệ thống chuẩn hóa SKU, chặn SKU đã tồn tại và bắt buộc Family với Configurable product.','Sản phẩm có cấu trúc đúng ngay từ đầu và giảm nguy cơ tạo trùng mã nội bộ.'],
+          ['Tạo draft và mở Product Editor','Prime OS tạo record trạng thái Draft, khởi tạo các warehouse balance và chuyển thẳng sang trang edit; prototype lưu record trong localStorage để vẫn mở được sau refresh.','User có một bản nháp an toàn để hoàn thiện dần thay vì phải nhập đủ mọi dữ liệu trong một lần.'],
+          ['Hoàn thiện canonical product data','User bổ sung tên, identifiers, category, description, media, SEO, pricing, package dimensions, compliance và specifications; progress và Product Data Coverage cập nhật theo dữ liệu đã nhập.','Mọi kênh dùng chung một nguồn thông tin sản phẩm nhất quán.'],
+          ['Xây dựng variants hoặc bundle composition','Với Configurable product, user tạo attribute groups, chọn combinations, sinh variant SKU và nhập giá; Bundle cần khai báo component, quantity và dependency trước khi sẵn sàng.','Từng mặt hàng bán được có mã và cấu trúc rõ ràng, tránh nhầm biến thể hoặc thành phần combo.'],
+          ['Xác nhận inventory readiness','Editor hiển thị stock theo warehouse và Master ATP; về target state, opening balance hoặc stock correction được ghi qua Warehouse inventory ledger thay vì tạo một số tồn độc lập trong Product Master.','Sản phẩm được nối đúng với nguồn tồn kho và không phát sinh hai con số stock master khác nhau.'],
+          ['Lưu và khôi phục Draft revision','Save Draft bị khóa khi media còn upload; hệ thống lưu snapshot, báo Unsaved changes và khôi phục draft khi user quay lại. Target state bổ sung optimistic locking khi nhiều người cùng sửa.','Người dùng không mất dữ liệu và biết rõ thay đổi nào chưa được lưu.'],
+          ['Chạy Product Readiness','Check Readiness kiểm tra identity, content, category, media, pricing, variants, logistics và ít nhất một channel handoff; lỗi đưa user về đúng section cần sửa.','Người dùng biết chính xác sản phẩm còn thiếu gì trước khi trở thành dữ liệu chính thức.'],
+          ['Review và publish canonical revision','Sau khi draft đã lưu và readiness đạt, user xác nhận Publish Product Revision; hệ thống đóng băng master facts và kích hoạt canonical revision. Việc này không tự submit listing ra sàn.','Doanh nghiệp có một phiên bản sản phẩm chính thức mà không vô tình đăng bán ra bên ngoài.'],
+          ['Mở Channel Listings trong đúng Product Master','User vào Sales Channels trong editor hoặc Channel Listings cards ở product detail; route listing catalog cũ quay về master catalog.','Toàn bộ công việc theo kênh nằm đúng ngữ cảnh của sản phẩm, không còn một catalog rời khó đối chiếu.'],
+          ['Chọn các kênh cần tạo listing','Wizard bước Choose channels cho phép chọn PrimeWeb, PrimePOS, Shopee, Lazada, TikTok Shop, Amazon, Rakuten hoặc Social Inbox và tạo Channel SKU gợi ý từ Master SKU.','User chỉ chuẩn bị đúng những kênh cần bán và vẫn nhìn thấy sản phẩm gốc của mọi listing.'],
+          ['Cấu hình từng listing theo provider','Wizard lần lượt yêu cầu Channel SKU, category hoặc catalog match, content override, variants/media, fulfillment và dữ liệu riêng: ASIN + FBA/FBM cho Amazon, warehouse cho TikTok, shipping option cho Shopee/Lazada, barcode cho POS hoặc URL cho PrimeWeb.','Mỗi kênh đáp ứng đúng yêu cầu riêng mà không ghi đè dữ liệu dùng chung.'],
+          ['Chọn chính sách stock cho từng listing','User chọn inventory source, Automatic, Manual hoặc Do not publish stock, allocation cap và safety buffer. Với Amazon FBA, Prime OS chỉ đọc quantity do Amazon quản lý.','Stock từng kênh vẫn độc lập mặc định và chỉ nhận quantity từ Prime OS khi user chủ động cho phép.'],
+          ['Review toàn bộ và sửa blocker','Bước Review tổng hợp Selected, Ready và Needs attention; listing thiếu trường bắt buộc không thể submit và có thể mở lại đúng kênh để sửa.','User thấy lỗi trước khi gửi, tránh bị từng sàn từ chối sau khi chờ xử lý.'],
+          ['Submit listing intents và xử lý kết quả độc lập','Mỗi listing được tạo intent riêng và chuyển Queued; target Listing Orchestrator dùng idempotency, lưu external ID/URL và trả Publishing, Published, Rejected hoặc Error theo từng kênh. Kết quả thành công được giữ khi kênh khác lỗi.','Một lỗi trên Amazon hoặc Shopee không chặn các kênh còn lại và không tạo listing trùng khi retry.'],
+          ['Sửa riêng một kênh hoặc cập nhật master có kiểm soát','Từ product detail, user mở đúng listing để sửa channel-owned content. Khi Master Product đổi, hệ thống preview listing, promotion, order và inventory impact rồi cho sync chọn lọc, schedule hoặc giữ override.','Có thể sửa riêng Amazon mà không làm đổi Product Master hoặc các kênh khác.'],
+          ['Unpublish hoặc archive an toàn','User gỡ từng listing nhưng vẫn giữ Product Master; archive/delete master bị chặn nếu còn listing, order, reservation, return, promotion hoặc live-session dependency chưa xử lý.','Doanh nghiệp ngừng bán có kiểm soát và vẫn giữ đầy đủ lịch sử sản phẩm.']
+        ],
+        diagram:'flowchart TD\n  subgraph START ["1 · TẠO NHANH VÀ LƯU NHÁP"]\n    A["Danh sách sản phẩm gốc"] --> B["Chọn Thêm sản phẩm gốc"]\n    B --> C["Chọn sản phẩm đơn có biến thể hoặc bộ sản phẩm"]\n    C --> D["Nhập mã sản phẩm gốc và nhóm sản phẩm"]\n    D --> E{"mã sản phẩm gốc hợp lệ và chưa tồn tại?"}\n    E -->|"Không"| D\n    E -->|"Có"| F["Tạo bản nháp và mở màn hình chỉnh sửa"]\n  end\n  subgraph MASTER ["2 · HOÀN THIỆN PRODUCT MASTER"]\n    F --> G["Hoàn thiện thông tin chung danh mục hình ảnh giá kích thước và cấu trúc"]\n    G --> H["Kiểm tra tồn kho hiện có"]\n    H --> I["Lưu bản nháp"]\n    I --> J{"Sản phẩm đã đủ thông tin?"}\n    J -->|"Chưa đủ"| K["Mở đúng phần còn thiếu để sửa"]\n    K --> I\n    J -->|"Đã đủ"| L{"Có cần phê duyệt?"}\n    L -->|"Có"| M{"Duyệt hay yêu cầu sửa?"}\n    M -->|"Yêu cầu sửa"| K\n    M -->|"Duyệt"| N["Đưa phiên bản sản phẩm gốc vào sử dụng"]\n    L -->|"Không"| N\n  end\n  subgraph WIZARD ["3 · TẠO LISTING CHO TỪNG KÊNH"]\n    N --> O["Mở mục Kênh bán trong sản phẩm"]\n    O --> P["Chọn các kênh muốn bán"]\n    P --> Q["Tạo mã sản phẩm trên kênh và nhập yêu cầu của từng kênh"]\n    Q --> R["Chọn biến thể hình ảnh cách giao hàng và chính sách tồn kho"]\n    R --> S{"Tất cả sản phẩm trên kênh đã đủ thông tin?"}\n    S -->|"Chưa"| Q\n    S -->|"Rồi"| T["Kiểm tra lại toàn bộ sản phẩm trên kênh"]\n    T --> U["Gửi từng sản phẩm trên kênh để xử lý riêng"]\n  end\n  subgraph RESULT ["4 · VẬN HÀNH VÀ CẬP NHẬT"]\n    U --> V{"Kết quả của từng kênh?"}\n    V -->|"Bị từ chối hoặc lỗi"| W["Hiển thị lý do sửa và gửi lại đúng sản phẩm trên kênh"]\n    W --> U\n    V -->|"Thành công một phần"| X["Giữ sản phẩm trên kênh đã thành công và tách sản phẩm bị lỗi"]\n    X --> W\n    V -->|"Đã đăng"| Y["Lưu mã ngoài đường dẫn và trạng thái đồng bộ"]\n    Y --> Z{"Người dùng muốn làm gì tiếp?"}\n    Z -->|"Sửa một kênh"| AA["Mở nội dung riêng của sản phẩm trên kênh đó"]\n    AA --> Y\n    Z -->|"Sửa sản phẩm gốc"| AB["Tạo phiên bản mới và xem phần bị ảnh hưởng"]\n    AB --> AC["Chọn đồng bộ lịch chạy giữ nội dung riêng hoặc quay lại bản trước"]\n    AC --> Y\n    Z -->|"Ngừng bán hoặc lưu trữ"| AD{"Đã xử lý hết dữ liệu liên quan?"}\n    AD -->|"Chưa"| Y\n    AD -->|"Rồi"| AE["Gỡ sản phẩm khỏi kênh đã chọn và lưu trữ sản phẩm an toàn"]\n  end'
+      },
+      {
+        id:'orders', title:'03 · Order intake → payment → fulfillment → return & settlement', outcome:'Every order reaches a clear operational and financial ending', summary:'Đưa order từ channel webhook, API hoặc nhập tay vào một canonical lifecycle duy nhất; xác nhận dữ liệu và payment, giữ ATP, phân kho, đóng gói, giao hàng, thu tiền, xử lý cancellation/return/refund và chỉ đóng order khi cả hàng lẫn tiền đều có kết quả rõ ràng.', actors:'Customer/Buyer · Sales Channel · Order Operator · OMS · Payment Provider · Inventory · Warehouse/Fulfillment · Carrier · Returns Team · Finance/Reconciliation', decision:'Order có trùng hoặc stale; payment có đủ bằng chứng; seller hay marketplace chịu trách nhiệm fulfillment; ATP có đủ; có cần split/reroute; shipment có giao thành công; cancellation/return/refund có hợp lệ; COD đã đối soát?', control:'Request idempotency · optimistic version · transition guard · immutable snapshots · atomic reservation · segregation of duties · payment evidence · SLA/exception queue · RMA disposition · audit trail', maturity:'Operational API + command-center prototype', maturityClass:'prototype', delivery:'Đã có API file-backed cho manual order, request-key deduplication, server-side totals, canonical transitions và version conflict; UI có create/edit draft, confirmation, early cancellation, payment confirmation, owner/note/warehouse preference, exception record/resolve, filters, saved operational views, export và detail tabs. Demo data phủ toàn lifecycle nhưng read-only. Allocation, packing/shipping transitions được dành cho Fulfillment service; carrier label/tracking, COD settlement, return approval/inspection/restock, refund transaction và marketplace ingestion vẫn cần service/API production.',
+        steps:[
+          ['Tiếp nhận order từ mọi nguồn','Channel webhook/API được ingest tự động; nhân viên cũng có thể Create order hoặc Save draft với store, customer, delivery address, items, currency, payment và fulfillment type.','Đơn online, marketplace, POS hoặc nhập tay đều đi vào cùng một nơi quản lý.'],
+          ['Validate và chuẩn hóa snapshot','Server kiểm tra 1–100 items, quantity nguyên dương, currency hỗ trợ, discount không vượt subtotal, địa chỉ bắt buộc và payment reference nếu đánh dấu Paid; tổng tiền được tính lại phía hệ thống.','Order sai dữ liệu bị chặn sớm và số tiền không phụ thuộc vào phép tính từ giao diện.'],
+          ['Tạo canonical order và giữ source snapshots','OMS lưu buyer, address, item, price, promotion, tax, payment và channel context tại thời điểm đặt hàng; dữ liệu master thay đổi sau đó không sửa ngược order cũ.','Nhân viên luôn thấy đúng nội dung khách đã mua và số tiền đã cam kết lúc checkout.'],
+          ['Đưa đơn vào đúng operational queue','Command Center phân loại theo lifecycle, exact status, payment, store, channel, warehouse, carrier và các queue Assigned to me, SLA at risk, Ready for pickup, Pickup overdue, Allocation failed, Sync errors.','Đội vận hành thấy những đơn cần hành động trước thay vì tìm thủ công trong toàn bộ danh sách.'],
+          ['Kiểm tra quyền và phiên bản trước khi thao tác','Demo/sample order ở chế độ read-only; command thật yêu cầu canWrite và đúng version. Nếu người khác đã cập nhật order, hệ thống trả conflict và yêu cầu refresh.','Ngăn người không có quyền hoặc màn hình dữ liệu cũ ghi đè trạng thái mới.'],
+          ['Review và xác nhận order','Operator kiểm tra items, customer, địa chỉ, note, tổng tiền và payment terms rồi chuyển Draft → Needs Confirmation → Confirmed; transition nhảy cóc bị chặn.','Chỉ đơn đã được kiểm tra mới chuyển sang chuẩn bị hàng.'],
+          ['Xử lý payment theo phương thức','Prepaid/Card/Bank transfer phải có webhook hoặc bằng chứng hợp lệ; Cash được ghi tại điểm bán; COD giữ trạng thái chờ thu. Bằng chứng mơ hồ được đưa vào exception thay vì tự đánh dấu Paid.','Đơn không bị giao dựa trên một khoản thanh toán chưa rõ, còn COD vẫn tiếp tục đúng quy trình.'],
+          ['Chọn fulfillment ownership','Order xác định Seller fulfilled hay Marketplace fulfilled. Marketplace flow nhận package/tracking từ sàn; seller flow gửi yêu cầu sang Fulfillment service. Warehouse preference chỉ là gợi ý và chưa giữ hàng.','Prime OS biết bên nào chịu trách nhiệm chuẩn bị/giao hàng và không nhầm lựa chọn kho với reservation thật.'],
+          ['Kiểm tra ATP và reserve atomically','Fulfillment đọc ATP mới nhất theo SKU/location, áp dụng mapping, priority, safety stock và SLA; reservation được tạo atomically với idempotency key.','Hàng được giữ đúng một lần cho order, giảm nguy cơ hai đơn cùng bán một sản phẩm cuối cùng.'],
+          ['Giải quyết thiếu hàng hoặc allocation failure','Nếu một kho không đủ, hệ thống cho reroute, split shipment, partial fulfill, backorder hoặc cancel line theo policy; operator thấy lý do và ảnh hưởng SLA trước khi chọn.','Đơn còn khả năng giao vẫn được cứu, còn phần không thể giao có kết quả rõ ràng cho khách.'],
+          ['Pick, pack và tạo shipment','Warehouse nhận fulfillment task, scan SKU/quantity, ghi shortage hoặc substitution, đóng parcel, cân đo, chọn carrier/service và tạo label. Nhiều package hoặc partial shipment được theo dõi riêng.','Kho giao đúng hàng, đúng số lượng và mỗi kiện có bằng chứng xử lý riêng.'],
+          ['Handover và theo dõi pickup SLA','Sau khi scan bàn giao, trạng thái chuyển Packing → Partially Shipped/Shipped; carrier trả tracking events. Pickup overdue, label failure hoặc carrier unavailable tạo exception có owner và retry path.','Đội vận hành phát hiện kiện chưa rời kho hoặc lỗi vận chuyển trước khi khách phải phản ánh.'],
+          ['Theo dõi delivery và xử lý ngoại lệ','Tracking được chuẩn hóa thành in transit, attempted, delayed, lost, damaged, returned-to-sender hoặc delivered; exception không làm mất lifecycle chính và được resolve riêng.','Nhân viên biết kiện nào đang gặp sự cố và có thể chủ động liên hệ khách hoặc carrier.'],
+          ['Xử lý cancellation đúng thời điểm','Trước allocation, order có thể cancel với reason. Sau khi đã giữ/đóng hàng, hệ thống phải hủy fulfillment, void label và release reservation trước. Sau carrier handover, yêu cầu trở thành intercept hoặc return-to-sender; nếu đã Paid thì mở refund workflow riêng.','Hủy đơn không để hàng bị giữ, kiện hàng mất dấu hoặc tiền của khách bị bỏ quên.'],
+          ['Xác nhận Delivered và đối soát payment/COD','Delivered không đồng nghĩa đã thu tiền. Prepaid được so với provider transaction; COD được đối chiếu carrier remittance, fee, shortage và settlement batch. Sai lệch tạo reconciliation case.','Doanh nghiệp phân biệt rõ giao thành công với tiền thực nhận và biết khoản nào còn thiếu.'],
+          ['Tiếp nhận yêu cầu Return hoặc Exchange','Sau giao hàng, user tạo RMA theo item, quantity, reason, evidence và resolution mong muốn; hệ thống kiểm tra return window, final-sale policy, duplicate RMA và remaining returnable quantity.','Khách được hướng dẫn rõ có đủ điều kiện trả/đổi hay không và tránh hoàn trùng một sản phẩm.'],
+          ['Approve, nhận hàng và inspect','Return được approve/reject có lý do; nếu approve, hệ thống chọn return route/label. Khi kho nhận, nhân viên scan và phân loại Restock, Quarantine, Damaged, Repair hoặc Dispose theo từng item.','Hàng trả quay về đúng trạng thái tồn thay vì tự động cộng toàn bộ vào hàng bán được.'],
+          ['Refund và đảo các khoản liên quan','Refund chỉ chạy theo quantity/value đã duyệt; hệ thống liên kết provider transaction, điều chỉnh promotion, tax, shipping, loyalty và marketplace/COD settlement. Partial return chỉ hoàn đúng phần được chấp nhận.','Khách nhận đúng tiền và doanh thu, khuyến mãi, phí, tồn kho được điều chỉnh nhất quán.'],
+          ['Đóng lifecycle và lưu audit trail','Order chỉ Closed khi delivery hoàn tất, payment đã Paid/settled và không còn return/exception đang mở; timeline ghi actor, thời gian, transition, payment, shipment và RMA events rồi cập nhật Customer 360 và Analytics.','Mỗi đơn kết thúc bằng một trạng thái có thể giải thích, đối soát và kiểm tra lại.']
+        ],
+        diagram:'flowchart TD\n  subgraph INTAKE ["1 · TIẾP NHẬN VÀ TẠO ORDER"]\n    A["Nhận đơn từ kênh bán quầy bán hàng hệ thống kết nối hoặc nhập tay"] --> B["Kiểm tra và chuẩn hóa khách hàng sản phẩm thanh toán và tổng tiền"]\n    B --> F["Tạo bản nháp hoặc đơn chờ xác nhận"]\n    F --> G["Lưu thông tin khách sản phẩm giá và thanh toán tại thời điểm đặt"]\n    G --> H["Đưa đơn vào danh sách cần xử lý"]\n  end\n  subgraph REVIEW ["2 · KIỂM TRA THANH TOÁN VÀ NGƯỜI XỬ LÝ"]\n    H --> I{"Có quyền thao tác và đang xem bản mới nhất?"}\n    I -->|"Không"| J["Tải lại dữ liệu hoặc yêu cầu cấp quyền"]\n    J --> H\n    I -->|"Có"| K["Kiểm tra và xác nhận đơn"]\n    K --> L{"Khách chọn cách thanh toán nào?"}\n    L -->|"Trả trước tiền mặt hoặc chuyển khoản"| M{"Đã xác minh được thanh toán?"}\n    M -->|"Chưa rõ"| N["Tạo việc cần kiểm tra thanh toán"]\n    N --> M\n    M -->|"Đã xác minh"| O["Đánh dấu đã thanh toán"]\n    L -->|"Thu hộ khi giao"| P["Chờ đối tác giao hàng chuyển tiền về"]\n    O --> Q{"Ai chịu trách nhiệm giao hàng?"}\n    P --> Q\n  end\n  subgraph FULFILL ["3 · GIỮ HÀNG VÀ CHUẨN BỊ GIAO"]\n    Q -->|"Sàn xử lý"| R["Theo dõi kiện hàng và mã vận đơn từ sàn"]\n    Q -->|"Doanh nghiệp xử lý"| S["Gửi yêu cầu sang bộ phận kho và giao hàng"]\n    S --> T{"Số lượng có thể bán có đủ?"}\n    T -->|"Không"| U["Đổi kho chia kiện chờ thêm hàng hoặc hủy sản phẩm"]\n    U --> T\n    T -->|"Có"| V["Giữ hàng và phân về kho phù hợp"]\n    V --> W["Lấy hàng quét mã đóng gói và tạo nhãn giao"]\n    W --> X{"Đã gửi đủ sản phẩm?"}\n    X -->|"Chưa"| Y["Đánh dấu giao một phần và tiếp tục phần còn lại"]\n    Y --> W\n    X -->|"Rồi"| Z["Bàn giao cho đơn vị vận chuyển"]\n    R --> Z\n  end\n  subgraph DELIVERY ["4 · GIAO HÀNG THANH TOÁN VÀ HỦY"]\n    Z --> AA["Nhận và chuẩn hóa trạng thái vận chuyển"]\n    AA --> AB{"Kết quả giao hàng?"}\n    AB -->|"Chậm thất lạc hư hỏng hoặc giao thất bại"| AC["Giao người xử lý gửi lại hoặc hoàn về"]\n    AC --> AA\n    AB -->|"Đã giao"| AD{"Tiền đã được ghi nhận đầy đủ?"}\n    AD -->|"Thanh toán trả trước chưa khớp"| AE["Đối chiếu giao dịch thanh toán"]\n    AD -->|"COD chưa về hoặc bị lệch"| AF["Đối chiếu tiền thu hộ và phí vận chuyển"]\n    AE --> AD\n    AF --> AD\n    K --> AG{"Khách yêu cầu hủy ở giai đoạn nào?"}\n    V --> AG\n    W --> AG\n    Z --> AG\n    AG -->|"Trước khi giữ hàng"| AH["Hủy đơn và ghi lý do"]\n    AG -->|"Đã giữ hàng nhưng chưa bàn giao"| AI["Hủy xử lý kho hủy nhãn và trả lại tồn"]\n    AG -->|"Đã bàn giao vận chuyển"| AZ["Yêu cầu chặn giao hoặc hoàn hàng về"]\n    AZ --> AA\n    AI --> AJ{"Khách đã thanh toán?"}\n    AH --> AJ\n    AJ -->|"Có"| AK["Mở quy trình hoàn tiền"]\n    AJ -->|"Chưa"| AL["Đóng đơn với trạng thái Đã hủy"]\n  end\n  subgraph RETURN ["5 · TRẢ HÀNG HOÀN TIỀN VÀ ĐÓNG ĐƠN"]\n    AD -->|"Đã đủ"| AM{"Khách có yêu cầu trả hoặc đổi hàng?"}\n    AM -->|"Không"| AN["Đóng đơn và lưu toàn bộ lịch sử"]\n    AM -->|"Có"| AO{"Sản phẩm số lượng và thời hạn có đủ điều kiện?"}\n    AO -->|"Không"| AP["Từ chối và giải thích lý do"]\n    AP --> AM\n    AO -->|"Có"| AQ["Duyệt yêu cầu trả hàng và chọn nơi nhận"]\n    AQ --> AR["Kho nhận và kiểm tra hàng trả"]\n    AR --> AS{"Hàng trả được xử lý thế nào?"}\n    AS -->|"Còn bán được"| AT["Nhập lại kho"]\n    AS -->|"Cần kiểm tra thêm"| AU["Cách ly hoặc sửa chữa"]\n    AS -->|"Không bán được"| AV["Đánh dấu hư hỏng hoặc tiêu hủy"]\n    AT --> AW["Tính số tiền hoàn hoặc sản phẩm đổi"]\n    AU --> AW\n    AV --> AW\n    AW --> AK\n    AK --> AX["Điều chỉnh thanh toán khuyến mãi thuế điểm thưởng và đối soát"]\n    AX --> AY["Đóng yêu cầu trả hàng khi tiền và tồn kho đã khớp"]\n    AY --> AN\n  end'
+      },
+      {
+        id:'live', title:'04 · Live session → reserved stock → release', outcome:'Live growth without oversell', summary:'Lập kế hoạch livestream, bảo vệ tồn theo SKU, giám sát realtime và trả tồn chưa bán về pool theo chính sách.', actors:'Live Planner · Inventory · Live Channel · War Room', decision:'Allocation còn trong ATP và có cần top-up?', control:'98% safety buffer · release policy · stock audit', maturity:'UI + API', maturityClass:'api', delivery:'Create, ATP validation, file-backed reservation, top-up và immediate release đã có. Cần bổ sung scheduler thực thi HOLD_2_HOURS, manual-release action và production event ingestion thay cho demo stream.',
+        steps:[
+          ['Lập kế hoạch live session','User chọn channel/account, host, warehouse, thời gian, duration và owner.','Buổi livestream có lịch, người phụ trách và kho cấp hàng rõ ràng.'],
+          ['Chọn SKU và live offer','Prime OS tải ATP tại kho, cho nhập allocated quantity và live price theo SKU.','Buổi livestream có đúng sản phẩm, số lượng và giá bán riêng.'],
+          ['Validate và reserve stock','Hệ thống chặn quantity vượt ATP, trừ ATP khả dụng và áp dụng safety buffer 98%.','Hàng dành cho livestream không bị bán nhầm cho đơn khác hoặc bán vượt tồn.'],
+          ['Publish session','Session cùng release policy được lưu và đồng bộ tới live channel.','Đội vận hành biết buổi live đang chờ bắt đầu hay đang diễn ra.'],
+          ['Điều hành trong War Room','Realtime stream cập nhật orders, sold/reserved, revenue và cảnh báo stock pressure.','Người phụ trách thấy đơn và tồn kho ngay lúc livestream để xử lý kịp thời.'],
+          ['Top-up hoặc dừng bán SKU','User bổ sung hàng từ ATP còn lại hoặc khóa offer khi đạt guardrail.','Có thể bán thêm khi còn hàng và dừng đúng lúc để tránh hết hàng ngoài ý muốn.'],
+          ['Kết thúc và release','Unsold stock được trả ngay, sau 2 giờ hoặc sau manual approval tùy policy; audit log ghi kết quả.','Hàng chưa bán được trả lại kho chung để tiếp tục bán trên các kênh khác.']
+        ],
+        diagram:'flowchart LR\n  A["Lập lịch bán hàng trực tiếp"] --> B["Chọn kho và sản phẩm"]\n  B --> C{"Số lượng dành cho livestream có nằm trong tồn khả dụng?"}\n  C -->|"Không"| D["Giảm số lượng"]\n  D --> C\n  C -->|"Có"| E["Giữ hàng và công bố phiên bán hàng trực tiếp"]\n  E --> F["Theo dõi phiên bán hàng trực tiếp theo thời gian thực"]\n  F --> G{"Cần xử lý tồn kho thế nào?"}\n  G -->|"Bổ sung hàng"| F\n  G -->|"Dừng bán hoặc kết thúc"| H["Áp dụng chính sách trả hàng chưa bán"]\n  H --> I["Trả lại tồn khả dụng và lưu lịch sử"]'
+      },
+      {
+        id:'customer', title:'05 · Customer identity → 360° lifecycle orchestration', outcome:'One governed customer relationship', summary:'Hợp nhất identity từ Web, POS, marketplace và Inbox thành hồ sơ khách được quản trị, phân đoạn và chuyển thành hành động có owner.', actors:'Customer Ops · Identity Service · Commerce · Service · Marketing', decision:'Đây là hồ sơ mới hay duplicate cần human review?', control:'Consent · merge approval · source-of-truth ownership', maturity:'Functional prototype', maturityClass:'prototype', delivery:'Directory, profile 360, account/contact CRUD và duplicate suggestion đã có bằng local state/read model. Cần persistence, merge approval workflow và deep links tạo action thật sang Marketing, Service, Inbox và Orders.',
+        steps:[
+          ['Thu nhận customer signals','Order, POS visit, web identity và conversation events được chuẩn hóa thành customer/contact candidates.','Thông tin khách từ Web, POS, sàn và Inbox được tập trung về một nơi.'],
+          ['Identity resolution','Hệ thống so khớp email, phone, social ID và address; trường hợp rủi ro được đưa vào review queue.','Giảm hồ sơ khách bị trùng và tránh chăm sóc cùng một người nhiều lần.'],
+          ['Review và phê duyệt merge','Authorized user so sánh source evidence, chọn master record và xác nhận merge có audit trail.','Khách hàng có một hồ sơ chính xác mà vẫn giữ nguyên lịch sử từ các nguồn.'],
+          ['Khám phá Customer 360°','Profile hiển thị contacts, channel mix, orders, product affinity, service cases, campaigns và timeline.','Nhân viên hiểu khách đã mua gì, trao đổi gì và đang cần hỗ trợ gì.'],
+          ['Quản trị owner và lifecycle','User cập nhật primary contact, owner, lifecycle, tags, consent và segment membership.','Mỗi khách hàng có người phụ trách và trạng thái chăm sóc rõ ràng.'],
+          ['Tạo next-best action','Prime OS đề xuất follow-up, audience, service recovery hoặc commerce task dựa trên signal và policy.','Thông tin về khách được chuyển thành công việc cụ thể có thời hạn.'],
+          ['Thực thi và ghi nhận kết quả','User mở đúng workspace đích; outcome quay lại customer timeline và cập nhật lifecycle.','Các đội cùng nhìn một hồ sơ khách thống nhất nhưng vẫn làm đúng phần việc của mình.']
+        ],
+        diagram:'flowchart LR\n  A["Nhận thông tin từ website quầy bán hàng sàn và Prime Inbox"] --> B["Xác định khách hàng"]\n  B --> C{"Có thể là khách đã tồn tại?"}\n  C -->|"Có"| D["Nhân viên kiểm tra và gộp hồ sơ"]\n  C -->|"Không"| E["Tạo hồ sơ khách hàng toàn diện"]\n  D --> E\n  E --> F["Gán người phụ trách giai đoạn nhãn và quyền liên hệ"]\n  F --> G["Đề xuất hành động phù hợp tiếp theo"]\n  G --> H["Chuyển sang Tiếp thị Dịch vụ khách hàng Prime Inbox hoặc Bán hàng"]\n  H --> I["Ghi kết quả trở lại lịch sử khách hàng"]'
+      },
+      {
+        id:'inbox', title:'06 · Conversation → service or assisted commerce', outcome:'Resolved conversation with attribution', summary:'Kết nối nguồn chat, route theo SLA và cho agent xử lý hỗ trợ hoặc tạo đơn mà không rời khỏi Prime Inbox Workspace.', actors:'Customer · Messaging Platform · Inbox · Agent/AI · OMS', decision:'Intent cần service recovery hay assisted purchase?', control:'SLA · AI guardrail · secure checkout · attribution', maturity:'UI + API / workspace prototype', maturityClass:'api', delivery:'Connection API, quick-link/OAuth path, routing configuration và 3-column desk đã có. Cần production WebSocket ingestion, OMS draft-order API, CRM ticket/timeline writeback, payment confirmation và attribution.',
+        steps:[
+          ['Kết nối conversation source','Admin quick-link token của connected store hoặc OAuth Facebook, Zalo, Instagram, WhatsApp hay Web LiveChat.','Tin nhắn và bình luận từ các kênh được đưa về Prime Inbox.'],
+          ['Cấu hình routing, SLA và automation','Chọn team queue/round-robin, response threshold, welcome template và AI guardrails.','Mỗi cuộc trò chuyện có đội phụ trách và thời hạn phản hồi rõ ràng.'],
+          ['Nhận và nhận diện khách','Webhook chuẩn hóa message; identity service tìm hoặc tạo customer profile phù hợp.','Nhân viên thấy thông tin khách cùng cuộc trò chuyện, không chỉ thấy tên tài khoản mạng xã hội.'],
+          ['Triage và phản hồi','Agent hoặc AI copilot phân loại intent, dùng quick reply, attachment và escalation khi cần.','Khách được phản hồi nhanh hơn, còn quyết định quan trọng vẫn do con người xác nhận.'],
+          ['Tra cứu dữ liệu vận hành','Order terminal lấy order history, master SKU, giá, ATP và warehouse options từ Main Workspace.','Nhân viên trả lời đúng về đơn hàng và có thể giới thiệu sản phẩm đang còn hàng.'],
+          ['Giải quyết hoặc tạo checkout','Agent tạo CRM ticket hoặc draft order, chọn kho/quantity/discount và gửi secure checkout link.','Cuộc trò chuyện được kết thúc bằng một yêu cầu hỗ trợ rõ ràng hoặc một đơn hàng mới.'],
+          ['Xác nhận outcome và đóng SLA','Payment/order confirmation hoặc ticket resolution được ghi vào conversation và customer timeline.','Doanh nghiệp biết cuộc trò chuyện tạo ra đơn hàng hay đã giải quyết vấn đề trong bao lâu.']
+        ],
+        diagram:'sequenceDiagram\n  participant P as Kênh nhắn tin\n  participant I as Prime Inbox\n  participant C as Hồ sơ khách hàng\n  participant O as Sản phẩm Đơn hàng và Tồn kho\n  participant A as Nhân viên hoặc trợ lý AI\n  P->>I: Gửi tin nhắn hoặc bình luận\n  I->>C: Tìm đúng khách hàng\n  C-->>I: Trả về hồ sơ và lịch sử liên quan\n  I->>A: Phân công theo đội và thời hạn phản hồi\n  A->>O: Tra sản phẩm đơn hàng và tồn kho\n  alt Khách cần hỗ trợ\n    A->>C: Tạo yêu cầu và lịch theo dõi\n  else Khách muốn mua hàng\n    A->>O: Tạo đơn nháp và bước thanh toán\n    O-->>I: Trả về kết quả thanh toán và xác nhận đơn\n  end\n  I-->>P: Phản hồi và kết thúc cuộc hội thoại\n  I->>C: Ghi kết quả vào lịch sử khách hàng'
+      },
+      {
+        id:'billing', title:'07 · Subscription → entitlement & billing lifecycle', outcome:'Controlled commercial lifecycle', summary:'Cho Workspace Admin hiểu usage, thay đổi gói, xử lý thanh toán và theo dõi toàn bộ quyết định subscription có audit trail.', actors:'Workspace Admin · Billing · Payment Provider · Entitlement', decision:'Upgrade, downgrade hay terminate và hiệu lực khi nào?', control:'Authorization · proration · payment retry · audit trail', maturity:'Prototype', maturityClass:'prototype', delivery:'Overview, four-plan comparison, confirmation và local request history đã có. Cần backend request lifecycle, entitlement enforcement, approval, proration, payment method, invoices, retry và audit persistence.',
+        steps:[
+          ['Xem subscription và usage','Billing overview hiển thị current plan, renewal, seats, channel/product/order usage và limit pressure.','Admin biết gói hiện tại còn phù hợp hay sắp chạm giới hạn sử dụng.'],
+          ['So sánh plan và entitlement','Feature matrix đối chiếu Freemium, Starter, Standard và Pro theo capacity lẫn capability.','Admin chọn gói phù hợp với số người dùng và khối lượng vận hành thực tế.'],
+          ['Mô phỏng tác động thay đổi','Hệ thống tính effective date, proration, entitlement mất/được và các resource vượt giới hạn.','Admin biết sẽ trả bao nhiêu, thay đổi có hiệu lực khi nào và tính năng nào bị ảnh hưởng.'],
+          ['Xác nhận và phê duyệt','Authorized admin gửi Upgrade, Downgrade hoặc Terminate; policy yêu cầu approval nếu vượt ngưỡng.','Chỉ người có quyền mới có thể thay đổi hoặc chấm dứt gói dịch vụ.'],
+          ['Thanh toán hoặc lập lịch hiệu lực','Upgrade xử lý payment và kích hoạt ngay; downgrade áp dụng chu kỳ sau; termination giữ access tới kỳ hạn.','Tính năng được mở hoặc giới hạn đúng thời điểm đã thông báo cho khách hàng.'],
+          ['Theo dõi request và phục hồi lỗi','Request history hiển thị Pending, Approved, Rejected hoặc Failed cùng retry/cancel path.','Admin luôn biết yêu cầu đang chờ, đã duyệt, bị từ chối hay cần thử lại.'],
+          ['Nhận invoice và audit trail','Invoice, payment receipt, plan history và actor/timestamp được lưu cho workspace.','Admin và kế toán có đủ hóa đơn, thanh toán và lịch sử thay đổi tại một nơi.']
+        ],
+        diagram:'flowchart LR\n  A["Gói Prime OS hiện tại và mức sử dụng"] --> B["So sánh các gói"]\n  B --> C["Xem tính năng chi phí và phần tiền chênh lệch"]\n  C --> D{"Người dùng muốn thay đổi thế nào?"}\n  D -->|"Nâng cấp"| E["Phê duyệt và thanh toán"]\n  D -->|"Hạ gói"| F["Áp dụng từ kỳ tiếp theo"]\n  D -->|"Ngừng sử dụng"| G["Giữ quyền dùng đến cuối kỳ"]\n  E --> H["Cập nhật quyền dùng tính năng"]\n  F --> H\n  G --> H\n  H --> I["Lưu yêu cầu hóa đơn và lịch sử thay đổi"]'
+      },
+      {
+        id:'marketing', title:'08 · Marketing source → campaign → attributed demand', outcome:'Demand created, converted and attributable', summary:'Biến acquisition source và customer audience thành campaign có kiểm soát, phân phối nội dung theo từng kênh, thu nhận demand signal và nối lead, order, revenue về đúng hoạt động marketing.', actors:'Growth Manager · Marketing Ops · Customer/Audience · Product Master · Channels · Orders · Analytics', decision:'Source, consent, audience, content, product, ATP và budget có đủ readiness; campaign nên publish, optimize, pause hay stop?', control:'Consent · approval · budget guardrail · channel policy · inventory readiness · attribution model · audit trail', maturity:'UI + Data prototype', maturityClass:'prototype', delivery:'Source hiện có /marketing với Overview, Campaigns, Audiences, Sources, Content Studio và Analytics; snapshot đã liên kết campaign với product, SKU, lead, order và revenue. Cần backend campaign lifecycle, audience snapshot, approval, channel delivery adapters, event ingestion, budget enforcement và attribution ledger production.',
+        steps:[
+          ['Chọn và kiểm tra acquisition source','User chọn connected channel, paid source, marketplace, partner hoặc manual import; Prime OS kiểm tra authorization, tracking health, ownership và consent basis.','Chỉ những nguồn hợp lệ và có thể đo kết quả mới được dùng cho chiến dịch.'],
+          ['Xây dựng audience snapshot','User chọn segment từ Customer System of Record; hệ thống loại consent-suppressed, duplicate, unreachable và excluded customers rồi khóa snapshot/version.','Chiến dịch có danh sách người nhận rõ ràng và không tự thay đổi ngoài ý muốn.'],
+          ['Định nghĩa campaign brief','Growth Manager đặt objective, product/SKU, market, channel, thời gian, budget, owner và success metric.','Cả đội hiểu chiến dịch hướng tới ai, bán gì, chi bao nhiêu và cần đạt kết quả nào.'],
+          ['Chuẩn bị content và channel plan','Team tạo hoặc chọn content variants, CTA, destination, UTM/tracking identity và lịch phân phối riêng cho từng channel.','Mỗi kênh có nội dung phù hợp nhưng kết quả vẫn được tính chung cho cùng một chiến dịch.'],
+          ['Liên kết promotion nếu cần','User chọn promotion đã duyệt hoặc tạo request mới; hệ thống kiểm tra thời gian, audience, product, channel và commercial compatibility.','Chiến dịch dùng đúng ưu đãi đã được kiểm tra và phê duyệt.'],
+          ['Chạy campaign readiness gate','Prime OS kiểm tra listing active, channel token/scopes, audience size, content policy, ATP/forecast, promotion, budget và tracking. Blocking Error tách khỏi Warning theo từng channel.','Người dùng biết kênh nào có thể chạy ngay và kênh nào cần sửa trước.'],
+          ['Review và phê duyệt','Reviewer xem diff, evidence, budget, margin và risk; approve, reject hoặc yêu cầu chỉnh sửa. Thay đổi material sau approval làm campaign quay lại review.','Chỉ chiến dịch đã được đúng người phê duyệt mới được chạy.'],
+          ['Publish hoặc schedule bất đồng bộ','Orchestrator tạo delivery job có idempotency key theo channel/content; kết quả trả Scheduled, Active, Rejected hoặc Error theo từng destination.','Kênh đăng thành công vẫn tiếp tục chạy; chỉ kênh lỗi cần được sửa hoặc thử lại.'],
+          ['Capture demand và resolve identity','Event ingestion nhận impression, click, message, lead và RFQ; hệ thống chống trùng, chuẩn hóa source identity và nối với customer khi đủ confidence.','Lượt xem, nhấp, tin nhắn và khách hàng tiềm năng được nối về đúng nguồn.'],
+          ['Gắn attribution vào conversion','Khi checkout/order xuất hiện, attribution ledger áp dụng model/version và lưu touchpoint, campaign, promotion, product, revenue cùng confidence.','Doanh nghiệp biết chiến dịch nào trực tiếp tạo đơn và chiến dịch nào chỉ góp phần hỗ trợ.'],
+          ['Optimize, pause hoặc stop','Guardrail cảnh báo overspend, low conversion, stock risk, tracking loss hoặc channel degradation; authorized user điều chỉnh, pause hay stop theo từng channel.','Đội marketing có thể giảm lãng phí và dừng sớm khi chiến dịch kém hiệu quả hoặc sắp hết hàng.'],
+          ['Đóng campaign và ghi kết quả','Hệ thống chờ attribution window, đối chiếu late events/refunds rồi khóa performance snapshot; insight ghi về Analytics và Customer Timeline.','Kết quả và bài học của chiến dịch được lưu lại để cải thiện lần chạy tiếp theo.']
+        ],
+        diagram:'flowchart TD\n  subgraph PLAN ["1 · CHỌN NGUỒN KHÁCH VÀ LẬP KẾ HOẠCH"]\n    A["Chọn nguồn tiếp cận khách hàng"] --> B{"Kết nối theo dõi và quyền liên hệ còn hợp lệ?"}\n    B -->|"Không"| C["Sửa kết nối loại khách không hợp lệ hoặc chọn nguồn khác"]\n    C --> A\n    B -->|"Có"| D["Tạo danh sách khách hàng tại thời điểm chạy"]\n    D --> E["Chọn mục tiêu sản phẩm ngân sách và người phụ trách"]\n    E --> F["Chuẩn bị nội dung kênh triển khai và cách đo lường"]\n    F --> G["Có thể gắn chương trình khuyến mãi đã duyệt"]\n  end\n  subgraph GOVERN ["2 · KIỂM TRA VÀ PHÊ DUYỆT"]\n    G --> H{"Chiến dịch đã sẵn sàng trên từng kênh?"}\n    H -->|"Có lỗi chặn"| I["Sửa sản phẩm trên kênh kết nối nội dung tồn kho ngân sách hoặc khuyến mãi"]\n    I --> H\n    H -->|"Có cảnh báo hoặc đã sẵn sàng"| J{"Kết quả phê duyệt?"}\n    J -->|"Yêu cầu sửa"| E\n    J -->|"Đã duyệt"| K["Khóa phiên bản chiến dịch đã duyệt"]\n  end\n  subgraph EXECUTE ["3 · PHÂN PHỐI VÀ NHẬN NHU CẦU"]\n    K --> L["Gửi nội dung đến từng kênh"]\n    L --> M{"Kết quả gửi?"}\n    M -->|"Thất bại"| N["Xem lỗi và gửi lại đúng kênh"]\n    N --> L\n    M -->|"Thành công một phần"| O["Giữ phần đã thành công và tách phần lỗi"]\n    O --> N\n    M -->|"Đang chạy"| P["Ghi nhận lượt xem nhấp tin nhắn khách tiềm năng và yêu cầu báo giá"]\n    P --> Q["Xác định đúng khách hàng"]\n  end\n  subgraph LEARN ["4 · ĐO LƯỜNG VÀ ĐIỀU CHỈNH"]\n    Q --> R["Nối tương tác tiếp thị với thanh toán và đơn hàng"]\n    R --> S{"Chiến dịch vẫn nằm trong giới hạn an toàn?"}\n    S -->|"Không"| T["Điều chỉnh tạm dừng hoặc dừng kênh có vấn đề"]\n    T --> P\n    S -->|"Có"| U["Tiếp tục đến khi chiến dịch kết thúc"]\n    U --> V["Chốt thời gian ghi nhận kết quả và điều chỉnh đơn hoàn"]\n    V --> W["Cập nhật kết quả vào Báo cáo phân tích và lịch sử khách hàng"]\n  end'
+      },
+      {
+        id:'promotions', title:'09 · Promotion policy → redemption → commercial outcome', outcome:'Controlled incentive with measurable margin impact', summary:'Quản trị promotion như một chính sách thương mại xuyên kênh: thiết kế benefit và eligibility, kiểm tra margin/stock, publish có version, quyết định tại checkout, xử lý redemption đồng thời và điều chỉnh đúng khi order bị hủy hoặc hoàn.', actors:'Growth Manager · Commercial Approver · Product Master · Customer Segments · Promotion Engine · Checkout/POS/Inbox · Orders · Inventory · Analytics', decision:'Promotion có hợp lệ cho customer, basket, time, channel và budget; có thể cộng dồn; redemption có còn quota và giữ được margin?', control:'Rule version · maker-checker · price floor · atomic counter · stacking priority · order snapshot · refund adjustment · audit', maturity:'Guided UI prototype', maturityClass:'prototype', delivery:'Discount Codes đã có list, filters, create wizard, channel/customer eligibility, usage limit, schedule và local pause/resume. Automatic Discounts, Flash Sales, Loyalty và Analytics hiện mới là summary surfaces. Cần persistent rule engine, approval, channel adapters, atomic redemption ledger, checkout evaluation contract, promotion snapshot trên order và reversal/refund accounting.',
+        steps:[
+          ['Chọn promotion type và ownership','User chọn discount code, automatic discount, flash sale hoặc loyalty benefit; gán business owner, approver và objective.','Mỗi chương trình ưu đãi có mục tiêu và người chịu trách nhiệm rõ ràng.'],
+          ['Định nghĩa benefit và funding','Thiết lập percentage, fixed amount, bundle/gift, shipping benefit, maximum discount và bên tài trợ; hệ thống chuẩn hóa currency/rounding.','Doanh nghiệp biết khách được giảm bao nhiêu và ai chịu chi phí trước khi phát hành.'],
+          ['Xây dựng eligibility','Chọn product/variant/category, minimum basket, customer segment/tier, first purchase, region, channel, outlet và exclusion.','Chỉ đúng khách hàng, sản phẩm, cửa hàng và kênh bán mới được nhận ưu đãi.'],
+          ['Thiết lập schedule và limits','Khai báo timezone, start/end, total quota, per-customer limit, per-order limit và frequency; hệ thống kiểm tra code collision và khoảng thời gian sai.','Ưu đãi chỉ chạy đúng thời gian và không vượt số lượt đã cho phép.'],
+          ['Cấu hình stacking và priority','User xác định promotion có cộng dồn với voucher, loyalty, marketplace subsidy hoặc shipping discount hay không; engine mô phỏng thứ tự áp dụng.','Khách luôn nhận mức giảm giá đúng và hệ thống không cộng ưu đãi ngoài ý muốn.'],
+          ['Kiểm tra margin, budget và stock','Simulation đánh giá price floor, maximum exposure, projected discount cost, SKU ATP và reserve requirement cho flash sale.','Đội kinh doanh biết trước nguy cơ lỗ, vượt ngân sách hoặc bán quá số hàng hiện có.'],
+          ['Review và publish immutable rule version','Approver xem diff/evidence rồi approve hoặc reject; khi publish, Prime OS khóa rule version và tạo deployment job theo từng channel.','Mọi điểm bán áp dụng đúng chính sách đã duyệt và có thể quay lại bản trước nếu có lỗi.'],
+          ['Đồng bộ theo channel và xử lý partial result','Adapter chuyển rule sang PrimeWeb, PrimePOS, Inbox hoặc provider được hỗ trợ; unsupported rule, token error và mapping failure được cô lập theo destination.','Kênh đang chạy tốt không bị ảnh hưởng khi một kênh khác đồng bộ lỗi.'],
+          ['Evaluate tại checkout','Checkout gửi customer, basket, channel, location và time; engine trả Eligible, Ineligible hoặc Conflict kèm benefit và reason code theo rule version.','Khách biết ngay mình có được giảm giá hay không; nhân viên cũng thấy rõ lý do.'],
+          ['Giữ quota và commit redemption','Prime OS atomically holds quota trong lúc payment/order pending, commit khi order được xác nhận hoặc release khi timeout/failure; duplicate request dùng idempotency key.','Nhiều khách mua cùng lúc vẫn không vượt giới hạn hoặc bị tính trùng lượt sử dụng.'],
+          ['Điều chỉnh theo order lifecycle','Cancel, partial cancel, return và refund tạo reversal theo policy; hệ thống phân bổ discount theo line, quyết định phục hồi quota và giữ audit snapshot trên order.','Khi đơn bị hủy hoặc hoàn, tiền giảm và lượt sử dụng được điều chỉnh đúng.'],
+          ['Pause, expire và đo commercial outcome','Authorized user pause/terminate hoặc hệ thống tự expire; sau attribution window, Analytics đối chiếu redemption, revenue, discount cost, margin và conversion lift.','Người quản lý biết chương trình thực sự tăng doanh thu hay chỉ làm tăng chi phí giảm giá.']
+        ],
+        diagram:'flowchart TD\n  subgraph DESIGN ["1 · THIẾT KẾ CHƯƠNG TRÌNH"]\n    A["Chọn loại khuyến mãi mục tiêu và người phụ trách"] --> B["Chọn quyền lợi nguồn chi và tiền tệ"]\n    B --> C["Chọn sản phẩm khách hàng kênh và địa điểm được áp dụng"]\n    C --> D["Đặt thời gian số lượt dùng và giới hạn mỗi khách"]\n    D --> E["Quy định cách dùng chung với khuyến mãi khác và thứ tự ưu tiên"]\n  end\n  subgraph GOVERN ["2 · KIỂM TRA HIỆU QUẢ VÀ PHÊ DUYỆT"]\n    E --> F{"Biên lợi nhuận ngân sách và tồn kho còn an toàn?"}\n    F -->|"Không"| G["Giảm quyền lợi phạm vi hoặc số người được áp dụng"]\n    G --> F\n    F -->|"Có"| H{"Kết quả phê duyệt?"}\n    H -->|"Yêu cầu sửa"| A\n    H -->|"Đã duyệt"| I["Công bố phiên bản quy tắc đã duyệt"]\n    I --> J{"Kết quả gửi sang các kênh?"}\n    J -->|"Thất bại"| K["Sửa quy tắc chưa hỗ trợ kết nối hoặc liên kết dữ liệu"]\n    K --> I\n    J -->|"Thành công một phần"| L["Giữ kênh đã thành công và tách kênh lỗi"]\n    L --> K\n  end\n  subgraph REDEEM ["3 · KIỂM TRA KHI THANH TOÁN"]\n    J -->|"Kênh đã hoạt động"| M["Nhận thông tin khách và giỏ hàng"]\n    M --> N{"Khách và giỏ hàng đủ điều kiện dùng chung?"}\n    N -->|"Không"| O["Giải thích lý do và gợi ý lựa chọn khác"]\n    N -->|"Có"| P{"Vẫn còn lượt sử dụng?"}\n    P -->|"Không"| O\n    P -->|"Có"| Q["Giữ một lượt và tính số tiền được giảm"]\n    Q --> R{"Thanh toán hoặc đơn hàng đã xác nhận?"}\n    R -->|"Hết thời gian hoặc thất bại"| S["Trả lại lượt sử dụng"]\n    R -->|"Có"| T["Ghi nhận lần sử dụng vào đơn hàng"]\n  end\n  subgraph OUTCOME ["4 · HỦY HOÀN VÀ ĐO LƯỜNG"]\n    T --> U{"Đơn bị hủy trả hoặc hoàn tiền?"}\n    U -->|"Có"| V["Điều chỉnh quyền lợi và số lượt theo chính sách"]\n    U -->|"Không"| W["Giữ lần sử dụng đã ghi nhận"]\n    V --> X["Cập nhật doanh thu chi phí giảm giá và lợi nhuận"]\n    W --> X\n    X --> Y["Tạm dừng hết hạn hoặc kết thúc chương trình"]\n    Y --> Z["Báo cáo lượt dùng doanh thu tăng thêm hiệu quả và lịch sử"]\n  end'
+      },
+      {
+        id:'inventory', title:'10 · Warehouse Stock → Master Stock → optional channel sync', outcome:'One trusted internal stock total, with channel synchronization controlled by the user', summary:'Warehouse Stock và Master Stock thuộc cùng một hệ thống tồn kho Prime OS: mọi nghiệp vụ nhập, chuyển, giữ, xuất hoặc điều chỉnh tại kho đều tự động tính lại Master Stock/ATP. Stock trên từng sàn mặc định hoạt động độc lập; chỉ những channel listing được user cấu hình Inventory Sync mới nhận quantity từ Prime OS.', actors:'Inventory Controller · Warehouse Operator · OMS · Live Commerce · Product Master · Sales Channels · Carrier · Approver', decision:'Biến động thuộc kho Prime OS hay kho do sàn quản lý; Master ATP còn đủ và còn mới; demand nên allocate, split, backorder hay reroute; channel nào đã được phép nhận stock update?', control:'Single inventory ledger · automatic Master Stock roll-up · explicit channel opt-in · idempotency · atomic reservation · safety stock · reason code · maker-checker · audit trail', maturity:'UI + Data prototype', maturityClass:'prototype', delivery:'Prototype đã chuyển quyền thay đổi stock về Warehouse, tự tính lại Master Stock sau adjustment/transfer và giữ Product Master ở chế độ chỉ đọc. Channel inventory hiển thị “Managed independently” mặc định và có flow Configure Inventory Sync riêng. Bước tiếp theo là hợp nhất transactional ledger, persistence cho sync policy, receiving/transfer milestones, reservation concurrency và channel adapter thực tế.',
+        steps:[
+          ['Thiết lập warehouse network','Admin tạo physical warehouse, code, region, manager, fulfillment priority và negative-stock policy; hệ thống kiểm tra trùng code, địa chỉ và trạng thái operational.','Doanh nghiệp biết hàng đang được quản lý tại những địa điểm nào và kho nào được ưu tiên xử lý đơn.'],
+          ['Phân loại nguồn tồn kho','Hệ thống phân biệt physical warehouse do Prime OS quản lý, seller-managed 3PL và marketplace-managed inventory; quyền chỉnh sửa được áp dụng theo inventory authority.','User biết kho nào có thể cập nhật trong Prime OS và kho nào chỉ được theo dõi từ sàn.'],
+          ['Map channel location với kho vật lý','User nối pickup/return location của store với physical warehouse để routing đơn; mapping này không tự động bật đồng bộ stock ra kênh.','Đơn được chuyển về đúng kho mà không làm thay đổi cách sàn đang quản lý số lượng bán.'],
+          ['Khởi tạo Warehouse Stock','Opening balance, CSV import hoặc phiếu nhập được kiểm tra Master SKU, location, đơn vị tính và chứng từ trước khi ghi inventory ledger.','Mỗi lượng hàng ban đầu đều có sản phẩm, kho và nguồn hình thành rõ ràng.'],
+          ['Nhận hàng và kiểm tra chất lượng','Warehouse Operator tiếp nhận inbound, đối chiếu expected với received, phân loại accepted, damaged hoặc quarantine và ghi nhận chênh lệch.','Chỉ hàng đã kiểm tra mới trở thành tồn có thể bán.'],
+          ['Tự động tính lại Master Stock và ATP','Mỗi thay đổi Warehouse Stock cập nhật On Hand, Reserved, Safety Stock, In Transit và Damaged; Prime OS tự tổng hợp Master Stock/ATP theo SKU.','User luôn thấy tổng lượng hàng nội bộ mới nhất mà không phải nhập thêm một số Master Stock riêng.'],
+          ['Tạo và phê duyệt stock transfer','User chọn kho nguồn/đích, SKU và số lượng; hệ thống kiểm tra ATP, quyền, duplicate request và yêu cầu approval nếu vượt ngưỡng.','Hàng chỉ được chuyển khi kho nguồn đủ hàng và đúng người phê duyệt.'],
+          ['Dispatch và receive transfer','Khi xuất kho, số lượng chuyển sang In Transit; kho đích có thể nhận đủ, nhận một phần, báo mất hoặc damaged trước khi stock được cộng.','Hàng đang di chuyển không bị tính bán hai lần và mọi thiếu hụt đều được theo dõi.'],
+          ['Nhận nhu cầu giữ hàng','Order, live session, POS hold hoặc checkout gửi reservation request kèm SKU, quantity, location preference, expiry và idempotency key.','Mọi kênh giữ hàng theo cùng một quy tắc, tránh gửi yêu cầu trùng.'],
+          ['Kiểm tra ATP và giữ hàng nguyên tử','Engine kiểm tra ATP mới nhất, safety stock và concurrent reservations; kết quả là Reserved, Partial hoặc Rejected kèm reason code.','Hai khách mua cùng lúc không thể cùng giữ một đơn vị hàng cuối cùng.'],
+          ['Phân kho và xử lý thiếu hàng','Routing chọn kho theo mapping, priority, khoảng cách và SLA; nếu thiếu hàng, user hoặc rule có thể split, reroute, backorder hay cancel line.','Đơn được giao từ kho phù hợp và người vận hành thấy rõ lựa chọn khi không đủ hàng.'],
+          ['Commit hoặc release reservation','Reservation được commit khi fulfillment bắt đầu; payment fail, cancel, timeout, live end hoặc allocation change sẽ release đúng quantity bằng idempotent event.','Hàng được trừ khi thực sự xử lý và tự trả về ATP khi giao dịch không tiếp tục.'],
+          ['Điều chỉnh và cycle count có kiểm soát','User nhập quantity change và reason; hệ thống yêu cầu evidence/approval theo threshold, chặn stale update và lưu before/after balance.','Sai lệch tồn được sửa có lý do, không thể âm thầm thay đổi số lượng.'],
+          ['Giữ stock từng sàn độc lập theo mặc định','Sau khi Master Stock thay đổi, hệ thống dừng tại internal inventory boundary; không gửi quantity sang Shopee, Lazada, Amazon hoặc kênh khác.','User có thể tiếp tục quản lý stock trên từng sàn mà không lo Prime OS tự ghi đè.'],
+          ['Tùy chọn cấu hình Inventory Sync','Khi có nhu cầu, user chủ động chọn channel listing, inventory source, shared/fixed/percentage allocation, safety stock và chế độ manual/automatic.','Chỉ đúng kênh và đúng sản phẩm được user cho phép mới nhận stock từ Prime OS.'],
+          ['Publish và đối chiếu kênh đã opt-in','Prime OS tính channel quantity theo policy, gửi update, nhận acknowledgement và cô lập Pending, Error hoặc Mismatch; kênh chưa cấu hình không bị tác động.','Đồng bộ stock có kiểm soát và lỗi ở một sàn không làm thay đổi các sàn còn lại.'],
+          ['Giám sát cảnh báo và audit','Dashboard cảnh báo low stock, negative ATP attempt, stale reservation, transfer overdue và sync failure; audit cho phép truy ngược từng thay đổi.','Đội vận hành phát hiện sớm rủi ro hết hàng và giải thích được vì sao tồn kho thay đổi.']
+        ],
+        diagram:'flowchart TD\n  subgraph FOUNDATION ["1 · NỀN TẢNG TỒN KHO NỘI BỘ"]\n    A["Tạo kho vật lý trong Prime OS"] --> B{"Ai quản lý tồn kho này?"}\n    B -->|"Prime OS hoặc doanh nghiệp quản lý"| C["Khởi tạo tồn kho theo mã sản phẩm tại từng kho"]\n    B -->|"Sàn quản lý"| D["Chỉ đọc số tồn do sàn cung cấp"]\n    C --> E["Nhập điều chỉnh chuyển giữ hoặc xuất hàng"]\n    E --> F["Cập nhật số tồn tại kho"]\n    F --> G["Tự động tính lại tổng tồn kho và số lượng có thể bán"]\n    D --> H["Cập nhật số tồn mới nhất từ sàn"]\n  end\n  subgraph OPERATE ["2 · XỬ LÝ NHU CẦU VÀ ĐƠN HÀNG"]\n    G --> I["Nhận nhu cầu từ đơn hàng bán trực tiếp quầy bán hàng hoặc trang thanh toán"]\n    I --> J{"Tồn khả dụng mới nhất có đủ?"}\n    J -->|"Có"| K["Giữ hàng và phân kho"]\n    J -->|"Đủ một phần"| L["Chia kho đổi kho hoặc chờ thêm hàng"]\n    J -->|"Không"| M["Từ chối hoặc hủy sản phẩm và ghi lý do"]\n    L --> K\n    K --> N{"Nhu cầu có tiếp tục?"}\n    N -->|"Bắt đầu xử lý hàng"| O["Ghi nhận xuất hoặc chuyển hàng tại kho"]\n    N -->|"Thất bại hủy hoặc hết thời gian"| P["Trả lại lượng hàng đã giữ"]\n    O --> F\n    P --> G\n  end\n  subgraph BOUNDARY ["3 · RANH GIỚI VỚI TỒN KHO TRÊN KÊNH"]\n    G --> Q{"Sản phẩm trên kênh này đã bật đồng bộ tồn kho?"}\n    Q -->|"Chưa bật mặc định"| R["Giữ số tồn trên kênh hoạt động độc lập"]\n    Q -->|"Đã được người dùng bật"| S["Đọc nguồn hàng mức phân bổ và tồn an toàn"]\n    S --> T["Tính số lượng được phép gửi sang kênh"]\n    T --> U["Chỉ cập nhật kênh đã chọn"]\n    U --> V{"Kênh đã xác nhận?"}\n    V -->|"Thành công"| W["Đánh dấu đã đồng bộ"]\n    V -->|"Đang chờ lỗi hoặc lệch số"| X["Thử lại tạm dừng hoặc đối chiếu"]\n    X --> U\n  end\n  subgraph CONTROL ["4 · KIỂM SOÁT VÀ LƯU LỊCH SỬ"]\n    F --> Y["Ghi số trước và sau lý do người thao tác"]\n    H --> Y\n    R --> Y\n    W --> Y\n    Y --> Z["Theo dõi sắp hết hàng giữ hàng quá lâu thất thoát khi chuyển kho và lỗi đồng bộ"]\n  end'
+      }
+    ];
+
+    let activeFeatureFilter = 'Tất cả';
+    let activeFlow = flows[0].id;
+    let mermaidReady = false;
+
+    function readStoredTheme() {
+      try { return window.localStorage.getItem('prime-presentation-theme'); }
+      catch (error) { return null; }
+    }
+
+    function storeTheme(theme) {
+      try { window.localStorage.setItem('prime-presentation-theme', theme); }
+      catch (error) { /* File previews may disable storage; the selected theme still works for this session. */ }
+    }
+
+    function navMarkup(tab) {
+      return `<button class="nav-button" type="button" data-tab="${tab.id}" aria-controls="panel-${tab.id}">${tab.icon}<span>${tab.label}</span></button>`;
+    }
+
+    function initializeNavigation() {
+      document.querySelector('.nav-list').innerHTML = tabs.map(navMarkup).join('');
+      document.querySelector('.mobile-nav').innerHTML = tabs.map(navMarkup).join('');
+      document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => activatePanel(button.dataset.tab)));
+      document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => activatePanel(button.dataset.go)));
+      const initial = location.hash.replace('#','');
+      activatePanel(tabs.some(tab => tab.id === initial) ? initial : 'overview', false);
+    }
+
+    async function activatePanel(id, updateHash = true) {
+      document.querySelectorAll('[data-panel]').forEach(panel => {
+        const active = panel.dataset.panel === id;
+        panel.hidden = !active;
+        panel.classList.toggle('panel-enter', active);
+      });
+      document.querySelectorAll('[data-tab]').forEach(button => {
+        const active = button.dataset.tab === id;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      if (updateHash) history.replaceState(null, '', `#${id}`);
+      const behavior = updateHash && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: 0, behavior })));
+      if (id === 'architecture') await renderMermaid(document.querySelector('[data-panel="architecture"]'));
+      if (id === 'flows') await renderMermaid(document.querySelector('[data-panel="flows"]'));
+    }
+
+    function renderFeatureFilters() {
+      const categories = ['Tất cả', ...new Set(features.map(item => item.category))];
+      document.querySelector('#feature-filters').innerHTML = categories.map(category => `<button type="button" class="chip ${category === activeFeatureFilter ? 'active' : ''}" data-feature-filter="${category}">${category}</button>`).join('');
+      document.querySelectorAll('[data-feature-filter]').forEach(button => button.addEventListener('click', () => {
+        activeFeatureFilter = button.dataset.featureFilter;
+        renderFeatureFilters();
+        renderFeatures();
+      }));
+    }
+
+    function renderFeatures() {
+      const query = document.querySelector('#feature-search').value.trim().toLowerCase();
+      const filtered = features.filter(item => (activeFeatureFilter === 'Tất cả' || item.category === activeFeatureFilter) && `${item.title} ${item.copy} ${item.benefit} ${item.source}`.toLowerCase().includes(query));
+      document.querySelector('#feature-grid').innerHTML = filtered.length ? filtered.map(item => {
+        const cls = item.maturity === 'UI + API' ? 'api' : item.maturity === 'Prototype' ? 'prototype' : '';
+        return `<article class="feature-card"><div class="feature-top"><span class="feature-icon">${icons.cube}</span><span class="tag ${cls}">${item.maturity}</span></div><h3>${item.title}</h3><p>${item.copy}</p><div class="benefit"><strong>User value:</strong> ${item.benefit}</div><div class="source-ref">${item.source}</div></article>`;
+      }).join('') : '<div class="empty">Không tìm thấy capability phù hợp với bộ lọc hiện tại.</div>';
+    }
+
+    function renderFlowMenu() {
+      document.querySelector('#flow-menu').innerHTML = flows.map((flow, index) => `<button type="button" role="tab" class="flow-button ${flow.id === activeFlow ? 'active' : ''}" data-flow="${flow.id}"><span>${flow.title}</span><span>${String(index + 1).padStart(2,'0')}</span></button>`).join('');
+      document.querySelectorAll('[data-flow]').forEach(button => button.addEventListener('click', () => {
+        activeFlow = button.dataset.flow;
+        renderFlowMenu();
+        renderFlow();
+      }));
+    }
+
+    function diagramContextMarkup(flow) {
+      return `<div><span>Actors & systems</span><strong>${flow.actors}</strong></div><div><span>Critical decision</span><strong>${flow.decision}</strong></div><div><span>Control & guardrail</span><strong>${flow.control}</strong></div>`;
+    }
+
+    function flowFallbackMarkup(flow) {
+      return `<div class="diagram-fallback"><div class="fallback-heading"><strong>Luồng thao tác tổng quát</strong><span>Bản HTML dự phòng khi sơ đồ tương tác không tải được</span></div><div class="fallback-flow">${flow.steps.map((step, index) => `<div class="fallback-node"><span class="fallback-index">${String(index + 1).padStart(2, '0')}</span>${step[0]}</div>`).join('')}</div></div>`;
+    }
+
+    function renderFlow() {
+      const flow = flows.find(item => item.id === activeFlow);
+      document.querySelector('#flow-content').innerHTML = `<div class="flow-summary"><div class="flow-title-row"><h2>${flow.title}</h2><span class="flow-outcome">${flow.outcome}</span></div><p>${flow.summary}</p><div class="flow-meta"><span class="flow-status target">Target-state E2E</span><span class="flow-status ${flow.maturityClass}">Current: ${flow.maturity}</span></div></div><section class="diagram-card" aria-labelledby="diagram-title-${flow.id}"><header class="diagram-header"><div class="diagram-heading"><span>${icons.diagram}</span><div><h3 id="diagram-title-${flow.id}">Sơ đồ luồng hệ thống end-to-end</h3><p>Xem ai tham gia, các điểm ra quyết định, cách xử lý khi có lỗi và kết quả cuối cùng trước khi đọc từng bước.</p></div></div><button type="button" class="diagram-expand" data-expand-diagram aria-label="Phóng to sơ đồ ${flow.title}">${icons.expand}<span>Phóng to</span></button></header><div class="diagram-context">${diagramContextMarkup(flow)}</div><div class="diagram-body"><div class="mermaid" data-flow-diagram="${flow.id}">${flow.diagram}</div>${flowFallbackMarkup(flow)}</div></section><div class="flow-steps">${flow.steps.map((step, index) => `<article class="flow-step"><div class="step-number">${index + 1}</div><div class="step-cell"><span class="step-label">Action</span><strong>${step[0]}</strong></div><div class="step-cell"><span class="step-label">System response</span><p>${step[1]}</p></div><div class="step-cell"><span class="step-label">Business outcome</span><p>${step[2]}</p></div></article>`).join('')}</div>`;
+      const diagramCard = document.querySelector('#flow-content .diagram-card');
+      document.querySelector('[data-expand-diagram]').addEventListener('click', () => openDiagram(flow));
+      if (!document.querySelector('[data-panel="flows"]').hidden) void renderMermaid(diagramCard);
+    }
+
+    let diagramReturnFocus = null;
+
+    async function openDiagram(flow) {
+      const modal = document.querySelector('#diagram-modal');
+      diagramReturnFocus = document.activeElement;
+      document.querySelector('#diagram-modal-title').textContent = flow.title;
+      document.querySelector('#diagram-modal-subtitle').textContent = `${flow.outcome} · Target-state end-to-end operating model`;
+      document.querySelector('#diagram-modal-context').innerHTML = diagramContextMarkup(flow);
+      document.querySelector('#diagram-modal-body').innerHTML = `<div class="mermaid" data-flow-diagram="${flow.id}">${flow.diagram}</div>${flowFallbackMarkup(flow)}`;
+      modal.hidden = false;
+      document.body.classList.add('diagram-open');
+      document.querySelector('#diagram-close').focus();
+      await renderMermaid(modal);
+    }
+
+    function closeDiagram() {
+      const modal = document.querySelector('#diagram-modal');
+      if (modal.hidden) return;
+      modal.hidden = true;
+      document.body.classList.remove('diagram-open');
+      document.querySelector('#diagram-modal-body').innerHTML = '';
+      if (diagramReturnFocus instanceof HTMLElement) diagramReturnFocus.focus();
+    }
+
+    async function renderMermaid(scope) {
+      const nodes = [...scope.querySelectorAll('.mermaid:not([data-processed])')];
+      if (!nodes.length) return;
+      if (!window.mermaid) {
+        nodes.forEach(node => { node.hidden = true; });
+        return;
+      }
+      const dark = document.documentElement.classList.contains('dark');
+      mermaid.initialize({ startOnLoad:false, securityLevel:'loose', theme: dark ? 'dark' : 'base', themeVariables: dark ? { primaryColor:'#312e81', primaryTextColor:'#f8fafc', primaryBorderColor:'#6366f1', lineColor:'#a1a1aa', secondaryColor:'#18181b', tertiaryColor:'#27272a' } : { primaryColor:'#eef2ff', primaryTextColor:'#0f172a', primaryBorderColor:'#818cf8', lineColor:'#64748b', secondaryColor:'#ecfdf5', tertiaryColor:'#f8fafc' }, flowchart:{ curve:'basis', htmlLabels:true } });
+      for (const node of nodes) {
+        const fallback = node.nextElementSibling;
+        try {
+          await mermaid.run({ nodes:[node] });
+          if (fallback?.classList.contains('diagram-fallback')) fallback.hidden = true;
+          mermaidReady = true;
+        } catch (error) {
+          node.hidden = true;
+          if (fallback?.classList.contains('diagram-fallback')) fallback.hidden = false;
+          console.warn('Mermaid diagram could not render; showing the HTML fallback.', error);
+        }
+      }
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      storeTheme(theme);
+      document.querySelector('#theme-button').setAttribute('aria-pressed', String(theme === 'dark'));
+      if (mermaidReady) location.reload();
+    }
+
+    document.querySelector('#feature-search').addEventListener('input', renderFeatures);
+    window.addEventListener('hashchange', () => {
+      const target = location.hash.replace('#', '');
+      if (tabs.some(tab => tab.id === target)) activatePanel(target, false);
+    });
+    document.querySelector('#theme-button').addEventListener('click', () => applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'));
+    document.querySelector('#diagram-close').innerHTML = icons.close;
+    document.querySelector('#diagram-close').addEventListener('click', closeDiagram);
+    document.querySelector('#diagram-modal').addEventListener('click', event => { if (event.target.id === 'diagram-modal') closeDiagram(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeDiagram(); });
+    const savedTheme = readStoredTheme() || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    initializeNavigation();
+    setTimeout(() => window.scrollTo(0, 0), 60);
+    renderFeatureFilters();
+    renderFeatures();
+    renderFlowMenu();
+    renderFlow();
+  </script>
+</body>
+</html>

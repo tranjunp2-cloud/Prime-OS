@@ -24,6 +24,7 @@ import { useI18n } from '@/lib/i18n/I18nContext';
 import { formatLocalizedNumber, formatMessage } from '@/lib/i18n/format';
 import { cn } from '@/lib/utils';
 import type { ChannelWizardDraft } from '@/components/products/ChannelListingWizard';
+import { getActiveCatalogBrands, getActiveCatalogCategories, getAttributesForCategory } from '@/lib/product-catalog-settings-store';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -120,12 +121,7 @@ function channelSetupComplete(key: OverrideChannel, value: ChannelOverrideForm) 
   if (key === 'rakuten') return Boolean(value.category.trim() && value.stock_quantity && value.identifier.trim());
   return Boolean(value.category.trim() && value.stock_quantity && value.shipping_option);
 }
-const CATEGORIES = [
-  'Watch', 'Shoe', 'Bag', 'Hat', 'Jacket', 'Sunglasses',
-  'Bicycle', 'Headphones', 'Electronics', 'Food & Beverages',
-  'Beauty & Personal Care', 'Home & Living', 'Sports', 'Books', 'Toys',
-];
-const CATEGORY_TREE = [
+const DEFAULT_CATEGORY_TREE = [
   { label: 'Fashion', children: [
     { label: 'Apparel', children: ['Jacket', 'Shoe', 'Hat'] },
     { label: 'Accessories', children: ['Bag', 'Watch', 'Sunglasses'] },
@@ -141,6 +137,19 @@ const CATEGORY_TREE = [
     { label: 'Beauty', children: ['Beauty & Personal Care'] },
   ] },
 ];
+
+function buildCategoryTree() {
+  const categories = getActiveCatalogCategories();
+  if (!categories.length) return DEFAULT_CATEGORY_TREE;
+  const groups = new Map<string, Map<string, string[]>>();
+  categories.forEach(category => {
+    if (!groups.has(category.group)) groups.set(category.group, new Map());
+    const parent = category.parent && category.parent !== 'None (root category)' ? category.parent : category.group;
+    const children = groups.get(category.group)!;
+    children.set(parent, [...(children.get(parent) ?? []), category.name]);
+  });
+  return Array.from(groups, ([label, children]) => ({ label, children: Array.from(children, ([childLabel, leaves]) => ({ label: childLabel, children: leaves })) }));
+}
 const PRODUCT_TYPE_ICONS = {
   single: Package,
   variant: Layers,
@@ -990,6 +999,8 @@ export default function ProductCreatePage() {
   const editId = params.id ?? (queryEdit ?? undefined);
   const existingProduct = editId ? getProductById(editId) : null;
   const existingSkuList = getAllSkus();
+  const catalogBrands = useMemo(() => getActiveCatalogBrands(), []);
+  const categoryTree = useMemo(() => buildCategoryTree(), []);
 
   const [inventory, setInventory] = useState<Record<string, string>>(
     existingProduct
@@ -1180,13 +1191,23 @@ export default function ProductCreatePage() {
   const [uploadingImageCount, setUploadingImageCount] = useState(0);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
-  const [categoryLevelOne, setCategoryLevelOne] = useState(CATEGORY_TREE[0].label);
-  const [categoryLevelTwo, setCategoryLevelTwo] = useState(CATEGORY_TREE[0].children[0].label);
+  const [categoryLevelOne, setCategoryLevelOne] = useState(categoryTree[0].label);
+  const [categoryLevelTwo, setCategoryLevelTwo] = useState(categoryTree[0].children[0].label);
   const [pendingCategory, setPendingCategory] = useState(form.category);
   const [activeSection, setActiveSection] = useState('basic');
   const [specifications, setSpecifications] = useState<Array<{ id: string; name: string; value: string }>>(
     existingProduct?.specifications?.map(item => ({ ...item, id: genId('spec') })) ?? [{ id: genId('spec'), name: '', value: '' }]
   );
+
+  useEffect(() => {
+    if (!form.category) return;
+    const categoryAttributes = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
+    setSpecifications(current => {
+      const existingNames = new Set(current.map(item => item.name.toLowerCase()));
+      const missing = categoryAttributes.filter(item => !existingNames.has(item.name.toLowerCase())).map(item => ({ id: genId('spec'), name: item.name, value: '' }));
+      return missing.length ? [...current.filter(item => item.name || item.value), ...missing] : current;
+    });
+  }, [form.category]);
 
   // Variant state
   const [variantGroups, setVariantGroups] = useState<VariantGroup[]>(() => hydrateExistingVariants(existingProduct).groups);
@@ -1530,9 +1551,9 @@ export default function ProductCreatePage() {
   const recommendedAttributeCount = [form.gtin, form.mpn, form.model_number, form.brand, form.asin, form.manufacturer, form.original_price, form.prod_length, form.prod_height, form.prod_width, form.prod_weight, form.hs_code, form.slug, form.meta_title, form.meta_description].filter(value => String(value).trim()).length;
   const completedAttributeCount = requiredAttributeCount + recommendedAttributeCount + completedSpecifications;
   const totalAttributeCount = 45;
-  const selectedCategoryGroup = CATEGORY_TREE.find(item => item.label === categoryLevelOne) ?? CATEGORY_TREE[0];
+  const selectedCategoryGroup = categoryTree.find(item => item.label === categoryLevelOne) ?? categoryTree[0];
   const selectedCategorySubgroup = selectedCategoryGroup.children.find(item => item.label === categoryLevelTwo) ?? selectedCategoryGroup.children[0];
-  const matchingCategoryPaths = CATEGORY_TREE.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group: group.label, subgroup: subgroup.label, leaf })))).filter(item => !categorySearch.trim() || `${item.group} ${item.subgroup} ${item.leaf}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
+  const matchingCategoryPaths = categoryTree.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group: group.label, subgroup: subgroup.label, leaf })))).filter(item => !categorySearch.trim() || `${item.group} ${item.subgroup} ${item.leaf}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
   const currentSnapshot = JSON.stringify({ form, inventory, images, imageAltTexts, variantGroups, variantItems, channelOverrides, specifications });
   latestSnapshotRef.current = currentSnapshot;
   const isDirty = dirtyTrackingReady && currentSnapshot !== baselineSnapshotRef.current;
@@ -1720,7 +1741,7 @@ export default function ProductCreatePage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Brand">
-                    <Input value={form.brand} onChange={e => setField('brand', e.target.value)} placeholder={copy.brandPlaceholder} />
+                    <select value={form.brand} onChange={e => setField('brand', e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="">Select canonical brand</option>{catalogBrands.map(brand => <option key={brand.id} value={brand.name}>{brand.name}{brand.status === 'Unverified' ? ' · Needs review' : ''}</option>)}</select>
                   </Field>
                   <Field label="GTIN / Barcode">
                     <Input value={form.gtin} onChange={e => setField('gtin', e.target.value)} placeholder={copy.gtinPlaceholder} inputMode="numeric" />
@@ -2139,7 +2160,7 @@ export default function ProductCreatePage() {
           <div className="p-5">
             <div className="relative mb-4"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={categorySearch} onChange={event => setCategorySearch(event.target.value)} placeholder="Search categories..." className="pl-9" /></div>
             {categorySearch.trim() ? <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border p-2">{matchingCategoryPaths.map(item => <button key={`${item.group}-${item.subgroup}-${item.leaf}`} type="button" onClick={() => { setCategoryLevelOne(item.group); setCategoryLevelTwo(item.subgroup); setPendingCategory(item.leaf); }} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${pendingCategory === item.leaf ? 'bg-primary/10 text-primary' : ''}`}><span>{item.group} / {item.subgroup} / <strong>{item.leaf}</strong></span>{pendingCategory === item.leaf ? <Check className="size-4" /> : null}</button>)}</div> : <div className="grid min-h-72 grid-cols-1 overflow-hidden rounded-lg border sm:grid-cols-3">
-              <div className="border-b p-2 sm:border-b-0 sm:border-r">{CATEGORY_TREE.map(group => <button key={group.label} type="button" onClick={() => { setCategoryLevelOne(group.label); setCategoryLevelTwo(group.children[0].label); }} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelOne === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
+              <div className="border-b p-2 sm:border-b-0 sm:border-r">{categoryTree.map(group => <button key={group.label} type="button" onClick={() => { setCategoryLevelOne(group.label); setCategoryLevelTwo(group.children[0].label); }} className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelOne === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
               <div className="border-b p-2 sm:border-b-0 sm:border-r">{selectedCategoryGroup.children.map(group => <button key={group.label} type="button" onClick={() => setCategoryLevelTwo(group.label)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelTwo === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
               <div className="p-2">{selectedCategorySubgroup.children.map(category => <button key={category} type="button" onClick={() => setPendingCategory(category)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${pendingCategory === category ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{category}{pendingCategory === category ? <Check className="size-4" /> : null}</button>)}</div>
             </div>}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Award, Check, ChevronRight, CircleAlert, FolderTree, Layers3, Plus, Search,
@@ -18,11 +18,17 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { getProducts } from '@/lib/product-store';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  getProductCatalogSettings, saveProductCatalogSettings,
+  type CatalogAttribute as AttributeDefinition,
+  type CatalogBrand as BrandDefinition,
+  type CatalogCategory,
+  type CatalogChannel,
+  type ReviewStatus as MappingStatus,
+} from '@/lib/product-catalog-settings-store';
 
 type ViewTab = 'categories' | 'attributes' | 'brands';
 type DrawerTab = 'general' | 'attributes' | 'mapping';
-type MappingStatus = 'mapped' | 'unmapped';
-
 interface CategoryRow {
   id: string;
   category: string;
@@ -30,74 +36,19 @@ interface CategoryRow {
   productCount: number;
   attributes: string[];
   status: 'Active' | 'Inactive';
-  mappings: Record<'webstore' | 'pos' | 'shopee' | 'tiktok' | 'lazada', MappingStatus>;
+  source: 'internal' | 'imported';
+  mappings: Record<CatalogChannel, MappingStatus>;
 }
 
-interface AttributeDefinition {
-  id: string;
-  name: string;
-  key: string;
-  type: string;
-  categories: number;
-  description: string;
-  options: string;
-  unit: string;
-  validation: string;
-  status: 'Active' | 'Inactive';
-}
-
-interface BrandDefinition {
-  id: string;
-  name: string;
-  code: string;
-  manufacturer: string;
-  country: string;
-  website: string;
-  productCount: number;
-  status: 'Verified' | 'Unverified' | 'Inactive';
-  amazonId: string;
-  shopeeId: string;
-  lazadaId: string;
-}
-
-const taxonomyDefaults: Record<string, string[]> = {
-  Fashion: ['Brand', 'Material', 'Color', 'Size', 'Care instructions', 'Dimensions'],
-  Electronics: ['Brand', 'Model', 'Connectivity', 'Dimensions', 'Warranty'],
-  Lifestyle: ['Brand', 'Material', 'Dimensions', 'Care instructions', 'Country of origin'],
-  'Personal Care': ['Brand', 'Volume', 'Ingredients', 'Skin type', 'Country of origin'],
-  Uncategorized: ['Brand', 'Model'],
-};
-
-const channelLabels = [
-  ['webstore', 'WebStore'], ['pos', 'POS'], ['shopee', 'Shopee'], ['tiktok', 'TikTok Shop'], ['lazada', 'Lazada'],
+const channelLabels: Array<[CatalogChannel, string]> = [
+  ['webstore', 'PrimeWeb'], ['pos', 'PrimePOS'], ['shopee', 'Shopee'], ['lazada', 'Lazada'],
+  ['tiktok', 'TikTok Shop'], ['amazon', 'Amazon'], ['rakuten', 'Rakuten'], ['social', 'Social Inbox'],
 ] as const;
 
-const initialAttributes: AttributeDefinition[] = [
-  { id: 'brand', name: 'Brand', key: 'brand', type: 'Single-line text', categories: 12, description: 'Canonical manufacturer or house brand.', options: '', unit: '', validation: 'Maximum 100 characters', status: 'Active' },
-  { id: 'material', name: 'Material', key: 'material', type: 'Multi-select', categories: 8, description: 'Primary materials used to manufacture the product.', options: 'Cotton, Leather, Metal, Plastic, Wood', unit: '', validation: 'At least one value when required by category', status: 'Active' },
-  { id: 'care-instructions', name: 'Care Instructions', key: 'care_instructions', type: 'Rich text', categories: 5, description: 'Handling, cleaning and storage guidance.', options: '', unit: '', validation: 'Maximum 2,000 characters', status: 'Active' },
-  { id: 'dimensions', name: 'Dimensions', key: 'dimensions', type: 'Measurement set', categories: 10, description: 'Length, width, height and supported unit.', options: '', unit: 'cm', validation: 'Values must be greater than zero', status: 'Active' },
-  { id: 'country-of-origin', name: 'Country of Origin', key: 'country_of_origin', type: 'Country selector', categories: 9, description: 'Manufacturing country used for compliance.', options: '', unit: '', validation: 'ISO 3166 country list', status: 'Active' },
-];
-
 const blankAttribute: AttributeDefinition = {
-  id: '', name: '', key: '', type: 'Single-line text', categories: 0, description: '', options: '', unit: '', validation: '', status: 'Active',
+  id: '', name: '', key: '', type: 'Single-line text', categories: 0, description: '', options: '', unit: '', validation: '', status: 'Active', source: 'internal',
 };
-
-const initialBrands: BrandDefinition[] = [
-  { id: 'cyber-records', name: 'CYBER-RECORDS', code: 'CYBR', manufacturer: 'CyberRecord Japan Co.', country: 'Japan', website: 'https://cyber-records.example', productCount: 5, status: 'Verified', amazonId: 'CYBER RECORDS', shopeeId: '1009234', lazadaId: 'BR-20418' },
-  { id: 'prime-essentials', name: 'Prime Essentials', code: 'PRME', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 12, status: 'Verified', amazonId: '', shopeeId: '1008871', lazadaId: '' },
-  { id: 'no-brand', name: 'No Brand', code: 'GENERIC', manufacturer: '', country: '', website: '', productCount: 8, status: 'Unverified', amazonId: 'Generic', shopeeId: '0', lazadaId: 'No Brand' },
-];
-const blankBrand: BrandDefinition = { id: '', name: '', code: '', manufacturer: '', country: '', website: '', productCount: 0, status: 'Unverified', amazonId: '', shopeeId: '', lazadaId: '' };
-
-function taxonomyGroup(category: string) {
-  if (['Jacket', 'Shoe', 'Hat', 'Bag', 'Watch', 'Sunglasses'].includes(category)) return 'Fashion';
-  if (['Electronics', 'Headphones'].includes(category)) return 'Electronics';
-  if (category === 'Beauty & Personal Care') return 'Personal Care';
-  if (category) return 'Lifestyle';
-  return 'Uncategorized';
-}
+const blankBrand: BrandDefinition = { id: '', name: '', code: '', manufacturer: '', country: '', website: '', productCount: 0, status: 'Unverified', source: 'internal', aliases: [], mappings: {} };
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -112,41 +63,37 @@ export default function ProductCategories() {
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('general');
   const [selectedCategory, setSelectedCategory] = useState<CategoryRow | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [attributes, setAttributes] = useState<AttributeDefinition[]>(initialAttributes);
+  const initialSettings = useMemo(() => getProductCatalogSettings(), []);
+  const [categories, setCategories] = useState<CatalogCategory[]>(initialSettings.categories);
+  const [attributes, setAttributes] = useState<AttributeDefinition[]>(initialSettings.attributes);
   const [attributeDrawerOpen, setAttributeDrawerOpen] = useState(false);
   const [attributeDraft, setAttributeDraft] = useState<AttributeDefinition>(blankAttribute);
   const [isCreatingAttribute, setIsCreatingAttribute] = useState(false);
-  const [brands, setBrands] = useState<BrandDefinition[]>(initialBrands);
+  const [brands, setBrands] = useState<BrandDefinition[]>(initialSettings.brands);
   const [brandDrawerOpen, setBrandDrawerOpen] = useState(false);
   const [brandDraft, setBrandDraft] = useState<BrandDefinition>(blankBrand);
   const [isCreatingBrand, setIsCreatingBrand] = useState(false);
   const products = getProducts();
 
+  useEffect(() => { saveProductCatalogSettings({ categories, attributes, brands }); }, [categories, attributes, brands]);
+
   const rows = useMemo<CategoryRow[]>(() => {
     const counts = new Map<string, number>();
     products.forEach(product => counts.set(product.category || 'Uncategorized', (counts.get(product.category || 'Uncategorized') ?? 0) + 1));
-    const demoCategories = ['Art Supplies', 'Stationery', 'Electronics', 'Headphones', 'Beauty & Personal Care', 'Home & Living'];
-    const categories = Array.from(new Set([...counts.keys(), ...demoCategories]));
-    return categories.map((category, index) => {
-      const group = taxonomyGroup(category);
+    return categories.map((category) => {
       return {
-        id: `cat-${slugify(category)}`,
-        category,
-        group,
-        productCount: counts.get(category) ?? (index % 3),
-        attributes: taxonomyDefaults[group] ?? taxonomyDefaults.Uncategorized,
-        status: index === categories.length - 1 ? 'Inactive' : 'Active',
-        mappings: {
-          webstore: 'mapped',
-          pos: index % 4 === 0 ? 'unmapped' : 'mapped',
-          shopee: index % 3 === 1 ? 'unmapped' : 'mapped',
-          tiktok: index % 3 === 2 ? 'unmapped' : 'mapped',
-          lazada: index % 2 === 0 ? 'mapped' : 'unmapped',
-        },
+        id: category.id,
+        category: category.name,
+        group: category.group,
+        productCount: counts.get(category.name) ?? 0,
+        attributes: category.attributes.map(assignment => attributes.find(item => item.key === assignment.key)?.name).filter(Boolean) as string[],
+        status: category.status,
+        source: category.source,
+        mappings: category.mappings,
       };
     }).filter(row => `${row.group} ${row.category} ${row.attributes.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase()))
       .sort((a, b) => a.group.localeCompare(b.group) || a.category.localeCompare(b.category));
-  }, [products, search]);
+  }, [products, search, categories, attributes]);
 
   const filteredAttributes = attributes.filter(attribute => `${attribute.name} ${attribute.type} ${attribute.description}`.toLowerCase().includes(search.trim().toLowerCase()));
   const filteredBrands = brands.filter(brand => `${brand.name} ${brand.code} ${brand.manufacturer} ${brand.country}`.toLowerCase().includes(search.trim().toLowerCase()));
@@ -223,10 +170,10 @@ export default function ProductCategories() {
         <TabsContent value="categories" className="m-0">
           <div className="overflow-x-auto"><table className="w-full min-w-[1180px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['CATEGORY PATH', 'PRODUCTS COUNT', 'REQUIRED ATTRIBUTES', 'CHANNEL CATEGORY MAPPING', 'STATUS', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead>
             <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} tabIndex={0} onClick={() => openCategory(row)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCategory(row); } }} className="cursor-pointer transition-colors hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
-              <td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><FolderTree className="size-4" /></span><div><p className="text-xs font-medium text-slate-500">{row.group} <span className="mx-1">›</span></p><p className="mt-0.5 text-sm font-semibold text-slate-900">{row.category}</p></div></div></td>
+              <td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><FolderTree className="size-4" /></span><div><p className="text-xs font-medium text-slate-500">{row.group} <span className="mx-1">›</span></p><div className="mt-0.5 flex items-center gap-2"><p className="text-sm font-semibold text-slate-900">{row.category}</p><Badge variant="outline" className="h-5 text-[10px]">{row.source === 'internal' ? 'Internal' : 'Imported'}</Badge></div></div></div></td>
               <td className="px-4 py-3 text-sm font-semibold tabular-nums text-slate-700">{row.productCount}</td>
               <td className="px-4 py-3"><div className="flex max-w-[330px] flex-wrap gap-1.5">{row.attributes.slice(0, 4).map(attribute => <Badge key={attribute} variant="outline" className="font-medium">{attribute}</Badge>)}{row.attributes.length > 4 ? <Popover><PopoverTrigger asChild><button type="button" onClick={event => event.stopPropagation()} className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100">+{row.attributes.length - 4} more</button></PopoverTrigger><PopoverContent align="start" className="w-64 p-3"><p className="mb-2 text-xs font-semibold text-slate-900">All required attributes</p><div className="flex flex-wrap gap-1.5">{row.attributes.map(attribute => <Badge key={attribute} variant="outline">{attribute}</Badge>)}</div></PopoverContent></Popover> : null}</div></td>
-              <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">{channelLabels.map(([key, label]) => <span key={key} className={cn('inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold', row.mappings[key] === 'mapped' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500')}><span className={cn('size-2 rounded-full', row.mappings[key] === 'mapped' ? 'bg-emerald-500' : 'bg-amber-400')} />{label}</span>)}</div></td>
+              <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">{channelLabels.slice(0, 3).map(([key, label]) => <span key={key} className={cn('inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold', row.mappings[key] === 'mapped' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : row.mappings[key] === 'needs_review' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-500')}><span className={cn('size-2 rounded-full', row.mappings[key] === 'mapped' ? 'bg-emerald-500' : row.mappings[key] === 'needs_review' ? 'bg-amber-400' : 'bg-slate-400')} />{label} · {row.mappings[key] === 'mapped' ? 'Mapped' : row.mappings[key] === 'needs_review' ? 'Review' : 'N/A'}</span>)}<Popover><PopoverTrigger asChild><button type="button" onClick={event => event.stopPropagation()} className="inline-flex min-h-7 items-center rounded-md border px-2 text-[11px] font-semibold hover:bg-muted">+{channelLabels.length - 3} channels</button></PopoverTrigger><PopoverContent align="start" className="w-72 p-3"><p className="mb-2 text-xs font-semibold">All channel mappings</p><div className="space-y-2">{channelLabels.map(([key, label]) => <div key={key} className="flex items-center justify-between gap-3 text-xs"><span>{label}</span><span className={cn('font-semibold', row.mappings[key] === 'mapped' ? 'text-emerald-700' : row.mappings[key] === 'needs_review' ? 'text-amber-700' : 'text-muted-foreground')}>{row.mappings[key] === 'mapped' ? 'Mapped' : row.mappings[key] === 'needs_review' ? 'Needs review' : 'Not required'}</span></div>)}</div></PopoverContent></Popover></div></td>
               <td className="px-4 py-3"><Badge className={row.status === 'Active' ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50' : 'bg-slate-100 text-slate-600 hover:bg-slate-100'}>{row.status}</Badge></td>
               <td className="px-4 py-3"><div className="flex justify-end"><Button type="button" variant="outline" size="sm" onClick={event => { event.stopPropagation(); openCategory(row); }}>Configure<ChevronRight className="size-4" /></Button></div></td>
             </tr>)}</tbody>
@@ -240,20 +187,65 @@ export default function ProductCategories() {
         </TabsContent>
 
         <TabsContent value="brands" className="m-0">
-          <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['BRAND', 'MANUFACTURER', 'COUNTRY', 'PRODUCTS', 'CHANNEL MAPPING', 'STATUS', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredBrands.map(brand => <tr key={brand.id} tabIndex={0} onClick={() => editBrand(brand)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editBrand(brand); } }} className="cursor-pointer hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{brand.name.slice(0, 1)}</span><div><p className="text-sm font-semibold text-slate-900">{brand.name}</p><p className="mt-0.5 font-mono text-xs text-slate-500">{brand.code}</p></div></div></td><td className="px-4 py-3 text-sm text-slate-700">{brand.manufacturer || '—'}</td><td className="px-4 py-3 text-sm text-slate-700">{brand.country || '—'}</td><td className="px-4 py-3 text-sm font-semibold tabular-nums">{brand.productCount}</td><td className="px-4 py-3"><div className="flex gap-1.5">{[['AMZ', brand.amazonId], ['SHP', brand.shopeeId], ['LAZ', brand.lazadaId]].map(([label, value]) => <Badge key={label} variant="outline" className={value ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'text-slate-400'}>{label} {value ? 'Mapped' : '—'}</Badge>)}</div></td><td className="px-4 py-3"><Badge className={brand.status === 'Verified' ? 'bg-emerald-50 text-emerald-700' : brand.status === 'Inactive' ? 'bg-slate-100 text-slate-500' : 'bg-amber-50 text-amber-700'}>{brand.status}</Badge></td><td className="px-4 py-3 text-right"><Button variant="ghost" size="sm" onClick={event => { event.stopPropagation(); editBrand(brand); }}>Edit<ChevronRight className="size-4" /></Button></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['BRAND', 'SOURCE', 'MANUFACTURER', 'COUNTRY', 'PRODUCTS', 'CHANNEL MAPPING', 'STATUS', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredBrands.map(brand => <tr key={brand.id} tabIndex={0} onClick={() => editBrand(brand)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editBrand(brand); } }} className="cursor-pointer hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{brand.name.slice(0, 1)}</span><div><p className="text-sm font-semibold text-slate-900">{brand.name}</p><p className="mt-0.5 font-mono text-xs text-slate-500">{brand.code}</p></div></div></td><td className="px-4 py-3"><Badge variant="outline">{brand.source === 'internal' ? 'Internal' : 'Imported'}</Badge></td><td className="px-4 py-3 text-sm text-slate-700">{brand.manufacturer || '—'}</td><td className="px-4 py-3 text-sm text-slate-700">{brand.country || '—'}</td><td className="px-4 py-3 text-sm font-semibold tabular-nums">{brand.productCount}</td><td className="px-4 py-3"><div className="flex gap-1.5">{([['AMZ', brand.mappings.amazon], ['SHP', brand.mappings.shopee], ['LAZ', brand.mappings.lazada]] as const).map(([label, value]) => <Badge key={label} variant="outline" className={value ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'text-slate-400'}>{label} {value ? 'Mapped' : '—'}</Badge>)}</div></td><td className="px-4 py-3"><Badge className={brand.status === 'Verified' ? 'bg-emerald-50 text-emerald-700' : brand.status === 'Inactive' ? 'bg-slate-100 text-slate-500' : 'bg-amber-50 text-amber-700'}>{brand.status}</Badge></td><td className="px-4 py-3 text-right"><Button variant="ghost" size="sm" onClick={event => { event.stopPropagation(); editBrand(brand); }}>Edit<ChevronRight className="size-4" /></Button></td></tr>)}</tbody></table></div>
           {filteredBrands.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">No brands match this search.</div> : null}
         </TabsContent>
       </div>
     </Tabs>
 
-    <CategoryConfigurationDrawer open={drawerOpen} category={selectedCategory} creating={isCreating} tab={drawerTab} onTabChange={setDrawerTab} onClose={() => setDrawerOpen(false)} onSave={() => { toast({ title: isCreating ? 'Category created' : 'Category configuration saved', description: isCreating ? 'The new master category is ready for attribute assignment.' : `${selectedCategory?.category} mappings and attributes were updated.` }); setDrawerOpen(false); }} />
+    <ManagedCategoryConfigurationDrawer open={drawerOpen} category={selectedCategory} creating={isCreating} tab={drawerTab} attributes={attributes} onTabChange={setDrawerTab} onClose={() => setDrawerOpen(false)} onSave={(nextCategory) => { setCategories(current => isCreating ? [...current, nextCategory] : current.map(item => item.id === nextCategory.id ? nextCategory : item)); toast({ title: isCreating ? 'Category created' : 'Category configuration saved', description: `${nextCategory.name} is ready for Product Master selection.` }); setDrawerOpen(false); }} />
     <AttributeConfigurationDrawer open={attributeDrawerOpen} creating={isCreatingAttribute} value={attributeDraft} onChange={setAttributeDraft} onClose={() => setAttributeDrawerOpen(false)} onSave={() => saveAttribute(attributeDraft)} />
     <BrandConfigurationDrawer open={brandDrawerOpen} creating={isCreatingBrand} value={brandDraft} onChange={setBrandDraft} onClose={() => setBrandDrawerOpen(false)} onSave={() => saveBrand(brandDraft)} />
   </div>;
 }
 
+function ManagedCategoryConfigurationDrawer({ open, category, creating, tab, attributes, onTabChange, onClose, onSave }: { open: boolean; category: CategoryRow | null; creating: boolean; tab: DrawerTab; attributes: AttributeDefinition[]; onTabChange: (tab: DrawerTab) => void; onClose: () => void; onSave: (category: CatalogCategory) => void }) {
+  const emptyMappings = Object.fromEntries(channelLabels.map(([key]) => [key, key === 'webstore' ? 'mapped' : key === 'pos' || key === 'social' ? 'not_required' : 'needs_review'])) as Record<CatalogChannel, MappingStatus>;
+  const [draft, setDraft] = useState<CatalogCategory>({ id: '', name: '', group: 'Lifestyle', parent: 'None (root category)', description: '', status: 'Active', source: 'internal', attributes: [], mappings: emptyMappings });
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(category ? {
+      id: category.id, name: category.category, group: category.group, parent: category.group,
+      description: '', status: category.status, source: category.source,
+      attributes: attributes.filter(item => category.attributes.includes(item.name)).map(item => ({ key: item.key, required: true })),
+      mappings: category.mappings,
+    } : { id: '', name: '', group: 'Lifestyle', parent: 'None (root category)', description: '', status: 'Active', source: 'internal', attributes: [], mappings: emptyMappings });
+  }, [open, category, attributes]);
+
+  function toggleAttribute(key: string, checked: boolean) {
+    setDraft(current => ({ ...current, attributes: checked ? [...current.attributes, { key, required: false }] : current.attributes.filter(item => item.key !== key) }));
+  }
+
+  function toggleRequired(key: string, required: boolean) {
+    setDraft(current => ({ ...current, attributes: current.attributes.map(item => item.key === key ? { ...item, required } : item) }));
+  }
+
+  return <Sheet open={open} onOpenChange={next => !next && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-[650px]">
+    <SheetHeader className="border-b border-border px-6 py-5"><SheetTitle>{creating ? 'Add Category' : 'Configure Category'}</SheetTitle><SheetDescription>Maintain the internal taxonomy first, then review mappings imported from each channel.</SheetDescription></SheetHeader>
+    <Tabs value={tab} onValueChange={value => onTabChange(value as DrawerTab)} className="flex min-h-0 flex-1 flex-col">
+      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b bg-background px-4 py-0">
+        <TabsTrigger value="general" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">General</TabsTrigger>
+        <TabsTrigger value="attributes" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">Attributes</TabsTrigger>
+        <TabsTrigger value="mapping" className="h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">Channel mapping</TabsTrigger>
+      </TabsList>
+      <div className="flex-1 overflow-y-auto p-6 pb-28">
+        <TabsContent value="general" className="m-0 space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-medium">Group<select value={draft.group} onChange={event => setDraft({ ...draft, group: event.target.value })} className="h-10 rounded-md border border-input bg-background px-3 font-normal"><option>Fashion</option><option>Electronics</option><option>Lifestyle</option><option>Personal Care</option></select></label><label className="grid gap-2 text-sm font-medium">Status<select value={draft.status} onChange={event => setDraft({ ...draft, status: event.target.value as CatalogCategory['status'] })} className="h-10 rounded-md border border-input bg-background px-3 font-normal"><option>Active</option><option>Inactive</option></select></label></div>
+          <div className="grid gap-2"><Label htmlFor="managed-category-name">Category name</Label><Input id="managed-category-name" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value, id: creating ? slugify(event.target.value) : draft.id })} placeholder="e.g. Art Supplies" /></div>
+          <div className="grid gap-2"><Label htmlFor="managed-category-description">Description</Label><Textarea id="managed-category-description" value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} rows={4} /></div>
+          <div className="flex items-center justify-between rounded-lg border p-3"><div><p className="text-sm font-semibold">Data source</p><p className="text-xs text-muted-foreground">Imported records require review before becoming canonical.</p></div><Badge variant="outline">{draft.source === 'internal' ? 'Internal' : 'Imported'}</Badge></div>
+        </TabsContent>
+        <TabsContent value="attributes" className="m-0 space-y-3">{attributes.filter(item => item.status === 'Active').map(attribute => { const assignment = draft.attributes.find(item => item.key === attribute.key); return <div key={attribute.key} className="flex min-h-16 items-center gap-3 rounded-xl border p-3"><Checkbox checked={Boolean(assignment)} onCheckedChange={checked => toggleAttribute(attribute.key, checked === true)} aria-label={`Assign ${attribute.name}`} /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{attribute.name}</p><p className="mt-1 text-xs text-muted-foreground">{attribute.description}</p></div><label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Switch checked={assignment?.required ?? false} disabled={!assignment} onCheckedChange={checked => toggleRequired(attribute.key, checked)} />Required</label></div>; })}</TabsContent>
+        <TabsContent value="mapping" className="m-0 space-y-3"><div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm"><p className="font-semibold">Channel data is a mapping, not the master taxonomy</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Review imported suggestions before using them for publishing.</p></div>{channelLabels.map(([key, label]) => <div key={key} className="flex items-center gap-3 rounded-xl border p-4"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{label}</p><p className="mt-1 text-xs text-muted-foreground">{key === 'pos' || key === 'social' ? 'Category mapping is not required for this channel.' : 'Marketplace category mapping'}</p></div><select aria-label={`${label} mapping status`} value={draft.mappings[key]} disabled={key === 'pos' || key === 'social'} onChange={event => setDraft({ ...draft, mappings: { ...draft.mappings, [key]: event.target.value as MappingStatus } })} className="h-10 rounded-md border border-input bg-background px-3 text-sm"><option value="mapped">Mapped</option><option value="needs_review">Needs review</option><option value="not_required">Not required</option></select></div>)}</TabsContent>
+      </div>
+    </Tabs>
+    <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t bg-background/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!draft.name.trim()} onClick={() => onSave({ ...draft, id: draft.id || slugify(draft.name) })}>{creating ? 'Create Category' : 'Save Configuration'}</Button></div>
+  </SheetContent></Sheet>;
+}
+
 function BrandConfigurationDrawer({ open, creating, value, onChange, onClose, onSave }: { open: boolean; creating: boolean; value: BrandDefinition; onChange: (value: BrandDefinition) => void; onClose: () => void; onSave: () => void }) {
-  return <Sheet open={open} onOpenChange={next => !next && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-[600px]"><SheetHeader className="border-b border-slate-200 px-6 py-5"><SheetTitle>{creating ? 'Add Brand' : 'Edit Brand'}</SheetTitle><SheetDescription>Canonical product identity and marketplace brand mapping.</SheetDescription></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-6 pb-28"><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="brand-name">Brand Name</Label><Input id="brand-name" value={value.name} onChange={event => onChange({ ...value, name: event.target.value, code: creating ? event.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase() : value.code })} /></div><div className="grid gap-2"><Label htmlFor="brand-code">Brand Code</Label><Input id="brand-code" className="font-mono uppercase" value={value.code} onChange={event => onChange({ ...value, code: event.target.value.toUpperCase() })} /></div></div><div className="grid gap-2"><Label htmlFor="brand-manufacturer">Manufacturer / Owner</Label><Input id="brand-manufacturer" value={value.manufacturer} onChange={event => onChange({ ...value, manufacturer: event.target.value })} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="brand-country">Country</Label><Input id="brand-country" value={value.country} onChange={event => onChange({ ...value, country: event.target.value })} /></div><label className="grid gap-2 text-sm font-medium">Status<select className="h-10 rounded-md border bg-background px-3" value={value.status} onChange={event => onChange({ ...value, status: event.target.value as BrandDefinition['status'] })}><option>Verified</option><option>Unverified</option><option>Inactive</option></select></label></div><div className="grid gap-2"><Label htmlFor="brand-website">Website</Label><Input id="brand-website" type="url" value={value.website} onChange={event => onChange({ ...value, website: event.target.value })} /></div><section className="space-y-4 rounded-xl border p-4"><div><h3 className="text-sm font-semibold">Marketplace Brand Mapping</h3><p className="mt-1 text-xs text-slate-500">Map the canonical brand to identifiers recognized by each provider.</p></div><div className="grid gap-2"><Label>Amazon Brand</Label><Input value={value.amazonId} onChange={event => onChange({ ...value, amazonId: event.target.value })} /></div><div className="grid gap-2"><Label>Shopee Brand ID</Label><Input value={value.shopeeId} onChange={event => onChange({ ...value, shopeeId: event.target.value })} /></div><div className="grid gap-2"><Label>Lazada Brand ID</Label><Input value={value.lazadaId} onChange={event => onChange({ ...value, lazadaId: event.target.value })} /></div></section></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t bg-white/95 p-4"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={onSave} disabled={!value.name.trim() || !value.code.trim()}>{creating ? 'Create Brand' : 'Save Brand'}</Button></div></SheetContent></Sheet>;
+  return <Sheet open={open} onOpenChange={next => !next && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-[600px]"><SheetHeader className="border-b border-border px-6 py-5"><SheetTitle>{creating ? 'Add Brand' : 'Edit Brand'}</SheetTitle><SheetDescription>Canonical brand identity. Values synced from channels remain aliases or mappings until verified.</SheetDescription></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-6 pb-28"><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="brand-name">Brand Name</Label><Input id="brand-name" value={value.name} onChange={event => onChange({ ...value, name: event.target.value, code: creating ? event.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase() : value.code })} /></div><div className="grid gap-2"><Label htmlFor="brand-code">Brand Code</Label><Input id="brand-code" className="font-mono uppercase" value={value.code} onChange={event => onChange({ ...value, code: event.target.value.toUpperCase() })} /></div></div><div className="grid gap-2"><Label htmlFor="brand-aliases">Aliases from channels</Label><Input id="brand-aliases" value={value.aliases.join(', ')} onChange={event => onChange({ ...value, aliases: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} placeholder="CyberRecords, CYBER RECORDS" /></div><div className="grid gap-2"><Label htmlFor="brand-manufacturer">Manufacturer / Owner</Label><Input id="brand-manufacturer" value={value.manufacturer} onChange={event => onChange({ ...value, manufacturer: event.target.value })} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="brand-country">Country</Label><Input id="brand-country" value={value.country} onChange={event => onChange({ ...value, country: event.target.value })} /></div><label className="grid gap-2 text-sm font-medium">Status<select className="h-10 rounded-md border bg-background px-3" value={value.status} onChange={event => onChange({ ...value, status: event.target.value as BrandDefinition['status'] })}><option>Verified</option><option>Unverified</option><option>Inactive</option></select></label></div><div className="grid gap-2"><Label htmlFor="brand-website">Website</Label><Input id="brand-website" type="url" value={value.website} onChange={event => onChange({ ...value, website: event.target.value })} /></div><section className="space-y-4 rounded-xl border p-4"><div><h3 className="text-sm font-semibold">Marketplace Brand Mapping</h3><p className="mt-1 text-xs text-muted-foreground">Blank values stay unmapped and do not block Product Master.</p></div>{([['amazon', 'Amazon brand'], ['shopee', 'Shopee brand ID'], ['lazada', 'Lazada brand ID'], ['tiktok', 'TikTok Shop brand ID'], ['rakuten', 'Rakuten brand']] as Array<[CatalogChannel, string]>).map(([key, label]) => <div key={key} className="grid gap-2"><Label htmlFor={`brand-${key}`}>{label}</Label><Input id={`brand-${key}`} value={value.mappings[key] ?? ''} onChange={event => onChange({ ...value, mappings: { ...value.mappings, [key]: event.target.value } })} /></div>)}</section></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t bg-background/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={onSave} disabled={!value.name.trim() || !value.code.trim()}>{creating ? 'Create Brand' : 'Save Brand'}</Button></div></SheetContent></Sheet>;
 }
 
 function AttributeConfigurationDrawer({ open, creating, value, onChange, onClose, onSave }: { open: boolean; creating: boolean; value: AttributeDefinition; onChange: (value: AttributeDefinition) => void; onClose: () => void; onSave: () => void }) {
