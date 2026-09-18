@@ -29,6 +29,42 @@ const statusCopy: Record<ImportMatchStatus, { label: string; className: string }
 const channelMap: Record<CatalogImportItem['channel'], ChannelListing['channel']> = { shopee: 'shopee', amazon: 'amazon', lazada: 'lazada' };
 const safeSuggestionThreshold = 85;
 
+function syncCatalogListingToProduct(item: CatalogImportItem, productId: string) {
+  const product = getProducts().find(candidate => candidate.id === productId);
+  if (!product) return false;
+  const syncedAt = new Date().toISOString();
+  const listing: ChannelListing = { channel: channelMap[item.channel], external_id: item.listingId, status: 'active', listing_url: null, last_synced_at: syncedAt };
+  const existingOverride = product.channel_overrides?.[item.channel];
+  updateProduct(product.id, {
+    id: product.id,
+    name: product.name || item.title,
+    category: product.category || item.channelCategory.split('>').at(-1)?.trim() || '',
+    retail_price: product.retail_price || item.price,
+    price_currency: product.price_currency || item.currency,
+    images: product.images.length || !item.image ? product.images : [item.image],
+    channels: [...product.channels.filter(current => current.channel !== listing.channel), listing],
+    channel_overrides: {
+      ...product.channel_overrides,
+      [item.channel]: {
+        enabled: true,
+        title: existingOverride?.title || item.title,
+        description: existingOverride?.description || '',
+        price_markup: existingOverride?.price_markup ?? 0,
+        listing_sku: existingOverride?.listing_sku || item.channelSku,
+        category: existingOverride?.category || item.channelCategory,
+        stock_quantity: existingOverride?.stock_quantity || String(item.channelStock),
+        variant_scope: existingOverride?.variant_scope || 'all',
+        listing_mode: existingOverride?.listing_mode || 'master',
+        sync_policy: existingOverride?.sync_policy || 'automatic',
+        safety_buffer: existingOverride?.safety_buffer || '0',
+        allocation_cap: existingOverride?.allocation_cap || String(item.channelStock),
+        media_scope: existingOverride?.media_scope || 'all',
+      },
+    },
+  });
+  return true;
+}
+
 export default function CatalogImportReview() {
   const navigate = useNavigate();
   const [items, setItems] = useState(getCatalogImportItems);
@@ -55,20 +91,24 @@ export default function CatalogImportReview() {
       return aResolved - bResolved || queuePriority[a.status] - queuePriority[b.status] || a.confidence - b.confidence;
     }), [deferredQuery, items, tab]);
   const updateItems = (next: CatalogImportItem[]) => { setItems(next); saveCatalogImportItems(next); };
-  const syncListingToProduct = (item: CatalogImportItem, productId: string) => {
-    const product = getProducts().find(candidate => candidate.id === productId);
-    if (!product) return;
-    const listing: ChannelListing = { channel: channelMap[item.channel], external_id: item.channelSku, status: 'active', listing_url: null, last_synced_at: new Date().toISOString() };
-    updateProduct(product.id, { id: product.id, channels: [...product.channels.filter(current => current.channel !== listing.channel), listing] });
-  };
+  useEffect(() => {
+    const autoSynced = items.filter(item => item.resolution === 'link' && item.confirmed && item.resolvedProductId);
+    autoSynced.forEach(item => syncCatalogListingToProduct(item, item.resolvedProductId!));
+    if (autoSynced.length) setItems(current => [...current]);
+    // Hydrate normalized auto-sync mappings once when entering the review workspace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const resolveItem = (id: string, resolution: ImportResolution, productId?: string) => {
     const source = items.find(item => item.id === id);
-    if (resolution === 'link' && productId && source) syncListingToProduct(source, productId);
+    if (resolution === 'link' && productId && source) syncCatalogListingToProduct(source, productId);
     const next = items.map(item => item.id === id ? { ...item, resolution, resolvedProductId: productId, confirmed: resolution === 'link', status: resolution === 'ignore' ? 'ignored' as const : item.status === 'ignored' ? 'unmatched' as const : item.status } : item);
     updateItems(next); setActiveItem(current => current?.id === id ? next.find(item => item.id === id) ?? null : current);
   };
   const bulkResolve = (resolution: ImportResolution) => {
     let updated = 0;
+    if (resolution === 'link') items
+      .filter(item => selectedIds.includes(item.id) && item.suggestedProductId)
+      .forEach(item => syncCatalogListingToProduct(item, item.suggestedProductId!));
     updateItems(items.map(item => {
       if (!selectedIds.includes(item.id) || (resolution === 'link' && !item.suggestedProductId)) return item;
       updated += 1;
@@ -93,7 +133,7 @@ export default function CatalogImportReview() {
   const setActiveGroupId = (id: string | null) => setActiveGroup(id ? proposedGroups.find(group => group.id === id) || null : null);
   function acceptSuggestedGroup(productId: string) {
     const group = items.filter(item => item.status === 'suggested' && item.resolution === 'later' && item.suggestedProductId === productId);
-    group.forEach(item => syncListingToProduct(item, productId));
+    group.forEach(item => syncCatalogListingToProduct(item, productId));
     updateItems(items.map(item => group.some(candidate => candidate.id === item.id) ? { ...item, resolution: 'link', resolvedProductId: productId, confirmed: true } : item));
     toast.success(`${group.length} listings synced to the same Product Master`);
     setActiveItem(null);
@@ -101,7 +141,7 @@ export default function CatalogImportReview() {
 
   function assignSelectedToMaster() {
     if (!bulkProductId) return;
-    items.filter(item => selectedIds.includes(item.id)).forEach(item => syncListingToProduct(item, bulkProductId));
+    items.filter(item => selectedIds.includes(item.id)).forEach(item => syncCatalogListingToProduct(item, bulkProductId));
     updateItems(items.map(item => selectedIds.includes(item.id) ? { ...item, resolution: 'link', resolvedProductId: bulkProductId, confirmed: true } : item));
     toast.success(`${selectedIds.length} listings assigned to one Product Master`);
     setSelectedIds([]); setBulkAssignOpen(false); setBulkProductId('');
@@ -111,7 +151,7 @@ export default function CatalogImportReview() {
     const ids = new Set(groupItems.map(item => item.id));
     const product = getProducts().find(candidate => candidate.id === productId);
     if (product && canonicalCategory && product.category !== canonicalCategory) updateProduct(productId, { id: productId, category: canonicalCategory });
-    groupItems.forEach(item => syncListingToProduct(item, productId));
+    groupItems.forEach(item => syncCatalogListingToProduct(item, productId));
     updateItems(items.map(item => ids.has(item.id) ? { ...item, resolution: 'link', resolvedProductId: productId, confirmed: true } : item));
     toast.success(`${groupItems.length} listings synced to Product Master`);
     setActiveGroup(null);
@@ -150,8 +190,8 @@ export default function CatalogImportReview() {
   function completeDraftAndLink(item: CatalogImportItem, draftId: string, name: string, sku: string) {
     const draft = getProducts().find(product => product.id === draftId);
     if (draft) {
-      const listing: ChannelListing = { channel: channelMap[item.channel], external_id: item.channelSku, status: 'pending', listing_url: null, last_synced_at: null };
-      updateProduct(draftId, { id: draftId, name, sku_code: sku, channels: [listing] });
+      updateProduct(draftId, { id: draftId, name, sku_code: sku });
+      syncCatalogListingToProduct(item, draftId);
     }
     const next = items.map(current => current.id === item.id ? { ...current, status: 'matched' as const, confidence: 100, resolution: 'link' as const, suggestedProductId: draftId, resolvedProductId: draftId, confirmed: true } : current);
     updateItems(next);
