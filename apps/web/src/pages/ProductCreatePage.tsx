@@ -1794,6 +1794,16 @@ export default function ProductCreatePage() {
   const shippingPackageRequired = OVERRIDE_CHANNELS.some(channel =>
     channelOverrides[channel.key].enabled && !['pos', 'social'].includes(channel.key)
   );
+  const categoryAttributesForProduct = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
+  const selectableVariantAttributes = categoryAttributesForProduct.filter(attribute =>
+    (attribute.type === 'Single select' || attribute.type === 'Multi-select') && attribute.options.trim()
+  );
+  const invalidVariantGroups = variantGroups.filter(group =>
+    !selectableVariantAttributes.some(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase())
+  );
+  const variantOptionsReady = variantGroups.length > 0
+    && invalidVariantGroups.length === 0
+    && variantGroups.every(group => group.values.length > 0);
   const completionChecks = useMemo(() => {
     const channelReadyForPublishing =
       Object.values(channelOverrides).some(item => item.enabled) &&
@@ -1816,16 +1826,21 @@ export default function ProductCreatePage() {
     if (form.has_variants) {
       checks.push({
         id: 'variants',
-        label: 'Complete all selected variants',
-        done: variantGroups.length > 0 && hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim()),
+        label: invalidVariantGroups.length > 0
+          ? `Replace ${invalidVariantGroups.length} invalid variant option ${invalidVariantGroups.length === 1 ? 'type' : 'types'}`
+          : variantGroups.length === 0
+            ? 'Add at least one valid variant option'
+            : variantGroups.some(group => group.values.length === 0)
+              ? 'Select values for every variant option'
+              : 'Complete all selected variants',
+        done: variantOptionsReady && hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim()),
       });
     }
 
     checks.push({ id: 'channels', label: 'Prepare at least one channel for publishing', done: channelReadyForPublishing });
     return checks;
-  }, [channelOverrides, form, hasGeneratedVariants, images.length, logisticsReady, pricingAndInventoryReady, selectedVariantItems, shippingPackageRequired, variantGroups.length]);
+  }, [channelOverrides, form, hasGeneratedVariants, images.length, invalidVariantGroups.length, logisticsReady, pricingAndInventoryReady, selectedVariantItems, shippingPackageRequired, variantGroups, variantOptionsReady]);
   const completion = Math.round((completionChecks.filter(check => check.done).length / completionChecks.length) * 100);
-  const categoryAttributesForProduct = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
   const requiredCategoryAttributes = categoryAttributesForProduct.filter(attribute => attribute.required);
   const specificationForAttribute = (attribute: CatalogAttribute) => specifications.find(spec => spec.attributeKey === attribute.key)
     ?? specifications.find(spec => !spec.attributeKey && spec.name.trim().toLowerCase() === attribute.name.toLowerCase());
