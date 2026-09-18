@@ -13,10 +13,8 @@ import Orders from "@/pages/Orders";
 import Products from "@/pages/Products";
 import ProductCreatePage from "@/pages/ProductCreatePage";
 import ProductDetail from "@/pages/ProductDetail";
-import AmazonListingDetail from "@/pages/AmazonListingDetail";
-import ChannelListingDetail from "@/pages/ChannelListingDetail";
-import CreateChannelListingsPage from "@/pages/CreateChannelListingsPage";
 import ProductCategories from "@/pages/ProductCategories";
+import CatalogImportReview from "@/pages/CatalogImportReview";
 import Warehouses from "@/pages/Warehouses";
 import PrimeInboxWorkspace from "@/pages/PrimeInboxWorkspace";
 import FaqHub from "@/pages/FaqHub";
@@ -67,6 +65,12 @@ function LegacyOrdersRedirect() {
   const params = new URLSearchParams(search);
   if (id) params.set('order', id);
   return <Navigate to={`/orders${params.size ? `?${params}` : ''}`} replace />;
+}
+
+function ProductChannelManagementRedirect() {
+  const { productId, id } = useParams<{ productId?: string; id?: string }>();
+  const targetId = productId ?? id;
+  return <Navigate to={targetId ? `/products/${targetId}/edit?section=distribution` : "/products/master-catalog"} replace />;
 }
 
 export function PrimeRoutes() {
@@ -174,6 +178,7 @@ export function PrimeRoutes() {
     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
+    <Route path="/products/catalog-imports" element={<CatalogImportReview />} />
     <Route path="/products/channel-listings" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/categories" element={<ProductCategories />} />
     <Route path="/products/attributes" element={<ProductCategories />} />
@@ -181,9 +186,8 @@ export function PrimeRoutes() {
     <Route path="/products/inventory" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/new" element={<ProductCreatePage />} />
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
-    <Route path="/products/:id/channel-listings/new" element={<CreateChannelListingsPage />} />
-    <Route path="/products/:productId/channels/amazon" element={<AmazonListingDetail />} />
-    <Route path="/products/:productId/channels/:channelKey" element={<ChannelListingDetail />} />
+    <Route path="/products/:id/channel-listings/new" element={<ProductChannelManagementRedirect />} />
+    <Route path="/products/:productId/channels/:channelKey" element={<ProductChannelManagementRedirect />} />
     <Route path="/products/:id" element={<ProductDetail />} />
     <Route path="/warehouses" element={<Navigate to="/warehouse/mapping" replace />} />
     <Route path="/docs" element={<Docs />} />

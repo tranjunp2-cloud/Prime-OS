@@ -31,11 +31,9 @@ import {
   RadioTower,
   Search,
   Settings2,
-  SlidersHorizontal,
   ShoppingBag,
   Sparkles,
   Store,
-  Tags,
   Truck,
   Undo2,
   UsersRound,
@@ -68,8 +66,8 @@ const mainNavigation: NavGroup[] = [
     { id: 'orders', label: 'Orders', href: '/orders', icon: ShoppingBag },
     { id: 'products', label: 'Products', icon: Package, children: [
       { id: 'master-catalog', label: 'Product Master', href: '/products/master-catalog', icon: Boxes },
-      { id: 'product-categories', label: 'Categories', href: '/products/categories', icon: Tags },
-      { id: 'product-attributes', label: 'Attributes', href: '/products/attributes', icon: SlidersHorizontal },
+      { id: 'catalog-imports', label: 'Catalog Imports', href: '/products/catalog-imports', icon: FilePlus2 },
+      { id: 'categories-attributes', label: 'Categories & Attributes', href: '/products/categories', icon: Layers3 },
       { id: 'product-brands', label: 'Brands', href: '/products/brands', icon: Award },
     ] },
     { id: 'warehouse', label: 'Warehouses', icon: Warehouse, children: [
@@ -123,7 +121,7 @@ const posNavigation: NavGroup[] = [{ id: 'pos', label: 'Point of Sale', items: [
 function hrefIsActive(href: string | undefined, pathname: string, search: string) {
   if (!href) return false;
   const [hrefPath, hrefSearch = ''] = href.split('?');
-  const reservedProductRoutes = new Set(['master-catalog', 'categories', 'attributes', 'brands', 'inventory', 'new']);
+  const reservedProductRoutes = new Set(['master-catalog', 'catalog-imports', 'categories', 'attributes', 'brands', 'inventory', 'new']);
   const productSegments = pathname.split('/').filter(Boolean);
   const isProductEditorRoute = pathname === '/products/new'
     || (productSegments[0] === 'products' && productSegments.length >= 2 && !reservedProductRoutes.has(productSegments[1]) && (productSegments.length === 2 || (productSegments.length === 3 && productSegments[2] === 'edit')));

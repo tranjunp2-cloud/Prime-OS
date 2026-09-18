@@ -33,8 +33,10 @@ export interface CatalogBrand {
 export interface CatalogCategory {
   id: string;
   name: string;
-  group: string;
-  parent: string;
+  parentId: string | null;
+  /** Legacy fields retained only so older browser demo data can be migrated. */
+  group?: string;
+  parent?: string;
   description: string;
   status: 'Active' | 'Inactive';
   source: CatalogRecordSource;
@@ -82,11 +84,42 @@ const defs = [
   ['beauty-personal-care', 'Beauty & Personal Care', 'Personal Care', 'Beauty', ['country_of_origin']],
 ] as const;
 
-export const defaultCatalogCategories: CatalogCategory[] = defs.map(([id, name, group, parent, keys], index) => ({
-  id, name, group, parent, description: '', status: 'Active', source: index > 12 ? 'imported' : 'internal',
-  attributes: keys.map((key, keyIndex) => ({ key, required: keyIndex < 2 })),
-  mappings: mappedChannels({ webstore: 'mapped', shopee: index % 3 ? 'mapped' : 'needs_review', lazada: index % 2 ? 'needs_review' : 'mapped', amazon: index % 4 ? 'mapped' : 'needs_review' }),
-}));
+function taxonomyId(prefix: 'root' | 'branch', ...parts: string[]) {
+  return `category-${prefix}-${parts.join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+}
+
+function buildDefaultCategories(): CatalogCategory[] {
+  const nodes: CatalogCategory[] = [];
+  const seen = new Set<string>();
+  const addNode = (category: CatalogCategory) => {
+    if (!seen.has(category.id)) { seen.add(category.id); nodes.push(category); }
+  };
+
+  defs.forEach(([id, name, group, parent, keys], index) => {
+    const rootId = taxonomyId('root', group);
+    const branchId = taxonomyId('branch', group, parent);
+    addNode({ id: rootId, name: group, parentId: null, description: '', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
+    addNode({ id: branchId, name: parent, parentId: rootId, description: '', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
+    addNode({
+      id, name, parentId: branchId, description: '', status: 'Active', source: index > 12 ? 'imported' : 'internal',
+      attributes: keys.map((key, keyIndex) => ({ key, required: keyIndex < 2 })),
+      mappings: mappedChannels({ webstore: 'mapped', shopee: index % 3 ? 'mapped' : 'needs_review', lazada: index % 2 ? 'needs_review' : 'mapped', amazon: index % 4 ? 'mapped' : 'needs_review' }),
+    });
+  });
+
+  const creativeRootId = taxonomyId('root', 'Office & Creative');
+  const stationeryBranchId = taxonomyId('branch', 'Office & Creative', 'Stationery');
+  const emergingBranchId = taxonomyId('branch', 'Office & Creative', 'Emerging Categories');
+  addNode({ id: creativeRootId, name: 'Office & Creative', parentId: null, description: 'Office, stationery and creative product taxonomy.', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
+  addNode({ id: stationeryBranchId, name: 'Stationery', parentId: creativeRootId, description: 'Paper goods, notebooks and art materials.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: false }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'needs_review', tiktok: 'needs_review', amazon: 'mapped', rakuten: 'needs_review' }) });
+  addNode({ id: 'art-supplies', name: 'Art Supplies', parentId: stationeryBranchId, description: 'Drawing, painting and craft supplies.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: true }, { key: 'color', required: false }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'mapped', tiktok: 'mapped', amazon: 'mapped', rakuten: 'mapped' }) });
+  addNode({ id: 'painting-accessories', name: 'Painting Accessories', parentId: stationeryBranchId, description: 'Brushes, palettes and painting tools linked to Product Masters.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: true }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'mapped', tiktok: 'mapped', amazon: 'mapped', rakuten: 'mapped' }) });
+  addNode({ id: emergingBranchId, name: 'Emerging Categories', parentId: creativeRootId, description: 'New categories awaiting catalog and channel setup.', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels({ webstore: 'needs_review' }) });
+  addNode({ id: 'bamboo-crafts', name: 'Bamboo Crafts', parentId: emergingBranchId, description: 'Demo case: no Product Masters and no channel mappings.', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels({ webstore: 'needs_review' }) });
+  return nodes;
+}
+
+export const defaultCatalogCategories: CatalogCategory[] = buildDefaultCategories();
 
 export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[] }
 
@@ -98,11 +131,46 @@ function defaults(): ProductCatalogSettings {
   };
 }
 
+function migrateLegacyCategories(input: CatalogCategory[]): CatalogCategory[] {
+  if (input.every(category => Object.prototype.hasOwnProperty.call(category, 'parentId'))) {
+    return input.map(category => ({ ...category, parentId: category.parentId ?? null }));
+  }
+
+  const migrated: CatalogCategory[] = [];
+  const seen = new Set<string>();
+  const addNode = (category: CatalogCategory) => {
+    if (!seen.has(category.id)) { seen.add(category.id); migrated.push(category); }
+  };
+
+  input.forEach(category => {
+    const group = category.group?.trim();
+    const legacyParent = category.parent?.trim();
+    if (!group) {
+      addNode({ ...category, parentId: null });
+      return;
+    }
+    const rootId = taxonomyId('root', group);
+    addNode({ id: rootId, name: group, parentId: null, description: '', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
+    const hasBranch = Boolean(legacyParent && legacyParent !== 'None (root category)' && legacyParent !== group);
+    const parentId = hasBranch ? taxonomyId('branch', group, legacyParent!) : rootId;
+    if (hasBranch) addNode({ id: parentId, name: legacyParent!, parentId: rootId, description: '', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
+    addNode({ ...category, parentId });
+  });
+  return migrated;
+}
+
+function ensureDemoTaxonomy(categories: CatalogCategory[]): CatalogCategory[] {
+  const existingIds = new Set(categories.map(category => category.id));
+  return [...categories, ...defaultCatalogCategories.filter(category => !existingIds.has(category.id))];
+}
+
 export function getProductCatalogSettings(): ProductCatalogSettings {
   if (typeof window === 'undefined') return defaults();
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored ? { ...defaults(), ...JSON.parse(stored) } : defaults();
+    if (!stored) return defaults();
+    const parsed = { ...defaults(), ...JSON.parse(stored) } as ProductCatalogSettings;
+    return { ...parsed, categories: ensureDemoTaxonomy(migrateLegacyCategories(parsed.categories)) };
   } catch { return defaults(); }
 }
 

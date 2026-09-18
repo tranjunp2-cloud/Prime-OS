@@ -3,11 +3,12 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Info, Image, Package, Truck, Layers, Check, Lock,
   Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes, PackageCheck,
-  Globe2, CircleCheck, CircleAlert, CloudUpload, Search, ChevronDown, ChevronRight, Save,
-  ShoppingBag, Store, MonitorSmartphone, MessageSquare, Radio,
+  Globe2, Circle, CircleCheck, CircleAlert, CloudUpload, Search, ChevronDown, ChevronRight, Save, ExternalLink,
+  ShoppingBag, Store, MonitorSmartphone, MessageSquare, Radio, Tags, Star, MoreHorizontal,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,16 +16,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { addProduct, updateProduct, getProductById, getAllSkus, type Product, type ChannelListing, type ProductType } from '@/lib/product-store';
+import { addProduct, updateProduct, getProductById, getAllSkus, getProducts, type Product, type ChannelListing, type ProductType, type MarketPrice, type ProductAssociation, type ProductRevision } from '@/lib/product-store';
 import { getWarehouses } from '@/lib/warehouse-store';
 import type { AmazonVariant } from '@/lib/amazon-catalog';
 import { uploadProductImage, validateImageFile } from '@/lib/product-images';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { formatLocalizedNumber, formatMessage } from '@/lib/i18n/format';
 import { cn } from '@/lib/utils';
-import type { ChannelWizardDraft } from '@/components/products/ChannelListingWizard';
-import { getActiveCatalogBrands, getActiveCatalogCategories, getAttributesForCategory } from '@/lib/product-catalog-settings-store';
+import { ChannelListingWizard, type ChannelWizardDraft } from '@/components/products/ChannelListingWizard';
+import { ChannelListingEditorDrawer } from '@/components/products/ChannelListingEditorDrawer';
+import { getActiveCatalogBrands, getActiveCatalogCategories, getAttributesForCategory, getProductCatalogSettings, saveProductCatalogSettings, type CatalogAttribute, type CatalogBrand } from '@/lib/product-catalog-settings-store';
+import { getCatalogImportItems } from '@/lib/catalog-import-store';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,11 +51,33 @@ interface VariantItem {
 type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
 interface ChannelOverrideForm extends ChannelWizardDraft {}
 
+type ProductWorkspace = 'overview' | 'product-data' | 'commerce' | 'distribution' | 'activity';
+type ContentLocale = 'en-US' | 'ja-JP' | 'vi-VN';
+
+const PRODUCT_WORKSPACES: Array<{ id: ProductWorkspace; label: string; description: string; icon: typeof Package }> = [
+  { id: 'overview', label: 'Overview', description: 'Status and next steps', icon: Package },
+  { id: 'product-data', label: 'Product data', description: 'Identity and attributes', icon: Tags },
+  { id: 'commerce', label: 'Pricing & Inventory', description: 'Variants, pricing and stock', icon: ShoppingBag },
+  { id: 'distribution', label: 'Media & Channels', description: 'Images and channel listings', icon: Globe2 },
+  { id: 'activity', label: 'Version history', description: 'Published revisions', icon: Info },
+];
+
+function resolveProductWorkspace(value: string | null): ProductWorkspace {
+  return PRODUCT_WORKSPACES.some(workspace => workspace.id === value) ? value as ProductWorkspace : 'overview';
+}
+
+function completionWorkspaceFor(checkId: string): { id: ProductWorkspace; label: string } {
+  if (['identity', 'content', 'category', 'shipping'].includes(checkId)) return { id: 'product-data', label: 'Product data' };
+  if (['price', 'variants'].includes(checkId)) return { id: 'commerce', label: 'Pricing & Inventory' };
+  return { id: 'distribution', label: 'Media & Channels' };
+}
+
 interface FormState {
   gtin: string;
   mpn: string;
   model_number: string;
   brand: string;
+  brandId: string;
   asin: string;
   manufacturer: string;
   sku_code: string;
@@ -83,22 +110,39 @@ interface FormState {
 const WAREHOUSES = getWarehouses().map(warehouse => ({ id: warehouse.id, label: warehouse.name, code: warehouse.code }));
 const CONDITIONS = ['new', 'refurbished', 'used_like_new', 'used_acceptable'];
 const CURRENCIES = ['JPY', 'USD', 'SGD', 'MYR', 'VND'];
+const COMMERCE_MARKETS: Array<{ market: MarketPrice['market']; label: string; currency: MarketPrice['currency'] }> = [
+  { market: 'JP', label: 'Japan', currency: 'JPY' },
+  { market: 'SG', label: 'Singapore', currency: 'SGD' },
+  { market: 'VN', label: 'Vietnam', currency: 'VND' },
+];
 const COUNTRIES = ['JP', 'CN', 'KR', 'US', 'SG', 'MY', 'VN', 'TW', 'TH', 'ID'];
+// Associations stay in the product model, but are hidden until a customer-facing
+// recommendation, accessory, replacement, or upsell workflow consumes them.
+const SHOW_PRODUCT_ASSOCIATIONS = false;
+type VersionHistoryEntry = ProductRevision & { changes: string[] };
+const DEMO_VERSION_HISTORY: VersionHistoryEntry[] = [
+  { id: 'demo-rev-1', number: 1, status: 'published', createdAt: '2026-09-15T08:10:00+07:00', createdBy: 'PrimeOS Admin', summary: 'Created the canonical Product Master from imported listings', changes: ['Created master identity and SKU', 'Mapped the Headphones category', 'Linked PrimeWeb and PrimePOS listings'] },
+  { id: 'demo-rev-2', number: 2, status: 'published', createdAt: '2026-09-16T14:35:00+07:00', createdBy: 'Mai Nguyen', summary: 'Completed product attributes and variant structure', changes: ['Added Color as a variant option', 'Generated Black and White variants', 'Updated canonical pricing and inventory'] },
+  { id: 'demo-rev-3', number: 3, status: 'restored', createdAt: '2026-09-17T10:20:00+07:00', createdBy: 'PrimeOS Admin', summary: 'Restored approved media and product content', changes: ['Restored the approved English description', 'Restored the main product image', 'Kept channel-owned listing overrides unchanged'] },
+];
 const OVERRIDE_CHANNELS: Array<{
   key: OverrideChannel;
   label: string;
   description: string;
+  account?: string;
+  connectionStatus: 'connected' | 'attention' | 'not_connected';
+  unavailableReason?: string;
   icon: typeof Globe2;
   iconClassName: string;
 }> = [
-  { key: 'webstore', label: 'PrimeWeb', description: 'Online storefront', icon: Globe2, iconClassName: 'bg-emerald-50 text-emerald-600' },
-  { key: 'pos', label: 'PrimePOS', description: 'Retail outlets', icon: Store, iconClassName: 'bg-violet-50 text-violet-600' },
-  { key: 'shopee', label: 'Shopee', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-orange-50 text-orange-600' },
-  { key: 'lazada', label: 'Lazada', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-blue-50 text-blue-600' },
-  { key: 'tiktok', label: 'TikTok Shop', description: 'Social commerce', icon: MonitorSmartphone, iconClassName: 'bg-slate-100 text-slate-700' },
-  { key: 'amazon', label: 'Amazon', description: 'Global marketplace', icon: ShoppingBag, iconClassName: 'bg-amber-50 text-amber-700' },
-  { key: 'rakuten', label: 'Rakuten', description: 'Marketplace', icon: ShoppingBag, iconClassName: 'bg-rose-50 text-rose-700' },
-  { key: 'social', label: 'Social Inbox', description: 'Chat-assisted sales', icon: MessageSquare, iconClassName: 'bg-sky-50 text-sky-600' },
+  { key: 'webstore', label: 'PrimeWeb', description: 'Online storefront', account: 'primebeauty.vn', connectionStatus: 'connected' as const, icon: Globe2, iconClassName: 'bg-emerald-50 text-emerald-600' },
+  { key: 'pos', label: 'PrimePOS', description: 'Retail outlets', account: 'District 1 Flagship', connectionStatus: 'connected' as const, icon: Store, iconClassName: 'bg-violet-50 text-violet-600' },
+  { key: 'shopee', label: 'Shopee', description: 'Marketplace', account: 'Prime Beauty Official', connectionStatus: 'connected' as const, icon: ShoppingBag, iconClassName: 'bg-orange-50 text-orange-600' },
+  { key: 'lazada', label: 'Lazada', description: 'Marketplace', account: 'Prime Flagship Store', connectionStatus: 'attention' as const, unavailableReason: 'Reconnect the expired store before creating a listing.', icon: ShoppingBag, iconClassName: 'bg-blue-50 text-blue-600' },
+  { key: 'tiktok', label: 'TikTok Shop', description: 'Social commerce', account: 'Prime Live Store', connectionStatus: 'attention' as const, unavailableReason: 'Resolve the channel sync error before creating a listing.', icon: MonitorSmartphone, iconClassName: 'bg-slate-100 text-slate-700' },
+  { key: 'amazon', label: 'Amazon', description: 'Global marketplace', account: 'Prime Beauty US', connectionStatus: 'attention' as const, unavailableReason: 'Resolve the channel sync error before creating a listing.', icon: ShoppingBag, iconClassName: 'bg-amber-50 text-amber-700' },
+  { key: 'rakuten', label: 'Rakuten', description: 'Marketplace', account: 'Prime Beauty JP', connectionStatus: 'connected' as const, icon: ShoppingBag, iconClassName: 'bg-rose-50 text-rose-700' },
+  { key: 'social', label: 'Social Inbox', description: 'Chat-assisted sales', connectionStatus: 'not_connected' as const, unavailableReason: 'Connect a Social Inbox workspace before creating a listing.', icon: MessageSquare, iconClassName: 'bg-sky-50 text-sky-600' },
 ];
 
 const listingChannelByOverride: Record<OverrideChannel, ChannelListing['channel']> = {
@@ -141,14 +185,19 @@ const DEFAULT_CATEGORY_TREE = [
 function buildCategoryTree() {
   const categories = getActiveCatalogCategories();
   if (!categories.length) return DEFAULT_CATEGORY_TREE;
-  const groups = new Map<string, Map<string, string[]>>();
-  categories.forEach(category => {
-    if (!groups.has(category.group)) groups.set(category.group, new Map());
-    const parent = category.parent && category.parent !== 'None (root category)' ? category.parent : category.group;
-    const children = groups.get(category.group)!;
-    children.set(parent, [...(children.get(parent) ?? []), category.name]);
+  const childrenByParent = new Map<string | null, typeof categories>();
+  categories.forEach(category => childrenByParent.set(category.parentId, [...(childrenByParent.get(category.parentId) ?? []), category]));
+  const sorted = (items: typeof categories) => [...items].sort((a, b) => a.name.localeCompare(b.name));
+  return sorted(childrenByParent.get(null) ?? []).map(root => {
+    const branches = sorted(childrenByParent.get(root.id) ?? []);
+    return {
+      label: root.name,
+      children: branches.length ? branches.map(branch => {
+        const leaves = sorted(childrenByParent.get(branch.id) ?? []).map(leaf => leaf.name);
+        return { label: branch.name, children: leaves.length ? leaves : [branch.name] };
+      }) : [{ label: root.name, children: [root.name] }],
+    };
   });
-  return Array.from(groups, ([label, children]) => ({ label, children: Array.from(children, ([childLabel, leaves]) => ({ label: childLabel, children: leaves })) }));
 }
 const PRODUCT_TYPE_ICONS = {
   single: Package,
@@ -156,7 +205,7 @@ const PRODUCT_TYPE_ICONS = {
 } satisfies Record<ProductType, typeof PackageCheck>;
 
 const EMPTY_FORM: FormState = {
-  gtin: '', mpn: '', model_number: '', brand: '',
+  gtin: '', mpn: '', model_number: '', brand: '', brandId: '',
   asin: '', manufacturer: '',
   sku_code: '', name: '', product_type: 'single',
   description: '',
@@ -172,8 +221,37 @@ function genId(prefix = 'id') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 function num(v: string) { return v ? Number(v) : 0; }
+
+function recoverImportedProductDraft(productId: string): Product | null {
+  const prefix = 'prod_import_';
+  if (!productId.startsWith(prefix)) return null;
+  const importId = productId.slice(prefix.length);
+  const item = getCatalogImportItems().find(candidate => candidate.id === importId);
+  if (!item) return null;
+  const categoryPath = item.channelCategory.toLowerCase();
+  const category = getActiveCatalogCategories()
+    .filter(candidate => categoryPath.includes(candidate.name.toLowerCase()))
+    .sort((left, right) => right.name.length - left.name.length)[0]?.name ?? '';
+  const now = new Date().toISOString();
+  return {
+    id: productId,
+    name: item.title,
+    sku_code: item.channelSku,
+    product_type: item.variants > 1 ? 'variant' : 'single',
+    gtin: '', mpn: '', model_number: '', brand: '', asin: item.channel === 'amazon' ? item.listingId : '', manufacturer: '',
+    category, condition: 'new', description: '',
+    original_price: 0, retail_price: item.price, price_currency: item.currency,
+    prod_length: 0, prod_height: 0, prod_width: 0, prod_weight: 0,
+    pkg_length: 0, pkg_height: 0, pkg_width: 0, pkg_weight: 0,
+    country_of_origin: '', hs_code: '', images: item.image ? [item.image] : [], specifications: [], inventory: {},
+    has_variants: item.variants > 1,
+    channels: [{ channel: item.channel, external_id: item.channelSku, status: 'pending', listing_url: null, last_synced_at: null }],
+    status: 'draft', created_at: now, updated_at: now, skus: [],
+  };
+}
+
 function slugify(value: string) {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return value.toLowerCase().replace(/[đĐ]/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 // Cartesian product of string arrays
@@ -221,6 +299,43 @@ function Field({ label, required, error, children }: {
   );
 }
 
+function BrandReferencePicker({ brands, brandId, brandName, onSelect, onCreate }: { brands: CatalogBrand[]; brandId: string; brandName: string; onSelect: (brand: CatalogBrand | null) => void; onCreate: (name: string) => CatalogBrand }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const normalizedQuery = query.trim().toLowerCase();
+  const results = brands.filter(brand => !normalizedQuery || [brand.name, brand.code, ...brand.aliases].some(value => value.toLowerCase().includes(normalizedQuery))).slice(0, 8);
+  const duplicate = Boolean(createName.trim()) && brands.some(brand => brand.name.trim().toLowerCase() === createName.trim().toLowerCase());
+  const selected = brands.find(brand => brand.id === brandId) ?? brands.find(brand => brand.name === brandName);
+
+  const createBrand = () => {
+    if (!createName.trim() || duplicate) return;
+    const brand = onCreate(createName.trim());
+    onSelect(brand);
+    setCreateName('');
+    setCreateOpen(false);
+  };
+
+  return <><Popover open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}><PopoverTrigger asChild><Button type="button" variant="outline" role="combobox" aria-expanded={open} className={cn('h-10 w-full justify-between px-3 font-normal', !selected && 'text-muted-foreground')}><span className="truncate">{selected?.name ?? 'Select canonical brand'}</span><ChevronDown className="size-4 opacity-60" /></Button></PopoverTrigger><PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0"><div className="border-b p-2"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search brands..." className="h-10 pl-9" /></div></div><div className="max-h-64 overflow-y-auto p-1">{results.length ? results.map(brand => <button key={brand.id} type="button" onClick={() => { onSelect(brand); setOpen(false); }} className="flex min-h-10 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="min-w-0"><span className="block truncate font-medium">{brand.name}</span><span className="block truncate font-mono text-[11px] text-muted-foreground">{brand.code}</span></span>{selected?.id === brand.id ? <Check className="size-4 shrink-0 text-emerald-500" /> : null}</button>) : <p className="px-3 py-4 text-center text-xs text-muted-foreground">No matching brand found.</p>}{selected ? <button type="button" onClick={() => { onSelect(null); setOpen(false); }} className="min-h-10 w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted">Clear brand</button> : null}</div><div className="border-t p-1"><button type="button" onClick={() => { setCreateName(query); setOpen(false); setCreateOpen(true); }} className="flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Plus className="size-4" />Create new brand</button></div></PopoverContent></Popover><Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Create brand</DialogTitle><DialogDescription>Create a reusable canonical Brand and link it to this Product Master.</DialogDescription></DialogHeader><div className="space-y-2 py-2"><Label htmlFor="inline-brand-name">Brand name</Label><Input id="inline-brand-name" autoFocus value={createName} onChange={event => setCreateName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); createBrand(); } }} placeholder="e.g. Sony" aria-invalid={duplicate} />{duplicate ? <p className="text-xs font-medium text-destructive">This Brand already exists. Select it from the list instead.</p> : null}</div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button><Button type="button" disabled={!createName.trim() || duplicate} onClick={createBrand}>Create and select</Button></div></DialogContent></Dialog></>;
+}
+
+function DynamicAttributeValueControl({ attribute, value, onChange }: { attribute: CatalogAttribute & { required: boolean }; value: string; onChange: (value: string) => void }) {
+  const options = attribute.options.split(',').map(option => option.trim()).filter(Boolean);
+  const selectedValues = value.split(',').map(option => option.trim()).filter(Boolean);
+  if (attribute.type === 'Single select') return <select value={value} onChange={event => onChange(event.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="">Select {attribute.name.toLowerCase()}</option>{options.map(option => <option key={option} value={option}>{option}</option>)}</select>;
+  if (attribute.type === 'Multi-select') return <div className="flex min-h-10 flex-wrap gap-2 rounded-md border border-input p-2">{options.map(option => { const checked = selectedValues.includes(option); return <button key={option} type="button" aria-pressed={checked} onClick={() => onChange(checked ? selectedValues.filter(item => item !== option).join(', ') : [...selectedValues, option].join(', '))} className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted')}>{option}</button>; })}</div>;
+  if (attribute.type === 'Number') return <Input type="number" value={value} onChange={event => onChange(event.target.value)} placeholder="Enter a number" />;
+  if (attribute.type === 'Measurement' || attribute.type === 'Measurement set') {
+    const unit = attribute.unit || 'cm';
+    const numericValue = value.endsWith(` ${unit}`) ? value.slice(0, -(unit.length + 1)) : value;
+    return <div className="grid grid-cols-[1fr_88px] gap-2"><Input type="number" value={numericValue} onChange={event => onChange(event.target.value ? `${event.target.value} ${unit}` : '')} placeholder="0" /><div className="grid place-items-center rounded-md border bg-muted/30 px-3 text-sm font-medium text-muted-foreground">{unit}</div></div>;
+  }
+  if (attribute.type === 'Country selector') return <select value={value} onChange={event => onChange(event.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="">Select country</option>{['Japan', 'Singapore', 'Vietnam', 'China', 'South Korea', 'United States', 'United Kingdom', 'Other'].map(country => <option key={country}>{country}</option>)}</select>;
+  if (attribute.type === 'Rich text') return <Textarea value={value} onChange={event => onChange(event.target.value)} rows={3} placeholder={`Enter ${attribute.name.toLowerCase()}`} />;
+  return <Input value={value} onChange={event => onChange(event.target.value)} placeholder={`Enter ${attribute.name.toLowerCase()}`} />;
+}
+
 function RowField({ label, fields }: {
   label: string;
   fields: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string }[];
@@ -254,6 +369,8 @@ interface VariantSectionProps {
   basePrice: string;
   currency: string;
   existingSkus: string[];
+  availableAttributes: Array<{ key: string; name: string; options: string[] }>;
+  onManageAttribute: (key: string) => void;
   copy: {
     duplicateAttribute: string;
     addValuePlaceholder: string;
@@ -274,10 +391,9 @@ interface VariantSectionProps {
 
 function VariantSection({
   groups, onGroupsChange, items, onItemsChange,
-  parentSku, basePrice, currency, existingSkus, copy,
+  parentSku, basePrice, currency, existingSkus, availableAttributes, onManageAttribute, copy,
 }: VariantSectionProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [groupInput, setGroupInput] = useState<Record<string, string>>({});
   const [addGroupName, setAddGroupName] = useState('');
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [bulkPrice, setBulkPrice] = useState('');
@@ -359,88 +475,49 @@ function VariantSection({
     setErrors(e => ({ ...e, addGroup: '' }));
   }
 
-  function deleteGroupValue(groupId: string, valIdx: number) {
-    onGroupsChange(groups.map(g =>
-      g.id === groupId ? { ...g, values: g.values.filter((_, i) => i !== valIdx) } : g
-    ));
+  function toggleGroupValue(groupId: string, value: string) {
+    onGroupsChange(groups.map(group => group.id === groupId
+      ? { ...group, values: group.values.some(current => current.toLowerCase() === value.toLowerCase()) ? group.values.filter(current => current.toLowerCase() !== value.toLowerCase()) : [...group.values, value] }
+      : group));
   }
 
-  function addValueToGroup(groupId: string, val: string) {
-    if (!val.trim()) return;
-    const normalized = val.trim();
-    if (groups.find(g => g.id === groupId)?.values.find(v => v.toLowerCase() === normalized.toLowerCase())) {
-      return;
-    }
-    onGroupsChange(groups.map(g =>
-      g.id === groupId ? { ...g, values: [...g.values, normalized] } : g
-    ));
-    // clear input
-    setGroupInput(prev => ({ ...prev, [groupId]: '' }));
+  function replaceGroupAttribute(groupId: string, attributeName: string) {
+    const attribute = availableAttributes.find(item => item.name === attributeName);
+    if (!attribute) return;
+    onGroupsChange(groups.map(group => group.id === groupId ? { ...group, name: attribute.name, values: [] } : group));
   }
 
   const totalSelected = items.filter(i => i.selected).length;
   const totalCombinations = variantKeys.length;
+  const remainingAttributes = availableAttributes.filter(attribute =>
+    !groups.some(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase())
+  );
 
   return (
     <div className="space-y-4">
 
         {/* Existing Groups */}
-        {groups.map(group => (
-          <div key={group.id} className="border rounded-lg p-3 space-y-2">
+        {groups.map(group => {
+          const canonicalAttribute = availableAttributes.find(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase());
+          const canonicalOptions = canonicalAttribute?.options ?? [];
+          return <div key={group.id} className="border rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">{group.name}</p>
-              <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => deleteGroup(group.id)}>
+              <div><p className="text-sm font-medium">{canonicalAttribute?.name ?? group.name}</p>{canonicalAttribute ? <p className="mt-0.5 text-[11px] text-muted-foreground">Select values available for this product.</p> : <p className="mt-0.5 text-[11px] font-medium text-amber-600">This option type is not defined for the selected category.</p>}</div>
+              {groups.length > 1 ? <Button variant="ghost" size="icon" className="size-7 text-destructive" aria-label={`Remove ${canonicalAttribute?.name ?? group.name} from variants`} onClick={() => deleteGroup(group.id)}>
                 <Trash2 className="size-3.5" />
-              </Button>
+              </Button> : null}
             </div>
-            {/* Values */}
-            <div className="flex flex-wrap gap-1.5">
-              {group.values.map((val, vi) => (
-                <span key={vi} className="inline-flex items-center gap-1 bg-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
-                  {val}
-                  <button
-                    onClick={() => deleteGroupValue(group.id, vi)}
-                    className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="size-2.5" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            {/* Add value */}
-            <div className="flex gap-1.5">
-              <Input
-                value={groupInput[group.id] ?? ''}
-                onChange={e => setGroupInput(prev => ({ ...prev, [group.id]: e.target.value }))}
-                placeholder={formatMessage(copy.addValuePlaceholder, { group: group.name })}
-                className="h-8 text-xs"
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addValueToGroup(group.id, groupInput[group.id] ?? '');
-                  }
-                }}
-              />
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => addValueToGroup(group.id, groupInput[group.id] ?? '')}>
-                <Plus className="size-3 mr-0.5" /> {copy.add}
-              </Button>
-            </div>
-          </div>
-        ))}
+            {canonicalAttribute ? <><div className="flex flex-wrap gap-2" role="group" aria-label={`Select ${canonicalAttribute.name} variant values`}>{canonicalOptions.map(option => { const selected = group.values.some(value => value.toLowerCase() === option.toLowerCase()); return <button key={option} type="button" aria-pressed={selected} onClick={() => toggleGroupValue(group.id, option)} className={cn('min-h-9 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5')}>{option}{selected ? <Check className="ml-1.5 inline size-3" /> : null}</button>; })}</div><button type="button" onClick={() => onManageAttribute(canonicalAttribute.key)} className="text-[11px] font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{canonicalAttribute.name} not listed? Manage values</button></> : <div className="space-y-2 rounded-lg border border-amber-300/50 bg-amber-500/5 p-3"><label className="text-xs font-semibold" htmlFor={`replace-variant-${group.id}`}>Replace “{group.name}” with a valid option type</label><select id={`replace-variant-${group.id}`} value="" onChange={event => replaceGroupAttribute(group.id, event.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Select option type</option>{availableAttributes.filter(attribute => !groups.some(current => current.id !== group.id && current.name.toLowerCase() === attribute.name.toLowerCase())).map(attribute => <option key={attribute.key} value={attribute.name}>{attribute.name}</option>)}</select></div>}
+          </div>;
+        })}
 
         {/* Add Group */}
-        {showAddGroup ? (
+        {groups.length < 2 && remainingAttributes.length > 0 && (showAddGroup ? (
           <div className="border border-dashed border-border rounded-lg p-3 space-y-2">
-            <Input
-              value={addGroupName}
-              onChange={e => { setAddGroupName(e.target.value); setErrors({}); }}
-              placeholder={copy.addGroupPlaceholder}
-              className="h-8 text-xs"
-              autoFocus
-            />
+            <select aria-label="Variant option type" value={addGroupName} onChange={event => { setAddGroupName(event.target.value); setErrors({}); }} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" autoFocus><option value="">Select option type</option>{remainingAttributes.map(attribute => <option key={attribute.key} value={attribute.name}>{attribute.name}</option>)}</select>
             {errors.addGroup && <p className="text-xs text-destructive">{errors.addGroup}</p>}
             <div className="flex gap-1.5">
-              <Button size="sm" className="h-8 text-xs" onClick={addGroup}>{copy.addAttribute}</Button>
+              <Button size="sm" className="h-8 text-xs" disabled={!addGroupName} onClick={addGroup}>Add option type</Button>
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => { setShowAddGroup(false); setAddGroupName(''); }}>
                 {copy.cancel}
               </Button>
@@ -452,19 +529,18 @@ function VariantSection({
             size="sm"
             className="text-xs h-8"
             onClick={() => setShowAddGroup(true)}
-            disabled={groups.length >= 2}
           >
-            <Plus className="size-3 mr-1" /> {copy.addVariantAttribute}
+            <Plus className="size-3 mr-1" /> Add option type
           </Button>
-        )}
-        <p className="text-[11px] text-muted-foreground">Up to 2 attributes are supported, for example Color × Size.</p>
+        ))}
+        {remainingAttributes.length > 0 && groups.length < 2 ? <p className="text-[11px] text-muted-foreground">Add another option type configured for this category, such as Size.</p> : null}
 
         {/* Variant Matrix Summary */}
         {totalCombinations > 0 && (
           <div className="border-t pt-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs text-muted-foreground">
-                {formatMessage(copy.variantsWillBeCreated, { count: totalCombinations })}
+                {groups.map(group => `${group.values.length} ${group.name.toLowerCase()}${group.values.length === 1 ? '' : 's'}`).join(' × ')} <span aria-hidden="true">·</span> <strong className="text-foreground">{totalCombinations} {totalCombinations === 1 ? 'variant' : 'variants'}</strong>
               </p>
               <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                 <Checkbox
@@ -477,11 +553,12 @@ function VariantSection({
 
             {/* Variant Table */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="grid gap-2 border-b bg-muted/40 p-3 sm:grid-cols-[1fr_1fr_1.2fr_auto]">
-                <Field label="Bulk Price"><Input type="number" value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Leave unchanged" className="h-8 text-xs" /></Field>
-                <Field label="Bulk Stock"><Input type="number" value={bulkStock} onChange={event => setBulkStock(event.target.value)} placeholder="Leave unchanged" className="h-8 text-xs" /></Field>
-                <Field label="SKU Prefix"><Input value={bulkSku} onChange={event => setBulkSku(event.target.value)} placeholder="e.g. SHIRT" className="h-8 text-xs uppercase" /></Field>
-                <Button type="button" size="sm" className="self-end" disabled={!bulkPrice && !bulkStock && !bulkSku.trim()} onClick={applyBulkValues}>Apply to all</Button>
+              <div className="border-b bg-muted/40 p-3"><p className="mb-2 text-xs font-semibold">Bulk edit</p><div className="grid gap-2 sm:grid-cols-[1fr_1fr_1.2fr_auto]">
+                <Field label="Price"><Input type="number" value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="No change" className="h-8 text-xs" /></Field>
+                <Field label="Stock"><Input type="number" value={bulkStock} onChange={event => setBulkStock(event.target.value)} placeholder="No change" className="h-8 text-xs" /></Field>
+                <Field label="SKU prefix"><Input value={bulkSku} onChange={event => setBulkSku(event.target.value)} placeholder="e.g. SHIRT" className="h-8 text-xs uppercase" /></Field>
+                <Button type="button" size="sm" className="self-end" disabled={!bulkPrice && !bulkStock && !bulkSku.trim()} onClick={applyBulkValues}>Apply</Button>
+              </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs" aria-label="Variant pricing matrix">
@@ -647,7 +724,7 @@ export default function ProductCreatePage() {
       required: 'Required',
       recommended: 'Recommended',
       mainImage: 'Main Image',
-      additionalImages: 'Additional Images ({count}/9)',
+      additionalImages: 'Additional images · {count} of 9',
       add: 'Add',
       units: 'units',
       totalStock: 'Total Stock',
@@ -746,7 +823,7 @@ export default function ProductCreatePage() {
       required: '必須',
       recommended: '推奨',
       mainImage: 'メイン画像',
-      additionalImages: '追加画像 ({count}/9)',
+      additionalImages: '追加画像 · {count}/9',
       add: '追加',
       units: '点',
       totalStock: '総在庫',
@@ -845,7 +922,7 @@ export default function ProductCreatePage() {
       required: 'Bắt buộc',
       recommended: 'Khuyến nghị',
       mainImage: 'Ảnh chính',
-      additionalImages: 'Ảnh bổ sung ({count}/9)',
+      additionalImages: 'Ảnh bổ sung · {count} trên 9',
       add: 'Thêm',
       units: 'đơn vị',
       totalStock: 'Tổng tồn',
@@ -944,7 +1021,7 @@ export default function ProductCreatePage() {
     required: 'Required',
     recommended: 'Recommended',
     mainImage: 'Main Image',
-    additionalImages: 'Additional Images ({count}/9)',
+    additionalImages: 'Additional images · {count} of 9',
     add: 'Add',
     units: 'units',
     totalStock: 'Total Stock',
@@ -997,9 +1074,14 @@ export default function ProductCreatePage() {
   // Edit mode: read product ID from URL param (:id) or query (?edit=)
   const queryEdit = new URLSearchParams(location.search).get('edit');
   const editId = params.id ?? (queryEdit ?? undefined);
-  const existingProduct = editId ? getProductById(editId) : null;
+  const storedProduct = editId ? getProductById(editId) : null;
+  const recoveredImportProduct = useMemo(
+    () => editId && !storedProduct ? recoverImportedProductDraft(editId) : null,
+    [editId, storedProduct],
+  );
+  const existingProduct = storedProduct ?? recoveredImportProduct;
   const existingSkuList = getAllSkus();
-  const catalogBrands = useMemo(() => getActiveCatalogBrands(), []);
+  const [catalogBrands, setCatalogBrands] = useState<CatalogBrand[]>(() => getActiveCatalogBrands());
   const categoryTree = useMemo(() => buildCategoryTree(), []);
 
   const [inventory, setInventory] = useState<Record<string, string>>(
@@ -1007,6 +1089,21 @@ export default function ProductCreatePage() {
       ? Object.fromEntries(Object.entries(existingProduct.inventory).map(([k, v]) => [k, String(v)]))
       : Object.fromEntries(WAREHOUSES.map(w => [w.id, '0']))
   );
+  const [marketPrices, setMarketPrices] = useState<MarketPrice[]>(() => COMMERCE_MARKETS.map(market => {
+    const saved = existingProduct?.market_prices?.find(item => item.market === market.market);
+    const canonicalMarket = existingProduct?.price_currency === market.currency;
+    return saved ?? {
+      market: market.market,
+      currency: market.currency,
+      enabled: Boolean(canonicalMarket),
+      price: canonicalMarket ? existingProduct?.retail_price ?? 0 : 0,
+    };
+  }));
+  const [associations, setAssociations] = useState<ProductAssociation[]>(existingProduct?.associations ?? []);
+  const [associationProductId, setAssociationProductId] = useState('');
+  const [associationType, setAssociationType] = useState<ProductAssociation['type']>('related');
+  const [revisionDetail, setRevisionDetail] = useState<VersionHistoryEntry | null>(null);
+  const associationCandidates = useMemo(() => getProducts().filter(product => product.id !== existingProduct?.id), [existingProduct?.id]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -1014,6 +1111,18 @@ export default function ProductCreatePage() {
   const searchParams = new URLSearchParams(location.search);
   const urlSku = searchParams.get('sku') ?? '';
   const urlFamily = searchParams.get('family') ?? '';
+  const selectedRevisionId = searchParams.get('revision');
+  const selectedRevision = existingProduct?.revisions?.find(revision => revision.id === selectedRevisionId);
+  const isHistorical = Boolean(selectedRevisionId && selectedRevision);
+  const versionHistoryEntries: VersionHistoryEntry[] = existingProduct?.revisions?.length
+    ? existingProduct.revisions.map(revision => ({ ...revision, changes: [revision.summary] }))
+    : existingProduct?.id === 'prod_import_imp-003' ? DEMO_VERSION_HISTORY : [];
+  const requestedContentLocale = searchParams.get('locale');
+  const contentLocale: ContentLocale = requestedContentLocale === 'ja-JP' || requestedContentLocale === 'vi-VN' ? requestedContentLocale : 'en-US';
+  const canWrite = searchParams.get('mode') !== 'viewer' && !isHistorical;
+  const [localizedContent, setLocalizedContent] = useState(existingProduct?.localized_content ?? {});
+  const [staleConflictOpen, setStaleConflictOpen] = useState(false);
+  const loadedVersionRef = useRef(existingProduct?.record_version ?? 1);
 
   const initForm = () => {
     if (existingProduct) {
@@ -1022,6 +1131,7 @@ export default function ProductCreatePage() {
         mpn: existingProduct.mpn,
         model_number: existingProduct.model_number,
         brand: existingProduct.brand,
+        brandId: existingProduct.brandId ?? getActiveCatalogBrands().find(brand => [brand.name, brand.code, ...brand.aliases].some(value => value.toLowerCase() === existingProduct.brand.toLowerCase()))?.id ?? '',
         asin: existingProduct.asin,
         manufacturer: existingProduct.manufacturer,
         sku_code: existingProduct.sku_code,
@@ -1055,6 +1165,9 @@ export default function ProductCreatePage() {
   const [form, setForm] = useState<FormState>(initForm);
   const [advancedIdentityOpen, setAdvancedIdentityOpen] = useState(() => Boolean(
     existingProduct?.mpn || existingProduct?.model_number || existingProduct?.manufacturer,
+  ));
+  const [complianceOpen, setComplianceOpen] = useState(() => Boolean(
+    existingProduct?.country_of_origin || existingProduct?.hs_code,
   ));
 
   // Sync form fields when URL params change (e.g. after navigating from CreateProductDialog)
@@ -1117,7 +1230,7 @@ export default function ProductCreatePage() {
         ...(urlFamily ? { category: urlFamily } : {}),
         ...(urlAsin ? { asin: urlAsin } : {}),
         ...(urlTitle ? { name: urlTitle } : {}),
-        ...(urlBrand ? { brand: urlBrand } : {}),
+        ...(urlBrand ? { brand: urlBrand, brandId: getActiveCatalogBrands().find(brand => [brand.name, brand.code, ...brand.aliases].some(value => value.toLowerCase() === urlBrand.toLowerCase()))?.id ?? '' } : {}),
         ...(urlMsrp ? { original_price: urlMsrp } : {}),
         ...(urlVariants === '1' ? { has_variants: true } : {}),
       }));
@@ -1126,7 +1239,7 @@ export default function ProductCreatePage() {
   }, [location.search]);
 
   const [packageWeightUnit, setPackageWeightUnit] = useState<'g' | 'kg'>('g');
-  const [channelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
+  const [channelOverrides, setChannelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
     const saved = existingProduct?.channel_overrides;
     const make = (key: OverrideChannel): ChannelOverrideForm => ({
       enabled: saved?.[key]?.enabled ?? Boolean(existingProduct?.channels.some(listing => listing.channel === listingChannelByOverride[key])),
@@ -1164,6 +1277,10 @@ export default function ProductCreatePage() {
     });
     return Object.fromEntries(OVERRIDE_CHANNELS.map(channel => [channel.key, make(channel.key)])) as Record<OverrideChannel, ChannelOverrideForm>;
   });
+  const [channelListingWizardOpen, setChannelListingWizardOpen] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<OverrideChannel | null>(null);
+  const [channelRemovalTarget, setChannelRemovalTarget] = useState<OverrideChannel | null>(null);
+  const [channelListingDrafts, setChannelListingDrafts] = useState<Record<OverrideChannel, ChannelOverrideForm>>(channelOverrides);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishPercent, setPublishPercent] = useState(0);
   const [readinessStatus, setReadinessStatus] = useState<'unchecked' | 'checking' | 'blocked' | 'ready' | 'published'>(
@@ -1176,14 +1293,17 @@ export default function ProductCreatePage() {
   const [skuChangeConfirmed, setSkuChangeConfirmed] = useState(false);
   const [skuChangeError, setSkuChangeError] = useState('');
   const [, setDraftSaveGeneration] = useState(0);
+  const [catalogSettingsVersion, setCatalogSettingsVersion] = useState(0);
   const [dirtyTrackingReady, setDirtyTrackingReady] = useState(false);
   const [hasScrolledFromTop, setHasScrolledFromTop] = useState(false);
   const baselineSnapshotRef = useRef('');
   const latestSnapshotRef = useRef('');
 
   useEffect(() => {
-    if (editId && !existingProduct) navigate('/products/new', { replace: true });
-  }, [editId, existingProduct, navigate]);
+    if (editId && recoveredImportProduct && !storedProduct) {
+      addProduct(recoveredImportProduct);
+    }
+  }, [editId, recoveredImportProduct, storedProduct]);
 
   // Images (stored as data URLs)
   const [images, setImages] = useState<string[]>(existingProduct?.images ?? []);
@@ -1194,38 +1314,97 @@ export default function ProductCreatePage() {
   const [categoryLevelOne, setCategoryLevelOne] = useState(categoryTree[0].label);
   const [categoryLevelTwo, setCategoryLevelTwo] = useState(categoryTree[0].children[0].label);
   const [pendingCategory, setPendingCategory] = useState(form.category);
-  const [activeSection, setActiveSection] = useState('basic');
-  const [specifications, setSpecifications] = useState<Array<{ id: string; name: string; value: string }>>(
-    existingProduct?.specifications?.map(item => ({ ...item, id: genId('spec') })) ?? [{ id: genId('spec'), name: '', value: '' }]
+  const [activeSection, setActiveSection] = useState<ProductWorkspace>(() => resolveProductWorkspace(new URLSearchParams(location.search).get('section')));
+  const [specifications, setSpecifications] = useState<Array<{ id: string; attributeKey?: string; name: string; value: string }>>(
+    existingProduct?.specifications?.map(item => ({ ...item, id: genId('spec') })) ?? []
   );
 
   useEffect(() => {
-    if (!form.category) return;
+    if (!form.category) {
+      setSpecifications(current => current.filter(item => !item.attributeKey));
+      return;
+    }
     const categoryAttributes = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
     setSpecifications(current => {
-      const existingNames = new Set(current.map(item => item.name.toLowerCase()));
-      const missing = categoryAttributes.filter(item => !existingNames.has(item.name.toLowerCase())).map(item => ({ id: genId('spec'), name: item.name, value: '' }));
-      return missing.length ? [...current.filter(item => item.name || item.value), ...missing] : current;
+      const canonical = categoryAttributes.map(attribute => {
+        const existing = current.find(item => item.attributeKey === attribute.key)
+          ?? current.find(item => !item.attributeKey && item.name.trim().toLowerCase() === attribute.name.toLowerCase());
+        return existing
+          ? { ...existing, attributeKey: attribute.key, name: attribute.name }
+          : { id: genId('spec'), attributeKey: attribute.key, name: attribute.name, value: '' };
+      });
+      const categoryKeys = new Set(categoryAttributes.map(attribute => attribute.key));
+      const categoryNames = new Set(categoryAttributes.map(attribute => attribute.name.toLowerCase()));
+      const custom = current.filter(item => !categoryKeys.has(item.attributeKey ?? '') && !categoryNames.has(item.name.trim().toLowerCase()));
+      return [...canonical, ...custom.filter(item => item.name || item.value)];
     });
-  }, [form.category]);
+  }, [form.category, catalogSettingsVersion]);
+
+  useEffect(() => {
+    const refreshCatalogSettings = () => setCatalogSettingsVersion(current => current + 1);
+    window.addEventListener('focus', refreshCatalogSettings);
+    window.addEventListener('storage', refreshCatalogSettings);
+    return () => {
+      window.removeEventListener('focus', refreshCatalogSettings);
+      window.removeEventListener('storage', refreshCatalogSettings);
+    };
+  }, []);
 
   // Variant state
   const [variantGroups, setVariantGroups] = useState<VariantGroup[]>(() => hydrateExistingVariants(existingProduct).groups);
   const [variantItems, setVariantItems] = useState<VariantItem[]>(() => hydrateExistingVariants(existingProduct).items);
+  const variantAutoSeedKeyRef = useRef('');
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; target: Exclude<ProductType, 'variant'> }>({ open: false, target: 'single' });
 
   function setField<K extends keyof FormState>(k: K, v: FormState[K]) {
+    if (!canWrite) return;
     setForm(f => ({ ...f, [k]: v }));
     if (errors[k]) setErrors(e => ({ ...e, [k]: '' }));
   }
 
+  function createCanonicalBrand(name: string): CatalogBrand {
+    const canonicalName = name.trim();
+    const brand: CatalogBrand = {
+      id: `${slugify(canonicalName)}-${Date.now().toString(36)}`,
+      name: canonicalName,
+      code: slugify(canonicalName).replace(/-/g, '_').toUpperCase(),
+      manufacturer: '', country: '', website: '', productCount: 0,
+      status: 'Unverified', source: 'internal', aliases: [], mappings: {},
+    };
+    const settings = getProductCatalogSettings();
+    saveProductCatalogSettings({ ...settings, brands: [...settings.brands, brand] });
+    setCatalogBrands(current => [...current, brand]);
+    toast({ title: 'Brand created', description: `${brand.name} was added to the Brand registry and selected.` });
+    return brand;
+  }
+
   function updateProductName(value: string) {
+    if (!canWrite) return;
+    if (contentLocale !== 'en-US') {
+      setLocalizedContent(current => ({ ...current, [contentLocale]: { name: value, description: current[contentLocale]?.description ?? '' } }));
+      return;
+    }
     setForm(current => ({
       ...current,
       name: value,
       slug: current.slug && current.slug !== slugify(current.name) ? current.slug : slugify(value),
     }));
     if (errors.name) setErrors(current => ({ ...current, name: '' }));
+  }
+
+  function updateProductDescription(value: string) {
+    if (!canWrite) return;
+    if (contentLocale !== 'en-US') {
+      setLocalizedContent(current => ({ ...current, [contentLocale]: { name: current[contentLocale]?.name ?? '', description: value } }));
+      return;
+    }
+    setField('description', value);
+  }
+
+  function selectContentLocale(nextLocale: ContentLocale) {
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.set('locale', nextLocale);
+    navigate({ pathname: location.pathname, search: nextParams.toString() }, { replace: true });
   }
 
   function openMasterSkuChange() {
@@ -1257,20 +1436,76 @@ export default function ProductCreatePage() {
     });
   }
 
-  function scrollToSection(id: string) {
-    document.getElementById(`product-section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  function selectWorkspace(id: ProductWorkspace) {
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.set('section', id);
+    navigate({ pathname: location.pathname, search: nextParams.toString() }, { replace: true });
     setActiveSection(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openAttributeSetup(target: { attribute?: string; category?: string }) {
+    if (isDirty && !handleSave('draft', { navigateAfter: false })) return;
+    const params = new URLSearchParams();
+    if (target.attribute) {
+      params.set('tab', 'attributes');
+      params.set('attribute', target.attribute);
+    }
+    if (target.category) {
+      params.set('category', target.category);
+      params.set('panel', 'attributes');
+    }
+    params.set('returnTo', `${location.pathname}?section=product-data`);
+    params.set('returnLabel', form.name || form.sku_code || 'Product Master');
+    params.set('returnMode', 'navigate');
+    navigate(`/products/categories?${params.toString()}`);
+  }
+
+  function openChannelListingSetup() {
+    if (!existingProduct || isDirty) {
+      toast({
+        title: existingProduct ? 'Save this Product Master first' : 'Create this Product Master first',
+        description: 'Channel listings must use a saved Product Master revision.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setChannelListingDrafts(Object.fromEntries(Object.entries(channelOverrides).map(([key, value]) => [key, { ...value }])) as Record<OverrideChannel, ChannelOverrideForm>);
+    setChannelListingWizardOpen(true);
+  }
+
+  function viewRevision(revisionId: string) {
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.set('section', 'activity');
+    nextParams.set('revision', revisionId);
+    navigate({ pathname: location.pathname, search: nextParams.toString() }, { replace: true });
+    setActiveSection('activity');
+  }
+
+  function returnToCurrentDraft() {
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.delete('revision');
+    navigate({ pathname: location.pathname, search: nextParams.toString() }, { replace: true });
+  }
+
+  function openCompletionItem(checkId: string) {
+    const workspace = completionWorkspaceFor(checkId).id;
+    const targetByCheck: Record<string, string> = {
+      identity: 'product-name', content: 'product-description', category: 'product-category-trigger',
+      shipping: 'product-section-shipping', price: 'product-section-pricing', variants: 'variant-attributes-title',
+      media: 'product-media-panel', channels: 'product-section-channels',
+    };
+    selectWorkspace(workspace);
+    window.setTimeout(() => {
+      const target = document.getElementById(targetByCheck[checkId] ?? '');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target?.focus({ preventScroll: true });
+    }, 120);
   }
 
   useEffect(() => {
-    const ids = ['channels', 'basic', 'pricing', 'shipping', 'more'];
-    const observer = new IntersectionObserver(entries => {
-      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (visible) setActiveSection(visible.target.id.replace('product-section-', ''));
-    }, { rootMargin: '-25% 0px -60% 0px', threshold: [0.05, 0.25] });
-    ids.forEach(id => { const element = document.getElementById(`product-section-${id}`); if (element) observer.observe(element); });
-    return () => observer.disconnect();
-  }, []);
+    setActiveSection(resolveProductWorkspace(new URLSearchParams(location.search).get('section')));
+  }, [location.search]);
 
   async function handleImageUpload(file: File, mode: 'primary' | 'gallery') {
     const validation = validateImageFile(file);
@@ -1295,6 +1530,23 @@ export default function ProductCreatePage() {
   function handleProductTypeChange(nextType: ProductType) {
     if (nextType === form.product_type) return;
     if (nextType === 'variant') {
+      const eligibleAttributes = categoryAttributesForProduct.filter(attribute =>
+        (attribute.type === 'Single select' || attribute.type === 'Multi-select') && attribute.options.trim()
+      );
+      const suggestedAttribute = eligibleAttributes.find(attribute => {
+        const value = specificationForAttribute(attribute)?.value.trim();
+        return Boolean(value);
+      }) ?? eligibleAttributes[0];
+      if (suggestedAttribute && variantGroups.length === 0) {
+        const currentValue = specificationForAttribute(suggestedAttribute)?.value.trim() ?? '';
+        setVariantGroups([{ id: genId('variant-group'), name: suggestedAttribute.name, values: currentValue ? [currentValue] : [] }]);
+        toast({
+          title: currentValue ? `${suggestedAttribute.name} moved to variants` : `${suggestedAttribute.name} added to variants`,
+          description: currentValue
+            ? `${currentValue} is now the first variant value. Add more values in Commerce.`
+            : `Choose one or more ${suggestedAttribute.name.toLowerCase()} values in Commerce.`,
+        });
+      }
       setForm(current => ({ ...current, product_type: 'variant', has_variants: true }));
       return;
     }
@@ -1312,7 +1564,13 @@ export default function ProductCreatePage() {
     setConfirmDialog({ open: false, target: 'single' });
   }
 
-  function handleSave(statusOverride?: Product['status'], options: { navigateAfter?: boolean } = {}) {
+  function handleSave(statusOverride?: Product['status'], options: { navigateAfter?: boolean; force?: boolean } = {}) {
+    if (!canWrite) return false;
+    const latestVersion = existingProduct ? getProductById(existingProduct.id)?.record_version ?? 1 : 1;
+    if (existingProduct && latestVersion !== loadedVersionRef.current && !options.force) {
+      setStaleConflictOpen(true);
+      return false;
+    }
     if (uploadingImageCount > 0) {
       toast({
         title: copy.imagesStillUploading,
@@ -1329,6 +1587,9 @@ export default function ProductCreatePage() {
     }
     if (!form.name.trim()) e.name = copy.nameRequired;
     if (!form.category) e.category = copy.categoryRequired;
+    if (form.category && missingRequiredCategoryAttributes.length) {
+      e.attributes = `Complete required product attributes: ${missingRequiredCategoryAttributes.map(attribute => attribute.name).join(', ')}.`;
+    }
 
     // Variant SKU duplicate check
     if (form.has_variants) {
@@ -1389,15 +1650,18 @@ export default function ProductCreatePage() {
       mpn: form.mpn.trim(),
       model_number: form.model_number.trim(),
       brand: form.brand.trim(),
+      brandId: form.brandId || undefined,
       asin: form.asin.trim(),
       manufacturer: form.manufacturer.trim(),
       name: form.name.trim(),
       category: form.category,
       condition: form.condition,
       description: form.description.trim(),
+      localized_content: localizedContent,
       original_price: num(form.original_price),
       retail_price: form.has_variants && variantRetailPrices.length > 0 ? Math.min(...variantRetailPrices) : num(form.retail_price),
       price_currency: form.price_currency,
+      market_prices: marketPrices,
       prod_length: num(form.prod_length),
       prod_height: num(form.prod_height),
       prod_width: num(form.prod_width),
@@ -1413,7 +1677,7 @@ export default function ProductCreatePage() {
       slug: form.slug.trim() || slugify(form.name),
       meta_title: form.meta_title.trim(),
       meta_description: form.meta_description.trim(),
-      specifications: specifications.filter(item => item.name.trim() && item.value.trim()).map(({ name, value }) => ({ name: name.trim(), value: value.trim() })),
+      specifications: specifications.filter(item => item.attributeKey && categoryAttributesForProduct.some(attribute => attribute.key === item.attributeKey) && item.value.trim()).map(({ attributeKey, name, value }) => ({ attributeKey, name: name.trim(), value: value.trim() })),
       inventory: Object.fromEntries(Object.entries(inventory).map(([k, v]) => [k, num(v)])),
       has_variants: form.has_variants,
       channels: selectedChannels,
@@ -1451,6 +1715,18 @@ export default function ProductCreatePage() {
         attribute_material: value.attribute_material.trim(),
         attribute_color: value.attribute_color.trim(),
       }])),
+      associations,
+      revisions: statusOverride === 'published'
+        ? [...(existingProduct?.revisions ?? []), {
+          id: `rev-${Date.now().toString(36)}`,
+          number: (existingProduct?.revisions?.at(-1)?.number ?? 0) + 1,
+          status: 'published' as const,
+          createdAt: now,
+          createdBy: 'PrimeOS Admin',
+          summary: 'Published canonical Product Master revision',
+        }]
+        : existingProduct?.revisions ?? [],
+      record_version: latestVersion + 1,
       status: statusOverride ?? existingProduct?.status ?? 'draft',
       created_at: existingProduct?.created_at ?? now,
       updated_at: now,
@@ -1458,7 +1734,7 @@ export default function ProductCreatePage() {
       _variants: variants,
     };
 
-    if (existingProduct) {
+    if (storedProduct) {
       updateProduct(existingProduct.id, payload);
       toast({ title: copy.updated, description: formatMessage(copy.updatedDescription, { name: payload.name }) });
     } else {
@@ -1467,6 +1743,7 @@ export default function ProductCreatePage() {
     }
 
     baselineSnapshotRef.current = latestSnapshotRef.current;
+    loadedVersionRef.current = payload.record_version ?? loadedVersionRef.current;
     setDraftSaveGeneration(value => value + 1);
     if (statusOverride === 'published') setReadinessStatus('published');
     else setReadinessStatus('unchecked');
@@ -1480,10 +1757,14 @@ export default function ProductCreatePage() {
     existingProduct.status !== 'draft' || existingProduct.channels.length > 0 || totalStock > 0
   ));
   const selectedVariantItems = variantItems.filter(item => item.selected);
+  const listingEditorVariants = useMemo(() => variantItems.filter(item => item.selected).map(item => ({ id: item.key, label: item.key, sku: item.sku_code })), [variantItems]);
   const hasGeneratedVariants = form.has_variants && selectedVariantItems.length > 0;
   const variantPricingReady = hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim() && num(item.price) > 0) && selectedVariantItems.reduce((sum, item) => sum + num(item.stock), 0) > 0;
   const pricingAndInventoryReady = hasGeneratedVariants ? variantPricingReady : num(form.retail_price) > 0 && totalStock > 0;
   const logisticsReady = Boolean(form.pkg_length && form.pkg_width && form.pkg_height && form.pkg_weight);
+  const shippingPackageRequired = OVERRIDE_CHANNELS.some(channel =>
+    channelOverrides[channel.key].enabled && !['pos', 'social'].includes(channel.key)
+  );
   const completionChecks = useMemo(() => {
     const channelReadyForPublishing =
       Object.values(channelOverrides).some(item => item.enabled) &&
@@ -1492,15 +1773,16 @@ export default function ProductCreatePage() {
       Boolean(form.category) &&
       images.length >= 3 &&
       pricingAndInventoryReady &&
-      logisticsReady;
+      (!shippingPackageRequired || logisticsReady);
     const checks = [
       { id: 'identity', label: 'Add product name and master SKU', done: form.name.trim().length >= 3 && Boolean(form.sku_code.trim()) },
       { id: 'media', label: 'Add at least 3 product images', done: images.length >= 3 },
       { id: 'content', label: 'Write a detailed description (100+ characters)', done: form.description.trim().length >= 100 },
       { id: 'category', label: 'Select an accurate product category', done: Boolean(form.category) },
       { id: 'price', label: form.has_variants ? 'Configure variant pricing and stock' : 'Configure base price and inventory', done: pricingAndInventoryReady },
-      { id: 'shipping', label: 'Configure package weight and dimensions', done: logisticsReady },
     ];
+
+    if (shippingPackageRequired) checks.push({ id: 'shipping', label: 'Configure shipping package dimensions and weight', done: logisticsReady });
 
     if (form.has_variants) {
       checks.push({
@@ -1512,49 +1794,47 @@ export default function ProductCreatePage() {
 
     checks.push({ id: 'channels', label: 'Prepare at least one channel for publishing', done: channelReadyForPublishing });
     return checks;
-  }, [channelOverrides, form, hasGeneratedVariants, images.length, logisticsReady, pricingAndInventoryReady, selectedVariantItems, variantGroups.length]);
+  }, [channelOverrides, form, hasGeneratedVariants, images.length, logisticsReady, pricingAndInventoryReady, selectedVariantItems, shippingPackageRequired, variantGroups.length]);
   const completion = Math.round((completionChecks.filter(check => check.done).length / completionChecks.length) * 100);
-  const completedIdentityFields = [form.brand, form.gtin, form.manufacturer, form.mpn, form.model_number]
-    .filter(value => value.trim()).length;
-  const completedProductDetails = [
-    Boolean(form.sku_code.trim()),
-    form.name.trim().length >= 3,
-    Boolean(form.category),
-    form.description.trim().length >= 100,
-  ].filter(Boolean).length;
-  const readiness = (Object.entries(channelOverrides) as Array<[OverrideChannel, ChannelOverrideForm]>).map(([key, override]) => {
-    const masterDataReady = form.name.trim().length >= 3 && form.description.trim().length >= 100 && Boolean(form.category) && images.length >= 3 && pricingAndInventoryReady && logisticsReady;
-    const overrideStarted = Boolean(override.title.trim() || override.description.trim() || override.price_markup);
-    const incompleteOverride = overrideStarted && (!override.title.trim() || !override.description.trim());
-    const listingSetupIncomplete = !channelSetupComplete(key, override);
-    const channel = OVERRIDE_CHANNELS.find(item => item.key === key);
-    return {
-      key,
-      label: channel?.label ?? key,
-      state: !override.enabled ? 'inactive' : !masterDataReady ? 'blocked' : listingSetupIncomplete || incompleteOverride ? 'warning' : 'ready',
-      detail: !override.enabled ? 'Not selected' : !masterDataReady ? 'Complete the required master product data' : listingSetupIncomplete ? 'Complete channel SKU, category and fulfillment' : incompleteOverride ? 'Complete or clear the optional overrides' : '100% Ready',
-    } as const;
-  });
-  const completedSpecifications = specifications.filter(item => item.name.trim() && item.value.trim()).length;
-  const requiredAttributeCount = [
-    form.name.trim().length >= 3,
-    Boolean(form.sku_code.trim()),
-    form.description.trim().length >= 100,
-    Boolean(form.category),
-    pricingAndInventoryReady,
-    logisticsReady,
-    Boolean(form.country_of_origin),
-    images.length >= 3,
-    form.has_variants ? hasGeneratedVariants : true,
-    Object.values(channelOverrides).some(item => item.enabled),
-  ].filter(Boolean).length;
-  const recommendedAttributeCount = [form.gtin, form.mpn, form.model_number, form.brand, form.asin, form.manufacturer, form.original_price, form.prod_length, form.prod_height, form.prod_width, form.prod_weight, form.hs_code, form.slug, form.meta_title, form.meta_description].filter(value => String(value).trim()).length;
-  const completedAttributeCount = requiredAttributeCount + recommendedAttributeCount + completedSpecifications;
-  const totalAttributeCount = 45;
+  const categoryAttributesForProduct = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
+  const requiredCategoryAttributes = categoryAttributesForProduct.filter(attribute => attribute.required);
+  const specificationForAttribute = (attribute: CatalogAttribute) => specifications.find(spec => spec.attributeKey === attribute.key)
+    ?? specifications.find(spec => !spec.attributeKey && spec.name.trim().toLowerCase() === attribute.name.toLowerCase());
+  useEffect(() => {
+    if (!form.has_variants || !form.category) return;
+
+    const seedKey = `${form.category}:${form.product_type}:${catalogSettingsVersion}`;
+    if (variantAutoSeedKeyRef.current === seedKey) return;
+    variantAutoSeedKeyRef.current = seedKey;
+    if (variantGroups.length > 0) return;
+
+    const eligibleAttributes = getAttributesForCategory(form.category).filter(attribute =>
+      attribute.key !== 'brand'
+      && (attribute.type === 'Single select' || attribute.type === 'Multi-select')
+      && attribute.options.trim()
+    );
+    const suggestedAttribute = eligibleAttributes.find(attribute => {
+      const specification = specifications.find(spec => spec.attributeKey === attribute.key)
+        ?? specifications.find(spec => !spec.attributeKey && spec.name.trim().toLowerCase() === attribute.name.toLowerCase());
+      return Boolean(specification?.value.trim());
+    }) ?? eligibleAttributes[0];
+    if (!suggestedAttribute) return;
+
+    const specification = specifications.find(spec => spec.attributeKey === suggestedAttribute.key)
+      ?? specifications.find(spec => !spec.attributeKey && spec.name.trim().toLowerCase() === suggestedAttribute.name.toLowerCase());
+    const currentValue = specification?.value.trim() ?? '';
+    setVariantGroups([{ id: genId('variant-group'), name: suggestedAttribute.name, values: currentValue ? [currentValue] : [] }]);
+  }, [catalogSettingsVersion, form.category, form.has_variants, form.product_type, specifications, variantGroups.length]);
+  const missingRequiredCategoryAttributes = requiredCategoryAttributes.filter(attribute => !specificationForAttribute(attribute)?.value.trim());
+  const catalogCategories = getActiveCatalogCategories();
+  const selectedCatalogCategory = catalogCategories.find(category => category.name === form.category);
+  const categoryParent = selectedCatalogCategory?.parentId ? catalogCategories.find(category => category.id === selectedCatalogCategory.parentId) : undefined;
+  const categoryRoot = categoryParent?.parentId ? catalogCategories.find(category => category.id === categoryParent.parentId) : categoryParent;
+  const categoryPath = [categoryRoot?.name, categoryParent?.name, selectedCatalogCategory?.name].filter((value, index, values) => value && values.indexOf(value) === index);
   const selectedCategoryGroup = categoryTree.find(item => item.label === categoryLevelOne) ?? categoryTree[0];
   const selectedCategorySubgroup = selectedCategoryGroup.children.find(item => item.label === categoryLevelTwo) ?? selectedCategoryGroup.children[0];
   const matchingCategoryPaths = categoryTree.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group: group.label, subgroup: subgroup.label, leaf })))).filter(item => !categorySearch.trim() || `${item.group} ${item.subgroup} ${item.leaf}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
-  const currentSnapshot = JSON.stringify({ form, inventory, images, imageAltTexts, variantGroups, variantItems, channelOverrides, specifications });
+  const currentSnapshot = JSON.stringify({ form, localizedContent, inventory, marketPrices, images, imageAltTexts, variantGroups, variantItems, channelOverrides, associations, specifications });
   latestSnapshotRef.current = currentSnapshot;
   const isDirty = dirtyTrackingReady && currentSnapshot !== baselineSnapshotRef.current;
 
@@ -1580,6 +1860,27 @@ export default function ProductCreatePage() {
       setReadinessStatus('unchecked');
     }
   }, [isDirty, readinessStatus]);
+
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [isDirty]);
+
+  useEffect(() => {
+    const shouldDisable = !canWrite && activeSection !== 'activity';
+    const controls = document.querySelectorAll<HTMLElement>('[data-editor-fields] input, [data-editor-fields] textarea, [data-editor-fields] select, [data-editor-fields] button');
+    controls.forEach(control => {
+      if ('disabled' in control) (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement).disabled = shouldDisable;
+    });
+    return () => controls.forEach(control => {
+      if ('disabled' in control) (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement).disabled = false;
+    });
+  }, [activeSection, canWrite]);
 
   function checkReadiness() {
     if (isDirty) return;
@@ -1623,13 +1924,37 @@ export default function ProductCreatePage() {
           : readinessStatus === 'published'
             ? 'published'
             : 'check';
+  const displayedProductName = contentLocale === 'en-US' ? form.name : localizedContent[contentLocale]?.name ?? '';
+  const displayedProductDescription = contentLocale === 'en-US' ? form.description : localizedContent[contentLocale]?.description ?? '';
 
-  if (editId && !existingProduct) return null;
+  if (editId && !existingProduct) {
+    return (
+      <div className="grid min-h-full place-items-center bg-background p-6">
+        <Card className="w-full max-w-lg">
+          <CardContent className="p-8 text-center">
+            <Package className="mx-auto size-8 text-muted-foreground" />
+            <h1 className="mt-4 text-lg font-semibold">Product Master not found</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This record may have been removed or the link is no longer valid.
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              <Button variant="outline" onClick={() => navigate('/products/catalog-imports')}>
+                Open Catalog Imports
+              </Button>
+              <Button onClick={() => navigate('/products/master-catalog')}>
+                Back to Product Master
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div data-testid="product-editor-page" className="flex min-h-full flex-col bg-background">
       {/* Top Bar */}
-      <div className={`sticky top-0 z-[100] flex flex-wrap items-center gap-3 border-b bg-card/95 px-4 backdrop-blur transition-[padding,box-shadow] duration-200 motion-reduce:transition-none sm:px-6 ${hasScrolledFromTop ? 'py-2 shadow-sm' : 'py-4'}`}>
+      <div className={`sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b bg-card/95 px-4 backdrop-blur transition-[padding,box-shadow] duration-200 motion-reduce:transition-none sm:px-6 ${hasScrolledFromTop ? 'py-2 shadow-sm' : 'py-4'}`}>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-3">
           <button onClick={() => navigate('/products/master-catalog')} className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
@@ -1639,19 +1964,12 @@ export default function ProductCreatePage() {
           {!hasScrolledFromTop ? <><span className="text-muted-foreground">/</span><span className="truncate text-sm font-medium">
             {existingProduct ? copy.editDetails : copy.createNew}
           </span></> : null}
-          {hasScrolledFromTop ? <div className="ml-2 flex min-w-24 max-w-sm flex-1 items-center gap-2"><Progress value={completion} aria-label={`Overall Completion: ${completion}%`} className="h-2" /><span className="shrink-0 text-xs font-semibold tabular-nums text-primary">{completion}%</span></div> : null}
           </div>
-          {!hasScrolledFromTop ? <div className="mt-3 flex max-w-xl items-center gap-3">
-            <div className="flex items-center gap-2 whitespace-nowrap text-xs font-semibold text-foreground"><span>Overall Completion</span><span className="tabular-nums text-primary">{completion}%</span></div>
-            <Progress value={completion} aria-label={`Overall Completion: ${completion}%`} className="h-2" />
-          </div> : null}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Button variant="ghost" className="text-primary hover:bg-primary/5 hover:text-primary" onClick={() => handleSave('draft', { navigateAfter: false })} disabled={uploadingImageCount > 0 || !isDirty}>
-            {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            Save Draft
-          </Button>
-          <Button
+          <select aria-label="Content locale" value={contentLocale} onChange={event => selectContentLocale(event.target.value as ContentLocale)} className="h-9 rounded-md border border-input bg-background px-2 text-xs font-semibold"><option value="en-US">English</option><option value="ja-JP">日本語</option><option value="vi-VN">Tiếng Việt</option></select>
+          {!canWrite && !isHistorical ? <Badge variant="outline">View only</Badge> : null}
+          {isHistorical ? <Button type="button" variant="outline" onClick={returnToCurrentDraft}><ArrowLeft className="size-4" />Return to current draft</Button> : canWrite ? <Button
             onClick={() => {
               if (primaryAction === 'save') handleSave('draft', { navigateAfter: false });
               if (primaryAction === 'check') checkReadiness();
@@ -1661,22 +1979,12 @@ export default function ProductCreatePage() {
             disabled={uploadingImageCount > 0 || publishOpen || primaryAction === 'checking' || primaryAction === 'published'}
           >
             {uploadingImageCount > 0 || primaryAction === 'checking' ? <Loader2 className="size-4 animate-spin" /> : primaryAction === 'publish' || primaryAction === 'published' ? <CloudUpload className="size-4" /> : primaryAction === 'review' ? <CircleAlert className="size-4" /> : primaryAction === 'check' ? <PackageCheck className="size-4" /> : <Save className="size-4" />}
-            {primaryAction === 'save' ? 'Save changes' : primaryAction === 'checking' ? 'Checking readiness…' : primaryAction === 'review' ? 'Review issues' : primaryAction === 'publish' ? 'Publish changes' : primaryAction === 'published' ? 'Published' : 'Check readiness'}
-          </Button>
+            {primaryAction === 'save' ? (existingProduct ? 'Save changes' : 'Save draft') : primaryAction === 'checking' ? 'Checking readiness…' : primaryAction === 'review' ? 'Review issues' : primaryAction === 'publish' ? 'Publish changes' : primaryAction === 'published' ? 'Published' : 'Check readiness'}
+          </Button> : null}
         </div>
       </div>
 
-      <div className="border-b bg-muted/20 px-4 py-2 sm:px-6" aria-live="polite">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-          <span className="font-semibold text-foreground">Prototype workflow</span>
-          {[
-            { id: 'draft', label: 'Draft saved', done: !isDirty },
-            { id: 'readiness', label: 'Readiness checked', done: readinessStatus === 'ready' || readinessStatus === 'published' },
-            { id: 'published', label: 'Revision published', done: readinessStatus === 'published' },
-          ].map((step, index) => <div key={step.id} className="flex items-center gap-2"><span className={`grid size-5 place-items-center rounded-full border text-[10px] font-bold ${step.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-border bg-background text-muted-foreground'}`}>{step.done ? <Check className="size-3" /> : index + 1}</span><span className={step.done ? 'font-medium text-foreground' : 'text-muted-foreground'}>{step.label}</span></div>)}
-          {isDirty ? <span className="ml-auto font-medium text-amber-700">Unsaved changes</span> : null}
-        </div>
-      </div>
+      {isHistorical ? <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm sm:mx-6"><Info className="size-4 text-amber-600" /><strong>Viewing revision {selectedRevision?.number}</strong><span className="text-muted-foreground">This historical revision is read-only.</span></div> : null}
 
       {uploadingImageCount > 0 && (
         <div className="mx-6 mt-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
@@ -1692,95 +2000,115 @@ export default function ProductCreatePage() {
         <div className="mx-6 mt-4 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-3">
           <AlertTriangle className="size-4 text-destructive shrink-0" />
           <p className="text-sm text-destructive">
-            {errors.variant_duplicate ?? errors.sku_code ?? errors.name ?? errors.category ?? copy.errorFallback}
+            {errors.variant_duplicate ?? errors.sku_code ?? errors.name ?? errors.category ?? errors.attributes ?? copy.errorFallback}
           </p>
         </div>
       )}
 
-      <nav className="sticky top-[104px] z-30 flex min-h-12 gap-1 overflow-x-auto border-b bg-background/95 px-6 backdrop-blur sm:top-14" aria-label="Product form sections">
-        {[
-          ['basic', 'Basic & Classification'],
-          ['pricing', 'Structure & Pricing'],
-          ['shipping', 'Shipping & Inventory'],
-          ['more', 'More Information'],
-          ['channels', 'Channel Handoff'],
-        ].map(([id, label]) => <button key={id} type="button" onClick={() => scrollToSection(id)} aria-current={activeSection === id ? 'step' : undefined} className={`relative min-h-12 shrink-0 px-3 text-sm font-medium transition-colors ${activeSection === id ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-muted-foreground hover:text-foreground'}`}>{label}</button>)}
-      </nav>
-
       {/* Content */}
       <div data-testid="product-editor-content">
-        <div className="grid w-full grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid w-full grid-cols-1 gap-6 px-4 py-6 sm:px-6 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
+
+          <nav className="h-fit overflow-x-auto xl:sticky xl:top-20" aria-label="Product editor workspaces">
+            <div className="flex min-w-max gap-1 xl:min-w-0 xl:flex-col">
+              {PRODUCT_WORKSPACES.map(workspace => {
+                const WorkspaceIcon = workspace.icon;
+                const active = activeSection === workspace.id;
+                return <button key={workspace.id} type="button" disabled={isHistorical && workspace.id !== 'activity'} onClick={() => selectWorkspace(workspace.id)} aria-current={active ? 'page' : undefined} className={cn('flex min-h-12 items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 xl:w-full', active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground')}>
+                  <WorkspaceIcon className="size-4 shrink-0" />
+                  <span className="min-w-0"><span className="block text-sm font-semibold">{workspace.label}</span><span className="hidden truncate text-[11px] font-normal text-muted-foreground xl:block">{workspace.description}</span></span>
+                </button>;
+              })}
+            </div>
+          </nav>
 
           {/* Left Column */}
-          <div className="flex flex-col gap-5">
+          <div data-editor-fields className="flex flex-col gap-5">
 
-            {/* Sales Channels */}
-            <Card id="product-section-channels" className="order-5 scroll-mt-28 border-primary/20">
+            {activeSection === 'overview' ? <Card>
               <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Sales Channels</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">Create and configure channel listings directly from this Product Master. Every channel keeps its own SKU, category, fulfillment and overrides.</p></div>
-                  <Button type="button" onClick={() => existingProduct ? navigate(`/products/${existingProduct.id}/channel-listings/new`) : handleSave('draft', { navigateAfter: false })}><Plus className="size-4" />{existingProduct ? 'Create channel listings' : 'Save master to continue'}</Button>
-                </div>
+                <CardTitle className="flex items-center gap-2 text-base"><Package className="size-4 text-primary" />Product overview</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">Review the canonical product status and continue with the next required task.</p>
               </CardHeader>
-              <CardContent>
-                {Object.values(channelOverrides).every(channel => !channel.enabled) ? <div className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground"><Radio className="size-5" /><span><strong className="block text-foreground">No channel listings configured</strong><span className="mt-1 block text-xs">Save this Product Master, then create listings in the dedicated channel workspace.</span></span></div> : <div className="space-y-3">{OVERRIDE_CHANNELS.filter(channel => channelOverrides[channel.key].enabled).map(channel => { const override = channelOverrides[channel.key]; const ChannelIcon = channel.icon; const complete = channelSetupComplete(channel.key, override); return <button key={channel.key} type="button" onClick={() => existingProduct && navigate(`/products/${existingProduct.id}/channel-listings/new`)} className="flex min-h-16 w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className={cn('grid size-9 place-items-center rounded-lg', channel.iconClassName)}><ChannelIcon className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{channel.label}</strong><span className="block truncate font-mono text-xs text-muted-foreground">{override.listing_sku || 'Channel SKU not configured'}</span></span><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', complete ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>{complete ? 'Ready' : 'Needs setup'}</span><ChevronRight className="size-4 text-muted-foreground" /></button>; })}</div>}
-              </CardContent>
-            </Card>
-
-            {/* Product Identity */}
-            <Card id="product-section-basic" className="order-1 scroll-mt-28">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Layers className="size-4 text-primary" />
-                    {copy.productIdentity}
-                  </CardTitle>
-                  <span className="text-xs tabular-nums text-muted-foreground">{completedIdentityFields} of 5 completed</span>
+              <CardContent className="space-y-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Master SKU</p><p className="mt-1 truncate font-mono text-sm font-semibold">{form.sku_code || 'Not assigned'}</p></div>
+                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Product type</p><p className="mt-1 text-sm font-semibold">{form.has_variants ? 'Product with variants' : 'Single product'}</p></div>
+                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Category</p><p className="mt-1 truncate text-sm font-semibold">{form.category || 'Not selected'}</p></div>
+                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Status</p><p className="mt-1 text-sm font-semibold capitalize">{readinessStatus === 'unchecked' ? 'Draft' : readinessStatus}</p></div>
                 </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                  <div><p className="text-sm font-semibold">{completionChecks.filter(check => !check.done).length ? `${completionChecks.filter(check => !check.done).length} items need attention` : 'Required details are complete'}</p><p className="mt-1 text-xs text-muted-foreground">Master readiness and channel readiness are checked separately.</p></div>
+                  <Button type="button" variant="outline" onClick={() => selectWorkspace(completionChecks.some(check => !check.done && ['identity', 'content', 'category'].includes(check.id)) ? 'product-data' : completionChecks.some(check => !check.done && ['price', 'variants', 'shipping'].includes(check.id)) ? 'commerce' : 'distribution')}>Continue setup<ChevronRight className="size-4" /></Button>
+                </div>
+              </CardContent>
+            </Card> : null}
+
+            {/* Product media belongs to the canonical master and is prepared before channel distribution. */}
+            {activeSection === 'distribution' ? <Card id="product-media-panel" tabIndex={-1}>
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-sm"><Image className="size-4 text-primary" />{copy.media}</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">Add and arrange the canonical images inherited by channel listings.</p></div><Badge variant="outline" className={cn(images.length >= 3 && 'border-emerald-300 text-emerald-700')}>{images.length}/3 required · 9 max</Badge></div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Brand">
-                    <select value={form.brand} onChange={e => setField('brand', e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="">Select canonical brand</option>{catalogBrands.map(brand => <option key={brand.id} value={brand.name}>{brand.name}{brand.status === 'Unverified' ? ' · Needs review' : ''}</option>)}</select>
-                  </Field>
-                  <Field label="GTIN / Barcode">
-                    <Input value={form.gtin} onChange={e => setField('gtin', e.target.value)} placeholder={copy.gtinPlaceholder} inputMode="numeric" />
-                  </Field>
-                </div>
-                <div className="overflow-hidden rounded-lg border">
-                  <button type="button" aria-expanded={advancedIdentityOpen} onClick={() => setAdvancedIdentityOpen(open => !open)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                    <ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', advancedIdentityOpen ? 'rotate-180' : '')} />
-                    <span>Advanced identifiers</span>
-                    <span className="ml-auto text-xs font-normal text-muted-foreground">MPN, model and manufacturer</span>
-                  </button>
-                  {advancedIdentityOpen ? <div className="grid grid-cols-1 gap-4 border-t bg-muted/10 p-4 md:grid-cols-3">
-                    <Field label="Manufacturer">
-                      <Input value={form.manufacturer} onChange={e => setField('manufacturer', e.target.value)} placeholder={copy.manufacturerPlaceholder} />
-                    </Field>
-                    <Field label="MPN">
-                      <Input value={form.mpn} onChange={e => setField('mpn', e.target.value)} placeholder={copy.mpnPlaceholder} />
-                    </Field>
-                    <Field label="Model Number">
-                      <Input value={form.model_number} onChange={e => setField('model_number', e.target.value)} placeholder={copy.modelPlaceholder} />
-                    </Field>
-                  </div> : null}
-                </div>
-                <p className="text-xs text-muted-foreground">Amazon ASIN is managed in the Amazon channel listing.</p>
+                {images.length === 0 ? <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/20 px-6 py-8 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring"><input type="file" accept="image/*" multiple className="sr-only" aria-label="Upload product images" onChange={async event => { const files = Array.from(event.target.files ?? []).slice(0, 9); for (const [index, file] of files.entries()) await handleImageUpload(file, index === 0 ? 'primary' : 'gallery'); event.target.value = ''; }} /><span className="grid size-11 place-items-center rounded-full bg-primary/10 text-primary"><Upload className="size-5" /></span><span className="mt-3 text-sm font-semibold">Upload product images</span><span className="mt-1 text-xs text-muted-foreground">Drop files here or browse · JPG, PNG · up to 9 images</span></label> : <><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{images.map((url, index) => <div key={url} className="group relative aspect-square overflow-hidden rounded-xl border bg-muted/20"><img src={url} alt={index === 0 ? copy.mainAlt : formatMessage(copy.additionalImageAlt, { index: index + 1 })} className="size-full object-cover" />{index === 0 ? <Badge className="absolute left-2 top-2 gap-1"><Star className="size-3 fill-current" />Main</Badge> : <Button type="button" size="sm" variant="secondary" className="absolute bottom-2 left-2 h-7 px-2 text-[11px] opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" onClick={() => { setImages(items => [items[index], ...items.filter((_, itemIndex) => itemIndex !== index)]); setImageAltTexts(items => [items[index] ?? '', ...items.filter((_, itemIndex) => itemIndex !== index)]); }}>Set as main</Button>}<button type="button" onClick={() => { setImages(items => items.filter((_, itemIndex) => itemIndex !== index)); setImageAltTexts(items => items.filter((_, itemIndex) => itemIndex !== index)); }} aria-label={`Remove image ${index + 1}`} className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/65 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100 group-focus-within:opacity-100"><X className="size-3.5" /></button></div>)}{images.length < 9 ? <label className="flex aspect-square min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed bg-muted/20 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring"><input type="file" accept="image/*" multiple className="sr-only" aria-label="Add more product images" onChange={async event => { const files = Array.from(event.target.files ?? []).slice(0, 9 - images.length); for (const file of files) await handleImageUpload(file, 'gallery'); event.target.value = ''; }} /><Plus className="size-5" /><span>Add images</span></label> : null}</div><p className="text-[11px] text-muted-foreground">The first image is the main image. Images appear in this order on supported channels.</p></>}
+                {images.length > 0 ? <details className="group rounded-lg border"><summary className="flex min-h-11 cursor-pointer list-none items-center px-4 text-sm font-medium">Image accessibility text<Badge variant="outline" className="ml-auto">{images.length}</Badge><ChevronRight className="ml-2 size-4 transition-transform group-open:rotate-90" /></summary><div className="space-y-2 border-t p-4">{images.map((url, index) => <div key={`${url}-distribution-alt`} className="flex items-center gap-3"><img src={url} alt="" className="size-10 rounded-md border object-cover" /><Input value={imageAltTexts[index] ?? ''} maxLength={125} onChange={event => setImageAltTexts(current => { const next = [...current]; next[index] = event.target.value; return next; })} placeholder={`Describe image ${index + 1}`} aria-label={`Alt text for image ${index + 1}`} className="h-9 text-xs" /></div>)}</div></details> : null}
               </CardContent>
-            </Card>
+            </Card> : null}
 
-            {/* Product Details */}
-            <Card className="order-1">
+            {/* Sales Channels */}
+            <Card id="product-section-channels" className={cn('border-primary/20', activeSection !== 'distribution' && 'hidden')}>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Package className="size-4 text-primary" />
-                    {copy.productDetails}
-                  </CardTitle>
-                  <span className="text-xs tabular-nums text-muted-foreground">{completedProductDetails} of 4 completed</span>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Sales Channels</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">Create one listing for each connected store. Product variants are included and managed inside each listing.</p></div>
+                  <Button type="button" disabled={!existingProduct || isDirty} onClick={openChannelListingSetup}><Plus className="size-4" />Create channel listings</Button>
                 </div>
               </CardHeader>
               <CardContent>
+                {!existingProduct || isDirty ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" /><div><p className="font-semibold">A saved Product Master revision is required</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Save the current changes before creating channel listings. Listings inherit data from the last saved revision.</p></div></div> : null}
+                {Object.values(channelOverrides).every(channel => !channel.enabled) ? <div className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground"><Radio className="size-5" /><span><strong className="block text-foreground">No channel listings configured</strong><span className="mt-1 block text-xs">Choose connected stores and configure their listing details without leaving this Product Master.</span></span></div> : <div className="space-y-3">{OVERRIDE_CHANNELS.filter(channel => channelOverrides[channel.key].enabled).map(channel => { const override = channelOverrides[channel.key]; const ChannelIcon = channel.icon; const complete = channelSetupComplete(channel.key, override); const listing = existingProduct?.channels.find(item => item.channel === listingChannelByOverride[channel.key]); const includedVariantCount = form.has_variants ? selectedVariantItems.length : 1; return <div key={channel.key} className="flex min-h-20 w-full flex-wrap items-center gap-3 rounded-lg border p-3"><span className={cn('grid size-9 place-items-center rounded-lg', channel.iconClassName)}><ChannelIcon className="size-4" /></span><span className="min-w-[180px] flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><strong className="text-sm">{channel.label}</strong>{channel.account ? <span className="truncate text-xs text-muted-foreground">{channel.account}</span> : null}</span><span className="mt-1 block truncate text-xs text-muted-foreground"><span className="font-medium text-foreground/80">Parent listing SKU:</span> <span className="font-mono">{override.listing_sku || 'Not configured'}</span></span><span className="mt-1 block text-[11px] text-muted-foreground">{form.has_variants ? `${includedVariantCount} variant${includedVariantCount === 1 ? '' : 's'} included` : 'Single sellable SKU'} · {listing?.last_synced_at ? `Published ${new Date(listing.last_synced_at).toLocaleDateString()}` : 'Not published yet'}</span></span><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', complete ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300')}>{complete ? 'Ready' : 'Needs setup'}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingChannel(channel.key)}>Manage listing<ChevronRight className="size-3.5" /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" aria-label={`More actions for ${channel.label}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52"><DropdownMenuLabel>Listing actions</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setChannelRemovalTarget(channel.key)}><Trash2 className="size-4" />{listing?.last_synced_at ? 'Unpublish and remove' : 'Remove listing'}</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>; })}</div>}
+              </CardContent>
+            </Card>
+
+            {SHOW_PRODUCT_ASSOCIATIONS && activeSection === 'distribution' ? <Card id="product-associations">
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-sm"><Boxes className="size-4 text-primary" />Associations</CardTitle><p className="text-xs leading-5 text-muted-foreground">Connect related, accessory, replacement or upsell Product Masters.</p></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
+                  <select aria-label="Association type" value={associationType} onChange={event => setAssociationType(event.target.value as ProductAssociation['type'])} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="related">Related</option><option value="accessory">Accessory</option><option value="replacement">Replacement</option><option value="upsell">Upsell</option></select>
+                  <select aria-label="Product to associate" value={associationProductId} onChange={event => setAssociationProductId(event.target.value)} className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm"><option value="">Select Product Master</option>{associationCandidates.filter(product => !associations.some(item => item.productId === product.id)).map(product => <option key={product.id} value={product.id}>{product.name} · {product.sku_code}</option>)}</select>
+                  <Button type="button" disabled={!associationProductId} onClick={() => { setAssociations(current => [...current, { productId: associationProductId, type: associationType }]); setAssociationProductId(''); }}><Plus className="size-4" />Add</Button>
+                </div>
+                {associations.length ? <div className="divide-y overflow-hidden rounded-lg border">{associations.map(association => { const product = associationCandidates.find(item => item.id === association.productId); return <div key={association.productId} className="flex min-h-14 items-center gap-3 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{product?.name ?? association.productId}</p><p className="text-xs text-muted-foreground"><span className="capitalize">{association.type}</span>{product ? ` · ${product.sku_code}` : ''}</p></div><Button type="button" variant="ghost" size="icon" aria-label={`Remove association ${product?.name ?? association.productId}`} onClick={() => setAssociations(current => current.filter(item => item.productId !== association.productId))}><Trash2 className="size-4" /></Button></div>; })}</div> : <div className="rounded-lg border border-dashed p-5 text-center"><p className="text-sm font-medium">No associated products</p><p className="mt-1 text-xs text-muted-foreground">Associations are optional and do not block publishing.</p></div>}
+              </CardContent>
+            </Card> : null}
+
+            {activeSection === 'product-data' ? <Card id="product-structure-choice">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm"><Boxes className="size-4 text-primary" />Product structure</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">Choose whether this Product Master represents one sellable SKU or a family of variant SKUs before completing its attributes.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Product structure">
+                  {([
+                    { type: 'single', title: 'Single product', description: 'One SKU with one price, stock record and attribute value.' },
+                    { type: 'variant', title: 'Product with variants', description: 'Multiple SKUs by Color, Size or another option.' },
+                  ] as const).map(option => {
+                    const TypeIcon = PRODUCT_TYPE_ICONS[option.type];
+                    const selected = form.product_type === option.type;
+                    return <button key={option.type} type="button" role="radio" aria-checked={selected} onClick={() => handleProductTypeChange(option.type)} className={`min-h-20 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
+                      <span className="flex items-start gap-3"><span className={`grid size-8 shrink-0 place-items-center rounded-md ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}><TypeIcon className="size-4" /></span><span><span className="flex items-center gap-2 text-sm font-semibold">{option.title}{selected ? <Check className="size-4 text-primary" /> : null}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span></span></span>
+                    </button>;
+                  })}
+                </div>
+              </CardContent>
+            </Card> : null}
+
+            {/* Basic information */}
+            <Card id="product-section-basic" className={cn(activeSection !== 'product-data' && 'hidden')}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm"><Package className="size-4 text-primary" />Basic information</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">Core identity, category and customer-facing product information.</p>
+              </CardHeader>
+              <CardContent className="space-y-5">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
                   <div className="sm:col-span-6">
                     <Field label={copy.skuCode} required error={errors.sku_code}>
@@ -1792,64 +2120,97 @@ export default function ProductCreatePage() {
                     </Field>
                   </div>
                   <div className="sm:col-span-6">
-                    <Field label={copy.productName} required error={errors.name}>
-                    <Input value={form.name} onChange={e => updateProductName(e.target.value)} placeholder={copy.namePlaceholder} minLength={3} maxLength={120} />
+                    <Field label={`${copy.productName}${contentLocale !== 'en-US' ? ` · ${contentLocale}` : ''}`} required={contentLocale === 'en-US'} error={contentLocale === 'en-US' ? errors.name : undefined}>
+                    <Input id="product-name" value={displayedProductName} onChange={e => updateProductName(e.target.value)} placeholder={contentLocale === 'en-US' ? copy.namePlaceholder : form.name || copy.namePlaceholder} minLength={3} maxLength={120} />
+                    {contentLocale !== 'en-US' && !displayedProductName ? <p className="text-xs text-muted-foreground">Empty translation. The English canonical value will be used as fallback.</p> : null}
                     </Field>
                   </div>
                   <div className="sm:col-span-6">
                     <Field label={copy.category} required error={errors.category}>
-                      <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(form.category); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
+                      <Button id="product-category-trigger" type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(form.category); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
+                      {selectedCatalogCategory ? <div className="space-y-1 text-xs text-muted-foreground"><p>{categoryPath.join(' / ')}</p><p>{requiredCategoryAttributes.length} required {requiredCategoryAttributes.length === 1 ? 'attribute' : 'attributes'}</p></div> : null}
                     </Field>
                   </div>
                   <div className="sm:col-span-6">
-                    <Field label={copy.condition}>
+                    <Field label="Default condition">
                       <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" value={form.condition} onChange={e => setField('condition', e.target.value)}>
                         {CONDITIONS.map(c => <option key={c} value={c}>{conditionLabels[c as keyof typeof conditionLabels]}</option>)}
                       </select>
                     </Field>
                   </div>
                   <div className="sm:col-span-12">
-                    <Field label={copy.description}>
-                      <Textarea value={form.description} onChange={e => setField('description', e.target.value)} placeholder={copy.descriptionPlaceholder} rows={2} className="min-h-16 resize-y" />
+                    <Field label={`${copy.description}${contentLocale !== 'en-US' ? ` · ${contentLocale}` : ''}`} required={contentLocale === 'en-US'}>
+                      <Textarea id="product-description" value={displayedProductDescription} onChange={e => updateProductDescription(e.target.value)} placeholder={contentLocale === 'en-US' ? copy.descriptionPlaceholder : form.description || copy.descriptionPlaceholder} rows={2} className="min-h-16 resize-y" />
+                      {contentLocale === 'en-US' ? <p className="text-xs text-muted-foreground">Use at least 100 characters for readiness.</p> : null}
+                      {contentLocale !== 'en-US' && !displayedProductDescription ? <p className="text-xs text-muted-foreground">Empty translation. The English canonical description will be used as fallback.</p> : null}
                     </Field>
                   </div>
                 </div>
+                <div className="grid grid-cols-1 gap-4 border-t pt-5 sm:grid-cols-2">
+                  <Field label="Brand"><BrandReferencePicker brands={catalogBrands} brandId={form.brandId} brandName={form.brand} onSelect={brand => setForm(current => ({ ...current, brand: brand?.name ?? '', brandId: brand?.id ?? '' }))} onCreate={createCanonicalBrand} /></Field>
+                  <Field label="GTIN / Barcode"><Input value={form.gtin} onChange={e => setField('gtin', e.target.value)} placeholder={copy.gtinPlaceholder} inputMode="numeric" /></Field>
+                </div>
+                <div className="overflow-hidden rounded-lg border">
+                  <button type="button" aria-expanded={advancedIdentityOpen} onClick={() => setAdvancedIdentityOpen(open => !open)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', advancedIdentityOpen ? 'rotate-180' : '')} /><span>More identifiers</span><span className="ml-auto text-xs font-normal text-muted-foreground">Manufacturer, MPN and model</span></button>
+                  {advancedIdentityOpen ? <div className="grid grid-cols-1 gap-4 border-t bg-muted/10 p-4 md:grid-cols-3"><Field label="Manufacturer"><Input value={form.manufacturer} onChange={e => setField('manufacturer', e.target.value)} placeholder={copy.manufacturerPlaceholder} /></Field><Field label="MPN"><Input value={form.mpn} onChange={e => setField('mpn', e.target.value)} placeholder={copy.mpnPlaceholder} /></Field><Field label="Model number"><Input value={form.model_number} onChange={e => setField('model_number', e.target.value)} placeholder={copy.modelPlaceholder} /></Field></div> : null}
+                </div>
+                <section className="mt-5 space-y-4 border-t pt-5" aria-labelledby="product-attributes-title">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><h3 id="product-attributes-title" className="text-sm font-semibold">Product attributes</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Fields are loaded automatically from the selected category.</p></div>
+                    {missingRequiredCategoryAttributes.length ? <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50">{missingRequiredCategoryAttributes.length} required {missingRequiredCategoryAttributes.length === 1 ? 'field' : 'fields'} missing</Badge> : requiredCategoryAttributes.length ? <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">Required fields complete</Badge> : null}
+                  </div>
+                  {!form.category ? <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">Attributes will appear after selecting a category</p><p className="mt-1 text-xs text-muted-foreground">Use the Product category field above to load its required attributes.</p></div> : categoryAttributesForProduct.length ? <div className="divide-y overflow-hidden rounded-lg border">{categoryAttributesForProduct.map(attribute => { const spec = specificationForAttribute(attribute); const managedGroup = form.has_variants ? variantGroups.find(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase()) : undefined; const missingRequired = attribute.required && !spec?.value.trim() && !managedGroup?.values.length; return <div key={attribute.key} className="grid gap-3 p-4 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.3fr)] sm:items-start"><div><div className="flex items-center gap-2"><Label htmlFor={`product-attribute-${attribute.key}`} className="text-sm font-semibold">{attribute.name}</Label>{managedGroup ? <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">Variant attribute</Badge> : attribute.required ? <span className="text-xs font-semibold text-destructive">Required</span> : <span className="text-xs text-muted-foreground">Optional</span>}</div><p className="mt-1 text-xs text-muted-foreground">{attribute.type}</p></div><div className="space-y-1.5" id={`product-attribute-${attribute.key}`}>{managedGroup ? <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2"><div><p className="text-sm font-medium">Managed by variants</p><p className="mt-0.5 text-xs text-muted-foreground">{managedGroup.values.length ? managedGroup.values.join(', ') : 'Add at least one value in Commerce'}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => selectWorkspace('commerce')}>Manage variants<ChevronRight className="size-3.5" /></Button></div> : <><DynamicAttributeValueControl attribute={attribute} value={spec?.value ?? ''} onChange={nextValue => setSpecifications(current => current.map(item => item.attributeKey === attribute.key || (!item.attributeKey && item.name.toLowerCase() === attribute.name.toLowerCase()) ? { ...item, attributeKey: attribute.key, name: attribute.name, value: nextValue } : item))} />{missingRequired ? <p className="text-xs font-medium text-destructive">Enter a value before saving.</p> : attribute.required && attribute.validation ? <p className="text-xs text-muted-foreground">{attribute.validation}</p> : null}</>}</div></div>; })}</div> : <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">No additional attributes required</p><p className="mt-1 text-xs text-muted-foreground">This category does not require extra product information.</p></div>}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div><p className="text-xs font-medium">Attribute setup</p><p className="mt-1 text-xs text-muted-foreground">Changes open in Catalog Setup. Save there to return to this product.</p></div><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm" disabled={!form.category || !canWrite}>Manage attribute setup<ChevronDown className="size-3.5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-80"><DropdownMenuLabel>Manage {form.category || 'category'} attributes</DropdownMenuLabel>{categoryAttributesForProduct.filter(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select').map(attribute => <DropdownMenuItem key={attribute.key} className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ attribute: attribute.key })}><Tags className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Edit {attribute.name} values</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Add or edit selectable values used across products.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem>)}{categoryAttributesForProduct.some(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select') ? <DropdownMenuSeparator /> : null}<DropdownMenuItem className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ category: form.category })}><Layers className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Manage attributes for {form.category}</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Assign fields and set which ones are required.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                </section>
               </CardContent>
             </Card>
 
-            {/* Product Structure */}
-            <Card id="product-section-pricing" className="order-2 scroll-mt-28">
+            {activeSection === 'commerce' ? <Card id="product-markets" className="order-2">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />Structure &amp; Pricing</CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">Choose the selling structure, then configure the pricing and variant data that belong to it.</p>
+                <CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />{form.has_variants ? 'Base prices by market' : 'Prices by market'}</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">{form.has_variants ? 'Set the default price used when creating new variant SKUs in each market.' : 'Set the Product Master price for each market.'} Channel-specific adjustments are configured in each listing.</p>
               </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Product structure">
-                  {([
-                    { type: 'single', title: 'Single product', description: 'One SKU with one price and stock record.' },
-                    { type: 'variant', title: 'Product with variants', description: 'Multiple SKUs by Color, Size or other options.' },
-                  ] as const).map(option => {
-                    const TypeIcon = PRODUCT_TYPE_ICONS[option.type];
-                    const selected = form.product_type === option.type;
-                    return <button key={option.type} type="button" role="radio" aria-checked={selected} onClick={() => handleProductTypeChange(option.type)} className={`min-h-20 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
-                      <span className="flex items-start gap-3">
-                        <span className={`grid size-8 shrink-0 place-items-center rounded-md ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}><TypeIcon className="size-4" /></span>
-                        <span><span className="flex items-center gap-2 text-sm font-semibold">{option.title}{selected ? <Check className="size-4 text-primary" /> : null}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span></span>
-                      </span>
-                    </button>;
+              <CardContent className="space-y-3">
+                <div className="overflow-hidden rounded-lg border">
+                  <div className="hidden grid-cols-[minmax(140px,1fr)_90px_minmax(140px,0.8fr)_90px] gap-3 border-b bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+                    <span>Market</span><span>Currency</span><span>{form.has_variants ? 'Base price' : 'Market price'}</span><span>Status</span>
+                  </div>
+                  {COMMERCE_MARKETS.map(market => {
+                    const value = marketPrices.find(item => item.market === market.market)!;
+                    return <div key={market.market} className="grid gap-3 border-b p-4 last:border-b-0 sm:grid-cols-[minmax(140px,1fr)_90px_minmax(140px,0.8fr)_90px] sm:items-center">
+                      <div><p className="text-sm font-semibold">{market.label}</p><p className="text-xs text-muted-foreground">{market.market}</p></div>
+                      <span className="text-sm font-medium">{market.currency}</span>
+                      <Input aria-label={`${market.label} ${form.has_variants ? 'base' : 'market'} price`} type="number" min="0" value={value.price || ''} disabled={!value.enabled} placeholder="0" onChange={event => setMarketPrices(current => current.map(item => item.market === market.market ? { ...item, price: num(event.target.value) } : item))} />
+                      <button type="button" role="switch" aria-checked={value.enabled} aria-label={`${value.enabled ? 'Disable' : 'Enable'} ${market.label} market`} onClick={() => setMarketPrices(current => current.map(item => item.market === market.market ? { ...item, enabled: !item.enabled } : item))} className={cn('rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', value.enabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground')}>{value.enabled ? 'Available' : 'Disabled'}</button>
+                    </div>;
                   })}
                 </div>
-                {form.has_variants ? <section className="space-y-4 border-t pt-5" aria-labelledby="variant-attributes-title">
-                  <div className="flex items-start justify-between gap-3"><div><h3 id="variant-attributes-title" className="text-sm font-semibold">Variant attributes</h3><p className="mt-1 text-xs text-muted-foreground">Add up to two attributes, such as Color × Size, to generate the SKU matrix.</p></div><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{variantGroups.length} of 2</span></div>
+                <div className="flex items-start gap-2 rounded-lg bg-muted/30 p-3 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-3.5 shrink-0" /><span>{form.has_variants ? 'These prices initialize new variants only. After creation, edit the selling price for each SKU in the variant matrix.' : 'These prices belong to the Product Master.'} Shopee, Amazon and other listing adjustments do not change them.</span></div>
+                {OVERRIDE_CHANNELS.some(channel => channelOverrides[channel.key].enabled) ? <div className="space-y-2 border-t pt-3"><p className="text-xs font-semibold">Channel price adjustments</p>{OVERRIDE_CHANNELS.filter(channel => channelOverrides[channel.key].enabled).map(channel => <div key={channel.key} className="flex min-h-9 items-center gap-3 rounded-md border px-3 text-xs"><span className="font-medium">{channel.label}</span><span className="ml-auto text-muted-foreground">{num(channelOverrides[channel.key].price_markup) ? `${num(channelOverrides[channel.key].price_markup) > 0 ? '+' : ''}${channelOverrides[channel.key].price_markup}% override` : 'Uses canonical price'}</span></div>)}</div> : null}
+              </CardContent>
+            </Card> : null}
+
+            {/* Variant setup and pricing */}
+            <Card id="product-section-pricing" className={cn('order-1', activeSection !== 'commerce' && 'hidden')}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />{form.has_variants ? 'Variants & Pricing' : 'Pricing & Inventory'}</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">{form.has_variants ? 'Configure the variant attributes, SKU matrix and pricing for this Product Master.' : 'Configure the canonical price and inventory for this single-SKU Product Master.'}</p>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {form.has_variants ? <section className="space-y-4" aria-labelledby="variant-attributes-title">
+                  <div className="flex items-start justify-between gap-3"><div><h3 id="variant-attributes-title" className="text-sm font-semibold">Variant options</h3><p className="mt-1 text-xs text-muted-foreground">Select the Color, Size or other category values that create sellable SKUs.</p></div><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{variantGroups.length} of 2</span></div>
                   <VariantSection
                     groups={variantGroups}
                     onGroupsChange={setVariantGroups}
                     items={variantItems}
                     onItemsChange={setVariantItems}
                     parentSku={form.sku_code}
-                    basePrice={form.retail_price}
+                    basePrice={String(marketPrices.find(market => market.enabled && market.currency === form.price_currency)?.price || num(form.retail_price) || '')}
                     currency={form.price_currency}
                     existingSkus={existingSkuList}
+                    availableAttributes={categoryAttributesForProduct.filter(attribute => (attribute.type === 'Single select' || attribute.type === 'Multi-select') && attribute.options.trim()).map(attribute => ({ key: attribute.key, name: attribute.name, options: attribute.options.split(',').map(option => option.trim()).filter(Boolean) }))}
+                    onManageAttribute={key => openAttributeSetup({ attribute: key })}
                     copy={{
                       duplicateAttribute: copy.duplicateAttribute,
                       addValuePlaceholder: copy.addValuePlaceholder,
@@ -1869,16 +2230,16 @@ export default function ProductCreatePage() {
                   />
                 </section> : null}
 
-                {!hasGeneratedVariants ? <section className="space-y-4 border-t pt-5" aria-labelledby="product-pricing-title">
-                  <div><h3 id="product-pricing-title" className="text-sm font-semibold">{form.has_variants ? 'Default variant pricing' : 'Pricing'}</h3>{form.has_variants ? <p className="mt-1 text-xs leading-5 text-muted-foreground">Used only to initialize new variants. After the matrix is generated, manage prices per SKU.</p> : null}</div>
+                {!form.has_variants ? <section className="space-y-4 border-t pt-5" aria-labelledby="product-pricing-title">
+                  <div><h3 id="product-pricing-title" className="text-sm font-semibold">Pricing</h3></div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
                   <div className="sm:col-span-4">
-                  <Field label={copy.originalPrice}>
+                  <Field label="Cost price">
                     <Input value={form.original_price} onChange={e => setField('original_price', e.target.value)} placeholder="0" type="number" />
                   </Field>
                   </div>
                   <div className="sm:col-span-4">
-                  <Field label={copy.retailPrice}>
+                  <Field label="Selling price">
                     <Input value={form.retail_price} onChange={e => setField('retail_price', e.target.value)} placeholder="0" type="number" />
                   </Field>
                   </div>
@@ -1886,47 +2247,50 @@ export default function ProductCreatePage() {
                   <div className="flex items-end sm:col-span-2"><div className="flex h-9 w-full items-center justify-between rounded-md bg-muted/40 px-3 text-xs"><span className="text-muted-foreground">{copy.margin}</span><strong className="tabular-nums">{(() => { const retail = num(form.retail_price); const original = num(form.original_price); return retail > 0 ? `${(((retail - original) / retail) * 100).toFixed(1)}%` : '—'; })()}</strong></div></div>
                   </div>
                   {num(form.retail_price) > 0 ? <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-muted/30 px-3 py-2 text-xs"><span className="text-muted-foreground">Estimated profit</span><strong className="tabular-nums">{formatLocalizedNumber(locale, Math.max(0, num(form.retail_price) - num(form.original_price)))} {form.price_currency}</strong><span className="text-muted-foreground">before fees and channel adjustments</span></div> : null}
-                </section> : <div className="flex items-center justify-between gap-3 border-t pt-4 text-xs"><span className="text-muted-foreground">Pricing is managed per SKU in the variant matrix above.</span><Button type="button" variant="outline" size="sm" onClick={() => document.querySelector('[aria-label="Variant pricing matrix"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Manage variant pricing</Button></div>}
+                </section> : null}
               </CardContent>
             </Card>
+
+            {activeSection === 'commerce' && !form.has_variants ? <Card>
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-sm"><Package className="size-4 text-primary" />Inventory by location</CardTitle><p className="text-xs leading-5 text-muted-foreground">Set the available stock for this single-SKU Product Master.</p></CardHeader>
+              <CardContent className="space-y-2">{WAREHOUSES.map(warehouse => <div key={warehouse.id} className="grid min-h-12 grid-cols-[minmax(0,1fr)_120px] items-center gap-3 rounded-lg border px-3"><div><p className="text-sm font-medium">{warehouse.label}</p><p className="text-xs text-muted-foreground">{warehouse.code}</p></div><div className="flex items-center gap-2"><Input aria-label={`${warehouse.label} available stock`} value={inventory[warehouse.id] ?? '0'} onChange={event => setInventory(current => ({ ...current, [warehouse.id]: event.target.value }))} type="number" min="0" className="h-8 text-right font-mono text-xs" /><span className="text-xs text-muted-foreground">{copy.units}</span></div></div>)}<div className="flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">{copy.totalStock}</span><strong>{formatLocalizedNumber(locale, totalStock)} {copy.units}</strong></div></CardContent>
+            </Card> : null}
 
             {/* Shipping & Logistics */}
-            <Card id="product-section-shipping" className="order-3 scroll-mt-28">
+            <Card id="product-section-shipping" className={cn(activeSection !== 'product-data' && 'hidden')}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Truck className="size-4 text-primary" />
-                  Shipping & Logistics
-                </CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><Truck className="size-4 text-primary" />Shipping & Logistics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <RowField label={copy.productDimensions} fields={[
-                  { label: copy.length, value: form.prod_length, onChange: v => setField('prod_length', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.width, value: form.prod_width, onChange: v => setField('prod_width', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.height, value: form.prod_height, onChange: v => setField('prod_height', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.weight, value: form.prod_weight, onChange: v => setField('prod_weight', v), placeholder: '0', suffix: 'g' },
+                <RowField label="Product measurements · Optional" fields={[
+                  { label: 'Product length', value: form.prod_length, onChange: v => setField('prod_length', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Product width', value: form.prod_width, onChange: v => setField('prod_width', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Product height', value: form.prod_height, onChange: v => setField('prod_height', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Net weight', value: form.prod_weight, onChange: v => setField('prod_weight', v), placeholder: '0', suffix: 'g' },
                 ]} />
                 <div className="flex items-center justify-between gap-3">
-                  <div><Label>Package Dimensions & Weight</Label><p className="mt-1 text-xs text-muted-foreground">Required for marketplace shipping rates and carrier labels.</p></div>
+                  <div><Label>Shipping package</Label><p className="mt-1 text-xs text-muted-foreground">{shippingPackageRequired ? 'Required by the selected online sales channels for shipping rates and carrier labels.' : 'Required when publishing to a channel that calculates shipping rates.'}</p></div>
                   <select aria-label="Package weight unit" value={packageWeightUnit} onChange={event => setPackageWeightUnit(event.target.value as 'g' | 'kg')} className="h-8 rounded-md border border-input bg-background px-2 text-xs font-semibold"><option value="g">Grams (g)</option><option value="kg">Kilograms (kg)</option></select>
                 </div>
-                <RowField label="L × W × H" fields={[
-                  { label: copy.length, value: form.pkg_length, onChange: v => setField('pkg_length', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.width, value: form.pkg_width, onChange: v => setField('pkg_width', v), placeholder: '0', suffix: 'cm' },
-                  { label: copy.height, value: form.pkg_height, onChange: v => setField('pkg_height', v), placeholder: '0', suffix: 'cm' },
-                  { label: 'Package Weight', value: packageWeightUnit === 'kg' && form.pkg_weight ? String(num(form.pkg_weight) / 1000) : form.pkg_weight, onChange: v => setField('pkg_weight', packageWeightUnit === 'kg' ? String(num(v) * 1000) : v), placeholder: '0', suffix: packageWeightUnit },
+                <RowField label="Package dimensions" fields={[
+                  { label: 'Package length', value: form.pkg_length, onChange: v => setField('pkg_length', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Package width', value: form.pkg_width, onChange: v => setField('pkg_width', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Package height', value: form.pkg_height, onChange: v => setField('pkg_height', v), placeholder: '0', suffix: 'cm' },
+                  { label: 'Shipping weight', value: packageWeightUnit === 'kg' && form.pkg_weight ? String(num(form.pkg_weight) / 1000) : form.pkg_weight, onChange: v => setField('pkg_weight', packageWeightUnit === 'kg' ? String(num(v) * 1000) : v), placeholder: '0', suffix: packageWeightUnit },
                 ]} />
               </CardContent>
             </Card>
 
-            {/* Others */}
-            <Card id="product-section-more" className="order-4 scroll-mt-28">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Info className="size-4 text-primary" />
-                  {copy.others}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
+            {/* Trade & Compliance */}
+            <Card id="product-section-more" className={cn(activeSection !== 'product-data' && 'hidden')}>
+              <button type="button" aria-expanded={complianceOpen} onClick={() => setComplianceOpen(open => !open)} className="flex min-h-16 w-full items-center gap-3 px-6 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Info className="size-4" /></span>
+                <span className="min-w-0"><span className="block text-sm font-semibold">Trade &amp; Compliance</span><span className="mt-0.5 block text-xs text-muted-foreground">Country of origin and customs data for cross-border listings.</span></span>
+                {(form.country_of_origin || form.hs_code) ? <span className="ml-auto shrink-0 text-xs font-medium text-emerald-600">Configured</span> : <span className="ml-auto shrink-0 text-xs text-muted-foreground">Optional</span>}
+                <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', complianceOpen && 'rotate-180')} />
+              </button>
+              {complianceOpen ? <CardContent className="space-y-4 border-t pt-5">
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs leading-5 text-muted-foreground">Complete these fields when publishing internationally. Channel readiness will request them only when a destination or category requires customs information.</div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label={copy.countryOfOrigin}>
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.country_of_origin} onChange={e => setField('country_of_origin', e.target.value)}>
@@ -1946,59 +2310,41 @@ export default function ProductCreatePage() {
                     </p>
                   </Field>
                 </div>
-                <div className="border-t pt-4">
-                  <div className="mb-3 flex items-center justify-between"><div><Label>Specifications</Label><p className="mt-1 text-xs text-muted-foreground">Reusable attributes shown across channels.</p></div><Button type="button" variant="outline" size="sm" disabled={specifications.length >= 20} onClick={() => setSpecifications(current => [...current, { id: genId('spec'), name: '', value: '' }])}><Plus className="size-3.5" />Add information</Button></div>
-                  <div className="space-y-2">{specifications.map((spec, index) => <div key={spec.id} className="grid grid-cols-[1fr_1fr_auto] gap-2"><Input value={spec.name} onChange={event => setSpecifications(current => current.map(item => item.id === spec.id ? { ...item, name: event.target.value } : item))} placeholder="Attribute name" aria-label={`Specification ${index + 1} name`} /><Input value={spec.value} onChange={event => setSpecifications(current => current.map(item => item.id === spec.id ? { ...item, value: event.target.value } : item))} placeholder="Value" aria-label={`Specification ${index + 1} value`} /><Button type="button" variant="ghost" size="icon" aria-label={`Remove specification ${index + 1}`} onClick={() => setSpecifications(current => current.filter(item => item.id !== spec.id))}><Trash2 className="size-4" /></Button></div>)}</div>
-                </div>
-                <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2"><Field label="Product URL"><div className="flex h-10 items-center rounded-md border border-input bg-muted/20 pl-3 text-xs text-muted-foreground"><span className="shrink-0">store.primeweb.com/products/</span><Input value={form.slug} onChange={event => setField('slug', slugify(event.target.value))} className="h-9 border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0" placeholder="product-url" /></div></Field></div>
-                  <Field label="SEO Meta Title"><Input value={form.meta_title} maxLength={70} onChange={event => setField('meta_title', event.target.value)} placeholder={form.name || 'Search result title'} /><p className="text-right text-[10px] text-muted-foreground">{form.meta_title.length}/70</p></Field>
-                  <Field label="SEO Meta Description"><Textarea rows={2} value={form.meta_description} maxLength={160} onChange={event => setField('meta_description', event.target.value)} placeholder="Short search-engine description" /><p className="text-right text-[10px] text-muted-foreground">{form.meta_description.length}/160</p></Field>
-                </div>
-              </CardContent>
+              </CardContent> : null}
             </Card>
+
+            {activeSection === 'activity' ? <Card>
+              <CardHeader><CardTitle className="text-base">Version history</CardTitle><p className="text-xs leading-5 text-muted-foreground">Review canonical publication history. Published revisions cannot be edited.</p></CardHeader>
+              <CardContent className="space-y-4">
+                <button type="button" onClick={() => setRevisionDetail(null)} aria-pressed={!revisionDetail} className={cn('flex min-h-16 w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', !revisionDetail ? 'border-primary/40 bg-primary/5' : 'hover:bg-muted/30')}><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">D</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Current draft</p><p className="text-xs text-muted-foreground">Updated {new Date(existingProduct?.updated_at ?? Date.now()).toLocaleString()}</p></div><Badge>Current</Badge></button>
+                {versionHistoryEntries.length ? <div className="overflow-hidden rounded-lg border"><div className="grid grid-cols-3 gap-3 border-b bg-muted/20 px-4 py-3 text-xs"><div><p className="text-muted-foreground">Published revisions</p><p className="mt-1 text-lg font-semibold text-foreground">{versionHistoryEntries.length}</p></div><div><p className="text-muted-foreground">Latest revision</p><p className="mt-1 text-lg font-semibold text-foreground">v{versionHistoryEntries.at(-1)?.number}</p></div><div><p className="text-muted-foreground">Last published by</p><p className="mt-1 truncate text-sm font-semibold text-foreground">{versionHistoryEntries.at(-1)?.createdBy}</p></div></div><div className="divide-y">{[...versionHistoryEntries].reverse().map(revision => <button type="button" key={revision.id} onClick={() => setRevisionDetail(revision)} aria-pressed={revisionDetail?.id === revision.id} className={cn('flex min-h-20 w-full items-center gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', revisionDetail?.id === revision.id ? 'bg-primary/5' : 'hover:bg-muted/30')}><span className={cn('grid size-10 shrink-0 place-items-center rounded-full border bg-background text-xs font-bold', revisionDetail?.id === revision.id && 'border-primary text-primary')}>v{revision.number}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{revision.summary}</p><Badge variant={revision.status === 'restored' ? 'secondary' : 'outline'}>{revision.status === 'restored' ? 'Restored' : 'Published'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{revision.createdBy} · {new Date(revision.createdAt).toLocaleString()}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{revision.changes.join(' · ')}</p></div><ChevronRight className="size-4 shrink-0 text-muted-foreground" /></button>)}</div></div> : <div className="rounded-lg border border-dashed p-8 text-center"><p className="text-sm font-semibold">No published revisions yet</p><p className="mt-1 text-xs text-muted-foreground">Complete readiness and publish the Product Master to create revision 1.</p></div>}
+                <div className="rounded-lg bg-muted/30 p-3 text-xs leading-5 text-muted-foreground"><strong className="text-foreground">Channel activity is separate.</strong> Publishing a Product Master revision does not automatically publish marketplace listings.</div>
+              </CardContent>
+            </Card> : null}
           </div>
 
           {/* Right Column */}
-          <div className="space-y-5">
+          <div data-editor-fields className="space-y-5 xl:sticky xl:top-20 xl:h-fit">
 
-            <Card>
-              <CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-sm">Product Content Strength</CardTitle><span className="text-sm font-bold tabular-nums text-primary">{completion}%</span></div><Progress value={completion} className="mt-2 h-2" /></CardHeader>
-              <CardContent><ul className="space-y-2">{completionChecks.map(check => <li key={check.id} className={`flex items-start gap-2 text-xs leading-5 ${check.done ? 'text-foreground' : 'text-muted-foreground'}`}><span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border ${check.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-border'}`}>{check.done ? <Check className="size-2.5" /> : null}</span><span>{check.label}</span></li>)}</ul></CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-sm"><CircleCheck className="size-4 text-primary" />Channel Readiness</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {readiness.every(channel => channel.state === 'inactive') ? <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-center text-xs leading-5 text-muted-foreground">No publishing channels selected yet.</div> : readiness.filter(channel => channel.state !== 'inactive').map(channel => <div key={channel.key} className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`size-2.5 rounded-full ${channel.state === 'ready' ? 'bg-emerald-500' : channel.state === 'warning' ? 'bg-amber-400' : 'bg-rose-500'}`} />
-                    <span className="text-sm font-semibold">{channel.label}</span>
-                    <span className={`ml-auto text-xs font-semibold ${channel.state === 'ready' ? 'text-emerald-700' : channel.state === 'warning' ? 'text-amber-700' : 'text-rose-700'}`}>{channel.state === 'ready' ? '100%' : channel.state === 'warning' ? 'Needs content' : 'Blocked'}</span>
-                  </div>
-                  <p className="mt-1.5 pl-[18px] text-[11px] leading-4 text-muted-foreground">{channel.detail}</p>
-                </div>)}
+            {activeSection === 'activity' ? <Card>
+              <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{revisionDetail ? `Revision ${revisionDetail.number}` : 'Current draft'}</CardTitle><p className="mt-1 text-xs leading-5 text-muted-foreground">{revisionDetail ? 'Read-only Product Master snapshot' : 'Latest editable Product Master state'}</p></div>{revisionDetail ? <Badge variant={revisionDetail.status === 'restored' ? 'secondary' : 'outline'}>{revisionDetail.status === 'restored' ? 'Restored' : 'Published'}</Badge> : <Badge>Current</Badge>}</div></CardHeader>
+              <CardContent className="space-y-4">
+                {revisionDetail ? <><div className="grid gap-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-xs text-muted-foreground">Published by</p><p className="mt-1 text-sm font-semibold">{revisionDetail.createdBy}</p></div><div><p className="text-xs text-muted-foreground">Published at</p><p className="mt-1 text-sm">{new Date(revisionDetail.createdAt).toLocaleString()}</p></div></div><div><p className="text-sm font-semibold">Summary</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{revisionDetail.summary}</p></div><div><p className="text-sm font-semibold">Changes in this revision</p><ul className="mt-2 space-y-2">{revisionDetail.changes.map(change => <li key={change} className="flex items-start gap-2 text-sm text-muted-foreground"><CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" /><span>{change}</span></li>)}</ul></div><div className="rounded-lg bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Channel listing changes are not included in this Product Master revision.</div></> : <><div className="grid gap-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-xs text-muted-foreground">Master SKU</p><p className="mt-1 font-mono text-sm font-semibold">{form.sku_code || 'Not assigned'}</p></div><div><p className="text-xs text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{new Date(existingProduct?.updated_at ?? Date.now()).toLocaleString()}</p></div></div><div><p className="text-sm font-semibold">Draft status</p><p className="mt-1 text-sm leading-6 text-muted-foreground">This draft can still be edited. Run readiness checks and publish it to create the next immutable revision.</p></div><Button type="button" variant="outline" className="w-full" onClick={() => selectWorkspace('overview')}>Review readiness</Button></>}
               </CardContent>
-            </Card>
+            </Card> : null}
 
-            {/* Product data coverage */}
-            <Card>
+            <Card className={cn(activeSection === 'activity' && 'hidden')}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Product Data Coverage</CardTitle>
+                <div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-sm"><CircleAlert className="size-4 text-amber-500" />Product readiness</CardTitle><p className="mt-1 text-xs leading-5 text-muted-foreground">Requirements across the entire Product Master.</p></div><span className="text-xs font-semibold tabular-nums text-muted-foreground">{completionChecks.filter(check => check.done).length}/{completionChecks.length}</span></div>
+                <Progress value={completion} className="mt-3 h-1.5" aria-label={`${completion}% of product requirements complete`} />
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">All fields</span><span className="font-semibold tabular-nums">{completedAttributeCount}/{totalAttributeCount}</span></div>
-                <Progress value={(completedAttributeCount / totalAttributeCount) * 100} className="h-1.5" />
-                <div className="space-y-2 border-t pt-3 text-xs">
-                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Required</span><span className={cn('font-semibold tabular-nums', requiredAttributeCount === 10 ? 'text-emerald-700' : 'text-amber-700')}>{requiredAttributeCount}/10</span></div>
-                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Recommended</span><span className="font-semibold tabular-nums">{recommendedAttributeCount}/15</span></div>
-                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Custom specifications</span><span className="font-semibold tabular-nums">{completedSpecifications}/20</span></div>
-                </div>
+                {completionChecks.some(check => !check.done) ? <ul className="space-y-1">{completionChecks.filter(check => !check.done).map(check => { const workspace = completionWorkspaceFor(check.id); return <li key={check.id}><button type="button" onClick={() => openCompletionItem(check.id)} className="flex min-h-11 w-full items-start gap-2 rounded-md px-2 py-2 text-left text-xs leading-5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" /><span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase tracking-wide text-primary">{workspace.label}</span><span className="block">{check.label}</span></span><ChevronRight className="mt-2 size-3.5 shrink-0" /></button></li>; })}</ul> : <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 p-3 text-xs font-medium text-emerald-700"><CircleCheck className="size-4" />Ready to publish.</div>}
               </CardContent>
             </Card>
 
             {/* Media */}
-            <Card>
+            <Card id="product-media-panel-legacy" tabIndex={-1} className="hidden">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Image className="size-4 text-primary" />
@@ -2040,27 +2386,8 @@ export default function ProductCreatePage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">{formatMessage(copy.additionalImages, { count: images.length - 1 })}</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">{formatMessage(copy.additionalImages, { count: Math.max(0, images.length - 1) })}</p>
                   <div className="grid grid-cols-4 gap-1.5">
-                    {Array.from({ length: Math.min(9, 9 - (images.length - 1)) }).map((_, i) => (
-                      <label
-                        key={i}
-                        className="aspect-square rounded-md border-2 border-dashed border-border flex items-center justify-center bg-muted/30 text-xs text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                      >
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={async e => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            await handleImageUpload(file, 'gallery');
-                            e.target.value = '';
-                          }}
-                        />
-                        +
-                      </label>
-                    ))}
                     {images.slice(1).map((url, i) => (
                       <div key={url} className="relative aspect-square rounded-md overflow-hidden border">
                         <img
@@ -2077,50 +2404,115 @@ export default function ProductCreatePage() {
                         </button>
                       </div>
                     ))}
+                    {images.length - 1 < 9 ? <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-border bg-muted/30 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 focus-within:ring-2 focus-within:ring-ring">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        aria-label="Add an additional product image"
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          await handleImageUpload(file, 'gallery');
+                          e.target.value = '';
+                        }}
+                      />
+                      <Plus className="size-4" />
+                      <span>{copy.add}</span>
+                    </label> : null}
                   </div>
+                  <p className={cn('mt-2 flex items-center gap-1.5 text-[11px]', images.length >= 3 ? 'text-emerald-600' : 'text-muted-foreground')}>
+                    {images.length >= 3 ? <CircleCheck className="size-3.5" /> : <Circle className="size-3.5" />}
+                    {images.length >= 3 ? 'Minimum image requirement met' : `${images.length} of 3 minimum images added`}
+                  </p>
                 </div>
                 {images.length > 0 ? <div className="space-y-2 border-t pt-3"><p className="text-xs font-medium">Image alt text</p>{images.map((url, index) => <div key={`${url}-alt`} className="flex items-center gap-2"><img src={url} alt="" className="size-8 rounded border object-cover" /><Input value={imageAltTexts[index] ?? ''} maxLength={125} onChange={event => setImageAltTexts(current => { const next = [...current]; next[index] = event.target.value; return next; })} placeholder={`Describe image ${index + 1}`} aria-label={`Alt text for image ${index + 1}`} className="h-8 text-xs" /></div>)}</div> : null}
               </CardContent>
             </Card>
 
-            {/* Inventory Information */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Package className="size-4 text-primary" />
-                  {copy.inventoryInformation}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {WAREHOUSES.map(wh => (
-                    <div key={wh.id} className="flex items-center justify-between">
-                      <span className="text-sm flex items-center gap-1.5">
-                        <span>{wh.code}</span>
-                        {wh.label}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <Input
-                          value={inventory[wh.id] ?? '0'}
-                          onChange={e => setInventory(prev => ({ ...prev, [wh.id]: e.target.value }))}
-                          className="w-16 h-7 text-xs text-right font-mono"
-                          type="number"
-                          min="0"
-                        />
-                        <span className="text-xs text-muted-foreground">{copy.units}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 pt-2 border-t flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">{copy.totalStock}</span>
-                  <span className="text-sm font-semibold">{formatLocalizedNumber(locale, totalStock)} {copy.units}</span>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
+
+      <ChannelListingWizard
+        open={channelListingWizardOpen}
+        onOpenChange={setChannelListingWizardOpen}
+        channels={OVERRIDE_CHANNELS}
+        drafts={channelListingDrafts}
+        masterSku={form.sku_code}
+        productName={form.name}
+        productCategory={form.category}
+        availableStock={totalStock}
+        imageCount={images.length}
+        productType={form.product_type}
+        existingMatches={editId === 'prod_import_imp-003' ? {
+          shopee: {
+            listingId: 'SHP-9384726150',
+            title: 'Premium Calligraphy Starter Kit – Official',
+            status: 'Active on Shopee',
+            differenceCount: 4,
+          },
+        } : undefined}
+        onChange={(channel, patch) => setChannelListingDrafts(current => ({
+          ...current,
+          [channel]: { ...current[channel as OverrideChannel], ...patch },
+        }))}
+        onSubmitted={() => {
+          setChannelOverrides(Object.fromEntries(Object.entries(channelListingDrafts).map(([key, value]) => [key, { ...value }])) as Record<OverrideChannel, ChannelOverrideForm>);
+          toast({ title: 'Channel listing drafts created', description: 'Review readiness and provider validation before publishing.' });
+        }}
+      />
+
+      <ChannelListingEditorDrawer
+        open={editingChannel !== null}
+        onOpenChange={open => { if (!open) setEditingChannel(null); }}
+        channel={editingChannel ? OVERRIDE_CHANNELS.find(channel => channel.key === editingChannel) ?? null : null}
+        draft={editingChannel ? channelOverrides[editingChannel] : null}
+        masterSku={form.sku_code}
+        productVariants={listingEditorVariants}
+        onSave={patch => {
+          if (!editingChannel) return;
+          setChannelOverrides(current => ({
+            ...current,
+            [editingChannel]: { ...current[editingChannel], ...patch },
+          }));
+          toast({ title: 'Listing draft updated', description: 'The Product Master remains unchanged.' });
+        }}
+      />
+
+      <ConfirmDialog
+        open={channelRemovalTarget !== null}
+        onOpenChange={open => { if (!open) setChannelRemovalTarget(null); }}
+        title={channelRemovalTarget ? `Remove ${OVERRIDE_CHANNELS.find(channel => channel.key === channelRemovalTarget)?.label ?? 'channel'} listing?` : 'Remove channel listing?'}
+        description={<span className="space-y-2"><span className="block">This removes the channel-specific setup from this Product Master. Product data, variants, prices and inventory will not be deleted.</span><span className="block font-medium text-foreground">You can create the listing again later.</span></span>}
+        confirmText="Remove listing"
+        cancelText="Keep listing"
+        variant="destructive"
+        onConfirm={() => {
+          if (!channelRemovalTarget) return;
+          const channel = OVERRIDE_CHANNELS.find(item => item.key === channelRemovalTarget);
+          setChannelOverrides(current => ({
+            ...current,
+            [channelRemovalTarget]: { ...current[channelRemovalTarget], enabled: false },
+          }));
+          setChannelListingDrafts(current => ({
+            ...current,
+            [channelRemovalTarget]: { ...current[channelRemovalTarget], enabled: false },
+          }));
+          if (editingChannel === channelRemovalTarget) setEditingChannel(null);
+          setChannelRemovalTarget(null);
+          toast({ title: `${channel?.label ?? 'Channel'} listing removed`, description: 'Save the Product Master to keep this change.' });
+        }}
+      />
+
+
+      <Dialog open={staleConflictOpen} onOpenChange={setStaleConflictOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>This product was updated elsewhere</DialogTitle><DialogDescription>Your editor is based on an older version. Review the latest record before deciding whether to keep your edits.</DialogDescription></DialogHeader>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm"><strong>No changes were overwritten.</strong><p className="mt-1 text-xs leading-5 text-muted-foreground">Reload to use the latest Product Master, or keep your current form values and save them as a newer version.</p></div>
+          <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => window.location.reload()}>Reload latest</Button><Button type="button" onClick={() => { setStaleConflictOpen(false); handleSave('draft', { navigateAfter: false, force: true }); }}>Keep my changes</Button></div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Dialog */}
       <Dialog open={skuChangeOpen} onOpenChange={setSkuChangeOpen}>
@@ -2182,7 +2574,7 @@ export default function ProductCreatePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Review product readiness</DialogTitle><DialogDescription>Complete these master-data requirements, save the draft, then run the check again.</DialogDescription></DialogHeader>
           <div className="max-h-[55vh] space-y-2 overflow-y-auto py-2" role="status">
-            {completionChecks.map(check => <button key={check.id} type="button" onClick={() => { setReadinessReviewOpen(false); scrollToSection(check.id === 'identity' || check.id === 'content' || check.id === 'category' ? 'basic' : check.id === 'media' ? 'more' : check.id === 'price' || check.id === 'variants' ? 'pricing' : check.id === 'shipping' ? 'shipping' : 'channels'); }} className="flex min-h-12 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {completionChecks.map(check => <button key={check.id} type="button" onClick={() => { setReadinessReviewOpen(false); openCompletionItem(check.id); }} className="flex min-h-12 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {check.done ? <CircleCheck className="size-5 shrink-0 text-emerald-600" /> : <CircleAlert className="size-5 shrink-0 text-amber-600" />}
               <span className={`text-sm ${check.done ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>{check.label}</span>
               <ChevronRight className="ml-auto size-4 text-muted-foreground" />
@@ -2194,7 +2586,7 @@ export default function ProductCreatePage() {
       <Dialog open={publishConfirmationOpen} onOpenChange={setPublishConfirmationOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Publish this Product revision?</DialogTitle><DialogDescription>The saved master data becomes the current canonical revision. Marketplace listings will not be submitted automatically.</DialogDescription></DialogHeader>
-          <div className="rounded-lg border bg-muted/30 p-4 text-sm"><div className="flex items-center justify-between"><span className="text-muted-foreground">Master SKU</span><strong className="font-mono">{form.sku_code}</strong></div><div className="mt-2 flex items-center justify-between"><span className="text-muted-foreground">Ready channels</span><strong>{readiness.filter(channel => channel.state === 'ready').length}</strong></div></div>
+          <div className="rounded-lg border bg-muted/30 p-4 text-sm"><div className="flex items-center justify-between"><span className="text-muted-foreground">Master SKU</span><strong className="font-mono">{form.sku_code}</strong></div></div>
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPublishConfirmationOpen(false)}>Cancel</Button><Button onClick={beginPublish}><CloudUpload className="size-4" />Publish revision</Button></div>
         </DialogContent>
       </Dialog>

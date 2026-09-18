@@ -59,6 +59,32 @@ export interface ChannelListing {
   last_synced_at: string | null;
 }
 
+export interface MarketPrice {
+  market: 'JP' | 'SG' | 'VN';
+  currency: 'JPY' | 'SGD' | 'VND';
+  enabled: boolean;
+  price: number;
+}
+
+export interface ProductAssociation {
+  productId: string;
+  type: 'related' | 'accessory' | 'replacement' | 'upsell';
+}
+
+export interface ProductRevision {
+  id: string;
+  number: number;
+  status: 'published' | 'restored';
+  createdAt: string;
+  createdBy: string;
+  summary: string;
+}
+
+export interface LocalizedProductContent {
+  name: string;
+  description: string;
+}
+
 // Product schema — SSOT: Product Master owns identity, pricing, media, variants
 // NOT owned here: ATS ledger (→ Inventory), order state (→ OMS), fulfillment (→ Fulfillment)
 export interface Product {
@@ -71,16 +97,21 @@ export interface Product {
   mpn: string;
   model_number: string;
   brand: string;
+  /** Stable reference to the canonical Brand registry entry. Legacy records may only have `brand`. */
+  brandId?: string;
   asin: string;
   manufacturer: string;
   // Details
   category: string;
   condition: string;
   description: string;
+  localized_content?: Partial<Record<'en-US' | 'ja-JP' | 'vi-VN', LocalizedProductContent>>;
   // Pricing
   original_price: number;
   retail_price: number;
   price_currency: string;
+  /** Canonical market prices. Marketplace-specific adjustments remain in channel_overrides. */
+  market_prices?: MarketPrice[];
   // Dimensions
   prod_length: number;
   prod_height: number;
@@ -99,13 +130,18 @@ export interface Product {
   slug?: string;
   meta_title?: string;
   meta_description?: string;
-  specifications?: Array<{ name: string; value: string }>;
+  /** Category attributes use a stable `attributeKey`; legacy/custom entries may only have a name. */
+  specifications?: Array<{ attributeKey?: string; name: string; value: string }>;
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
   channels: ChannelListing[];
   channel_overrides?: Partial<Record<'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten', ChannelOverride>>;
+  associations?: ProductAssociation[];
+  revisions?: ProductRevision[];
+  /** Incremented on every save and used for optimistic concurrency checks. */
+  record_version?: number;
   // Workflow
   status: 'draft' | 'review' | 'published' | 'archived';
   created_at: string;
@@ -180,7 +216,7 @@ const SEED_PRODUCTS: Product[] = [
     asin: 'B0FH1K4CMN',
     manufacturer: 'CyberRecord Japan Co.',
     name: 'Sketchbook Pro — 200gsm Watercolor Paper',
-    category: 'Art Supplies',
+    category: 'Painting Accessories',
     condition: 'new',
     description: 'Professional watercolor sketchbook with 200gsm cold-press cotton paper. Stitched binding lies flat. 48 sheets per book.',
     original_price: 2400,
@@ -334,25 +370,140 @@ const SEED_PRODUCTS: Product[] = [
   },
 ];
 
+const CATEGORY_DEMO_PRODUCTS: Product[] = [
+  {
+    ...SEED_PRODUCTS[0],
+    id: 'prod_demo_electronics',
+    sku_code: 'DEMO-ELC-001',
+    gtin: '4582512450100',
+    name: 'Wireless Studio Headphones',
+    category: 'Headphones',
+    description: 'Demo Product Master linked to the Headphones category.',
+    skus: [{ ...SEED_PRODUCTS[0].skus[0], id: 'sku_demo_electronics', sku_code: 'DEMO-ELC-001', variation_name: 'Midnight Black' }],
+  },
+  {
+    ...SEED_PRODUCTS[0],
+    id: 'prod_demo_headphones_002',
+    sku_code: 'DEMO-ELC-002',
+    gtin: '4582512450103',
+    name: 'Compact Wireless Headphones',
+    category: 'Headphones',
+    description: 'Second demo Product Master linked to the Headphones category.',
+    status: 'draft',
+    skus: [{ ...SEED_PRODUCTS[0].skus[0], id: 'sku_demo_headphones_002', sku_code: 'DEMO-ELC-002', variation_name: 'Cloud White' }],
+  },
+  {
+    ...SEED_PRODUCTS[1],
+    id: 'prod_demo_bag',
+    sku_code: 'DEMO-BAG-001',
+    gtin: '4582512450101',
+    name: 'Everyday Canvas Tote Bag',
+    category: 'Bag',
+    description: 'Demo Product Master linked to the Bag category.',
+    skus: [{ ...SEED_PRODUCTS[1].skus[0], id: 'sku_demo_bag', sku_code: 'DEMO-BAG-001', variation_name: 'Natural Canvas' }],
+  },
+  {
+    ...SEED_PRODUCTS[3],
+    id: 'prod_demo_books',
+    sku_code: 'DEMO-BOOK-001',
+    gtin: '4582512450102',
+    name: 'Japanese Design Reference Book',
+    category: 'Books',
+    description: 'Demo Product Master linked to the Books category.',
+    skus: [{ ...SEED_PRODUCTS[3].skus[0], id: 'sku_demo_books', sku_code: 'DEMO-BOOK-001', variation_name: 'Hardcover Edition' }],
+  },
+];
+
+const DEFAULT_PRODUCTS = [...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS];
+
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
 const PRODUCT_STORAGE_KEY = 'primeos-product-master-v1';
 
+function normalizeStoredProduct(product: Product): Product {
+  const now = new Date().toISOString();
+  const rawSpecifications = Array.isArray(product.specifications) ? product.specifications : [];
+  const specifications = rawSpecifications
+    .filter((item): item is { attributeKey?: string; name: string; value: string } => Boolean(
+      item && typeof item === 'object' && typeof item.name === 'string' && typeof item.value === 'string',
+    ))
+    .map(item => ({ attributeKey: typeof item.attributeKey === 'string' ? item.attributeKey : undefined, name: item.name, value: item.value }));
+
+  return {
+    id: String(product.id),
+    name: typeof product.name === 'string' ? product.name : '',
+    sku_code: typeof product.sku_code === 'string' ? product.sku_code : '',
+    product_type: product.product_type === 'variant' ? 'variant' : 'single',
+    gtin: typeof product.gtin === 'string' ? product.gtin : '',
+    mpn: typeof product.mpn === 'string' ? product.mpn : '',
+    model_number: typeof product.model_number === 'string' ? product.model_number : '',
+    brand: typeof product.brand === 'string' ? product.brand : '',
+    brandId: typeof product.brandId === 'string' ? product.brandId : undefined,
+    asin: typeof product.asin === 'string' ? product.asin : '',
+    manufacturer: typeof product.manufacturer === 'string' ? product.manufacturer : '',
+    category: typeof product.category === 'string' ? product.category : '',
+    condition: typeof product.condition === 'string' ? product.condition : 'new',
+    description: typeof product.description === 'string' ? product.description : '',
+    localized_content: product.localized_content && typeof product.localized_content === 'object' ? product.localized_content : {},
+    original_price: Number(product.original_price) || 0,
+    retail_price: Number(product.retail_price) || 0,
+    price_currency: typeof product.price_currency === 'string' ? product.price_currency : 'JPY',
+    market_prices: Array.isArray(product.market_prices) ? product.market_prices : [],
+    prod_length: Number(product.prod_length) || 0,
+    prod_height: Number(product.prod_height) || 0,
+    prod_width: Number(product.prod_width) || 0,
+    prod_weight: Number(product.prod_weight) || 0,
+    pkg_length: Number(product.pkg_length) || 0,
+    pkg_height: Number(product.pkg_height) || 0,
+    pkg_width: Number(product.pkg_width) || 0,
+    pkg_weight: Number(product.pkg_weight) || 0,
+    country_of_origin: typeof product.country_of_origin === 'string' ? product.country_of_origin : '',
+    hs_code: typeof product.hs_code === 'string' ? product.hs_code : '',
+    images: Array.isArray(product.images) ? product.images.filter((image): image is string => typeof image === 'string') : [],
+    image_alt_texts: Array.isArray(product.image_alt_texts) ? product.image_alt_texts.filter((text): text is string => typeof text === 'string') : [],
+    slug: typeof product.slug === 'string' ? product.slug : '',
+    meta_title: typeof product.meta_title === 'string' ? product.meta_title : '',
+    meta_description: typeof product.meta_description === 'string' ? product.meta_description : '',
+    specifications,
+    inventory: product.inventory && typeof product.inventory === 'object' && !Array.isArray(product.inventory) ? product.inventory : {},
+    has_variants: Boolean(product.has_variants),
+    channels: Array.isArray(product.channels) ? product.channels : [],
+    channel_overrides: product.channel_overrides && typeof product.channel_overrides === 'object' ? product.channel_overrides : {},
+    associations: Array.isArray(product.associations) ? product.associations : [],
+    revisions: Array.isArray(product.revisions) ? product.revisions : [],
+    record_version: Number(product.record_version) || 1,
+    status: ['draft', 'review', 'published', 'archived'].includes(product.status) ? product.status : 'draft',
+    created_at: typeof product.created_at === 'string' ? product.created_at : now,
+    updated_at: typeof product.updated_at === 'string' ? product.updated_at : now,
+    skus: Array.isArray(product.skus) ? product.skus : [],
+    _variants: Array.isArray(product._variants) ? product._variants : undefined,
+  };
+}
+
 function loadStoredProducts(): Product[] {
-  if (typeof window === 'undefined') return [...SEED_PRODUCTS];
+  if (typeof window === 'undefined') return [...DEFAULT_PRODUCTS];
   try {
     const raw = window.localStorage.getItem(PRODUCT_STORAGE_KEY);
-    if (!raw) return [...SEED_PRODUCTS];
+    if (!raw) return [...DEFAULT_PRODUCTS];
     const stored = JSON.parse(raw) as unknown;
-    if (!Array.isArray(stored)) return [...SEED_PRODUCTS];
+    if (!Array.isArray(stored)) return [...DEFAULT_PRODUCTS];
     const valid = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
-    const migrated = valid.map(product => (product as Product & { product_type?: string }).product_type === 'bundle'
-      ? { ...product, product_type: product.has_variants ? 'variant' as const : 'single' as const }
-      : product);
+    const migrated = valid.map(storedProduct => {
+      const product = normalizeStoredProduct(storedProduct);
+      const normalized = (product as Product & { product_type?: string }).product_type === 'bundle'
+        ? { ...product, product_type: product.has_variants ? 'variant' as const : 'single' as const }
+        : product;
+      // Keep the shipped demo taxonomy representative without overwriting user-assigned categories.
+      return normalized.id === 'prod_003' && normalized.category === 'Art Supplies'
+        ? { ...normalized, category: 'Painting Accessories' }
+        : normalized.id === 'prod_demo_electronics' && normalized.category === 'Electronics'
+          ? { ...normalized, category: 'Headphones' }
+        : normalized;
+    });
     const storedIds = new Set(migrated.map(product => product.id));
-    return [...migrated, ...SEED_PRODUCTS.filter(product => !storedIds.has(product.id))];
+    return [...migrated, ...DEFAULT_PRODUCTS.filter(product => !storedIds.has(product.id))];
   } catch {
-    return [...SEED_PRODUCTS];
+    return [...DEFAULT_PRODUCTS];
   }
 }
 
@@ -372,12 +523,13 @@ export function getProducts(): Product[] {
 }
 
 export function addProduct(p: Product): void {
-  _products = [p, ..._products];
+  const normalized = normalizeStoredProduct(p);
+  _products = [normalized, ..._products.filter(product => product.id !== normalized.id)];
   persistProducts();
 }
 
 export function updateProduct(id: string, p: Partial<Product> & { id: string }): void {
-  _products = _products.map(x => x.id === id ? { ...x, ...p, updated_at: new Date().toISOString() } : x);
+  _products = _products.map(x => x.id === id ? normalizeStoredProduct({ ...x, ...p, updated_at: new Date().toISOString() }) : x);
   persistProducts();
 }
 

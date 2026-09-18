@@ -5,6 +5,31 @@ import "./index.css";
 
 const rootElement = document.getElementById("root");
 
+class PrimeOsErrorBoundary extends React.Component<React.PropsWithChildren, { error: Error | null }> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
+        <section className="w-full max-w-lg rounded-2xl border bg-card p-7 text-center shadow-lg">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">PrimeOS recovery</p>
+          <h1 className="mt-3 text-2xl font-semibold">This screen could not be displayed</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Reload the screen to retry. Your Product Master data remains saved.</p>
+          <p className="mt-3 rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">{this.state.error.message}</p>
+          <button className="mt-5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground" onClick={() => window.location.reload()}>
+            Reload screen
+          </button>
+        </section>
+      </main>
+    );
+  }
+}
+
 function recoverBlankPrimeOsScreen(root: HTMLElement) {
   window.setTimeout(() => {
     const visibleText = root.innerText.trim();
@@ -50,6 +75,8 @@ recoverBlankPrimeOsScreen(rootElement);
 
 createRoot(rootElement).render(
   <React.StrictMode>
-    <App />
+    <PrimeOsErrorBoundary>
+      <App />
+    </PrimeOsErrorBoundary>
   </React.StrictMode>
 );
