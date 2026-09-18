@@ -414,7 +414,53 @@ const CATEGORY_DEMO_PRODUCTS: Product[] = [
   },
 ];
 
-const DEFAULT_PRODUCTS = [...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS];
+const IMPORTED_DEMO_PRODUCTS: Product[] = [{
+  id: 'prod_import_imp-003',
+  name: 'Premium Calligraphy Starter Kit',
+  sku_code: 'SHP-CALLI-KIT',
+  product_type: 'single',
+  gtin: '',
+  mpn: '',
+  model_number: '',
+  brand: '',
+  asin: '',
+  manufacturer: '',
+  category: 'Headphones',
+  condition: 'new',
+  description: '',
+  original_price: 0,
+  retail_price: 5200,
+  price_currency: 'JPY',
+  prod_length: 0,
+  prod_height: 0,
+  prod_width: 0,
+  prod_weight: 0,
+  pkg_length: 0,
+  pkg_height: 0,
+  pkg_width: 0,
+  pkg_weight: 0,
+  country_of_origin: '',
+  hs_code: '',
+  images: [],
+  inventory: {},
+  has_variants: false,
+  channels: [
+    { channel: 'website', external_id: 'WEB-SHP-CALLI-KIT', status: 'active', listing_url: '/products/premium-calligraphy-starter-kit', last_synced_at: null },
+    { channel: 'pos', external_id: 'POS-SHP-CALLI-KIT', status: 'active', listing_url: null, last_synced_at: null },
+    { channel: 'shopee', external_id: 'SHP-9012283', status: 'pending', listing_url: null, last_synced_at: null },
+  ],
+  channel_overrides: {
+    webstore: { enabled: true, title: 'Premium Calligraphy Starter Kit', description: '', price_markup: 0, listing_sku: 'WEB-SHP-CALLI-KIT', web_slug: '/products/premium-calligraphy-starter-kit', visibility: 'public', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '', media_scope: 'all' },
+    pos: { enabled: true, title: 'Premium Calligraphy Starter Kit', description: '', price_markup: 0, listing_sku: 'POS-SHP-CALLI-KIT', pos_barcode: 'SHP-CALLI-KIT', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '', media_scope: 'all' },
+    shopee: { enabled: true, title: 'Premium Calligraphy Starter Kit', description: '', price_markup: 0, listing_sku: 'SHO-SHP-CALLI-KIT', category: 'Art Supplies > Calligraphy', stock_quantity: '24', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '24', media_scope: 'all' },
+  },
+  status: 'draft',
+  created_at: '2026-09-18T06:48:26Z',
+  updated_at: '2026-09-18T11:15:28Z',
+  skus: [{ id: 'sku_import_imp-003', sku_code: 'SHP-CALLI-KIT', variation_name: 'Default', weight_g: 0, units_per_carton: 1, status: 'active', price: 5200, stock: 0 }],
+}];
+
+const DEFAULT_PRODUCTS = [...IMPORTED_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS];
 
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
