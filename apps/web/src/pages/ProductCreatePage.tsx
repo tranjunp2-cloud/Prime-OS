@@ -155,6 +155,34 @@ const listingChannelByOverride: Record<OverrideChannel, ChannelListing['channel'
   social: 'social',
   rakuten: 'rakuten',
 };
+const overrideByListingChannel = Object.fromEntries(
+  Object.entries(listingChannelByOverride).map(([override, listing]) => [listing, override]),
+) as Record<ChannelListing['channel'], OverrideChannel>;
+
+function buildExistingListingMatches(product: Product | null) {
+  if (!product) return undefined;
+  const importItems = getCatalogImportItems();
+  const importedSourceId = product.id.startsWith('prod_import_') ? product.id.slice('prod_import_'.length) : null;
+  const matches = product.channels.reduce<Record<string, { listingId: string; title: string; status: string; differenceCount: number }>>((result, listing) => {
+    const channelKey = overrideByListingChannel[listing.channel];
+    const importMatch = importItems
+      .filter(item => item.channel === listing.channel && (
+        item.id === importedSourceId
+        || item.resolvedProductId === product.id
+        || item.suggestedProductId === product.id
+      ))
+      .sort((left, right) => Number(Boolean(right.confirmed)) - Number(Boolean(left.confirmed)) || right.confidence - left.confidence)[0];
+    const confidence = importMatch?.confidence ?? (listing.external_id ? 100 : 90);
+    result[channelKey] = {
+      listingId: importMatch?.listingId || listing.external_id || `${channelKey.toUpperCase()}-${product.sku_code}`,
+      title: importMatch?.title || product.name,
+      status: `${listing.status === 'active' ? 'Active' : listing.status === 'pending' ? 'Pending' : 'Inactive'} on ${OVERRIDE_CHANNELS.find(channel => channel.key === channelKey)?.label ?? listing.channel}`,
+      differenceCount: confidence === 100 ? 0 : confidence >= 95 ? 1 : confidence >= 85 ? 2 : 4,
+    };
+    return result;
+  }, {});
+  return Object.keys(matches).length ? matches : undefined;
+}
 function channelSetupComplete(key: OverrideChannel, value: ChannelOverrideForm) {
   if (!value.listing_sku.trim()) return false;
   if (key === 'webstore') return Boolean(value.web_slug.trim());
@@ -245,7 +273,7 @@ function recoverImportedProductDraft(productId: string): Product | null {
     pkg_length: 0, pkg_height: 0, pkg_width: 0, pkg_weight: 0,
     country_of_origin: '', hs_code: '', images: item.image ? [item.image] : [], specifications: [], inventory: {},
     has_variants: item.variants > 1,
-    channels: [{ channel: item.channel, external_id: item.channelSku, status: 'pending', listing_url: null, last_synced_at: null }],
+    channels: [{ channel: item.channel, external_id: item.listingId, status: 'pending', listing_url: null, last_synced_at: null }],
     status: 'draft', created_at: now, updated_at: now, skus: [],
   };
 }
@@ -1080,6 +1108,7 @@ export default function ProductCreatePage() {
     [editId, storedProduct],
   );
   const existingProduct = storedProduct ?? recoveredImportProduct;
+  const existingListingMatches = useMemo(() => buildExistingListingMatches(existingProduct), [existingProduct]);
   const existingSkuList = getAllSkus();
   const [catalogBrands, setCatalogBrands] = useState<CatalogBrand[]>(() => getActiveCatalogBrands());
   const categoryTree = useMemo(() => buildCategoryTree(), []);
@@ -2445,14 +2474,7 @@ export default function ProductCreatePage() {
         availableStock={totalStock}
         imageCount={images.length}
         productType={form.product_type}
-        existingMatches={editId === 'prod_import_imp-003' ? {
-          shopee: {
-            listingId: 'SHP-9384726150',
-            title: 'Premium Calligraphy Starter Kit – Official',
-            status: 'Active on Shopee',
-            differenceCount: 4,
-          },
-        } : undefined}
+        existingMatches={existingListingMatches}
         onChange={(channel, patch) => setChannelListingDrafts(current => ({
           ...current,
           [channel]: { ...current[channel as OverrideChannel], ...patch },
