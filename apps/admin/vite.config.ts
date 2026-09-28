@@ -6,7 +6,10 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
-      '/api': process.env.PRIME_ADMIN_PROXY_TARGET || 'http://127.0.0.1:8280'
+      '/api': {
+        target: process.env.PRIME_ADMIN_PROXY_TARGET || 'http://localhost:8180',
+        changeOrigin: true
+      }
     }
   }
 });

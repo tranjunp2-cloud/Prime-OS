@@ -71,20 +71,28 @@ const statusTone: Record<SyncStatus, string> = {
 };
 
 const statusLabel: Record<SyncStatus, string> = { synced: 'Synced', pending: 'Pending', error: 'Error', missing: 'Not published' };
-function getChannelMatrix(index: number, productId?: string): Record<ChannelKey, SyncStatus> {
-  const patterns: Array<Record<ChannelKey, SyncStatus>> = [
-    { primeweb: 'synced', pos: 'synced', shopee: 'synced', lazada: 'synced', amazon: 'pending', rakuten: 'missing' },
-    { primeweb: 'synced', pos: 'synced', shopee: 'error', lazada: 'error', amazon: 'error', rakuten: 'pending' },
-    { primeweb: 'synced', pos: 'pending', shopee: 'synced', lazada: 'error', amazon: 'missing', rakuten: 'synced' },
-    { primeweb: 'synced', pos: 'synced', shopee: 'pending', lazada: 'synced', amazon: 'error', rakuten: 'missing' },
-  ];
-  const matrix = patterns[index % patterns.length];
-  const amazonListing = productId ? getSavedAmazonListing(productId) : null;
-  if (!amazonListing) return matrix;
-  return {
-    ...matrix,
-    amazon: amazonListing.status === 'synced' ? 'synced' : amazonListing.status === 'error' ? 'error' : amazonListing.status === 'draft' ? matrix.amazon : 'pending',
+function getChannelMatrix(product: Product): Record<ChannelKey, SyncStatus> {
+  const matrix: Record<ChannelKey, SyncStatus> = {
+    primeweb: 'missing', pos: 'missing', shopee: 'missing', lazada: 'missing', amazon: 'missing', rakuten: 'missing',
   };
+  const channelKeyMap: Partial<Record<Product['channels'][number]['channel'], ChannelKey>> = {
+    website: 'primeweb', pos: 'pos', shopee: 'shopee', lazada: 'lazada', amazon: 'amazon', rakuten: 'rakuten',
+  };
+  product.channels.forEach(listing => {
+    const key = channelKeyMap[listing.channel];
+    if (!key) return;
+    matrix[key] = listing.status === 'active' ? 'synced' : listing.status === 'pending' ? 'pending' : 'missing';
+  });
+  const overrideKeyMap: Partial<Record<keyof NonNullable<Product['channel_overrides']>, ChannelKey>> = {
+    webstore: 'primeweb', pos: 'pos', shopee: 'shopee', lazada: 'lazada', amazon: 'amazon', rakuten: 'rakuten',
+  };
+  Object.entries(product.channel_overrides ?? {}).forEach(([overrideKey, override]) => {
+    const key = overrideKeyMap[overrideKey as keyof NonNullable<Product['channel_overrides']>];
+    if (key && override?.enabled && matrix[key] === 'missing') matrix[key] = 'pending';
+  });
+  const amazonListing = getSavedAmazonListing(product.id);
+  if (amazonListing) matrix.amazon = amazonListing.status === 'synced' ? 'synced' : amazonListing.status === 'error' ? 'error' : 'pending';
+  return matrix;
 }
 
 
@@ -98,7 +106,10 @@ function ChannelOverflow({ matrix, onClick }: { matrix: Record<ChannelKey, SyncS
 
 function StockStatusCell({ product, matrix, inventorySyncKeys, onClick, onChannelIssue }: { product: Product; matrix: Record<ChannelKey, SyncStatus>; inventorySyncKeys: string[]; onClick: () => void; onChannelIssue: (channel: ChannelKey) => void }) {
   const { available, status } = getStockSummary(product);
-  const config = status === 'out-of-stock'
+  const stockNotSet = product.status === 'draft' && available === 0;
+  const config = stockNotSet
+    ? { label: 'Stock not set', icon: Boxes, tone: 'border-slate-200 bg-slate-50 text-slate-600', value: 'text-slate-600' }
+    : status === 'out-of-stock'
     ? { label: 'Out of stock', icon: PackageX, tone: 'border-rose-200 bg-rose-50 text-rose-700', value: 'text-rose-700' }
     : status === 'low-stock'
       ? { label: 'Low stock', icon: AlertTriangle, tone: 'border-amber-200 bg-amber-50 text-amber-700', value: 'text-amber-700' }
@@ -116,7 +127,7 @@ function StockStatusCell({ product, matrix, inventorySyncKeys, onClick, onChanne
     : `${channelIssues.length} channel stock issues`;
 
   return <div className="min-w-40">
-    <button type="button" onClick={onClick} className="group/stock min-h-11 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" aria-label={`${product.name}: ${available} Master ATS, ${config.label}. Manage master stock.`}><span className={cn('block text-sm font-bold tabular-nums', config.value)}>{available.toLocaleString()} Master ATS</span><span className={cn('mt-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold', config.tone)}><Icon className="size-3" />Master {config.label.toLowerCase()}</span></button>
+    <button type="button" onClick={onClick} className="group/stock min-h-11 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" aria-label={`${product.name}: ${stockNotSet ? 'stock not set' : `${available} Master ATS, ${config.label}`}. Manage master stock.`}><span className={cn('block text-sm font-bold tabular-nums', config.value)}>{stockNotSet ? 'Not set' : `${available.toLocaleString()} Master ATS`}</span><span className={cn('mt-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold', config.tone)}><Icon className="size-3" />{config.label}</span></button>
     {channelIssues.length ? <Tooltip><TooltipTrigger asChild><button type="button" onClick={() => onChannelIssue(primaryIssue.channel.key)} className={cn('mt-1 flex min-h-8 max-w-48 items-center gap-1 rounded-md px-1.5 text-left text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500', issueTone)} aria-label={`${issueLabel}. Review channel stock.`}><AlertTriangle className="size-3.5 shrink-0" /><span className="truncate">{issueLabel}</span></button></TooltipTrigger><TooltipContent side="top" align="start" className="w-72 p-3"><p className="font-semibold text-slate-900">Channel stock differs from Master</p><p className="mt-1 text-xs leading-5 text-slate-500">Master stock is still available, but these channels report a lower quantity than Prime OS allocated.</p><div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">{channelIssues.map(({ channel, stock }) => <div key={channel.key} className="flex items-center gap-2"><ChannelLogo channel={channel} size="sm" /><span className="flex-1 text-xs font-medium text-slate-700">{channel.label}</span><span className={cn('text-xs font-semibold tabular-nums', stock.reported === 0 ? 'text-rose-700' : 'text-amber-700')}>{stock.allocated} allocated · {stock.reported} reported</span></div>)}</div><p className="mt-2 border-t border-slate-100 pt-2 text-[10px] text-slate-400">Click to review the first affected channel in Channel Listings.</p></TooltipContent></Tooltip> : null}
   </div>;
 }
@@ -207,7 +218,7 @@ export default function Products() {
     if (channel && channels.some(({ key }) => key === channel)) setListingChannel(channel as ChannelKey);
   }, [location.search]);
 
-  const rows = useMemo(() => products.filter((product) => !hiddenIds.includes(product.id)).map((product, index) => ({ product, matrix: { ...getChannelMatrix(index, product.id), ...statusOverrides[product.id] } })), [hiddenIds, products, statusOverrides]);
+  const rows = useMemo(() => products.filter((product) => !hiddenIds.includes(product.id)).map(product => ({ product, matrix: { ...getChannelMatrix(product), ...statusOverrides[product.id] } })), [hiddenIds, products, statusOverrides]);
   const categories = useMemo(() => Array.from(new Set(products.map((product) => product.category).filter(Boolean))).sort(), [products]);
   const catalogCounts = useMemo(() => ({
     all: rows.length,
@@ -367,15 +378,15 @@ export default function Products() {
 
       <TooltipProvider delayDuration={150}><div className="overflow-x-auto"><table className={cn('w-full text-left', workspaceMode === 'master' ? 'min-w-[1280px]' : 'min-w-[1160px]')}><thead className="border-b border-slate-200 bg-slate-50/60"><tr><th className="sticky left-0 z-10 w-12 bg-slate-50 px-4 py-3"><Checkbox checked={filtered.length > 0 && filtered.every(({ product }) => selectedIds.includes(product.id))} onCheckedChange={() => setSelectedIds(filtered.every(({ product }) => selectedIds.includes(product.id)) ? selectedIds.filter((id) => !filtered.some(({ product }) => product.id === id)) : Array.from(new Set([...selectedIds, ...filtered.map(({ product }) => product.id)])))} aria-label="Select all visible products" /></th>{(workspaceMode === 'master' ? ['PRODUCT', 'MASTER SKU', 'VARIANTS', 'BASE PRICE', 'MASTER STOCK', 'CHANNEL USAGE', 'UPDATED', 'ACTIONS'] : ['PRODUCT SOURCE', `${selectedListingChannel.label.toUpperCase()} LISTING`, 'READINESS & SYNC', 'CHANNEL STOCK', 'CHANNEL PRICE', 'ACTION']).map((header) => <th key={header} className={cn('px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500', (header === 'ACTIONS' || header === 'ACTION') && 'text-right')}><span className={cn('inline-flex items-center gap-1', (header === 'ACTIONS' || header === 'ACTION') && 'w-full justify-end')}>{header}{header === 'MASTER STOCK' || header === 'CHANNEL STOCK' ? <Tooltip><TooltipTrigger asChild><button type="button" className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`How ${header.toLowerCase()} is calculated`}><Info className="size-3.5" /></button></TooltipTrigger><TooltipContent className="max-w-64 text-xs">{header === 'MASTER STOCK' ? 'Calculated automatically from stock held across Prime OS warehouses.' : 'Managed independently by default. Prime OS publishes updates only after inventory sync is configured for this listing.'}</TooltipContent></Tooltip> : null}</span></th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{isLoading ? Array.from({ length: 6 }).map((_, index) => <tr key={index}><td className="px-4 py-3"><Skeleton className="size-4" /></td><td className="px-4 py-3"><div className="flex items-center gap-3"><Skeleton className="size-10 rounded-lg" /><div className="space-y-2"><Skeleton className="h-4 w-44" /><Skeleton className="h-3 w-28" /></div></div></td><td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td><td className="px-4 py-3"><Skeleton className="h-4 w-20" /></td><td className="px-4 py-3"><Skeleton className="h-9 w-28" /></td><td className="px-4 py-3"><Skeleton className="h-9 w-52" /></td><td className="px-4 py-3"><Skeleton className="ml-auto h-9 w-20" /></td></tr>) : filtered.map(({ product, matrix }) => {
-          const image = getProductImage(product.id, product.asin);
+          const image = product.images[0] || (product.asin ? getProductImage(product.id, product.asin) : '');
           const variants = product.skus?.length ?? 0;
           return <tr key={product.id} className="group transition-colors hover:bg-slate-50/60">
             <td className="sticky left-0 z-[1] bg-white px-4 py-3 group-hover:bg-slate-50"><Checkbox checked={selectedIds.includes(product.id)} onCheckedChange={() => toggleProduct(product.id)} aria-label={`Select ${product.name}`} /></td>
-            <td className="px-4 py-3"><div className="flex items-start gap-3"><img src={image} alt="" className="size-10 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { (event.currentTarget as HTMLImageElement).src = `https://picsum.photos/seed/${product.id}/80/80`; }} /><div className="min-w-0"><div className="flex max-w-[310px] items-center gap-2"><Link to={`/products/${product.id}`} className="block min-w-0 truncate text-sm font-semibold text-slate-900 hover:text-indigo-700">{product.name}</Link>{product.id.startsWith('prod_import_') ? <Badge variant="outline" className="shrink-0 border-sky-200 bg-sky-50 text-[10px] text-sky-700">Imported</Badge> : null}</div><p className="mt-0.5 max-w-[280px] truncate text-xs text-slate-500">{product.brand || 'Unbranded'} · {product.category || 'Uncategorized'}</p>{product.id.startsWith('prod_import_') ? <p className="mt-1 text-[11px] font-medium text-sky-700">Created from channel listing · Complete master data</p> : null}{workspaceMode === 'master' ? <DataIssueBadge product={product} onClick={() => navigate(`/products/${product.id}/edit`)} /> : null}</div></div></td>
+            <td className="px-4 py-3"><div className="flex items-start gap-3"><div className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50"><PackageX className="size-4 text-slate-400" />{image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" onError={event => { event.currentTarget.style.display = 'none'; }} /> : null}</div><div className="min-w-0"><div className="flex max-w-[310px] items-center gap-2"><Link to={`/products/${product.id}`} className="block min-w-0 truncate text-sm font-semibold text-slate-900 hover:text-indigo-700">{product.name}</Link>{product.id.startsWith('prod_import_') ? <Badge variant="outline" className="shrink-0 border-sky-200 bg-sky-50 text-[10px] text-sky-700">Imported</Badge> : null}</div><p className="mt-0.5 max-w-[280px] truncate text-xs text-slate-500">{product.brand || 'Unbranded'} · {product.category || 'Uncategorized'}</p>{product.id.startsWith('prod_import_') ? <p className="mt-1 text-[11px] font-medium text-sky-700">Created from channel listing · Complete master data</p> : null}{workspaceMode === 'master' ? <DataIssueBadge product={product} onClick={() => navigate(`/products/${product.id}/edit`)} /> : null}</div></div></td>
             {workspaceMode === 'master' ? <>
               <td className="px-4 py-3"><div className="font-mono text-xs font-semibold text-slate-700">{product.sku_code}</div><Badge variant="outline" className="mt-1 capitalize">{product.status === 'published' ? 'Active' : product.status}</Badge></td>
               <td className="px-4 py-3"><span className="text-sm font-medium tabular-nums text-slate-700">{variants === 0 ? 'Single Product' : `${variants} ${variants === 1 ? 'Option' : 'Options'}`}</span></td>
-              <td className="px-4 py-3 text-sm font-semibold tabular-nums text-slate-900">{formatLocalizedMoney(locale, product.retail_price, product.price_currency)}</td>
+              <td className="px-4 py-3 text-sm font-semibold tabular-nums text-slate-900">{product.status === 'draft' && product.retail_price === 0 ? <span className="font-medium text-slate-500">Not set</span> : formatLocalizedMoney(locale, product.retail_price, product.price_currency)}</td>
               <td className="px-4 py-3"><StockStatusCell product={product} matrix={matrix} inventorySyncKeys={inventorySyncKeys} onClick={() => setStockTarget(product)} onChannelIssue={(channel) => navigate(`/products/${product.id}/channels/${channel}`)} /></td>
               <td className="px-4 py-3"><ListingCoverage matrix={matrix} onClick={() => navigate(`/products/${product.id}?tab=channels`)} /></td>
               <td className="px-4 py-3"><p className="text-sm font-medium text-slate-700">{new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(product.updated_at))}</p><p className="mt-1 text-xs text-slate-500">Product record</p></td>

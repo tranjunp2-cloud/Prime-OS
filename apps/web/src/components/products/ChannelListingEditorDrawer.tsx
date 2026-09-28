@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Circle, RefreshCw, Save, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Circle, Link2, RefreshCw, Save, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Textarea } from '@/components/ui/textarea';
 import type { ChannelWizardDraft, WizardChannel } from './ChannelListingWizard';
 
-type EditorTab = 'listing' | 'variants-media' | 'price-inventory' | 'requirements' | 'readiness';
+type EditorTab = 'listing' | 'sku-mapping' | 'variants-media' | 'price-inventory' | 'requirements' | 'readiness';
 
 interface Props {
   open: boolean;
@@ -29,7 +29,8 @@ const DEMO_VARIANTS = [
 
 const TABS: Array<{ value: EditorTab; label: string }> = [
   { value: 'listing', label: 'Listing' },
-  { value: 'variants-media', label: 'Variants & media' },
+  { value: 'sku-mapping', label: 'SKU mapping' },
+  { value: 'variants-media', label: 'Variants & channel media' },
   { value: 'price-inventory', label: 'Price & inventory' },
   { value: 'requirements', label: 'Channel requirements' },
   { value: 'readiness', label: 'Readiness' },
@@ -98,6 +99,7 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
   };
   const sectionIssueCounts: Record<EditorTab, number> = {
     listing: Number(!form.listing_sku.trim()) + Number(channel.key === 'webstore' && !form.web_slug.trim()) + Number(channel.key === 'pos' && !form.pos_barcode.trim()) + Number(channel.key === 'social' && !form.visibility),
+    'sku-mapping': listingVariants.length - variants.length,
     'variants-media': Number(!variants.length) + Number(!form.media_scope),
     'price-inventory': Number(channel.key !== 'amazon' && !form.listing_mode) + Number(!form.sync_policy) + Number(['shopee', 'lazada', 'tiktok', 'rakuten'].includes(channel.key) && !form.stock_quantity.trim()) + Number(channel.key === 'tiktok' && !form.warehouse),
     requirements: blockers.filter(item => /category|Shipping|ASIN|Catalog ID|Condition|Fulfillment/.test(item)).length,
@@ -136,12 +138,27 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
             {isMarketplace && <><Field label="Channel title" wide><Input value={form.title} onChange={event => patch({ title: event.target.value })} /></Field><Field label="Channel description" wide><Textarea rows={4} value={form.description} onChange={event => patch({ description: event.target.value })} placeholder="Leave empty to inherit Product Master content" /></Field></>}
           </Section>}
 
+          {tab === 'sku-mapping' && <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border bg-muted/20 p-4"><p className="text-xs text-muted-foreground">Product Master</p><p className="mt-1 truncate text-sm font-semibold">{masterSku}</p></div>
+              <div className="rounded-xl border bg-muted/20 p-4"><p className="text-xs text-muted-foreground">Channel listing</p><p className="mt-1 truncate font-mono text-sm font-semibold">{form.listing_sku || 'Not configured'}</p></div>
+              <div className="rounded-xl border bg-muted/20 p-4"><p className="text-xs text-muted-foreground">Mapping coverage</p><p className="mt-1 text-sm font-semibold">{variants.length}/{listingVariants.length} SKUs mapped</p></div>
+            </div>
+            <section className="overflow-hidden rounded-xl border">
+              <header className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><h3 className="text-sm font-semibold">Product & SKU mapping</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Connect each sellable Master SKU to the child SKU used by this channel listing.</p></div><Badge variant="outline" className={variants.length === listingVariants.length ? 'border-emerald-500/30 text-emerald-500' : 'border-amber-500/30 text-amber-500'}>{variants.length === listingVariants.length ? 'All mapped' : `${listingVariants.length - variants.length} need mapping`}</Badge></header>
+              <div className="divide-y">
+                {listingVariants.map((variant, index) => { const mapped = variants.includes(variant.id); const channelSku = listingVariants.length === 1 ? form.listing_sku : `${form.listing_sku}-${String(index + 1).padStart(2, '0')}`; return <div key={variant.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Master variant</p><p className="mt-1 truncate text-sm font-medium">{variant.label}</p><p className="truncate font-mono text-xs text-muted-foreground">{variant.sku}</p></div><Link2 className={mapped ? 'hidden size-4 text-emerald-500 sm:block' : 'hidden size-4 text-muted-foreground sm:block'} /><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{channel.label} variant</p>{mapped ? <><p className="mt-1 truncate text-sm font-medium">{variant.label}</p><p className="truncate font-mono text-xs text-muted-foreground">{channelSku}</p></> : <p className="mt-1 text-sm text-muted-foreground">Not connected</p>}</div><div className="flex items-center justify-between gap-2 sm:justify-end">{mapped ? <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-500">Mapped</Badge> : <Button type="button" size="sm" variant="outline" onClick={() => setVariants(current => [...new Set([...current, variant.id])])}>Include & map</Button>}</div></div>; })}
+              </div>
+            </section>
+            <p className="rounded-lg bg-primary/5 p-3 text-xs leading-5 text-muted-foreground">Variant inclusion controls which mappings are published. Removing a variant from this listing keeps the Master SKU unchanged.</p>
+          </div>}
+
           {tab === 'variants-media' && <div className="space-y-5">
             <Section title="Variants to publish" description="Choose the sellable child SKUs included in this parent-owned listing.">
               <div className="space-y-3 sm:col-span-2">{listingVariants.map(variant => { const checked = variants.includes(variant.id); return <label key={variant.id} className="flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border p-4 hover:bg-muted/20"><Checkbox checked={checked} onCheckedChange={next => setVariants(current => next ? [...new Set([...current, variant.id])] : current.filter(id => id !== variant.id))} /><span className="grid size-9 place-items-center rounded-lg border bg-muted"><Circle className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{variant.label}</strong><span className="font-mono text-xs text-muted-foreground">{variant.sku}</span></span>{variant.state === 'pending' && <Badge variant="outline" className="border-amber-300 text-amber-700">New · Review</Badge>}<Badge variant="secondary">{checked ? 'Included' : 'Excluded'}</Badge></label>; })}</div>
               {!variants.length && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:col-span-2">Include at least one variant before publishing.</p>}
             </Section>
-            <Section title="Channel media" description="Choose whether this listing inherits Product Master media or uses a channel-specific selection.">
+            <Section title="Channel media override" description="Inherit canonical Product Master media by default, or define a channel-specific selection.">
               <Field label="Media selection"><SelectControl value={form.media_scope} onChange={value => patch({ media_scope: value })} options={[['all', 'Use all Product Master images'], ['selected', 'Choose Product Master images'], ['custom', 'Use channel-only media']]} /></Field>
               {['tiktok', 'rakuten'].includes(channel.key) && <Field label={channel.key === 'tiktok' ? 'Product video' : 'R-Cabinet media'}><Input value={form.video_url} onChange={event => patch({ video_url: event.target.value })} placeholder="Select an asset or enter a URL" /></Field>}
             </Section>

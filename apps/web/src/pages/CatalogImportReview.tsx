@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Link2, PackagePlus, Search, Store, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Link2, PackagePlus, Search, ShieldCheck, Store, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem, type ImportMatchStatus, type ImportResolution } from '@/lib/catalog-import-store';
 import { addProduct, getProducts, updateProduct, type ChannelListing, type Product } from '@/lib/product-store';
 import { cn } from '@/lib/utils';
-import { getActiveCatalogCategories, type CatalogCategory } from '@/lib/product-catalog-settings-store';
+import { getActiveCatalogCategories, getProductCatalogSettings, saveProductCatalogSettings, type CatalogBrand, type CatalogCategory } from '@/lib/product-catalog-settings-store';
 
 type ReviewTab = 'mapping' | 'unresolved' | 'excluded';
 const tabs: Array<{ key: ReviewTab; label: string }> = [{ key: 'mapping', label: 'Mapping review' }, { key: 'unresolved', label: 'Unresolved' }, { key: 'excluded', label: 'Excluded' }];
@@ -163,27 +163,111 @@ export default function CatalogImportReview() {
     setActiveItem({ ...item, status: 'unmatched', resolution: 'later', suggestedProductId: undefined, resolvedProductId: undefined });
   }
 
+  /**
+   * Spec: Brand Auto-Resolve on Import (Option A)
+   * - Lookup registry by canonical name (case-insensitive)
+   * - If found → return existing brand (reuse, even if Unverified)
+   * - If not found → create new CatalogBrand with status 'Unverified' (= spec 'candidate')
+   *   and source 'imported' — never 'Verified' on auto-create
+   * Returns { brand, created: boolean } or null when no brand name provided.
+   */
+  function resolveBrandForImport(brandName: string | undefined): { brand: CatalogBrand; created: boolean } | null {
+    if (!brandName?.trim()) return null;
+    const name = brandName.trim();
+    const settings = getProductCatalogSettings();
+    const existing = settings.brands.find(b => b.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { brand: existing, created: false };
+    // Auto-create as Candidate (Unverified) — never pre-verified
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const newBrand: CatalogBrand = {
+      id: `${slug}-${Date.now().toString(36)}`,
+      name,
+      code: name.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12),
+      manufacturer: '', country: '', website: '', productCount: 0,
+      status: 'Unverified', source: 'imported', aliases: [], mappings: {},
+    };
+    saveProductCatalogSettings({ ...settings, brands: [...settings.brands, newBrand] });
+    return { brand: newBrand, created: true };
+  }
+
   function createProductMasterDraft(item: CatalogImportItem) {
     const id = `prod_import_${item.id}`;
     if (!getProducts().some(product => product.id === id)) {
       const now = new Date().toISOString();
-      addProduct({ id, name: item.title, sku_code: item.channelSku, product_type: item.variants > 1 ? 'variant' : 'single', gtin: '', mpn: '', model_number: '', brand: '', asin: item.channel === 'amazon' ? item.listingId : '', manufacturer: '', category: '', condition: 'new', description: '', original_price: 0, retail_price: item.price, price_currency: item.currency, prod_length: 0, prod_height: 0, prod_width: 0, prod_weight: 0, pkg_length: 0, pkg_height: 0, pkg_width: 0, pkg_weight: 0, country_of_origin: '', hs_code: '', images: item.image ? [item.image] : [], inventory: {}, has_variants: item.variants > 1, channels: [], status: 'draft', created_at: now, updated_at: now, skus: [] });
+      // Auto-resolve brand from channel listing data (Spec: Brand Auto-Create on Import)
+      const brandResult = resolveBrandForImport(item.brand);
+      addProduct({
+        id, name: item.title, sku_code: item.channelSku,
+        product_type: item.variants > 1 ? 'variant' : 'single',
+        gtin: '', mpn: '', model_number: '',
+        brand: brandResult?.brand.name ?? '',
+        asin: item.channel === 'amazon' ? item.listingId : '',
+        manufacturer: '', category: '', condition: 'new', description: '',
+        original_price: 0, retail_price: item.price, price_currency: item.currency,
+        // Shipping dimensions: fill-if-empty from channel data (no mapping needed — plain numbers)
+        prod_length: item.prod_length ?? 0, prod_height: item.prod_height ?? 0,
+        prod_width: item.prod_width ?? 0, prod_weight: item.prod_weight ?? 0,
+        pkg_length: item.pkg_length ?? 0, pkg_height: item.pkg_height ?? 0,
+        pkg_width: item.pkg_width ?? 0, pkg_weight: item.pkg_weight ?? 0,
+        country_of_origin: '', hs_code: '',
+        images: item.image ? [item.image] : [],
+        inventory: {}, has_variants: item.variants > 1, channels: [],
+        status: 'draft', created_at: now, updated_at: now, skus: [],
+      });
+      // Show appropriate toast based on brand resolution outcome
+      if (brandResult?.created) {
+        toast.warning(`Brand "${brandResult.brand.name}" auto-created as Candidate`, {
+          description: 'Verify this brand in Brand Registry before publishing.',
+          duration: 7000,
+        });
+      }
     }
     resolveItem(item.id, 'create', id);
-    toast.success('Product Master draft created successfully', { description: `${item.title} · ${item.channelSku}`, action: { label: 'View draft', onClick: () => navigate(`/products/${id}/edit`) } });
+    toast.success('Product Master draft created', {
+      description: `${item.title} · ${item.channelSku}`,
+      action: { label: 'View draft', onClick: () => navigate(`/products/${id}/edit`) },
+    });
     return id;
   }
 
   function createSelectedDrafts() {
     const selected = items.filter(item => selectedIds.includes(item.id));
     const now = new Date().toISOString();
+    let newBrandsCreated = 0;
+    const newBrandNames: string[] = [];
     selected.forEach(item => {
       const id = `prod_import_${item.id}`;
       if (getProducts().some(product => product.id === id)) return;
-      addProduct({ id, name: item.title, sku_code: item.channelSku, product_type: item.variants > 1 ? 'variant' : 'single', gtin: '', mpn: '', model_number: '', brand: '', asin: item.channel === 'amazon' ? item.listingId : '', manufacturer: '', category: '', condition: 'new', description: '', original_price: 0, retail_price: item.price, price_currency: item.currency, prod_length: 0, prod_height: 0, prod_width: 0, prod_weight: 0, pkg_length: 0, pkg_height: 0, pkg_width: 0, pkg_weight: 0, country_of_origin: '', hs_code: '', images: item.image ? [item.image] : [], inventory: {}, has_variants: item.variants > 1, channels: [], status: 'draft', created_at: now, updated_at: now, skus: [] });
+      // Auto-resolve brand from channel listing data
+      const brandResult = resolveBrandForImport(item.brand);
+      if (brandResult?.created) { newBrandsCreated++; newBrandNames.push(brandResult.brand.name); }
+      addProduct({
+        id, name: item.title, sku_code: item.channelSku,
+        product_type: item.variants > 1 ? 'variant' : 'single',
+        gtin: '', mpn: '', model_number: '',
+        brand: brandResult?.brand.name ?? '',
+        asin: item.channel === 'amazon' ? item.listingId : '',
+        manufacturer: '', category: '', condition: 'new', description: '',
+        original_price: 0, retail_price: item.price, price_currency: item.currency,
+        // Shipping dimensions: fill-if-empty from channel data (no mapping needed — plain numbers)
+        prod_length: item.prod_length ?? 0, prod_height: item.prod_height ?? 0,
+        prod_width: item.prod_width ?? 0, prod_weight: item.prod_weight ?? 0,
+        pkg_length: item.pkg_length ?? 0, pkg_height: item.pkg_height ?? 0,
+        pkg_width: item.pkg_width ?? 0, pkg_weight: item.pkg_weight ?? 0,
+        country_of_origin: '', hs_code: '',
+        images: item.image ? [item.image] : [],
+        inventory: {}, has_variants: item.variants > 1, channels: [],
+        status: 'draft', created_at: now, updated_at: now, skus: [],
+      });
     });
     updateItems(items.map(item => selectedIds.includes(item.id) ? { ...item, resolution: 'create', resolvedProductId: `prod_import_${item.id}`, confirmed: true } : item));
     toast.success(`${selected.length} Product Master drafts created`);
+    if (newBrandsCreated > 0) {
+      toast.warning(`${newBrandsCreated} brand${newBrandsCreated > 1 ? 's' : ''} auto-created as Candidate`, {
+        description: `Verify before publishing: ${newBrandNames.slice(0, 3).join(', ')}${newBrandNames.length > 3 ? ` +${newBrandNames.length - 3} more` : ''}`,
+        duration: 8000,
+      });
+    }
     setSelectedIds([]);
   }
 
@@ -261,10 +345,29 @@ function ReviewSheet({ item, products, relatedSuggestionCount, onClose, onResolv
   const picker = <div className="space-y-2 rounded-xl border bg-muted/10 p-4"><label className="text-sm font-semibold">Choose another Product Master</label><Select value={selectedProduct} onValueChange={setSelectedProduct}><SelectTrigger><SelectValue placeholder="Search or select Product Master" /></SelectTrigger><SelectContent>{products.map(product => <SelectItem key={product.id} value={product.id}>{product.name} · {product.sku_code}</SelectItem>)}</SelectContent></Select><Button className="w-full" disabled={!selectedProduct} onClick={() => finish('link', selectedProduct)}><Link2 className="size-4" />Link selected Product Master</Button></div>;
   return <Sheet open={Boolean(item)} onOpenChange={open => !open && onClose()}><SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-2xl">{item ? <><SheetHeader><div className="flex items-center gap-2"><SheetTitle>{itemSynced ? 'Mapping details' : item.status === 'matched' ? 'Confirm exact match' : item.status === 'suggested' ? 'Review suggested match' : item.status === 'unmatched' ? 'Resolve unmatched listing' : item.status === 'conflict' ? 'Resolve listing conflict' : 'Ignored listing'}</SheetTitle><Badge variant="outline" className={cn('ml-auto mr-6', statusCopy[item.status].className)}>{statusCopy[item.status].label}</Badge></div><SheetDescription>{item.storeName} · <span className="capitalize">{item.channel}</span> · {item.listingId}</SheetDescription></SheetHeader>
     {item.status === 'ignored' ? <div className="mt-6 space-y-5"><CompareCard title="Channel listing" rows={channelRows} /><div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><p className="font-semibold">This listing is excluded from the current import.</p><p className="mt-1 text-xs leading-5 text-slate-500">Restore it only if you want to link it or create a Product Master later.</p></div><Button onClick={() => finish('later')}><ArrowLeft className="size-4" />Restore to review queue</Button></div> : null}
-    {item.status === 'matched' ? <div className="mt-6 space-y-5"><div className="grid gap-4 sm:grid-cols-2"><CompareCard title="Channel listing" rows={channelRows} /><CompareCard title="Exact Product Master match" rows={masterRows} /></div><MatchConfidenceDetails item={item} /><div className="flex gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="mt-0.5 size-4 shrink-0" /><p>{itemSynced ? `This listing is synced to the Product Master with ${item.confidence}% confidence.` : `SKU and product identifiers match with ${item.confidence}% confidence. Confirm the relationship or choose a different master.`}</p></div>{showProductPicker ? picker : itemSynced ? <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button variant="ghost" onClick={() => setShowProductPicker(true)}>Change Product Master</Button></div> : <div className="flex flex-wrap gap-2"><Button onClick={() => finish('link', targetId)}><Check className="size-4" />Approve &amp; sync</Button><Button variant="outline" onClick={() => setShowProductPicker(true)}>Choose different master</Button><Button variant="ghost" onClick={() => finish('ignore')}>Ignore listing</Button></div>}</div> : null}
-    {item.status === 'suggested' ? <div className="mt-6 space-y-5"><div className="grid gap-4 sm:grid-cols-2"><CompareCard title="Channel listing" rows={channelRows} /><CompareCard title="Existing Product Master suggested" rows={masterRows} /></div><MatchConfidenceDetails item={item} /><div className={cn("flex gap-3 rounded-lg border p-3 text-sm", itemSynced ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}>{itemSynced ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}<div><p>{itemSynced ? `This listing was synced automatically at ${item.confidence}% confidence.` : `This is a ${item.confidence}% confidence suggestion. Review differences before accepting it.`}</p>{relatedSuggestionCount > 1 ? <p className="mt-1 text-xs font-semibold">{relatedSuggestionCount} imported listings share this Product Master suggestion.</p> : null}</div></div>{showProductPicker ? picker : itemSynced ? <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button variant="ghost" onClick={() => setShowProductPicker(true)}>Change Product Master</Button></div> : <div className="grid gap-2 sm:grid-cols-2"><Button onClick={() => relatedSuggestionCount > 1 && targetId ? onResolveSuggestedGroup(targetId) : finish('link', targetId)}><Link2 className="size-4" />{relatedSuggestionCount > 1 ? `Accept all ${relatedSuggestionCount} for this master` : 'Accept suggested match'}</Button><Button variant="outline" onClick={() => setShowProductPicker(true)}>Choose another master</Button><Button variant="outline" onClick={() => finish('create')}><PackagePlus className="size-4" />Create separate draft</Button><Button variant="ghost" onClick={() => finish('later')}>Keep for later</Button></div>}</div> : null}
+    {item.status === 'matched' ? <div className="mt-6 space-y-5"><FieldSplitView fields={[
+        { label: 'Title', importValue: item.title, masterValue: target?.name ?? '' },
+        { label: 'Channel SKU', importValue: item.channelSku, masterValue: target?.sku_code ?? '' },
+        { label: 'Category', importValue: item.channelCategory, masterValue: target?.category ?? '' },
+        { label: 'Price', importValue: `${item.price} ${item.currency}`, masterValue: target ? `${target.retail_price} ${target.price_currency}` : '' },
+        { label: 'Stock', importValue: String(item.channelStock), masterValue: target ? String(Object.values(target.inventory).reduce((s, v) => s + v, 0)) : '' },
+      ]} /><MatchConfidenceDetails item={item} /><div className="flex gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="mt-0.5 size-4 shrink-0" /><p>{itemSynced ? `This listing is synced to the Product Master with ${item.confidence}% confidence.` : `SKU and product identifiers match with ${item.confidence}% confidence. Confirm the relationship or choose a different master.`}</p></div>{showProductPicker ? picker : itemSynced ? <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button variant="ghost" onClick={() => setShowProductPicker(true)}>Change Product Master</Button></div> : <div className="flex flex-wrap gap-2"><Button onClick={() => finish('link', targetId)}><Check className="size-4" />Approve &amp; sync</Button><Button variant="outline" onClick={() => setShowProductPicker(true)}>Choose different master</Button><Button variant="ghost" onClick={() => finish('ignore')}>Ignore listing</Button></div>}</div> : null}
+
+    {item.status === 'suggested' ? <div className="mt-6 space-y-5"><FieldSplitView fields={[
+        { label: 'Title', importValue: item.title, masterValue: target?.name ?? '' },
+        { label: 'Channel SKU', importValue: item.channelSku, masterValue: target?.sku_code ?? '' },
+        { label: 'Category', importValue: item.channelCategory, masterValue: target?.category ?? '' },
+        { label: 'Price', importValue: `${item.price} ${item.currency}`, masterValue: target ? `${target.retail_price} ${target.price_currency}` : '' },
+        { label: 'Stock', importValue: String(item.channelStock), masterValue: target ? String(Object.values(target.inventory).reduce((s, v) => s + v, 0)) : '' },
+      ]} /><MatchConfidenceDetails item={item} /><div className={cn("flex gap-3 rounded-lg border p-3 text-sm", itemSynced ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}>{itemSynced ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}<div><p>{itemSynced ? `This listing was synced automatically at ${item.confidence}% confidence.` : `This is a ${item.confidence}% confidence suggestion. Review differences before accepting it.`}</p>{relatedSuggestionCount > 1 ? <p className="mt-1 text-xs font-semibold">{relatedSuggestionCount} imported listings share this Product Master suggestion.</p> : null}</div></div>{showProductPicker ? picker : itemSynced ? <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button variant="ghost" onClick={() => setShowProductPicker(true)}>Change Product Master</Button></div> : <div className="grid gap-2 sm:grid-cols-2"><Button onClick={() => relatedSuggestionCount > 1 && targetId ? onResolveSuggestedGroup(targetId) : finish('link', targetId)}><Link2 className="size-4" />{relatedSuggestionCount > 1 ? `Accept all ${relatedSuggestionCount} for this master` : 'Accept suggested match'}</Button><Button variant="outline" onClick={() => setShowProductPicker(true)}>Choose another master</Button><Button variant="outline" onClick={() => finish('create')}><PackagePlus className="size-4" />Create separate draft</Button><Button variant="ghost" onClick={() => finish('later')}>Keep for later</Button></div>}</div> : null}
     {item.status === 'unmatched' ? createdDraftId ? <div className="mt-6 space-y-5"><div className="flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" /><div><p className="text-sm font-semibold text-emerald-900">Product Master draft created</p><p className="mt-1 text-xs text-emerald-700">Draft ID: {createdDraftId}. Complete the minimum information below, or finish it later in Product Master.</p></div></div><section className="space-y-4 rounded-xl border p-4"><div><h3 className="text-sm font-semibold">Complete Product Master draft</h3><p className="mt-1 text-xs text-slate-500">Information from {item.channel} has been prefilled. Channel stock remains channel-owned.</p></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><label className="text-sm font-medium">Product name *</label><Input value={draftName} onChange={event => setDraftName(event.target.value)} /></div><div className="space-y-2"><label className="text-sm font-medium">Master SKU *</label><Input value={draftSku} onChange={event => setDraftSku(event.target.value)} /><p className="text-xs text-slate-500">Proposed from Channel SKU.</p></div></div><div className="grid gap-3 sm:grid-cols-3"><DraftFieldStatus label="Product structure" value={item.variants > 1 ? `Variants · ${item.variants}` : 'Single product'} ready /><DraftFieldStatus label="Internal category" value="Not selected" /><DraftFieldStatus label="Brand" value="Not identified" /></div></section><div className="flex flex-wrap gap-2"><Button disabled={!draftName.trim() || !draftSku.trim()} onClick={() => onCompleteDraft(item, createdDraftId, draftName.trim(), draftSku.trim())}><Link2 className="size-4" />Save &amp; link listing</Button><Button variant="outline" onClick={() => onOpenDraft(createdDraftId)}>Open full product editor</Button><Button variant="ghost" onClick={onClose}>Finish later</Button></div></div> : <div className="mt-6 space-y-5"><CompareCard title="Channel listing" rows={channelRows} /><div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><CircleAlert className="mt-0.5 size-4 shrink-0" /><div><p className="font-semibold">No Product Master match was found.</p><p className="mt-1 text-xs">Create a draft from this listing, or search for an existing master manually.</p></div></div>{showProductPicker ? picker : <div className="grid gap-2 sm:grid-cols-2"><Button onClick={() => setCreatedDraftId(onCreateDraft(item))}><PackagePlus className="size-4" />Create Product Master draft</Button><Button variant="outline" onClick={() => setShowProductPicker(true)}>Find existing master</Button><Button variant="ghost" onClick={() => finish('later')}>Keep for later</Button><Button variant="ghost" onClick={() => finish('ignore')}>Ignore listing</Button></div>}</div> : null}
-    {item.status === 'conflict' ? <div className="mt-6 space-y-5"><div className="grid gap-4 sm:grid-cols-2"><CompareCard title="Channel listing" rows={channelRows} /><CompareCard title="Potential Product Master" rows={masterRows} /></div><ConflictResolutionGuide item={item} target={target} />{showProductPicker ? picker : <div className="grid gap-2 sm:grid-cols-2"><Button onClick={() => setShowProductPicker(true)}>Start: select correct master</Button><Button variant="outline" onClick={() => finish('create')}><PackagePlus className="size-4" />Create separate draft</Button><Button variant="ghost" onClick={() => finish('later')}>Keep for later</Button><Button variant="ghost" onClick={() => finish('ignore')}>Ignore listing</Button></div>}</div> : null}
+    {item.status === 'conflict' ? <div className="mt-6 space-y-5"><FieldSplitView fields={[
+        { label: 'Title', importValue: item.title, masterValue: target?.name ?? '' },
+        { label: 'Channel SKU', importValue: item.channelSku, masterValue: target?.sku_code ?? '' },
+        { label: 'Category', importValue: item.channelCategory, masterValue: target?.category ?? '' },
+        { label: 'Price', importValue: `${item.price} ${item.currency}`, masterValue: target ? `${target.retail_price} ${target.price_currency}` : '' },
+        { label: 'Stock', importValue: String(item.channelStock), masterValue: target ? String(Object.values(target.inventory).reduce((s, v) => s + v, 0)) : '' },
+      ]} /><ConflictResolutionGuide item={item} target={target} />{showProductPicker ? picker : <div className="grid gap-2 sm:grid-cols-2"><Button onClick={() => setShowProductPicker(true)}>Start: select correct master</Button><Button variant="outline" onClick={() => finish('create')}><PackagePlus className="size-4" />Create separate draft</Button><Button variant="ghost" onClick={() => finish('later')}>Keep for later</Button><Button variant="ghost" onClick={() => finish('ignore')}>Ignore listing</Button></div>}</div> : null}
   </> : null}</SheetContent></Sheet>;
 }
 
@@ -308,4 +411,96 @@ function DecisionBadge({ resolution }: { resolution: ImportResolution }) {
     ignore: { label: 'Will ignore', className: 'border-slate-200 bg-slate-50 text-slate-500' },
   }[resolution];
   return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
+}
+
+// ─── Flow 5 — Field-level split-view ─────────────────────────────────────────
+
+type FieldDecision = 'applied' | 'preserved' | 'conflict' | 'blocked';
+
+function resolveFieldDecision(importValue: string, masterValue: string, isBlocked: boolean): FieldDecision {
+  if (isBlocked) return 'blocked';
+  if (!masterValue.trim()) return 'applied';
+  if (importValue.trim() === masterValue.trim()) return 'preserved';
+  return 'conflict';
+}
+
+const DECISION_STYLES: Record<FieldDecision, { badgeClass: string; rowClass: string; label: string; dotClass: string }> = {
+  applied:   { badgeClass: 'bg-emerald-500/12 text-emerald-700 border-emerald-200', rowClass: 'bg-emerald-500/5', label: 'Applied',    dotClass: 'bg-emerald-500' },
+  preserved: { badgeClass: 'bg-muted text-muted-foreground border-border',          rowClass: '',                label: 'Preserved', dotClass: 'bg-slate-400' },
+  conflict:  { badgeClass: 'bg-amber-500/12 text-amber-700 border-amber-200',       rowClass: 'bg-amber-500/5', label: 'Conflict',   dotClass: 'bg-amber-500' },
+  blocked:   { badgeClass: 'bg-muted text-muted-foreground border-border',          rowClass: 'opacity-50',     label: 'Blocked',    dotClass: 'bg-slate-300' },
+};
+
+interface SplitFieldRow {
+  label: string;
+  importValue: string;
+  masterValue: string;
+  isBlocked?: boolean;
+}
+
+function FieldSplitView({
+  fields,
+  onAcceptImport,
+  onKeepMaster,
+}: {
+  fields: SplitFieldRow[];
+  onAcceptImport?: (label: string, value: string) => void;
+  onKeepMaster?: (label: string) => void;
+}) {
+  const conflictCount = fields.filter(f => resolveFieldDecision(f.importValue, f.masterValue, f.isBlocked ?? false) === 'conflict').length;
+
+  return (
+    <div className="overflow-hidden rounded-xl border">
+      <div className="grid grid-cols-[120px_1fr_1fr_88px] gap-3 border-b bg-muted/30 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-[140px_1fr_1fr_100px]">
+        <span>Field</span>
+        <span>Imported value</span>
+        <span>Product Master</span>
+        <span>Decision</span>
+      </div>
+      <div className="divide-y">
+        {fields.map(field => {
+          const decision = resolveFieldDecision(field.importValue, field.masterValue, field.isBlocked ?? false);
+          const styles = DECISION_STYLES[decision];
+          return (
+            <div
+              key={field.label}
+              className={cn('grid grid-cols-[120px_1fr_1fr_88px] items-start gap-3 px-4 py-3 transition-colors duration-150 motion-reduce:transition-none sm:grid-cols-[140px_1fr_1fr_100px]', styles.rowClass)}
+            >
+              <span className="pt-0.5 text-xs font-semibold text-foreground/80">{field.label}</span>
+              <div>
+                <p className="truncate text-xs" title={field.importValue || 'None'}>{field.importValue || <span className="text-muted-foreground">None</span>}</p>
+                {decision === 'conflict' && onAcceptImport && (
+                  <button type="button" onClick={() => onAcceptImport(field.label, field.importValue)} className="mt-1 text-[10px] font-semibold text-amber-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">Use imported</button>
+                )}
+              </div>
+              <div>
+                <p className="truncate text-xs" title={field.masterValue || 'Empty'}>{field.masterValue || <span className="text-muted-foreground">Empty</span>}</p>
+                {decision === 'conflict' && onKeepMaster && (
+                  <button type="button" onClick={() => onKeepMaster(field.label)} className="mt-1 text-[10px] font-semibold text-foreground/60 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">Keep master</button>
+                )}
+              </div>
+              <div>
+                <span className={cn('inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold', styles.badgeClass)}>
+                  <span className={cn('size-1.5 shrink-0 rounded-full', styles.dotClass)} />
+                  {styles.label}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {fields.length === 0 && (
+        <div className="flex min-h-20 items-center justify-center gap-2 px-4 text-sm text-emerald-700">
+          <CheckCircle2 className="size-4" />
+          All fields applied cleanly — no conflicts detected.
+        </div>
+      )}
+      {conflictCount > 0 && (
+        <div className="border-t bg-amber-50/50 px-4 py-2.5 text-xs text-amber-800">
+          <AlertTriangle className="mr-1.5 inline size-3 shrink-0" />
+          {conflictCount} field{conflictCount > 1 ? 's require' : ' requires'} your decision before this listing can be linked.
+        </div>
+      )}
+    </div>
+  );
 }

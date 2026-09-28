@@ -14,6 +14,13 @@ export interface Sku {
   image_url?: string;
   price?: number;
   stock?: number;
+  stock_by_location?: Record<string, number>;
+}
+
+export interface VariantOptionDefinition {
+  attributeKey: string;
+  name: string;
+  values: string[];
 }
 
 export interface ChannelOverride {
@@ -66,6 +73,29 @@ export interface MarketPrice {
   price: number;
 }
 
+/**
+ * A reusable price calculation chain applied on top of the canonical retail price.
+ * Effective price = round_increment(
+ *   retail_price × fxRate × (1+adjustmentPct/100) × (1+marketplaceFeePct/100) × (1+taxPct/100),
+ *   roundingIncrement
+ * ) clamped to [minPrice, maxPrice].
+ */
+export interface PricePolicy {
+  id: string;
+  name: string;
+  code: string;
+  targetCurrency: string;
+  fxRate: number;           // 1 base_currency = fxRate target_currency
+  fxValidityHours: number;  // 0 = manual/fixed rate
+  adjustmentPct: number;    // markup (+) or markdown (-) %
+  marketplaceFeePct: number;
+  taxPct: number;
+  roundingIncrement: number;  // e.g. 1000 for VND, 0.1 for SGD
+  minPrice: number;           // 0 = no floor
+  maxPrice: number;           // 0 = no ceiling
+  enabled: boolean;
+}
+
 export interface ProductAssociation {
   productId: string;
   type: 'related' | 'accessory' | 'replacement' | 'upsell';
@@ -83,35 +113,49 @@ export interface ProductRevision {
 export interface LocalizedProductContent {
   name: string;
   description: string;
+  /**
+   * Localized values for attributes that have isLocalizable=true, keyed by attributeKey.
+   * e.g. { care_instructions: 'お手入れ方法：...' }
+   * Spec §5.2: only attributes with isLocalizable=true may carry a locale coordinate.
+   */
+  attributeValues?: Record<string, string>;
 }
 
 // Product schema — SSOT: Product Master owns identity, pricing, media, variants
 // NOT owned here: ATS ledger (→ Inventory), order state (→ OMS), fulfillment (→ Fulfillment)
+//
+// ⚠️  ARCHITECTURE NOTE (spec: Attributes, Validation & Rules):
+//     The `products` table in production will only keep:
+//       sku, productKind, status, familyId, mediaStrategy, parentProductId
+//     Fields marked [→ dynamic attr] will move to product_family_attributes (driven by familyId).
+//     Fields marked [→ product_identifiers] will move to a shared identifier namespace table.
 export interface Product {
   id: string;
-  // Identity
-  name: string;
-  sku_code: string;
-  product_type: ProductType;
-  gtin: string;
-  mpn: string;
-  model_number: string;
-  brand: string;
+  // Identity — fixed ✅
+  name: string;          // [→ dynamic attr, surface: 'basic', isLocalizable: true, isRequired: true]
+  sku_code: string;      // Fixed: varchar 180, no whitespace/control chars
+  product_type: ProductType;  // Fixed: 'single' | 'variant' (spec: 'simple' | 'configurable')
+  gtin: string;          // [→ product_identifiers, shared namespace with ean/upc/isbn/jan]
+  mpn: string;           // [→ product_identifiers, unique per type]
+  model_number: string;  // [→ dynamic attr, surface: 'basic']
+  brand: string;         // [→ dynamic attr, surface: 'basic', type: enum, option governance]
   /** Stable reference to the canonical Brand registry entry. Legacy records may only have `brand`. */
   brandId?: string;
-  asin: string;
-  manufacturer: string;
+  asin: string;          // [→ product_identifiers, unique per type]
+  manufacturer: string;  // [→ dynamic attr, surface: 'basic']
   // Details
-  category: string;
+  category: string;      // Taxonomy ref — kept as-is (prototype: doubles as Family proxy)
   condition: string;
-  description: string;
-  localized_content?: Partial<Record<'en-US' | 'ja-JP' | 'vi-VN', LocalizedProductContent>>;
-  // Pricing
-  original_price: number;
-  retail_price: number;
-  price_currency: string;
-  /** Canonical market prices. Marketplace-specific adjustments remain in channel_overrides. */
+  description: string;   // [→ dynamic attr, surface: 'basic', isLocalizable: true, isRequired: true]
+  localized_content?: Partial<Record<string, LocalizedProductContent>>; // key = BCP-47 locale, e.g. 'ja-JP'
+  // Pricing — spec: purchase_price & rrp should be type 'money' {amount, currency}
+  original_price: number;   // [→ dynamic attr 'purchase_price', type: money]
+  retail_price: number;     // [→ dynamic attr 'recommended_retail_price', type: money]
+  price_currency: string;   // Will be absorbed into money type in production
+  /** @deprecated Use price_policies instead. Kept for backward compat with stored data. */
   market_prices?: MarketPrice[];
+  /** Reusable pricing calculation chains (FX + adjustments + fees + tax + rounding). */
+  price_policies?: PricePolicy[];
   // Dimensions
   prod_length: number;
   prod_height: number;
@@ -122,17 +166,21 @@ export interface Product {
   pkg_width: number;
   pkg_weight: number;
   // Compliance
-  country_of_origin: string;
+  country_of_origin: string;  // [→ dynamic attr, surface: 'basic' or 'dynamic' per family]
   hs_code: string;
-  // Media
-  images: string[];
+  // Media — spec: images should be asset_ref type (DAM integration), not raw URLs
+  images: string[];           // [→ dynamic attr, surface: 'media', type: array<asset_ref>]
   image_alt_texts?: string[];
   slug?: string;
   meta_title?: string;
   meta_description?: string;
-  /** Category attributes use a stable `attributeKey`; legacy/custom entries may only have a name. */
+  /** Category attributes use a stable `attributeKey`; legacy/custom entries may only have a name.
+   *  TODO: In production, driven by product_family_attributes with surface='dynamic'.
+   *  TODO: Extend to support 13 data types: string, number, integer, boolean, enum, date,
+   *        datetime, money, measurement, object, array, asset_ref, commerce_entity_ref. */
   specifications?: Array<{ attributeKey?: string; name: string; value: string }>;
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
+
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
@@ -147,6 +195,8 @@ export interface Product {
   created_at: string;
   updated_at: string;
   // Variants
+  /** Canonical variant dimensions used to generate and hydrate the SKU matrix. */
+  variant_options?: VariantOptionDefinition[];
   skus: Sku[];
   _variants?: Sku[];
 }
@@ -173,6 +223,7 @@ const SEED_PRODUCTS: Product[] = [
     mpn: 'NTB-HC-001',
     model_number: 'NTB-2025-HC',
     brand: 'CYBER-RECORDS',
+    brandId: 'cyber-records',
     asin: 'B0G432Z31H',
     manufacturer: 'CyberRecord Japan Co.',
     name: 'Black Hardcover Notebook — Japanese Craft Paper',
@@ -193,16 +244,23 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '4820100000',
     images: [IMG('B0G432Z31H')],
-    inventory: { wh_crjp: 45, wh_rslsg: 12, wh_fbsmy: 8 },
+    inventory: { wh_crjp: 45, wh_rslsg: 12, wh_fbsmy: 8, wh_fbajp: 30 },
     has_variants: true,
+    variant_options: [
+      { attributeKey: 'color', name: 'Color', values: ['Black'] },
+      { attributeKey: 'paper_size', name: 'Paper Size', values: ['A4', 'B5', 'A5'] },
+    ],
     channels: [{ channel: 'amazon', external_id: 'B0G432Z31H', status: 'active', listing_url: null, last_synced_at: null }],
     status: 'published',
     created_at: '2026-04-01T08:00:00Z',
     updated_at: '2026-04-06T08:00:00Z',
     skus: [
-      { id: 'sku_001a', sku_code: 'CR-NTB-BLK-A5-A4', variation_name: 'Black / A4', weight_g: 230, units_per_carton: 20, status: 'active' },
-      { id: 'sku_001b', sku_code: 'CR-NTB-BLK-A5-B5', variation_name: 'Black / B5', weight_g: 210, units_per_carton: 20, status: 'active' },
-      { id: 'sku_001c', sku_code: 'CR-NTB-BLK-A5-A5', variation_name: 'Black / A5', weight_g: 195, units_per_carton: 24, status: 'active' },
+      { id: 'sku_001a', sku_code: 'CR-NTB-BLK-A5-A4', variation_name: 'Black / A4', weight_g: 230, units_per_carton: 20, status: 'active',
+        stock_by_location: { wh_crjp: 18, wh_rslsg: 5, wh_fbsmy: 3, wh_fbajp: 12 } },
+      { id: 'sku_001b', sku_code: 'CR-NTB-BLK-A5-B5', variation_name: 'Black / B5', weight_g: 210, units_per_carton: 20, status: 'active',
+        stock_by_location: { wh_crjp: 15, wh_rslsg: 4, wh_fbsmy: 3, wh_fbajp: 10 } },
+      { id: 'sku_001c', sku_code: 'CR-NTB-BLK-A5-A5', variation_name: 'Black / A5', weight_g: 195, units_per_carton: 24, status: 'active',
+        stock_by_location: { wh_crjp: 12, wh_rslsg: 3, wh_fbsmy: 2, wh_fbajp: 8 } },
     ],
   },
   {
@@ -213,6 +271,7 @@ const SEED_PRODUCTS: Product[] = [
     mpn: 'SKB-WC-001',
     model_number: 'SKB-2025-PRO',
     brand: 'CYBER-RECORDS',
+    brandId: 'cyber-records',
     asin: 'B0FH1K4CMN',
     manufacturer: 'CyberRecord Japan Co.',
     name: 'Sketchbook Pro — 200gsm Watercolor Paper',
@@ -233,16 +292,23 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '4820100000',
     images: [IMG('B0FH1K4CMN')],
-    inventory: { wh_crjp: 80, wh_rslsg: 20 },
+    inventory: { wh_crjp: 80, wh_rslsg: 20, wh_rakjp: 15 },
     has_variants: true,
+    variant_options: [
+      { attributeKey: 'binding_type', name: 'Binding Type', values: ['Hardcover', 'Softcover'] },
+      { attributeKey: 'paper_size', name: 'Paper Size', values: ['A5', 'A4'] },
+    ],
     channels: [{ channel: 'rakuten', external_id: 'R001002003', status: 'active', listing_url: null, last_synced_at: null }],
     status: 'published',
     created_at: '2026-04-01T08:00:00Z',
     updated_at: '2026-04-06T08:00:00Z',
     skus: [
-      { id: 'sku_002a', sku_code: 'CR-SKB-MDN-A5-HC', variation_name: 'Hardcover / A5', weight_g: 180, units_per_carton: 20, status: 'active' },
-      { id: 'sku_002b', sku_code: 'CR-SKB-MDN-A5-PB', variation_name: 'Softcover / A5', weight_g: 165, units_per_carton: 24, status: 'active' },
-      { id: 'sku_002c', sku_code: 'CR-SKB-MDN-A5-A4', variation_name: 'Hardcover / A4', weight_g: 280, units_per_carton: 12, status: 'active' },
+      { id: 'sku_002a', sku_code: 'CR-SKB-MDN-A5-HC', variation_name: 'Hardcover / A5', weight_g: 180, units_per_carton: 20, status: 'active',
+        stock_by_location: { wh_crjp: 35, wh_rslsg: 8, wh_rakjp: 7 } },
+      { id: 'sku_002b', sku_code: 'CR-SKB-MDN-A5-PB', variation_name: 'Softcover / A5', weight_g: 165, units_per_carton: 24, status: 'active',
+        stock_by_location: { wh_crjp: 28, wh_rslsg: 7, wh_rakjp: 5 } },
+      { id: 'sku_002c', sku_code: 'CR-SKB-MDN-A5-A4', variation_name: 'Hardcover / A4', weight_g: 280, units_per_carton: 12, status: 'active',
+        stock_by_location: { wh_crjp: 17, wh_rslsg: 5, wh_rakjp: 3 } },
     ],
   },
   {
@@ -253,6 +319,7 @@ const SEED_PRODUCTS: Product[] = [
     mpn: 'BSH-SET-12',
     model_number: 'BSH-2025-12P',
     brand: 'CYBER-RECORDS',
+    brandId: 'cyber-records',
     asin: 'B0FQHTSM8B',
     manufacturer: 'CyberRecord Japan Co.',
     name: 'Artist Precision Paint Brush Set — 12-piece',
@@ -273,7 +340,7 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '9603400000',
     images: [IMG('B0FQHTSM8B')],
-    inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2 },
+    inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2, wh_fbajp: 0 },
     has_variants: false,
     channels: [
       { channel: 'amazon', external_id: 'B0FQHTSM8B', status: 'active', listing_url: null, last_synced_at: null },
@@ -294,6 +361,7 @@ const SEED_PRODUCTS: Product[] = [
     mpn: 'ART-MYTH-10',
     model_number: 'ART-2024-MYTH',
     brand: 'CYBER-RECORDS',
+    brandId: 'cyber-records',
     asin: 'B0G5Y7YCDD',
     manufacturer: 'CyberRecord Japan Co.',
     name: 'Japanese Mythical Creatures — Traditional Art Collection (10 sheets)',
@@ -314,7 +382,7 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '4908900000',
     images: [IMG('B0G5Y7YCDD')],
-    inventory: { wh_crjp: 200, wh_fbsmy: 50, wh_3plvn: 25 },
+    inventory: { wh_crjp: 200, wh_fbsmy: 50, wh_3plvn: 25, wh_rakjp: 40 },
     has_variants: false,
     channels: [
       { channel: 'amazon', external_id: 'B0G5Y7YCDD', status: 'active', listing_url: null, last_synced_at: null },
@@ -335,6 +403,7 @@ const SEED_PRODUCTS: Product[] = [
     mpn: 'TAI-SET-B',
     model_number: 'TAI-2024-PRO',
     brand: 'CYBER-RECORDS',
+    brandId: 'cyber-records',
     asin: 'B0FH6LHSXD',
     manufacturer: 'CyberRecord Japan Co.',
     name: 'Traditional Japanese Precision Tailoring Set',
@@ -355,7 +424,7 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '9017200000',
     images: [IMG('B0FH6LHSXD')],
-    inventory: { wh_crjp: 0, wh_rslsg: 0 },
+    inventory: { wh_crjp: 0, wh_rslsg: 4 },
     has_variants: false,
     channels: [
       { channel: 'rakuten', external_id: 'R001002002', status: 'active', listing_url: null, last_synced_at: null },
@@ -379,6 +448,7 @@ const CATEGORY_DEMO_PRODUCTS: Product[] = [
     name: 'Wireless Studio Headphones',
     category: 'Headphones',
     description: 'Demo Product Master linked to the Headphones category.',
+    variant_options: [{ attributeKey: 'color', name: 'Color', values: ['Midnight Black'] }],
     skus: [{ ...SEED_PRODUCTS[0].skus[0], id: 'sku_demo_electronics', sku_code: 'DEMO-ELC-001', variation_name: 'Midnight Black' }],
   },
   {
@@ -390,6 +460,7 @@ const CATEGORY_DEMO_PRODUCTS: Product[] = [
     category: 'Headphones',
     description: 'Second demo Product Master linked to the Headphones category.',
     status: 'draft',
+    variant_options: [{ attributeKey: 'color', name: 'Color', values: ['Cloud White'] }],
     skus: [{ ...SEED_PRODUCTS[0].skus[0], id: 'sku_demo_headphones_002', sku_code: 'DEMO-ELC-002', variation_name: 'Cloud White' }],
   },
   {
@@ -400,6 +471,7 @@ const CATEGORY_DEMO_PRODUCTS: Product[] = [
     name: 'Everyday Canvas Tote Bag',
     category: 'Bag',
     description: 'Demo Product Master linked to the Bag category.',
+    variant_options: [{ attributeKey: 'material', name: 'Material', values: ['Natural Canvas'] }],
     skus: [{ ...SEED_PRODUCTS[1].skus[0], id: 'sku_demo_bag', sku_code: 'DEMO-BAG-001', variation_name: 'Natural Canvas' }],
   },
   {
@@ -422,27 +494,28 @@ const IMPORTED_DEMO_PRODUCTS: Product[] = [{
   gtin: '',
   mpn: '',
   model_number: '',
-  brand: '',
+  brand: 'Kuretake',
+  brandId: 'kuretake',
   asin: '',
-  manufacturer: '',
-  category: 'Headphones',
+  manufacturer: 'Kuretake Co., Ltd.',
+  category: 'Art Supplies',
   condition: 'new',
-  description: '',
+  description: 'Complete calligraphy starter kit by Kuretake. Includes brush pen, ink cartridges, practice sheets, and instruction booklet. Suitable for beginners and intermediate learners. Traditional Japanese calligraphy tools with modern ink delivery system.',
   original_price: 0,
   retail_price: 5200,
   price_currency: 'JPY',
-  prod_length: 0,
-  prod_height: 0,
-  prod_width: 0,
-  prod_weight: 0,
-  pkg_length: 0,
-  pkg_height: 0,
-  pkg_width: 0,
-  pkg_weight: 0,
-  country_of_origin: '',
-  hs_code: '',
+  prod_length: 25,
+  prod_height: 5,
+  prod_width: 15,
+  prod_weight: 350,
+  pkg_length: 28,
+  pkg_height: 6,
+  pkg_width: 18,
+  pkg_weight: 450,
+  country_of_origin: 'JP',
+  hs_code: '9608100000',
   images: [],
-  inventory: {},
+  inventory: { wh_crjp: 18, wh_fbsmy: 24, wh_3plvn: 30 },
   has_variants: false,
   channels: [
     { channel: 'website', external_id: 'WEB-SHP-CALLI-KIT', status: 'active', listing_url: '/products/premium-calligraphy-starter-kit', last_synced_at: null },
@@ -457,14 +530,61 @@ const IMPORTED_DEMO_PRODUCTS: Product[] = [{
   status: 'draft',
   created_at: '2026-09-18T06:48:26Z',
   updated_at: '2026-09-18T11:15:28Z',
-  skus: [{ id: 'sku_import_imp-003', sku_code: 'SHP-CALLI-KIT', variation_name: 'Default', weight_g: 0, units_per_carton: 1, status: 'active', price: 5200, stock: 0 }],
+  skus: [{ id: 'sku_import_imp-003', sku_code: 'SHP-CALLI-KIT', variation_name: 'Default', weight_g: 350, units_per_carton: 1, status: 'active', price: 5200, stock: 0 }],
 }];
 
-const DEFAULT_PRODUCTS = [...IMPORTED_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS];
+const DEMO_LOCALIZED_NAMES: Record<string, { ja: string; vi: string; ms: string }> = {
+  prod_001: { ja: '日本製クラフト紙・黒ハードカバーノート', vi: 'Sổ bìa cứng màu đen — Giấy thủ công Nhật Bản', ms: 'Buku nota kulit keras hitam — Kertas kraf Jepun' },
+  prod_002: { ja: '水彩紙スケッチブック Pro 200gsm', vi: 'Sổ phác thảo Pro — Giấy màu nước 200gsm', ms: 'Buku lakaran Pro — Kertas cat air 200gsm' },
+  prod_003: { ja: '精密画筆12本セット', vi: 'Bộ cọ vẽ chính xác 12 món', ms: 'Set berus lukisan tepat 12 keping' },
+  prod_004: { ja: '日本の妖怪・伝統画コレクション（10枚）', vi: 'Sinh vật huyền thoại Nhật Bản — Bộ tranh truyền thống 10 tờ', ms: 'Makhluk mitos Jepun — Koleksi seni tradisional 10 helai' },
+  prod_005: { ja: '日本伝統精密裁縫セット', vi: 'Bộ may đo chính xác truyền thống Nhật Bản', ms: 'Set jahitan tepat tradisional Jepun' },
+  'prod_import_imp-003': { ja: 'プレミアム書道入門セット', vi: 'Bộ thư pháp cao cấp cho người mới', ms: 'Kit permulaan kaligrafi premium' },
+  prod_demo_electronics: { ja: 'ワイヤレス・スタジオヘッドホン', vi: 'Tai nghe phòng thu không dây', ms: 'Fon kepala studio tanpa wayar' },
+  prod_demo_headphones_002: { ja: 'コンパクト・ワイヤレスヘッドホン', vi: 'Tai nghe không dây nhỏ gọn', ms: 'Fon kepala tanpa wayar kompak' },
+  prod_demo_bag: { ja: 'デイリー・キャンバストートバッグ', vi: 'Túi tote vải canvas hằng ngày', ms: 'Beg tote kanvas harian' },
+  prod_demo_books: { ja: '日本デザイン資料集', vi: 'Sách tham khảo thiết kế Nhật Bản', ms: 'Buku rujukan reka bentuk Jepun' },
+};
+
+const DEMO_COMPLETED_LOCALE: Record<string, 'ja-JP' | 'vi-VN' | 'ms-MY'> = {
+  'prod_import_imp-003': 'vi-VN',
+  prod_001: 'ja-JP',
+  prod_002: 'vi-VN',
+  prod_003: 'ms-MY',
+  prod_004: 'ja-JP',
+  prod_005: 'vi-VN',
+  prod_demo_electronics: 'ms-MY',
+  prod_demo_headphones_002: 'ja-JP',
+  prod_demo_bag: 'vi-VN',
+  prod_demo_books: 'ms-MY',
+};
+
+const DEMO_PARTIAL_LOCALE_PRODUCTS = new Set(['prod_002', 'prod_005', 'prod_demo_electronics']);
+
+function withDemoLocales(product: Product): Product {
+  const names = DEMO_LOCALIZED_NAMES[product.id];
+  const completedLocale = DEMO_COMPLETED_LOCALE[product.id];
+  if (!names || !completedLocale) return product;
+  const content = {
+    'ja-JP': { name: names.ja, description: `${names.ja}の商品仕様、素材、使用方法を日本のお客様向けにまとめています。` },
+    'vi-VN': { name: names.vi, description: `${names.vi}. Nội dung sản phẩm, vật liệu và hướng dẫn sử dụng dành cho thị trường Việt Nam.` },
+    'ms-MY': { name: names.ms, description: `${names.ms}. Maklumat produk, bahan dan panduan penggunaan untuk pasaran Malaysia.` },
+  };
+  const selectedContent = DEMO_PARTIAL_LOCALE_PRODUCTS.has(product.id)
+    ? { ...content[completedLocale], description: '' }
+    : content[completedLocale];
+  return {
+    ...product,
+    localized_content: { [completedLocale]: selectedContent },
+  };
+}
+
+const DEFAULT_PRODUCTS = [...IMPORTED_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS].map(withDemoLocales);
 
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
-const PRODUCT_STORAGE_KEY = 'primeos-product-master-v1';
+const PRODUCT_STORAGE_KEY = 'primeos-product-master-v5';
+const DEMO_LOCALE_MIGRATION_KEY = 'primeos-demo-locale-shape-v2';
 
 function normalizeStoredProduct(product: Product): Product {
   const now = new Date().toISOString();
@@ -495,6 +615,7 @@ function normalizeStoredProduct(product: Product): Product {
     retail_price: Number(product.retail_price) || 0,
     price_currency: typeof product.price_currency === 'string' ? product.price_currency : 'JPY',
     market_prices: Array.isArray(product.market_prices) ? product.market_prices : [],
+    price_policies: Array.isArray(product.price_policies) ? product.price_policies : [],
     prod_length: Number(product.prod_length) || 0,
     prod_height: Number(product.prod_height) || 0,
     prod_width: Number(product.prod_width) || 0,
@@ -521,6 +642,9 @@ function normalizeStoredProduct(product: Product): Product {
     status: ['draft', 'review', 'published', 'archived'].includes(product.status) ? product.status : 'draft',
     created_at: typeof product.created_at === 'string' ? product.created_at : now,
     updated_at: typeof product.updated_at === 'string' ? product.updated_at : now,
+    variant_options: Array.isArray(product.variant_options)
+      ? product.variant_options.filter(option => option && typeof option.attributeKey === 'string' && typeof option.name === 'string' && Array.isArray(option.values)).map(option => ({ attributeKey: option.attributeKey, name: option.name, values: option.values.filter((value): value is string => typeof value === 'string') }))
+      : undefined,
     skus: Array.isArray(product.skus) ? product.skus : [],
     _variants: Array.isArray(product._variants) ? product._variants : undefined,
   };
@@ -530,22 +654,37 @@ function loadStoredProducts(): Product[] {
   if (typeof window === 'undefined') return [...DEFAULT_PRODUCTS];
   try {
     const raw = window.localStorage.getItem(PRODUCT_STORAGE_KEY);
-    if (!raw) return [...DEFAULT_PRODUCTS];
+    if (!raw) {
+      window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
+      return [...DEFAULT_PRODUCTS];
+    }
     const stored = JSON.parse(raw) as unknown;
     if (!Array.isArray(stored)) return [...DEFAULT_PRODUCTS];
+    const shouldResetDemoLocales = window.localStorage.getItem(DEMO_LOCALE_MIGRATION_KEY) !== '1';
     const valid = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
     const migrated = valid.map(storedProduct => {
       const product = normalizeStoredProduct(storedProduct);
       const normalized = (product as Product & { product_type?: string }).product_type === 'bundle'
         ? { ...product, product_type: product.has_variants ? 'variant' as const : 'single' as const }
         : product;
-      // Keep the shipped demo taxonomy representative without overwriting user-assigned categories.
-      return normalized.id === 'prod_003' && normalized.category === 'Art Supplies'
-        ? { ...normalized, category: 'Painting Accessories' }
-        : normalized.id === 'prod_demo_electronics' && normalized.category === 'Electronics'
-          ? { ...normalized, category: 'Headphones' }
+      const defaultVariantOptions = DEFAULT_PRODUCTS.find(candidate => candidate.id === normalized.id)?.variant_options;
+      const defaultLocalizedContent = DEFAULT_PRODUCTS.find(candidate => candidate.id === normalized.id)?.localized_content;
+      const withVariantOptions = normalized.has_variants && !normalized.variant_options?.length && defaultVariantOptions?.length
+        ? { ...normalized, variant_options: defaultVariantOptions.map(option => ({ ...option, values: [...option.values] })) }
         : normalized;
+      // Shipped demo masters intentionally keep only one completed secondary locale
+      // so every market-level locale path remains testable. User-created masters are untouched.
+      const withLocalizedContent = shouldResetDemoLocales && defaultLocalizedContent && DEMO_COMPLETED_LOCALE[normalized.id]
+        ? { ...withVariantOptions, localized_content: { ...defaultLocalizedContent } }
+        : withVariantOptions;
+      // Keep the shipped demo taxonomy representative without overwriting user-assigned categories.
+      return withLocalizedContent.id === 'prod_003' && withLocalizedContent.category === 'Art Supplies'
+        ? { ...withLocalizedContent, category: 'Painting Accessories' }
+        : withLocalizedContent.id === 'prod_demo_electronics' && withLocalizedContent.category === 'Electronics'
+          ? { ...withLocalizedContent, category: 'Headphones' }
+        : withLocalizedContent;
     });
+    if (shouldResetDemoLocales) window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
     const storedIds = new Set(migrated.map(product => product.id));
     return [...migrated, ...DEFAULT_PRODUCTS.filter(product => !storedIds.has(product.id))];
   } catch {

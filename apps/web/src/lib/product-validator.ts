@@ -2,6 +2,7 @@
 // ECH Audit: validates Product Master data completeness before publish
 
 import type { Product } from './product-store';
+import type { CatalogAttribute } from './product-catalog-settings-store';
 
 export interface ValidationIssue {
   field: string;
@@ -150,10 +151,14 @@ export function validateProduct(product: Partial<Product>): ValidationResult {
 
 /**
  * Quick SKU validation.
+ * Spec rules: max 180 chars, no whitespace/control chars, letters+numbers+hyphen+underscore only.
  */
 export function validateSku(sku: string, existingSkus: string[]): { valid: boolean; error?: string } {
   const trimmed = sku.trim().toUpperCase();
   if (!trimmed) return { valid: false, error: 'SKU is required' };
+  if (trimmed.length > 180) {
+    return { valid: false, error: `SKU must be 180 characters or fewer (currently ${trimmed.length})` };
+  }
   if (!/^[A-Z0-9\-_]+$/.test(trimmed)) {
     return { valid: false, error: 'SKU can only contain letters, numbers, hyphens, and underscores' };
   }
@@ -161,4 +166,149 @@ export function validateSku(sku: string, existingSkus: string[]): { valid: boole
     return { valid: false, error: `SKU "${trimmed}" already exists` };
   }
   return { valid: true };
+}
+
+/**
+ * Validates a single dynamic attribute value against its declared data type.
+ * Covers all 13 spec data types. Returns null when valid, error message string when invalid.
+ *
+ * Spec types: string | number | integer | boolean | enum | date | datetime |
+ *             money | measurement | object | array | asset_ref | commerce_entity_ref
+ */
+export function validateAttributeValue(
+  attribute: Pick<CatalogAttribute, 'type' | 'options' | 'unit' | 'validation'>,
+  value: string,
+): string | null {
+  const v = value.trim();
+
+  // Empty value — required check is handled upstream (not here)
+  if (!v) return null;
+
+  switch (attribute.type) {
+    // ── string (plain text, rich text) ──────────────────────────────────────
+    case 'String':
+    case 'Rich text':
+      return null; // no structural constraint at Master tier (maxLength only at Channel tier)
+
+    // ── number (decimal allowed) ─────────────────────────────────────────────
+    case 'Number':
+      if (isNaN(Number(v))) return 'Must be a valid number';
+      return null;
+
+    // ── integer (whole numbers only) ─────────────────────────────────────────
+    case 'Integer':
+      if (!/^-?\d+$/.test(v)) return 'Must be a whole number (no decimals)';
+      return null;
+
+    // ── boolean ──────────────────────────────────────────────────────────────
+    case 'Boolean':
+      if (v !== 'true' && v !== 'false') return 'Must be true or false';
+      return null;
+
+    // ── enum (single-select from declared options) ───────────────────────────
+    case 'Single select':
+    case 'Enum': {
+      const allowed = attribute.options.split(',').map(o => o.trim()).filter(Boolean);
+      if (allowed.length && !allowed.includes(v)) {
+        return `Must be one of: ${allowed.join(', ')}`;
+      }
+      return null;
+    }
+
+    // ── array (multi-select from declared options) ───────────────────────────
+    case 'Multi-select':
+    case 'Array': {
+      const allowed = attribute.options.split(',').map(o => o.trim()).filter(Boolean);
+      if (!allowed.length) return null;
+      const selected = v.split(',').map(o => o.trim()).filter(Boolean);
+      const invalid = selected.filter(s => !allowed.includes(s));
+      if (invalid.length) return `Invalid values: ${invalid.join(', ')}`;
+      return null;
+    }
+
+    // ── date (ISO 8601 YYYY-MM-DD, must be a real calendar date) ────────────
+    case 'Date': {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'Use format YYYY-MM-DD (e.g. 2025-03-15)';
+      const d = new Date(v);
+      if (isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) {
+        return `"${v}" is not a real calendar date`;
+      }
+      return null;
+    }
+
+    // ── datetime (ISO 8601 YYYY-MM-DDTHH:MM) ────────────────────────────────
+    case 'Datetime': {
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) {
+        return 'Use format YYYY-MM-DDTHH:MM (e.g. 2025-03-15T14:30)';
+      }
+      const dt = new Date(v);
+      if (isNaN(dt.getTime())) return `"${v}" is not a valid datetime`;
+      return null;
+    }
+
+    // ── money {amount::currency} e.g. "1800::JPY" ───────────────────────────
+    case 'Money': {
+      // Stored as "amount::CURRENCY" e.g. "1800::JPY"
+      const parts = v.split('::');
+      if (parts.length !== 2) return 'Format: amount::CURRENCY (e.g. 1800::JPY)';
+      const [amtStr, currency] = parts;
+      if (isNaN(Number(amtStr)) || Number(amtStr) < 0) return 'Amount must be a non-negative number';
+      if (!/^[A-Z]{3}$/.test(currency)) return 'Currency must be 3 uppercase letters (e.g. JPY, USD)';
+      return null;
+    }
+
+    // ── measurement {value unit} e.g. "25 cm" ───────────────────────────────
+    case 'Measurement':
+    case 'Measurement set': {
+      const unit = attribute.unit || 'cm';
+      const numStr = v.endsWith(` ${unit}`) ? v.slice(0, -(unit.length + 1)) : v;
+      const num = Number(numStr);
+      if (isNaN(num)) return `Must be a number (e.g. 25 ${unit})`;
+      if (num < 0) return 'Value must be 0 or greater';
+      // allowedUnits check — in production, driven by attribute.allowedUnits[]
+      // prototype: unit is fixed per attribute definition (attribute.unit)
+      return null;
+    }
+
+    // ── object (JSON key-value) ──────────────────────────────────────────────
+    case 'Object': {
+      try {
+        const parsed = JSON.parse(v);
+        if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+          return 'Must be a JSON object (e.g. {"key": "value"})';
+        }
+      } catch {
+        return 'Must be valid JSON (e.g. {"key": "value"})';
+      }
+      return null;
+    }
+
+    // ── asset_ref (DAM asset ID or URL in prototype) ─────────────────────────
+    case 'Asset ref':
+    case 'asset_ref': {
+      // Prototype: accepts URL. Production: must be a DAM asset ID.
+      try {
+        new URL(v);
+        return null;
+      } catch {
+        return 'Must be a valid URL (prototype) or DAM asset ID (production)';
+      }
+    }
+
+    // ── commerce_entity_ref (format: cent_[a-z0-9]{8,40}) ───────────────────
+    case 'Commerce entity ref':
+    case 'commerce_entity_ref': {
+      if (!/^cent_[a-z0-9]{8,40}$/.test(v)) {
+        return 'Must match format: cent_ followed by 8–40 lowercase letters or digits (e.g. cent_abc12345)';
+      }
+      return null;
+    }
+
+    // ── Country selector ─────────────────────────────────────────────────────
+    case 'Country selector':
+      return null; // value constrained by UI select, no extra validation needed
+
+    default:
+      return null;
+  }
 }

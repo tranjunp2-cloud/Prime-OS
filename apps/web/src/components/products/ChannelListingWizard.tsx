@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Loader2, PackageSearch, RefreshCw, Send, Store, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Globe2, Loader2, PackageSearch, RefreshCw, Send, Store, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { CHANNEL_MARKET_LOCALES, getMarketLocaleIssues, type MarketLocaleIssue } from '@/lib/channel-market-locale';
 import { cn } from '@/lib/utils';
 
 export interface ChannelWizardDraft {
@@ -55,6 +56,20 @@ export interface WizardChannel {
   unavailableReason?: string;
 }
 
+export interface ExistingListingMatchData {
+  listingId: string;
+  title: string;
+  status: string;
+  differenceCount: number;
+  localizedContent?: {
+    locale: string;
+    localeLabel: string;
+    name: string;
+    description: string;
+    sourceLabel: string;
+  };
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,25 +82,30 @@ interface Props {
   availableStock: number;
   imageCount: number;
   productType: string;
-  existingMatches?: Record<string, { listingId: string; title: string; status: string; differenceCount: number }>;
+  localizedContent?: Record<string, { name?: string; description?: string }>;
+  existingMatches?: Record<string, ExistingListingMatchData>;
   onChange: (channel: string, patch: Partial<ChannelWizardDraft>) => void;
+  onEditLocaleIssue?: (issue: MarketLocaleIssue) => void;
+  onImportListingLocale?: (locale: string, content: { name: string; description: string }) => void;
   onSubmitted?: () => void;
 }
 
 const steps = ['Choose channels', 'Channel setup', 'Review', 'Submit', 'Done'];
 
-export function ChannelListingWizard({ open, onOpenChange, embedded = false, channels, drafts, masterSku, productName, productCategory, availableStock, imageCount, productType, existingMatches = {}, onChange, onSubmitted }: Props) {
+export function ChannelListingWizard({ open, onOpenChange, embedded = false, channels, drafts, masterSku, productName, productCategory, availableStock, imageCount, productType, localizedContent = {}, existingMatches = {}, onChange, onEditLocaleIssue, onImportListingLocale, onSubmitted }: Props) {
   const [step, setStep] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [failedChannels, setFailedChannels] = useState<string[]>([]);
   const [mergeStrategies, setMergeStrategies] = useState<Record<string, 'keep' | 'inherit' | 'review'>>({});
+  const [localeDecisions, setLocaleDecisions] = useState<Record<string, 'listing_only' | undefined>>({});
+  const [reviewLocaleChannel, setReviewLocaleChannel] = useState<string | null>(null);
   const selected = useMemo(() => channels.filter(channel => drafts[channel.key]?.enabled), [channels, drafts]);
   const active = selected[activeIndex];
 
   useEffect(() => {
     if (!open) return;
-    setStep(1); setActiveIndex(0); setSubmitting(false); setFailedChannels([]);
+    setStep(1); setActiveIndex(0); setSubmitting(false); setFailedChannels([]); setLocaleDecisions({}); setReviewLocaleChannel(null);
     setMergeStrategies(Object.fromEntries(Object.keys(existingMatches).map(key => [key, 'keep'])));
     // Reset only when the wizard opens; match data is stable for that session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,8 +154,12 @@ export function ChannelListingWizard({ open, onOpenChange, embedded = false, cha
       if (!draft.condition) issues.push('Condition');
       if (!draft.fulfillment) issues.push('FBA / FBM');
     }
+    if (localeDecisions[channel.key] !== 'listing_only') {
+      issues.push(...getMarketLocaleIssues(channel.key, localizedContent, draft).map(issue => `${issue.fieldLabel} · ${issue.locale}`));
+    }
     return issues;
   };
+  const localeIssuesFor = (channel: WizardChannel) => getMarketLocaleIssues(channel.key, localizedContent, drafts[channel.key]);
   const issueCount = selected.filter(channel => issuesFor(channel).length > 0).length;
 
   function submit() {
@@ -160,13 +184,50 @@ export function ChannelListingWizard({ open, onOpenChange, embedded = false, cha
       {step === 4 && <div className="mx-auto flex max-w-xl flex-col items-center py-14 text-center" aria-live="polite">{submitting ? <Loader2 className="size-12 animate-spin text-primary motion-reduce:animate-none" /> : <Send className="size-12 text-primary" />}<h3 className="mt-5 text-lg font-semibold">{submitting ? 'Creating listing drafts' : 'Drafts created'}</h3><p className="mt-2 text-sm text-muted-foreground">Saving {selected.length} channel-owned listing drafts from the current Product Master revision. No provider submission happens in this prototype.</p></div>}
       {step === 5 && <div className="mx-auto max-w-2xl py-8"><div className="text-center">{failedChannels.length ? <AlertCircle className="mx-auto size-14 text-amber-400" /> : <CheckCircle2 className="mx-auto size-14 text-emerald-400" />}<h3 className="mt-4 text-xl font-semibold">{failedChannels.length ? 'Some listings need attention' : 'Listing drafts created'}</h3><p className="mt-2 text-sm text-muted-foreground">{failedChannels.length ? 'Successful listings were kept. Retry only the channel that could not be validated.' : 'Review readiness and provider validation before publishing each listing.'}</p></div><div className="mt-6 space-y-2">{selected.map(channel => { const failed = failedChannels.includes(channel.key); return <div key={channel.key} className={cn('flex items-center gap-3 rounded-lg border p-3', failed && 'border-amber-500/35 bg-amber-500/10')}><span className="grid size-8 place-items-center">{failed ? <XCircle className="size-5 text-amber-300" /> : <CheckCircle2 className="size-5 text-emerald-400" />}</span><span className="min-w-0 flex-1"><span className="block font-semibold text-foreground">{channel.label}</span><span className="block truncate font-mono text-xs text-muted-foreground">{drafts[channel.key].listing_sku}</span>{failed && <span className="mt-1 block text-xs text-foreground/75">Provider validation timed out. Your setup was saved.</span>}</span>{failed ? <Button type="button" size="sm" variant="outline" className="border-amber-500/40 bg-background/70 text-foreground hover:bg-amber-500/10 hover:text-amber-200" onClick={() => setFailedChannels(current => current.filter(key => key !== channel.key))}><RefreshCw className="size-3.5" />Retry</Button> : <Badge variant="outline" className="border-emerald-500/35 text-emerald-300">Draft created</Badge>}</div>; })}</div></div>}
     </div>
+    {step === 2 && active && localeIssuesFor(active).length > 0 && localeDecisions[active.key] !== 'listing_only' && (() => {
+      const listingContent = existingMatches[active.key]?.localizedContent;
+      const reviewing = reviewLocaleChannel === active.key;
+      if (listingContent) return (
+        <div className="mb-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Globe2 className="size-5 shrink-0 text-blue-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{listingContent.localeLabel} content found on {listingContent.sourceLabel}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">The existing listing has Name and Description that are missing from this Product Master.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={() => setReviewLocaleChannel(reviewing ? null : active.key)}>{reviewing ? 'Hide comparison' : 'Review & import'}</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => onEditLocaleIssue?.(localeIssuesFor(active)[0])}>Enter manually</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => { setLocaleDecisions(current => ({ ...current, [active.key]: 'listing_only' })); setReviewLocaleChannel(null); }}>Keep listing-only</Button>
+            </div>
+          </div>
+          {reviewing && (
+            <div className="mt-4 space-y-3 border-t border-blue-500/20 pt-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border bg-background/50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Product Master · {listingContent.locale}</p><p className="mt-2 text-xs text-muted-foreground">Name: {localizedContent[listingContent.locale]?.name || 'Missing'}</p><p className="mt-1 text-xs text-muted-foreground">Description: {localizedContent[listingContent.locale]?.description || 'Missing'}</p></div>
+                <div className="rounded-lg border border-blue-500/25 bg-background/70 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-blue-400">{listingContent.sourceLabel}</p><p className="mt-2 text-xs font-medium">{listingContent.name}</p><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{listingContent.description}</p></div>
+              </div>
+              <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setReviewLocaleChannel(null)}>Cancel</Button><Button type="button" size="sm" onClick={() => { onImportListingLocale?.(listingContent.locale, { name: listingContent.name, description: listingContent.description }); setReviewLocaleChannel(null); }}>Import Name & Description</Button></div>
+            </div>
+          )}
+        </div>
+      );
+      return (
+        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-4 sm:flex-row sm:items-center">
+          <AlertTriangle className="size-5 shrink-0 text-amber-400" />
+          <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{active.label} · {CHANNEL_MARKET_LOCALES[active.key]?.market} needs localized content</p><p className="mt-0.5 text-xs text-muted-foreground">{localeIssuesFor(active).map(issue => issue.message).join(' · ')}</p></div>
+          <Button type="button" variant="outline" className="shrink-0" onClick={() => onEditLocaleIssue?.(localeIssuesFor(active)[0])}>Enter manually</Button>
+        </div>
+      );
+    })()}
+    {step === 2 && active && localeDecisions[active.key] === 'listing_only' && <div className="mb-3 flex items-center justify-between rounded-xl border bg-muted/30 px-4 py-3 text-xs"><span><strong>Listing-only content kept.</strong> Product Master translation remains unchanged.</span><Button type="button" size="sm" variant="ghost" onClick={() => setLocaleDecisions(current => ({ ...current, [active.key]: undefined }))}>Change decision</Button></div>}
     <div className="flex items-center justify-between border-t pt-4">{step > 1 && step < 4 ? <Button variant="outline" onClick={() => setStep(value => Math.max(1, value - 1))}><ArrowLeft className="size-4" />Back</Button> : <Button variant="outline" onClick={() => onOpenChange(false)}>{step === 5 ? 'Close' : 'Cancel'}</Button>}<Button onClick={() => { if (step === 1) { setActiveIndex(0); setStep(2); } else if (step === 2) setStep(3); else if (step === 3) submit(); else if (step === 5) onOpenChange(false); }} disabled={(step === 1 && selected.length === 0) || (step === 2 && issueCount > 0) || (step === 3 && issueCount > 0) || step === 4}>{step === 1 ? 'Continue' : step === 2 ? 'Review all listings' : step === 3 ? 'Submit listings' : step === 5 ? 'Done' : 'Submitting…'}{step < 4 && <ArrowRight className="size-4" />}</Button></div>
   </>;
   if (embedded) return <div className="mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-7xl flex-col px-5 py-6 lg:px-8">{content}</div>;
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="flex max-h-[92vh] flex-col overflow-hidden sm:max-w-6xl">{content}</DialogContent></Dialog>;
 }
 
-function ExistingListingMatch({ match, strategy, onChange }: { match: { listingId: string; title: string; status: string; differenceCount: number }; strategy: 'keep' | 'inherit' | 'review'; onChange: (strategy: 'keep' | 'inherit' | 'review') => void }) {
+function ExistingListingMatch({ match, strategy, onChange }: { match: ExistingListingMatchData; strategy: 'keep' | 'inherit' | 'review'; onChange: (strategy: 'keep' | 'inherit' | 'review') => void }) {
   const options: Array<{ value: 'keep' | 'inherit' | 'review'; label: string; description: string }> = [
     { value: 'keep', label: 'Keep channel data', description: 'Link the listing without replacing its current content, price or stock.' },
     { value: 'inherit', label: 'Update inherited fields', description: 'Apply Master data only where the channel has no override.' },
@@ -221,5 +282,5 @@ function listingSummary(key: string, draft: ChannelWizardDraft) {
 }
 
 function Summary({ selected, productType, active }: { selected: WizardChannel[]; productType: string; active?: string }) {
-  return <aside className="h-fit rounded-xl border p-5"><p className="font-semibold">Summary</p><div className="mt-4 flex items-center justify-between text-sm"><span className="text-muted-foreground">Selected channels</span><strong>{selected.length}</strong></div><div className="mt-4 space-y-2">{selected.map(channel => <div key={channel.key} className="flex items-center gap-2 text-sm"><span className="size-1.5 rounded-full bg-primary" /><span className="truncate font-medium">{channel.label}</span></div>)}</div><div className="my-4 border-t" /><div className="space-y-3 text-sm"><p className="flex justify-between gap-3"><span className="text-muted-foreground">Listing type</span><strong className="text-right">{productType === 'variant' ? 'Product family with variants' : productType}</strong></p><p className="flex justify-between"><span className="text-muted-foreground">Product source</span><strong>Product Master</strong></p>{active && <p className="flex justify-between"><span className="text-muted-foreground">Configuring</span><strong>{active}</strong></p>}</div><p className="mt-5 rounded-lg bg-primary/5 p-3 text-xs text-muted-foreground"><PackageSearch className="mr-1 inline size-3.5" />Each selected channel is configured in sequence.</p></aside>;
+  return <aside className="h-fit rounded-xl border p-5"><p className="font-semibold">Summary</p><div className="mt-4 flex items-center justify-between text-sm"><span className="text-muted-foreground">Selected channels</span><strong>{selected.length}</strong></div><div className="mt-4 space-y-3">{selected.map(channel => { const market = CHANNEL_MARKET_LOCALES[channel.key]; return <div key={channel.key} className="flex items-start gap-2 text-sm"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" /><span className="min-w-0"><span className="block truncate font-medium">{channel.label}</span>{market && <span className="block text-[11px] text-muted-foreground">{market.market} · {market.locale}</span>}</span></div>; })}</div><div className="my-4 border-t" /><div className="space-y-3 text-sm"><p className="flex justify-between gap-3"><span className="text-muted-foreground">Listing type</span><strong className="text-right">{productType === 'variant' ? 'Product family with variants' : productType}</strong></p><p className="flex justify-between"><span className="text-muted-foreground">Product source</span><strong>Product Master</strong></p>{active && <p className="flex justify-between"><span className="text-muted-foreground">Configuring</span><strong>{active}</strong></p>}</div><p className="mt-5 rounded-lg bg-primary/5 p-3 text-xs text-muted-foreground"><PackageSearch className="mr-1 inline size-3.5" />Locale requirements follow each connected market.</p></aside>;
 }
