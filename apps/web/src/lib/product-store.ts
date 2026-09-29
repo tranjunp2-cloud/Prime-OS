@@ -1,3 +1,4 @@
+import { normalizeDemoStockLocations } from './demo-warehouse-locations';
 // Shared product store — singleton in-memory for local mockup
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
@@ -27,6 +28,8 @@ export interface ChannelOverride {
   enabled: boolean;
   title: string;
   price_markup: number;
+  channel_price?: number;
+  channel_currency?: string;
   description: string;
   listing_sku?: string;
   category?: string;
@@ -56,6 +59,7 @@ export interface ChannelOverride {
   tax_code?: string;
   attribute_material?: string;
   attribute_color?: string;
+  localized_content_confirmed?: boolean;
 }
 
 export interface ChannelListing {
@@ -181,6 +185,7 @@ export interface Product {
   specifications?: Array<{ attributeKey?: string; name: string; value: string }>;
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
 
+  inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number; after: number; reason: string; createdAt: string }>;
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
@@ -192,6 +197,10 @@ export interface Product {
   record_version?: number;
   // Workflow
   status: 'draft' | 'review' | 'published' | 'archived';
+  import_result?: 'needs_review' | 'incomplete' | 'ready' | 'matched' | 'published';
+  import_source?: string;
+  import_issues?: string[];
+  import_sources?: Array<{ channel: ChannelListing['channel']; store: string; brand: string; price: number; currency: string }>;
   created_at: string;
   updated_at: string;
   // Variants
@@ -340,7 +349,7 @@ const SEED_PRODUCTS: Product[] = [
     country_of_origin: 'JP',
     hs_code: '9603400000',
     images: [IMG('B0FQHTSM8B')],
-    inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2, wh_fbajp: 0 },
+    inventory: { wh_crjp: 40, wh_rslsg: 20, wh_fbsmy: 12, wh_fbajp: 0 },
     has_variants: false,
     channels: [
       { channel: 'amazon', external_id: 'B0FQHTSM8B', status: 'active', listing_url: null, last_synced_at: null },
@@ -518,18 +527,14 @@ const IMPORTED_DEMO_PRODUCTS: Product[] = [{
   inventory: { wh_crjp: 18, wh_fbsmy: 24, wh_3plvn: 30 },
   has_variants: false,
   channels: [
-    { channel: 'website', external_id: 'WEB-SHP-CALLI-KIT', status: 'active', listing_url: '/products/premium-calligraphy-starter-kit', last_synced_at: null },
-    { channel: 'pos', external_id: 'POS-SHP-CALLI-KIT', status: 'active', listing_url: null, last_synced_at: null },
     { channel: 'shopee', external_id: 'SHP-9012283', status: 'pending', listing_url: null, last_synced_at: null },
   ],
   channel_overrides: {
-    webstore: { enabled: true, title: 'Premium Calligraphy Starter Kit', description: '', price_markup: 0, listing_sku: 'WEB-SHP-CALLI-KIT', web_slug: '/products/premium-calligraphy-starter-kit', visibility: 'public', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '', media_scope: 'all' },
-    pos: { enabled: true, title: 'Premium Calligraphy Starter Kit', description: '', price_markup: 0, listing_sku: 'POS-SHP-CALLI-KIT', pos_barcode: 'SHP-CALLI-KIT', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '', media_scope: 'all' },
     shopee: { enabled: true, title: 'Premium Calligraphy Starter Kit', description: '', price_markup: 0, listing_sku: 'SHO-SHP-CALLI-KIT', category: 'Art Supplies > Calligraphy', stock_quantity: '24', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '24', media_scope: 'all' },
   },
   status: 'draft',
   created_at: '2026-09-18T06:48:26Z',
-  updated_at: '2026-09-18T11:15:28Z',
+  updated_at: '2026-09-28T09:05:00Z',
   skus: [{ id: 'sku_import_imp-003', sku_code: 'SHP-CALLI-KIT', variation_name: 'Default', weight_g: 350, units_per_carton: 1, status: 'active', price: 5200, stock: 0 }],
 }];
 
@@ -579,12 +584,73 @@ function withDemoLocales(product: Product): Product {
   };
 }
 
-const DEFAULT_PRODUCTS = [...IMPORTED_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS].map(withDemoLocales);
+const IMPORT_REVIEW_DEMO_PRODUCTS: Product[] = [
+  { ...SEED_PRODUCTS[2], id: 'prod_import_review_demo', name: 'Artist Precision Brush Set — Imported', sku_code: 'IMP-BRUSH-12', status: 'review', inventory: { wh_crjp: 40, wh_rslsg: 20, wh_fbsmy: 12, wh_fbajp: 0 }, channels: [{ channel: 'amazon', external_id: 'B0IMPORTBRUSH', status: 'active', listing_url: null, last_synced_at: '2026-09-28T08:40:00Z' }, { channel: 'shopee', external_id: 'SHP-BRUSH-12', status: 'active', listing_url: null, last_synced_at: '2026-09-28T08:40:00Z' }, { channel: 'lazada', external_id: 'LZD-BRUSH-12', status: 'pending', listing_url: null, last_synced_at: '2026-09-28T08:40:00Z' }], channel_overrides: { amazon: { enabled: true, title: 'Artist Precision Brush Set 24 Pieces', description: '', price_markup: 0, channel_price: 34, channel_currency: 'USD', brand: 'Da Vinci', listing_sku: 'AMZ-BRUSH-24', category: 'Arts, Crafts & Sewing > Brushes', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '12', media_scope: 'all' }, shopee: { enabled: true, title: 'Artist Precision Brush Set', description: '', price_markup: 0, channel_price: 4900, channel_currency: 'JPY', brand: 'CYBER-RECORDS', listing_sku: 'SHP-BRUSH-12', category: 'Art Supplies > Brushes', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '11', media_scope: 'all' }, lazada: { enabled: true, title: 'Artist Precision Brush Set', description: '', price_markup: 0, channel_price: 4700, channel_currency: 'JPY', brand: 'Da Vinci', listing_sku: 'LZD-BRUSH-24', category: 'Stationery > Painting Tools', variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: '9', media_scope: 'all' } }, import_result: 'needs_review', import_source: 'Possible product mismatch · 3 linked listings', import_sources: [{ channel: 'amazon', store: 'Prime Beauty US', brand: 'Da Vinci', price: 34, currency: 'USD' }, { channel: 'shopee', store: 'Prime Beauty Official', brand: 'CYBER-RECORDS', price: 4900, currency: 'JPY' }, { channel: 'lazada', store: 'Prime Flagship Store', brand: 'Da Vinci', price: 4700, currency: 'JPY' }], import_issues: ['Product identity mismatch: GTIN, model and pack size differ'], updated_at: '2026-09-28T08:40:00Z' },
+  { ...SEED_PRODUCTS[1], id: 'prod_import_ready_demo', name: 'Watercolor Sketchbook Pro — Imported', sku_code: 'IMP-SKETCH-A5', status: 'published', channels: [{ channel: 'lazada', external_id: 'LZD-READY-SKETCH', status: 'active', listing_url: null, last_synced_at: '2026-09-28T08:42:00Z' }], import_result: 'published', import_source: 'Lazada · Prime Flagship Store', import_issues: [], updated_at: '2026-09-28T08:42:00Z' },
+];
+
+const ADDITIONAL_IMPORT_TEST_PRODUCTS: Product[] = [
+  {
+    ...IMPORTED_DEMO_PRODUCTS[0],
+    id: 'prod_import_test_incomplete_02',
+    name: '[Test 2] Calligraphy Starter Kit',
+    sku_code: 'TEST2-CALLI-KIT',
+    images: [],
+    asin: '',
+    status: 'draft',
+    import_result: 'incomplete',
+    import_source: 'Shopee · Test Store VN',
+    import_issues: ['Product image is required'],
+    updated_at: '2026-09-28T15:42:00Z',
+  },
+  {
+    ...IMPORT_REVIEW_DEMO_PRODUCTS[1],
+    id: 'prod_import_test_ready_02',
+    name: '[Test 2] Watercolor Sketchbook Pro',
+    sku_code: 'TEST2-SKETCH-A5',
+    status: 'published',
+    import_result: 'published',
+    import_source: 'Lazada · Test Flagship Store',
+    import_issues: [],
+    updated_at: '2026-09-28T15:41:00Z',
+  },
+  {
+    ...IMPORT_REVIEW_DEMO_PRODUCTS[0],
+    id: 'prod_import_test_review_02',
+    name: '[Test 2] Artist Precision Brush Set',
+    sku_code: 'TEST2-BRUSH-12',
+    inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2, wh_fbajp: 0 },
+    status: 'review',
+    import_result: 'needs_review',
+    import_source: 'Variant and pack conflict · 3 linked test listings',
+    import_issues: ['Variant structure conflict: imported listing is a 2-pack with 4 variants'],
+    updated_at: '2026-09-28T15:40:00Z',
+  },
+  {
+    ...SEED_PRODUCTS[3],
+    id: 'prod_import_test_matched_02',
+    name: '[Test 2] Japanese Mythical Art Print',
+    sku_code: 'TEST2-MYTH-ART-10',
+    channels: [...SEED_PRODUCTS[3].channels, { channel: 'shopee', external_id: 'SHP-TEST2-MYTH', status: 'active', listing_url: null, last_synced_at: '2026-09-28T15:39:00Z' }],
+    status: 'published',
+    import_result: 'matched',
+    import_source: 'Shopee · Test Store VN',
+    import_issues: [],
+    updated_at: '2026-09-28T15:39:00Z',
+  },
+];
+
+const DEFAULT_PRODUCTS = [...ADDITIONAL_IMPORT_TEST_PRODUCTS, ...IMPORTED_DEMO_PRODUCTS.map(product => ({ ...product, import_result: 'incomplete' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: ['Product image is required'] })), ...IMPORT_REVIEW_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS]
+  .map(product => product.id === 'prod_001' ? { ...product, channels: [...product.channels, { channel: 'shopee' as const, external_id: 'SHP-9012281', status: 'active' as const, listing_url: null, last_synced_at: '2026-09-28T08:38:00Z' }], import_result: 'matched' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: [], updated_at: '2026-09-28T08:38:00Z' } : product)
+  .map(withDemoLocales);
 
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
 const PRODUCT_STORAGE_KEY = 'primeos-product-master-v5';
+const DELETED_PRODUCT_STORAGE_KEY = 'primeos-product-master-deleted-v1';
 const DEMO_LOCALE_MIGRATION_KEY = 'primeos-demo-locale-shape-v2';
+const DEMO_IMPORT_DRAFT_MIGRATION_KEY = 'primeos-incomplete-import-drafts-v1';
+const INCOMPLETE_IMPORT_DEMO_IDS = new Set(['prod_import_test_incomplete_02', 'prod_import_imp-003']);
 
 function normalizeStoredProduct(product: Product): Product {
   const now = new Date().toISOString();
@@ -632,7 +698,8 @@ function normalizeStoredProduct(product: Product): Product {
     meta_title: typeof product.meta_title === 'string' ? product.meta_title : '',
     meta_description: typeof product.meta_description === 'string' ? product.meta_description : '',
     specifications,
-    inventory: product.inventory && typeof product.inventory === 'object' && !Array.isArray(product.inventory) ? product.inventory : {},
+    inventory_adjustments: Array.isArray(product.inventory_adjustments) ? product.inventory_adjustments : [],
+    inventory: product.inventory && typeof product.inventory === 'object' && !Array.isArray(product.inventory) ? normalizeDemoStockLocations(product.inventory) : {},
     has_variants: Boolean(product.has_variants),
     channels: Array.isArray(product.channels) ? product.channels : [],
     channel_overrides: product.channel_overrides && typeof product.channel_overrides === 'object' ? product.channel_overrides : {},
@@ -640,28 +707,72 @@ function normalizeStoredProduct(product: Product): Product {
     revisions: Array.isArray(product.revisions) ? product.revisions : [],
     record_version: Number(product.record_version) || 1,
     status: ['draft', 'review', 'published', 'archived'].includes(product.status) ? product.status : 'draft',
+    import_result: ['needs_review', 'incomplete', 'ready', 'matched', 'published'].includes(product.import_result ?? '') ? product.import_result : undefined,
+    import_source: typeof product.import_source === 'string' ? product.import_source : undefined,
+    import_issues: Array.isArray(product.import_issues) ? product.import_issues.filter((issue): issue is string => typeof issue === 'string') : undefined,
+    import_sources: Array.isArray(product.import_sources) ? product.import_sources : undefined,
     created_at: typeof product.created_at === 'string' ? product.created_at : now,
     updated_at: typeof product.updated_at === 'string' ? product.updated_at : now,
     variant_options: Array.isArray(product.variant_options)
       ? product.variant_options.filter(option => option && typeof option.attributeKey === 'string' && typeof option.name === 'string' && Array.isArray(option.values)).map(option => ({ attributeKey: option.attributeKey, name: option.name, values: option.values.filter((value): value is string => typeof value === 'string') }))
       : undefined,
-    skus: Array.isArray(product.skus) ? product.skus : [],
+    skus: Array.isArray(product.skus) ? product.skus.map(sku => ({ ...sku, ...(sku.stock_by_location ? { stock_by_location: normalizeDemoStockLocations(sku.stock_by_location) } : {}) })) : [],
     _variants: Array.isArray(product._variants) ? product._variants : undefined,
   };
 }
 
+function activateValidatedImport(product: Product): Product {
+  // The import validator owns readiness. Never bypass unresolved mapping or
+  // missing-data decisions, and never reactivate an archived product.
+  const importPassed = product.import_result === 'ready' || product.import_result === 'published';
+  if (!importPassed || product.import_issues?.length || product.status === 'archived') return product;
+  if (product.status === 'published' && product.import_result === 'published') return product;
+
+  const now = new Date().toISOString();
+  const revisions = product.revisions ?? [];
+  return {
+    ...product,
+    status: 'published',
+    import_result: 'published',
+    updated_at: now,
+    revisions: product.status === 'published' ? revisions : [...revisions, {
+      id: genId('rev'),
+      number: Math.max(0, ...revisions.map(revision => revision.number)) + 1,
+      status: 'published',
+      createdAt: now,
+      createdBy: 'PrimeOS',
+      summary: 'Activated automatically after import validation',
+    }],
+  };
+}
+
 function loadStoredProducts(): Product[] {
-  if (typeof window === 'undefined') return [...DEFAULT_PRODUCTS];
+  if (typeof window === 'undefined') return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
   try {
     const raw = window.localStorage.getItem(PRODUCT_STORAGE_KEY);
     if (!raw) {
       window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
-      return [...DEFAULT_PRODUCTS];
+      window.localStorage.setItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY, '1');
+      return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
     }
     const stored = JSON.parse(raw) as unknown;
-    if (!Array.isArray(stored)) return [...DEFAULT_PRODUCTS];
+    if (!Array.isArray(stored)) return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
     const shouldResetDemoLocales = window.localStorage.getItem(DEMO_LOCALE_MIGRATION_KEY) !== '1';
-    const valid = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
+    const storedProducts = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
+    // Reset the two requested incomplete demo cases to Draft once, preserving
+    // their revision history and listings. Future publications stay untouched.
+    const shouldResetImportDrafts = window.localStorage.getItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY) !== '1';
+    const valid = storedProducts.map(product => {
+      return shouldResetImportDrafts && INCOMPLETE_IMPORT_DEMO_IDS.has(product.id)
+        && product.status === 'published'
+        && product.import_result === 'incomplete'
+        ? { ...product, status: 'draft' as const }
+        : product;
+    });
+    if (valid.some((product, index) => product !== storedProducts[index])) {
+      window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(valid));
+    }
+    if (shouldResetImportDrafts) window.localStorage.setItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY, '1');
     const migrated = valid.map(storedProduct => {
       const product = normalizeStoredProduct(storedProduct);
       const normalized = (product as Product & { product_type?: string }).product_type === 'bundle'
@@ -678,17 +789,53 @@ function loadStoredProducts(): Product[] {
         ? { ...withVariantOptions, localized_content: { ...defaultLocalizedContent } }
         : withVariantOptions;
       // Keep the shipped demo taxonomy representative without overwriting user-assigned categories.
-      return withLocalizedContent.id === 'prod_003' && withLocalizedContent.category === 'Art Supplies'
-        ? { ...withLocalizedContent, category: 'Painting Accessories' }
-        : withLocalizedContent.id === 'prod_demo_electronics' && withLocalizedContent.category === 'Electronics'
-          ? { ...withLocalizedContent, category: 'Headphones' }
+      const defaultImport = DEFAULT_PRODUCTS.find(candidate => candidate.id === withLocalizedContent.id);
+      // Editable drafts and completed imports are not fixtures to reset on load.
+      // In particular, preserve uploaded media and the linked listings' own state.
+      if (INCOMPLETE_IMPORT_DEMO_IDS.has(withLocalizedContent.id)
+        || withLocalizedContent.import_result === 'ready'
+        || withLocalizedContent.import_result === 'published') {
+        return {
+          ...withLocalizedContent,
+          import_result: withLocalizedContent.import_result ?? defaultImport?.import_result,
+          import_source: withLocalizedContent.import_source ?? defaultImport?.import_source,
+          import_issues: withLocalizedContent.import_result ? withLocalizedContent.import_issues : defaultImport?.import_issues,
+        };
+      }
+      const withImportDemo = defaultImport?.import_result
+        ? {
+            ...withLocalizedContent,
+            import_result: withLocalizedContent.import_result ?? defaultImport.import_result,
+            import_source: withLocalizedContent.import_source ?? defaultImport.import_source,
+            import_sources: defaultImport.import_sources,
+            import_issues: withLocalizedContent.import_result === 'needs_review' && (defaultImport.id === 'prod_import_review_demo' || defaultImport.id === 'prod_import_test_review_02')
+              ? defaultImport.import_issues
+              : withLocalizedContent.import_result ? withLocalizedContent.import_issues : defaultImport.import_issues,
+            updated_at: defaultImport.updated_at,
+            channels: defaultImport.channels,
+            channel_overrides: defaultImport.channel_overrides,
+            ...(defaultImport.import_result === 'incomplete' && defaultImport.import_issues?.includes('Product image is required')
+              ? { images: [], image_alt_texts: [], asin: '' }
+              : {}),
+          }
         : withLocalizedContent;
+      const withOperationalDemoStock = withImportDemo.id === 'prod_import_test_review_02'
+        ? { ...withImportDemo, inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2, wh_fbajp: 0 } }
+        : withImportDemo.id === 'prod_import_review_demo' || withImportDemo.id === 'prod_003'
+          ? { ...withImportDemo, inventory: { wh_crjp: 40, wh_rslsg: 20, wh_fbsmy: 12, wh_fbajp: 0 } }
+          : withImportDemo;
+      return withOperationalDemoStock.id === 'prod_003' && withOperationalDemoStock.category === 'Art Supplies'
+        ? { ...withOperationalDemoStock, category: 'Painting Accessories' }
+        : withOperationalDemoStock.id === 'prod_demo_electronics' && withOperationalDemoStock.category === 'Electronics'
+          ? { ...withOperationalDemoStock, category: 'Headphones' }
+          : withOperationalDemoStock;
     });
     if (shouldResetDemoLocales) window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
     const storedIds = new Set(migrated.map(product => product.id));
-    return [...migrated, ...DEFAULT_PRODUCTS.filter(product => !storedIds.has(product.id))];
+    const deletedIds = new Set<string>(JSON.parse(window.localStorage.getItem(DELETED_PRODUCT_STORAGE_KEY) ?? '[]'));
+    return [...migrated, ...DEFAULT_PRODUCTS.filter(product => !storedIds.has(product.id) && !deletedIds.has(product.id)).map(normalizeStoredProduct)];
   } catch {
-    return [...DEFAULT_PRODUCTS];
+    return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
   }
 }
 
@@ -701,25 +848,36 @@ function persistProducts(): void {
   }
 }
 
-let _products: Product[] = loadStoredProducts();
+const loadedProducts = loadStoredProducts();
+let _products: Product[] = loadedProducts.map(activateValidatedImport);
+if (_products.some((product, index) => product !== loadedProducts[index])) persistProducts();
 
 export function getProducts(): Product[] {
   return _products;
 }
 
 export function addProduct(p: Product): void {
-  const normalized = normalizeStoredProduct(p);
+  const normalized = activateValidatedImport(normalizeStoredProduct(p));
   _products = [normalized, ..._products.filter(product => product.id !== normalized.id)];
   persistProducts();
 }
 
 export function updateProduct(id: string, p: Partial<Product> & { id: string }): void {
-  _products = _products.map(x => x.id === id ? normalizeStoredProduct({ ...x, ...p, updated_at: new Date().toISOString() }) : x);
+  _products = _products.map(x => x.id === id ? activateValidatedImport(normalizeStoredProduct({ ...x, ...p, updated_at: new Date().toISOString() })) : x);
   persistProducts();
 }
 
 export function deleteProduct(id: string): void {
   _products = _products.filter(x => x.id !== id);
+  if (typeof window !== 'undefined') {
+    try {
+      const deletedIds = new Set<string>(JSON.parse(window.localStorage.getItem(DELETED_PRODUCT_STORAGE_KEY) ?? '[]'));
+      deletedIds.add(id);
+      window.localStorage.setItem(DELETED_PRODUCT_STORAGE_KEY, JSON.stringify([...deletedIds]));
+    } catch {
+      // The in-memory deletion still works if storage is unavailable.
+    }
+  }
   persistProducts();
 }
 

@@ -1,0 +1,101 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { MyWarehouses } from './MyWarehouses';
+import { getWarehouses } from '@/lib/warehouse-store';
+import { getProducts } from '@/lib/product-store';
+import { channelIntegrationsApi } from '@/lib/channel-integrations-api';
+
+vi.mock('@/lib/channel-integrations-api', () => ({ channelIntegrationsApi: { channels: vi.fn() } }));
+const warehouses = [{ id: 'north', name: 'North' }, { id: 'south', name: 'South' }];
+const products = [{ ...getProducts()[0], id: 'shirt', name: 'Shirt', has_variants: false, inventory: { north: 8, south: 2 } }];
+const setup = () => render(<MemoryRouter><MyWarehouses warehouses={warehouses} products={products} /></MemoryRouter>);
+
+describe('My warehouses overview', () => {
+  afterEach(() => { cleanup(); vi.resetAllMocks(); });
+  it('counts shops separately from platforms and keeps warehouse cards and stock filters in sync', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [1, 2].map(id => ({ id: String(id), platform: 'shopee', name: 'Shopee', store_name: `Shop ${id}`, region: 'VN', type: 'Marketplace', status: 'CONNECTED', synced_listings: 1, sync_progress: 100, warehouse: { ...warehouses[0], code: 'N', city: 'North' }, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '' })) });
+    setup();
+    expect(await screen.findByText('2 linked shops across 1 sales channels')).toBeInTheDocument();
+    const cards = within(screen.getByRole('region', { name: 'Choose a warehouse' }));
+    expect(cards.getByRole('button', { name: /All warehouses/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Units across all warehouses')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('10')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '2 linked shops across 1 sales channels' }));
+    expect(screen.getByText('Shop 1')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(cards.getByRole('button', { name: /South/ }));
+    expect(screen.getByRole('heading', { name: 'South' })).toBeInTheDocument();
+    expect(screen.getByText('Single warehouse')).toBeInTheDocument();
+    expect(screen.getByText('Units in this warehouse')).toBeInTheDocument();
+    expect(cards.getByRole('button', { name: /South/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(cards.getByRole('button', { name: /All warehouses/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(screen.getByRole('table')).getByText('2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /All warehouses/ }));
+    expect(within(screen.getByRole('table')).getByText('10')).toBeInTheDocument();
+  });
+  it('opens the clicked warehouse details without changing the product table or filters', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: warehouses.map((warehouse, index) => ({ id: String(index), platform: 'shopee', name: 'Shopee', store_name: `Shop ${warehouse.name}`, region: 'VN', type: 'Marketplace', status: 'CONNECTED', synced_listings: 1, sync_progress: 100, warehouse: { ...warehouse, code: warehouse.id, city: warehouse.name }, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '' })) });
+    setup();
+    await screen.findByText('2 linked shops across 1 sales channels');
+    fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'shir' } });
+    fireEvent.change(screen.getByLabelText('Stock status'), { target: { value: 'available' } });
+    fireEvent.change(screen.getByLabelText('Sort products'), { target: { value: 'low' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Shirt' }));
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'North', exact: true }));
+    const drawer = within(screen.getByRole('dialog'));
+    expect(drawer.getByRole('heading', { name: 'North' })).toBeInTheDocument();
+    expect(drawer.getByText('Shop North')).toBeInTheDocument();
+    expect(drawer.queryByText('Shop South')).not.toBeInTheDocument();
+    fireEvent.click(drawer.getByRole('button', { name: 'Close' }));
+    expect(screen.getByLabelText('Product')).toHaveValue('shir');
+    expect(screen.getByLabelText('Stock status')).toHaveValue('available');
+    expect(screen.getByLabelText('Sort products')).toHaveValue('low');
+    expect(screen.getByLabelText('Warehouse scope')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Collapse Shirt' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Total across warehouses' })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'South', exact: true }));
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'South' })).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).queryByText('Shop North')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Locations & shops' }));
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'All warehouses' })).toBeInTheDocument();
+    expect(screen.getByText('Shop North')).toBeInTheDocument();
+    expect(screen.getByText('Shop South')).toBeInTheDocument();
+  });
+  it('keeps legacy channel demo locations within the five demo warehouses', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [{ id: 'demo-shop', platform: 'lazada', name: 'Lazada', store_name: 'Demo shop', region: 'VN', type: 'Marketplace', status: 'CONNECTED', synced_listings: 1, sync_progress: 100, warehouse: { id: 'wh_hn_01', name: 'Hanoi Hub', code: 'HN', city: 'Hanoi' }, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '' }] });
+    render(<MemoryRouter><MyWarehouses warehouses={getWarehouses()} products={getProducts()} /></MemoryRouter>);
+    expect(await screen.findByRole('button', { name: '1 linked shops across 1 sales channels' })).toBeInTheDocument();
+    const list = within(screen.getByRole('region', { name: 'Choose a warehouse' }));
+    expect(list.getAllByRole('button')).toHaveLength(6);
+    expect(list.queryByRole('button', { name: /Hanoi Hub|Unidentified warehouse/ })).not.toBeInTheDocument();
+    fireEvent.click(list.getByRole('button', { name: /Vietnam 3PL Partner/ }));
+    expect(screen.getByRole('button', { name: '1 linked shops across 1 sales channels' })).toBeInTheDocument();
+  });
+  it('keeps overview accessible when searching locations and supports mobile scope changes', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [] });
+    setup();
+    await screen.findByText('0 linked shops across 0 sales channels');
+    const list = within(screen.getByRole('region', { name: 'Choose a warehouse' }));
+    fireEvent.change(screen.getByLabelText('Find a warehouse'), { target: { value: 'No match' } });
+    expect(list.getByRole('button', { name: /All warehouses/ })).toBeInTheDocument();
+    expect(list.queryByRole('button', { name: /North/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Warehouse scope'), { target: { value: 'north' } });
+    expect(screen.getByRole('heading', { name: 'North' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('8')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }));
+    expect(screen.getByLabelText('Warehouse scope')).toHaveValue('');
+    expect(within(screen.getByRole('table')).getByText('10')).toBeInTheDocument();
+  });
+  it('shows unavailable shop data instead of silently claiming there are no shops', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockRejectedValue(new Error('offline'));
+    setup();
+    expect(await screen.findByText('Shop links unavailable. Stock is still available.')).toBeInTheDocument();
+    expect(screen.queryByText('0 linked shops across 0 sales channels')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry shop links' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('10')).toBeInTheDocument();
+  });
+});

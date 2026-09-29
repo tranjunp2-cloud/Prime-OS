@@ -66,16 +66,10 @@ const mainNavigation: NavGroup[] = [
     { id: 'orders', label: 'Orders', href: '/orders', icon: ShoppingBag },
     { id: 'products', label: 'Products', icon: Package, children: [
       { id: 'master-catalog', label: 'Product Master', href: '/products/master-catalog', icon: Boxes },
-      { id: 'catalog-imports', label: 'Catalog Imports', href: '/products/catalog-imports', icon: FilePlus2 },
       { id: 'categories-attributes', label: 'Categories & Attributes', href: '/products/categories', icon: Layers3 },
       { id: 'product-brands', label: 'Brands', href: '/products/brands', icon: Award },
     ] },
-    { id: 'warehouse', label: 'Warehouses', icon: Warehouse, children: [
-      { id: 'warehouse-mapping', label: 'Locations & Mapping', href: '/warehouse/mapping', icon: Link2 },
-      { id: 'warehouse-stock', label: 'Stock Levels', href: '/warehouse/stock', icon: Boxes },
-      { id: 'warehouse-transfers', label: 'Stock Transfers', href: '/warehouse/transfers', icon: ArrowRightLeft },
-      { id: 'warehouse-adjustments', label: 'Stock Adjustments', href: '/warehouse/adjustments', icon: ClipboardCheck },
-    ] },
+    { id: 'warehouse', label: 'Warehouses', href: '/warehouses', icon: Warehouse },
     { id: 'channels', label: 'Sales Channels', icon: Store, children: [
       { id: 'connected-channels', label: 'Connected Channels', href: '/sales-channels/connected-channels', icon: Store },
       { id: 'live-commerce', label: 'Live Commerce', href: '/sales-channels/live-commerce', icon: RadioTower },

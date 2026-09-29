@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import type { ChannelWizardDraft, WizardChannel } from './ChannelListingWizard';
 
@@ -18,6 +19,11 @@ interface Props {
   draft: ChannelWizardDraft | null;
   masterSku: string;
   productVariants?: Array<{ id: string; label: string; sku: string }>;
+  masterPersisted: boolean;
+  masterHasUnsavedChanges: boolean;
+  masterDataComplete: boolean;
+  masterBlockingReason?: string;
+  onSaveMaster: () => boolean;
   onSave: (patch: Partial<ChannelWizardDraft>) => void;
 }
 
@@ -36,7 +42,7 @@ const TABS: Array<{ value: EditorTab; label: string }> = [
   { value: 'readiness', label: 'Readiness' },
 ];
 
-export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft, masterSku, productVariants = [], onSave }: Props) {
+export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft, masterSku, productVariants = [], masterPersisted, masterHasUnsavedChanges, masterDataComplete, masterBlockingReason, onSaveMaster, onSave }: Props) {
   const [form, setForm] = useState<ChannelWizardDraft | null>(draft);
   const listingVariants = useMemo(() => productVariants.length ? productVariants.map(variant => ({ ...variant, state: 'included' as const })) : DEMO_VARIANTS.map(variant => ({ ...variant, sku: `${masterSku}-${variant.suffix}` })), [masterSku, productVariants]);
   const [variants, setVariants] = useState<string[]>([]);
@@ -45,6 +51,7 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
   const [providerFailed, setProviderFailed] = useState(true);
   const [baseline, setBaseline] = useState('');
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveMasterOpen, setSaveMasterOpen] = useState(false);
   const initializedForRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -105,13 +112,24 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
     requirements: blockers.filter(item => /category|Shipping|ASIN|Catalog ID|Condition|Fulfillment/.test(item)).length,
     readiness: blockers.length + Number(providerFailed),
   };
-  const publish = () => {
+  const startPublishing = () => {
     if (blockers.length) return;
     onSave({ ...form, variant_scope: variants.length === listingVariants.length ? 'all' : 'selected' });
     setBaseline(serializedState);
     setSavedAt(Date.now());
     setPublishing(true);
     window.setTimeout(() => { setPublishing(false); setProviderFailed(true); setTab('readiness'); }, 800);
+  };
+  const publish = () => {
+    if (!masterDataComplete) {
+      setTab('readiness');
+      return;
+    }
+    if (!masterPersisted || masterHasUnsavedChanges) {
+      setSaveMasterOpen(true);
+      return;
+    }
+    startPublishing();
   };
 
   return <Sheet open={open} onOpenChange={nextOpen => { if (!nextOpen) requestClose(); }}>
@@ -123,6 +141,8 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
           <Badge variant="outline" className="ml-auto shrink-0 border-amber-300 text-amber-700">Draft</Badge>
         </div>
       </SheetHeader>
+
+      {!masterDataComplete ? <div className="mx-6 mt-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3 text-sm"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" /><div><p className="font-semibold">Product Master data is incomplete</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{masterBlockingReason ?? 'Complete the required Master data before publishing this listing.'}</p></div></div> : (!masterPersisted || masterHasUnsavedChanges) ? <div className="mx-6 mt-4 flex items-start gap-3 rounded-lg border border-blue-500/25 bg-blue-500/[0.06] p-3 text-sm"><Save className="mt-0.5 size-4 shrink-0 text-blue-500" /><div><p className="font-semibold">{masterPersisted ? 'Product Master has unsaved changes' : 'Product Master must be saved first'}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">You can review this listing now. PrimeOS will ask you to save the Product Master before publishing.</p></div></div> : null}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b px-4 pt-3 md:w-48 md:flex-col md:overflow-x-visible md:border-b-0 md:border-r md:px-3 md:py-5" aria-label="Listing editor sections">
@@ -205,9 +225,10 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
 
       <SheetFooter className="flex-row items-center justify-between border-t px-6 py-4 sm:justify-between">
         <Button type="button" variant="outline" onClick={requestClose}>Close</Button>
-        <div className="flex items-center gap-2"><span className="hidden text-xs text-muted-foreground sm:inline" aria-live="polite">{hasUnsavedChanges ? 'Unsaved changes' : savedAt ? 'Saved just now' : 'No unsaved changes'}</span><Button type="button" variant="outline" disabled={!hasUnsavedChanges} onClick={save}><Save className="size-4" />Save draft</Button><Button type="button" disabled={publishing || blockers.length > 0} onClick={publish}>{publishing ? <RefreshCw className="size-4 animate-spin" /> : <Send className="size-4" />}{publishing ? 'Publishing…' : 'Publish update'}</Button></div>
+        <div className="flex items-center gap-2"><span className="hidden text-xs text-muted-foreground sm:inline" aria-live="polite">{hasUnsavedChanges ? 'Unsaved changes' : savedAt ? 'Saved just now' : 'No unsaved changes'}</span><Button type="button" variant="outline" disabled={!hasUnsavedChanges} onClick={save}><Save className="size-4" />Save draft</Button><Button type="button" disabled={publishing || blockers.length > 0 || !masterDataComplete} title={!masterDataComplete ? masterBlockingReason : undefined} onClick={publish}>{publishing ? <RefreshCw className="size-4 animate-spin" /> : <Send className="size-4" />}{publishing ? 'Publishing…' : 'Publish update'}</Button></div>
       </SheetFooter>
     </SheetContent>
+    <Dialog open={saveMasterOpen} onOpenChange={setSaveMasterOpen}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Save Product Master before publishing?</DialogTitle><DialogDescription>{masterPersisted ? 'This listing must use the latest saved Product Master data. Save your Master changes, then PrimeOS will continue publishing automatically.' : 'A saved Product Master is required to create the Master ID and SKU mapping used by this listing.'}</DialogDescription></DialogHeader><div className="rounded-lg border bg-muted/20 p-3 text-xs leading-5 text-muted-foreground"><strong className="text-foreground">Nothing will be published yet if saving fails.</strong> Your listing setup remains open so you can fix any required Master fields.</div><DialogFooter><Button type="button" variant="outline" onClick={() => setSaveMasterOpen(false)}>Cancel</Button><Button type="button" onClick={() => { if (!onSaveMaster()) return; setSaveMasterOpen(false); startPublishing(); }}><Save className="size-4" />Save &amp; continue</Button></DialogFooter></DialogContent></Dialog>
   </Sheet>;
 }
 

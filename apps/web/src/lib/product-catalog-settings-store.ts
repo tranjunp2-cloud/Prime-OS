@@ -2,6 +2,17 @@ export type CatalogRecordSource = 'internal' | 'imported';
 export type ReviewStatus = 'mapped' | 'needs_review' | 'not_required';
 export type CatalogChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'rakuten' | 'social';
 
+export interface CategoryChannelMapping {
+  externalCategoryId: string;
+  externalCategoryName: string;
+  externalCategoryPath: string[];
+  market: string;
+  account: string;
+  lastSyncedAt: string;
+  confidence?: number;
+  matchMethod?: 'automatic' | 'manual';
+}
+
 export interface CatalogAttribute {
   id: string;
   name: string;
@@ -12,6 +23,8 @@ export interface CatalogAttribute {
   options: string;
   unit: string;
   validation: string;
+  purpose?: 'variant' | 'specification';
+  groupId?: string;
   /**
    * When true, this attribute supports per-locale values.
    * Spec §5.2: only attributes with isLocalizable=true may receive a locale coordinate.
@@ -22,13 +35,23 @@ export interface CatalogAttribute {
   source: CatalogRecordSource;
 }
 
+export interface CatalogAttributeGroup {
+  id: string;
+  name: string;
+  description: string;
+  purpose: 'variant' | 'specification';
+  system?: boolean;
+}
+
 export interface CatalogBrand {
   id: string;
   name: string;
   code: string;
   manufacturer: string;
+  legalName?: string;
   country: string;
   website: string;
+  roles?: Array<'Brand' | 'Manufacturer' | 'Rights holder' | 'Distributor' | 'Reseller'>;
   productCount: number;
   status: 'Verified' | 'Unverified' | 'Inactive';
   source: CatalogRecordSource;
@@ -48,6 +71,7 @@ export interface CatalogCategory {
   source: CatalogRecordSource;
   attributes: Array<{ key: string; required: boolean }>;
   mappings: Record<CatalogChannel, ReviewStatus>;
+  channelMappings?: Partial<Record<CatalogChannel, CategoryChannelMapping>>;
 }
 
 const STORAGE_KEY = 'prime-product-catalog-settings-v2';
@@ -140,13 +164,22 @@ function buildDefaultCategories(): CatalogCategory[] {
 
 export const defaultCatalogCategories: CatalogCategory[] = buildDefaultCategories();
 
-export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[] }
+export const defaultCatalogAttributeGroups: CatalogAttributeGroup[] = [
+  { id: 'variant-attributes', name: 'Variant attributes', description: 'Create sellable combinations such as Black / Size M', purpose: 'variant', system: true },
+  { id: 'materials-construction', name: 'Materials & construction', description: 'Materials, finish and how the product is made', purpose: 'specification' },
+  { id: 'physical-details', name: 'Physical details', description: 'Dimensions, weight and measurable specifications', purpose: 'specification' },
+  { id: 'compliance-origin', name: 'Compliance & origin', description: 'Origin, regulatory and compliance information', purpose: 'specification' },
+  { id: 'product-content', name: 'Product content', description: 'Care instructions and customer-facing details', purpose: 'specification' },
+];
+
+export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[]; attributeGroups?: CatalogAttributeGroup[] }
 
 function defaults(): ProductCatalogSettings {
   return {
-    categories: defaultCatalogCategories.map(category => ({ ...category, attributes: category.attributes.map(attribute => ({ ...attribute })), mappings: { ...category.mappings } })),
-    attributes: defaultCatalogAttributes.map(attribute => ({ ...attribute })),
+    categories: defaultCatalogCategories.map(category => ({ ...category, attributes: category.attributes.map(attribute => ({ ...attribute })), mappings: { ...category.mappings }, channelMappings: { ...category.channelMappings } })),
+    attributes: defaultCatalogAttributes.map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })),
     brands: defaultCatalogBrands.map(brand => ({ ...brand, aliases: [...brand.aliases], mappings: { ...brand.mappings } })),
+    attributeGroups: defaultCatalogAttributeGroups.map(group => ({ ...group })),
   };
 }
 
@@ -202,13 +235,22 @@ function ensureDemoAttributes(attributes: CatalogAttribute[]): CatalogAttribute[
   return [...upgraded, ...defaultCatalogAttributes.filter(attribute => !existingKeys.has(attribute.key))];
 }
 
+function inferredAttributeGroup(attribute: CatalogAttribute): string {
+  if (attribute.groupId) return attribute.groupId;
+  if (attribute.purpose === 'variant' || /(^|\s)(color|colour|size|capacity|storage|style|version|variant|paper size|binding type)(\s|$)/i.test(attribute.name)) return 'variant-attributes';
+  if (/material|fabric|finish|construction/i.test(attribute.name)) return 'materials-construction';
+  if (/country|origin|compliance|certification/i.test(attribute.name)) return 'compliance-origin';
+  if (/dimension|weight|height|width|length|volume/i.test(attribute.name)) return 'physical-details';
+  return 'product-content';
+}
+
 export function getProductCatalogSettings(): ProductCatalogSettings {
   if (typeof window === 'undefined') return defaults();
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return defaults();
     const parsed = { ...defaults(), ...JSON.parse(stored) } as ProductCatalogSettings;
-    return { ...parsed, categories: ensureDemoTaxonomy(migrateLegacyCategories(parsed.categories)), attributes: ensureDemoAttributes(parsed.attributes) };
+    return { ...parsed, categories: ensureDemoTaxonomy(migrateLegacyCategories(parsed.categories)), attributes: ensureDemoAttributes(parsed.attributes).map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })), attributeGroups: parsed.attributeGroups?.length ? parsed.attributeGroups : defaultCatalogAttributeGroups.map(group => ({ ...group })) };
   } catch { return defaults(); }
 }
 

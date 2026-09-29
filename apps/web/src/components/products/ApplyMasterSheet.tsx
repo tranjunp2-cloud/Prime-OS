@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowUpFromLine, ChevronRight, Globe2, Minus, MonitorSmartphone, Radio, Send, ShoppingBag, Star, Store } from 'lucide-react';
+import { AlertTriangle, ArrowUpFromLine, ChevronRight, Radio, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -53,6 +53,9 @@ interface ApplyMasterSheetProps {
   form: FormState;
   images: string[];
   enabledChannels: EnabledChannel[];
+  listingDrafts: Record<OverrideChannel, ChannelWizardDraft>;
+  initialChannel?: OverrideChannel | null;
+  initialChannels?: OverrideChannel[];
   onApply: (patch: Partial<Record<OverrideChannel, Partial<ChannelWizardDraft>>>) => void;
 }
 
@@ -127,14 +130,15 @@ const FIELD_GROUPS: FieldGroup[] = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChannels, onApply }: ApplyMasterSheetProps) {
+export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChannels, listingDrafts, initialChannel, initialChannels, onApply }: ApplyMasterSheetProps) {
+  const startingChannels = initialChannels?.length ? initialChannels : initialChannel ? [initialChannel] : [];
   const [selectedGroups, setSelectedGroups] = useState<Record<FieldGroupKey, boolean>>(() =>
     Object.fromEntries(FIELD_GROUPS.map(g => [g.key, g.defaultChecked])) as Record<FieldGroupKey, boolean>
   );
-  const [expandedGroups, setExpandedGroups] = useState<Set<FieldGroupKey>>(new Set());
-  const [listingMode, setListingMode] = useState<'all' | 'select'>('all');
+  const [expandedGroups, setExpandedGroups] = useState<Set<FieldGroupKey>>(new Set(FIELD_GROUPS.map(group => group.key)));
+  const [listingMode, setListingMode] = useState<'all' | 'select'>(startingChannels.length ? 'select' : 'all');
   const [selectedListings, setSelectedListings] = useState<Set<OverrideChannel>>(
-    () => new Set(enabledChannels.filter(c => c.connectionStatus === 'connected').map(c => c.key))
+    () => new Set(startingChannels.length ? startingChannels : enabledChannels.filter(c => c.connectionStatus === 'connected').map(c => c.key))
   );
 
   const connectedChannels = enabledChannels.filter(c => c.connectionStatus !== 'not_connected');
@@ -143,6 +147,25 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
     : Array.from(selectedListings);
   const activeGroupKeys = FIELD_GROUPS.filter(g => selectedGroups[g.key]).map(g => g.key);
   const canApply = activeGroupKeys.length > 0 && activeListings.length > 0;
+
+  function currentListingValue(groupKey: FieldGroupKey, fieldLabel: string, draft: ChannelWizardDraft): string {
+    if (groupKey === 'content') {
+      if (fieldLabel === 'Product name') return draft.title || 'Not set';
+      if (fieldLabel === 'Description') return draft.description ? draft.description.slice(0, 55) + (draft.description.length > 55 ? '…' : '') : 'Not set';
+      if (fieldLabel === 'Brand') return draft.brand || 'Not set';
+    }
+    if (groupKey === 'media') return draft.media_scope === 'all' ? 'All Master images' : 'Listing-specific media';
+    if (groupKey === 'pricing') {
+      if (fieldLabel === 'Retail price') return draft.listing_mode === 'master' ? `Master price${draft.price_markup && draft.price_markup !== '0' ? ` + ${draft.price_markup}%` : ''}` : 'Manual channel price';
+      return draft.listing_mode === 'master' ? 'Inherit from Product Master' : 'Listing-specific price';
+    }
+    if (groupKey === 'shipping') {
+      const prefix = fieldLabel === 'Package dimensions' ? 'Package:' : fieldLabel === 'Country of origin' ? 'Origin:' : 'HS:';
+      const value = draft.compliance_notes.split('\n').find(line => line.startsWith(prefix));
+      return value?.slice(prefix.length).trim() || 'Not set';
+    }
+    return 'Not set';
+  }
 
   function toggleGroup(key: FieldGroupKey) {
     setSelectedGroups(prev => ({ ...prev, [key]: !prev[key] }));
@@ -189,11 +212,11 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
       <SheetContent side="right" className="flex w-full flex-col p-0 sm:max-w-[560px]">
         <SheetHeader className="border-b px-6 py-5">
           <SheetTitle className="flex items-center gap-2 text-base">
-            <ArrowUpFromLine className="size-4 text-primary" />
-            Apply master data to listings
+            <RefreshCw className="size-4 text-primary" />
+            Review changes before sync
           </SheetTitle>
           <SheetDescription>
-            Select which data groups and which channel listings to update. Channel-specific fields (SKU, category, fulfillment) are never touched.
+            Compare the current listing data with the latest Product Master. Select the groups to update, then confirm the sync.
           </SheetDescription>
         </SheetHeader>
 
@@ -206,6 +229,11 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
                 const isExpanded = expandedGroups.has(group.key);
                 const isChecked = selectedGroups[group.key];
                 const previews = group.fieldPreviews(form, images);
+                const changedFieldCount = activeListings.reduce((count, listingKey) => {
+                  const draft = listingDrafts[listingKey];
+                  if (!draft) return count;
+                  return count + previews.filter(field => currentListingValue(group.key, field.label, draft) !== field.value).length;
+                }, 0);
 
                 return (
                   <div key={group.key} className="overflow-hidden rounded-lg border">
@@ -233,7 +261,7 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
                           <AlertTriangle className="size-3 mr-1" />Caution
                         </Badge>
                       )}
-                      <span className="text-xs text-muted-foreground">{previews.length} {previews.length === 1 ? 'field' : 'fields'}</span>
+                      <span className={cn('text-xs font-medium', changedFieldCount ? 'text-blue-500' : 'text-muted-foreground')}>{changedFieldCount ? `${changedFieldCount} ${changedFieldCount === 1 ? 'change' : 'changes'}` : 'No changes'}</span>
                       <button
                         type="button"
                         onClick={() => toggleExpand(group.key)}
@@ -253,15 +281,36 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
                             {group.cautionNote}
                           </div>
                         )}
-                        <div className="space-y-0 divide-y divide-border/50 px-4 py-2">
-                          {previews.map(field => (
-                            <div key={field.label} className="flex items-center gap-3 py-2">
-                              <span className="w-32 shrink-0 text-xs font-medium text-foreground/80">{field.label}</span>
-                              <span className="ml-auto max-w-[200px] truncate font-mono text-xs text-muted-foreground" title={field.value}>
-                                {field.value}
-                              </span>
-                            </div>
-                          ))}
+                        <div className="space-y-4 px-4 py-3">
+                          {activeListings.map(listingKey => {
+                            const channel = enabledChannels.find(item => item.key === listingKey);
+                            const draft = listingDrafts[listingKey];
+                            if (!draft) return null;
+                            const changedFields = previews.filter(field => currentListingValue(group.key, field.label, draft) !== field.value);
+                            if (!changedFields.length) return null;
+                            return <div key={listingKey} className="overflow-hidden rounded-md border bg-background">
+                              <div className="flex items-center gap-2 border-b bg-muted/25 px-3 py-2">
+                                <span className="text-xs font-semibold">{channel?.label ?? listingKey}</span>
+                                {channel?.account ? <span className="truncate text-[11px] text-muted-foreground">{channel.account}</span> : null}
+                                <span className="ml-auto text-[10px] font-medium text-blue-500">{changedFields.length} {changedFields.length === 1 ? 'field' : 'fields'}</span>
+                              </div>
+                              <div className="grid grid-cols-[minmax(90px,0.75fr)_minmax(0,1fr)_16px_minmax(0,1fr)] items-center gap-x-2 border-b px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <span>Field</span><span>Current listing</span><span /><span>New from Master</span>
+                              </div>
+                              <div className="divide-y divide-border/50">
+                                {changedFields.map(field => {
+                                  const currentValue = currentListingValue(group.key, field.label, draft);
+                                  return <div key={field.label} className="grid grid-cols-[minmax(90px,0.75fr)_minmax(0,1fr)_16px_minmax(0,1fr)] items-start gap-x-2 px-3 py-2.5 text-xs">
+                                    <span className="font-medium text-foreground/80">{field.label}</span>
+                                    <span className="break-words text-muted-foreground" title={currentValue}>{currentValue}</span>
+                                    <ChevronRight className="mt-0.5 size-3.5 text-blue-500" />
+                                    <span className="break-words font-medium text-foreground" title={field.value}>{field.value}</span>
+                                  </div>;
+                                })}
+                              </div>
+                            </div>;
+                          })}
+                          {changedFieldCount === 0 ? <p className="py-2 text-center text-xs text-muted-foreground">This data already matches the selected listings.</p> : null}
                         </div>
                       </div>
                     )}
@@ -383,7 +432,7 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
           >
             <ArrowUpFromLine className="size-4" />
             {canApply
-              ? `Apply to ${activeListings.length} listing${activeListings.length > 1 ? 's' : ''}`
+              ? `Confirm & sync ${activeListings.length} listing${activeListings.length > 1 ? 's' : ''}`
               : 'Select fields and listings'}
           </Button>
         </div>

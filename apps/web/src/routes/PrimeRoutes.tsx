@@ -12,9 +12,7 @@ import { PrimeMarketingPage } from "@/pages/prime/PrimeMarketingPage";
 import Orders from "@/pages/Orders";
 import Products from "@/pages/Products";
 import ProductCreatePage from "@/pages/ProductCreatePage";
-import ProductDetail from "@/pages/ProductDetail";
 import ProductCategories from "@/pages/ProductCategories";
-import CatalogImportReview from "@/pages/CatalogImportReview";
 import Warehouses from "@/pages/Warehouses";
 import PrimeInboxWorkspace from "@/pages/PrimeInboxWorkspace";
 import FaqHub from "@/pages/FaqHub";
@@ -39,6 +37,11 @@ const cosInventoryHref = `${cosOverviewHref}&view=pim`;
 
 const cosFulfillmentHref = `${cosOverviewHref}&view=ship`;
 const cosChannelHref = `${cosOverviewHref}&view=pim`;
+
+function WarehouseOverviewRedirect() {
+  const location = useLocation();
+  return <Navigate to={{ pathname: '/warehouses', search: location.search }} replace />;
+}
 
 function LegacyCrmRedirect({ to, defaultSearch = "" }: { to: string; defaultSearch?: string }) {
   const { search } = useLocation();
@@ -71,6 +74,16 @@ function ProductChannelManagementRedirect() {
   const { productId, id } = useParams<{ productId?: string; id?: string }>();
   const targetId = productId ?? id;
   return <Navigate to={targetId ? `/products/${targetId}/edit?section=distribution` : "/products/master-catalog"} replace />;
+}
+
+function ProductMasterDetailRedirect() {
+  const { id } = useParams<{ id?: string }>();
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  if (params.get('tab') === 'channels') params.set('section', 'distribution');
+  params.delete('tab');
+  const nextSearch = params.toString();
+  return <Navigate to={id ? `/products/${id}/edit${nextSearch ? `?${nextSearch}` : ''}` : '/products/master-catalog'} replace />;
 }
 
 export function PrimeRoutes() {
@@ -178,7 +191,7 @@ export function PrimeRoutes() {
     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
-    <Route path="/products/catalog-imports" element={<CatalogImportReview />} />
+    <Route path="/products/catalog-imports" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/channel-listings" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/categories" element={<ProductCategories />} />
     <Route path="/products/attributes" element={<ProductCategories />} />
@@ -188,13 +201,13 @@ export function PrimeRoutes() {
     <Route path="/products/:id/edit" element={<ProductCreatePage />} />
     <Route path="/products/:id/channel-listings/new" element={<ProductChannelManagementRedirect />} />
     <Route path="/products/:productId/channels/:channelKey" element={<ProductChannelManagementRedirect />} />
-    <Route path="/products/:id" element={<ProductDetail />} />
-    <Route path="/warehouses" element={<Navigate to="/warehouse/mapping" replace />} />
+    <Route path="/products/:id" element={<ProductMasterDetailRedirect />} />
+    <Route path="/warehouses" element={<Warehouses />} />
     <Route path="/docs" element={<Docs />} />
-    <Route path="/warehouse/mapping" element={<Warehouses />} />
-    <Route path="/warehouse/stock" element={<Warehouses />} />
-    <Route path="/warehouse/transfers" element={<Warehouses />} />
-    <Route path="/warehouse/adjustments" element={<Warehouses />} />
+    <Route path="/warehouse/mapping" element={<WarehouseOverviewRedirect />} />
+    <Route path="/warehouse/stock" element={<WarehouseOverviewRedirect />} />
+    <Route path="/warehouse/transfers" element={<WarehouseOverviewRedirect />} />
+    <Route path="/warehouse/adjustments" element={<WarehouseOverviewRedirect />} />
     <Route path="/inventory/*" element={<Navigate to={cosInventoryHref} replace />} />
     <Route path="/orders" element={<Orders />} />
     <Route path="/orders/:id" element={<LegacyOrderDetailRedirect />} />
