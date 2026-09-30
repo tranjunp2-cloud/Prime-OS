@@ -11,10 +11,12 @@ import { DEMO_WAREHOUSE_ALIASES } from '@/lib/demo-warehouse-locations';
 import { getWarehouseById } from '@/lib/warehouse-store';
 import { productWarehouseIds, stockAt, sumStock } from '@/lib/warehouse-stock-view';
 import { cn } from '@/lib/utils';
+import { getInventoryPositions, type InventoryPosition } from '@/lib/inventory-store';
+import { StockGuide } from './StockAvailability';
 import { WarehouseStockTable, type StockLocation, type StockAdjustmentTarget } from './WarehouseStockTable';
 
 type Location = { id: string; name: string; code?: string; address?: string | null };
-export function MyWarehouses({ warehouses, products, onAdjustStock, initialSearch = '' }: { onAdjustStock?: (target: StockAdjustmentTarget) => void; warehouses: Location[]; products: Product[]; initialSearch?: string }) {
+export function MyWarehouses({ warehouses, products, onAdjustStock, positions = getInventoryPositions(), initialSearch = '' }: { onAdjustStock?: (target: StockAdjustmentTarget) => void; warehouses: Location[]; products: Product[]; positions?: InventoryPosition[]; initialSearch?: string }) {
   const [warehouseId, setWarehouseId] = useState('');
   const [warehouseSearch, setWarehouseSearch] = useState('');
   const [shops, setShops] = useState<ConnectedChannelRecord[]>([]);
@@ -46,14 +48,13 @@ export function MyWarehouses({ warehouses, products, onAdjustStock, initialSearc
   const detailsWarehouse = locations.get(detailsWarehouseId);
   const detailsLocations = detailsWarehouse ? [detailsWarehouse] : allWarehouses;
   const detailsShops = shops.filter(shop => shop.warehouse && (!detailsWarehouseId || shop.warehouse.id === detailsWarehouseId));
-  const scopedLocations = selected ? [selected] : allWarehouses;
   const scopedShops = shops.filter(shop => shop.warehouse && (!warehouseId || shop.warehouse.id === warehouseId));
   const stats = (scope: StockLocation[]) => {
     const values = products.map(product => sumStock(scope.map(w => stockAt(product, w.id))));
     const total = sumStock(values);
     return { products: values.filter(value => value.quantity !== null).length, ...total };
   };
-  const scopeStats = stats(scopedLocations);
+  const channelCount = new Set(scopedShops.map(shop => shop.platform)).size;
   const summary = (scope: StockLocation[]) => {
     const value = stats(scope);
     return `${value.products} products · ${value.quantity?.toLocaleString() ?? '—'} units${value.incomplete ? ' (partial)' : ''}`;
@@ -106,24 +107,20 @@ export function MyWarehouses({ warehouses, products, onAdjustStock, initialSearc
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             <h2 className="text-base font-semibold">{selected?.name ?? 'All warehouses'}</h2>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">{selected ? <Warehouse className="size-3.5" /> : <Layers3 className="size-3.5" />}{selected ? 'Single warehouse' : `Overview · ${allWarehouses.length} locations`}</span>
+            {!selected && <span className="text-xs text-muted-foreground">{allWarehouses.length} locations</span>}
             {selected?.external && <span className="text-xs text-muted-foreground" title="Stock is managed by the fulfillment provider.">Read only</span>}
           </div>
-          <div className="flex shrink-0 gap-2">
-            {selected && <Button variant="ghost" size="sm" onClick={() => setWarehouseId('')}><ArrowLeft className="mr-1.5 size-4" />Back to overview</Button>}
-            <Button variant="outline" size="sm" onClick={() => openDetails(warehouseId)}>{selected ? 'Warehouse details' : 'Locations & shops'}</Button>
+          <div className="flex max-w-full flex-wrap items-center gap-2">
+            {selected && <Button variant="ghost" size="sm" aria-label="Back to overview" onClick={() => setWarehouseId('')}><ArrowLeft className="mr-1 size-4" />All warehouses</Button>}
+            {status === 'ready' && <span className="mr-1 text-xs text-muted-foreground">{scopedShops.length} {scopedShops.length === 1 ? 'shop' : 'shops'} · {channelCount} {channelCount === 1 ? 'channel' : 'channels'}</span>}
+            <Button variant="outline" size="sm" aria-label={selected ? 'Warehouse details' : 'Locations & shops'} onClick={() => openDetails(warehouseId)}>Details</Button>
+            <StockGuide iconOnly />
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
-          <dl className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <div className="flex items-baseline gap-1.5"><dt className="text-muted-foreground">products</dt><dd className="order-first font-semibold tabular-nums">{scopeStats.products}</dd></div>
-            <div className="flex flex-wrap items-baseline gap-1.5"><dt className="text-muted-foreground">{selected ? 'Units in this warehouse' : 'Units across all warehouses'}</dt><dd className="order-first font-semibold tabular-nums">{scopeStats.quantity?.toLocaleString() ?? '—'}</dd>{scopeStats.incomplete && <dd className="text-xs text-amber-600 dark:text-amber-400">Partial data</dd>}</div>
-          </dl>
-          {status === 'ready' ? <button className="min-h-9 text-left text-sm font-medium text-primary hover:underline" onClick={() => openDetails(warehouseId)}>{scopedShops.length} linked shops across {new Set(scopedShops.map(shop => shop.platform)).size} sales channels</button> : status === 'loading' ? <p className="text-xs text-muted-foreground" role="status">Loading shop links…</p> : <div role="status" className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>Shop links unavailable. Stock is still available.</span><Button variant="ghost" size="sm" onClick={() => setAttempt(n => n + 1)}>Retry shop links</Button></div>}
-        </div>
+        {status === 'loading' ? <p className="mt-1 text-xs text-muted-foreground" role="status">Loading shop links…</p> : status === 'error' ? <div role="status" className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>Shop links unavailable. Stock is still available.</span><Button variant="ghost" size="sm" onClick={() => setAttempt(n => n + 1)}>Retry shop links</Button></div> : null}
         {selected?.unknown && <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">Stock is recorded against {selected.code}, but this location is not in the warehouse directory. These quantities remain included in totals.</p>}
       </header>
-      <WarehouseStockTable onViewWarehouse={openDetails} onAdjustStock={onAdjustStock} products={products} warehouses={allWarehouses} warehouseId={warehouseId} onShowAll={() => setWarehouseId('')} initialSearch={initialSearch} />
+      <WarehouseStockTable positions={positions} onViewWarehouse={openDetails} onAdjustStock={onAdjustStock} products={products} warehouses={allWarehouses} warehouseId={warehouseId} onShowAll={() => setWarehouseId('')} initialSearch={initialSearch} />
     </div>
     <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">

@@ -25,7 +25,7 @@ describe('stock adjustments', () => {
     fill('10');
     expect(screen.getByText('7 → 10 units · Increase by 3')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
-    expect(update).toHaveBeenCalledWith(simple.id, expect.objectContaining({ inventory: { wh_crjp: 10 }, inventory_adjustments: [expect.objectContaining({ before: 7, after: 10, reason: 'Physical stock count' })] }));
+    expect(update).toHaveBeenCalledWith(simple.id, expect.objectContaining({ inventory: { wh_crjp: 10 }, inventory_adjustments: [expect.objectContaining({ before: 7, after: 10, reason: 'Physical stock count' })] }), { requirePersistence: true });
     expect(saved).toHaveBeenCalledOnce();
   });
   it('blocks negative, fractional and unchanged counts but allows zero', () => {
@@ -102,7 +102,7 @@ describe('stock adjustments', () => {
     fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '0' } });
     expect(screen.getByText('Not recorded → 0 units · Initial count')).toBeInTheDocument();
     fireEvent.click(save);
-    expect(update).toHaveBeenCalledWith(simple.id, expect.objectContaining({ inventory: { wh_crjp: 0 }, inventory_adjustments: [expect.objectContaining({ before: null, after: 0 })] }));
+    expect(update).toHaveBeenCalledWith(simple.id, expect.objectContaining({ inventory: { wh_crjp: 0 }, inventory_adjustments: [expect.objectContaining({ before: null, after: 0 })] }), { requirePersistence: true });
   });
   it('does not overwrite a location recorded while the add form was open', () => {
     const { update } = setup({ ...simple, inventory: {} }, warehouse, true);
@@ -121,5 +121,32 @@ describe('stock adjustments', () => {
     setup({ ...simple, inventory: { wh_crjp: 0 } }, warehouse, true);
     expect(screen.getByRole('alert')).toHaveTextContent('Stock is already recorded');
     expect(screen.getByRole('button', { name: 'Save location & stock' })).toBeDisabled();
+  });
+  it('records the chosen variant only and keeps its initial audit balance unknown', () => {
+    const product = { ...simple, has_variants: true, skus: [{ ...base.skus[0], id: 'a', sku_code: 'A', stock_by_location: {} }, { ...base.skus[0], id: 'b', sku_code: 'B', stock_by_location: { wh_crjp: 3 } }] };
+    const { update, saved } = setup(product, warehouse, true);
+    expect(screen.getByLabelText('Initial stock')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Variant SKU'), { target: { value: 'A' } });
+    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+    expect(update.mock.calls[0][1].skus?.map(sku => sku.stock_by_location?.wh_crjp)).toEqual([8, 3]);
+    expect(update.mock.calls[0][1].inventory.wh_crjp).toBe(11);
+    expect(update.mock.calls[0][1].inventory_adjustments?.[0]).toMatchObject({ sku: 'A', before: null, after: 8 });
+    expect(saved).toHaveBeenCalledOnce();
+  });
+  it('switches from adjustment to initial stock inside the same dialog and reports save failures', () => {
+    const { update, saved } = setup({ ...simple, inventory: {} });
+    fireEvent.click(screen.getByRole('button', { name: 'Record initial stock' }));
+    expect(screen.getByRole('heading', { name: 'Record initial stock' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    update.mockImplementation(() => { throw new Error('Storage is full'); });
+    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Storage is full');
+    expect(saved).not.toHaveBeenCalled();
+    update.mockImplementation(() => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+    expect(saved).toHaveBeenCalledOnce();
   });
 });

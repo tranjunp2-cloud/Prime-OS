@@ -6,6 +6,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import ProductCreatePage from './ProductCreatePage';
 import Products from './Products';
 import { addProduct, deleteProduct, getProductById, getProducts, updateProduct, type Product } from '@/lib/product-store';
+import { addInventoryPosition, clearInventoryStore, getInventoryPositions } from '@/lib/inventory-store';
+import { getStockHoldHistory, STOCK_HOLD_STORAGE_KEY } from '@/lib/stock-hold-history';
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/lib/i18n/I18nContext', () => ({ useI18n: () => ({ locale: 'en-US', t: (key: string) => key }) }));
 const id = 'stock-detail-test';
@@ -23,13 +25,33 @@ function record(value: string) {
 }
 function saveMetadata() { fireEvent.click(screen.getByRole('button', { name: /^(Publish updates|Publish product|Complete product)$/ })); }
 beforeEach(() => {
+  clearInventoryStore();
+  window.localStorage.removeItem(STOCK_HOLD_STORAGE_KEY);
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   Element.prototype.scrollIntoView = vi.fn();
   product = { ...seed, id, name: 'Stock detail test', sku_code: 'STOCK-DETAIL-TEST', has_variants: false, product_type: 'single', inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbajp: 0 }, skus: [], channels: [], channel_overrides: {}, status: 'draft', inventory_adjustments: [], import_result: undefined, record_version: 1 };
   addProduct(product);
 });
-afterEach(() => { cleanup(); deleteProduct(id); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); deleteProduct(id); clearInventoryStore(); window.localStorage.removeItem(STOCK_HOLD_STORAGE_KEY); vi.restoreAllMocks(); });
 describe('stock adjustments without leaving Product Master', () => {
+  it('manages holds without leaving product details or overwriting unsaved product edits', async () => {
+    addInventoryPosition({ id: 'detail-hold', product_id: id, sku_id: `${id}_default`, warehouse_id: 'wh_crjp', on_hand: 7, reserved_unpaid: 0, reserved_paid: 1, allocated: 0, safety_stock: 1, campaign_lock: 0, unfulfillable: 0, inbound: 0, outbound: 0, return_pending: 0, version: 1, updated_at: '2026-09-30T00:00:00Z' });
+    mount(); await ready();
+    fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Unsaved product name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Manage holds for Stock detail test at CyberRecord Japan HQ' }));
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'campaign_lock' } });
+    fireEvent.change(screen.getByLabelText('Quantity to hold'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save hold' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('current-path')).toHaveTextContent(`/products/${id}/edit`);
+    expect(screen.getByDisplayValue('Unsaved product name')).toBeInTheDocument();
+    expect(getProductById(id)?.name).toBe(product.name);
+    expect(getProductById(id)?.inventory.wh_crjp).toBe(7);
+    saveMetadata();
+    expect(getProductById(id)?.name).toBe('Unsaved product name');
+    expect(getInventoryPositions()[0].campaign_lock).toBe(2);
+    expect(getStockHoldHistory()).toHaveLength(1);
+  });
   it('preserves unsaved product edits and adjusted stock when product details are later saved', async () => {
     mount(); await ready();
     const name = screen.getByDisplayValue(product.name);
@@ -83,6 +105,7 @@ describe('stock adjustments without leaving Product Master', () => {
   it('does not expose adjustment actions for a viewer or external warehouse', async () => {
     mount('&mode=viewer'); await ready();
     expect(screen.queryByRole('button', { name: /^Adjust stock/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Manage holds/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add stock location' })).not.toBeInTheDocument();
     cleanup(); mount();
     expect(screen.queryByRole('button', { name: 'Adjust stock at Fulfillment By Amazon Japan' })).not.toBeInTheDocument();
@@ -105,7 +128,7 @@ describe('stock adjustments without leaving Product Master', () => {
     mount(); await ready();
     fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Still editing this product' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add stock location' }));
-    const dialog = within(screen.getByRole('dialog', { name: 'Add stock location' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Record initial stock' }));
     expect(within(dialog.getByLabelText('Warehouse')).getAllByRole('option').map(option => option.textContent)).toEqual(['Select a warehouse', 'Vietnam 3PL Partner']);
     expect(dialog.getByRole('button', { name: 'Save location & stock' })).toBeDisabled();
     fireEvent.change(dialog.getByLabelText('Warehouse'), { target: { value: 'wh_3plvn' } });

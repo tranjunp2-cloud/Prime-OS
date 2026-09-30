@@ -7,6 +7,19 @@ import type { ListingPricing } from './pricing-rules';
 
 export type ProductType = 'single' | 'variant';
 
+export type StockTransferRecord = {
+  id: string;
+  sku: string;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  quantity: number;
+  fromBefore: number;
+  fromAfter: number;
+  toBefore: number | null;
+  toAfter: number;
+  createdAt: string;
+};
+
 export interface Sku {
   id: string;
   sku_code: string;
@@ -191,6 +204,7 @@ export interface Product {
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
 
   inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number | null; after: number; reason: string; createdAt: string }>;
+  inventory_transfers?: StockTransferRecord[];
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
@@ -706,6 +720,7 @@ function normalizeStoredProduct(product: Product): Product {
     meta_description: typeof product.meta_description === 'string' ? product.meta_description : '',
     specifications,
     inventory_adjustments: Array.isArray(product.inventory_adjustments) ? product.inventory_adjustments : [],
+    inventory_transfers: Array.isArray(product.inventory_transfers) ? product.inventory_transfers : [],
     inventory: product.inventory && typeof product.inventory === 'object' && !Array.isArray(product.inventory) ? normalizeDemoStockLocations(product.inventory) : {},
     has_variants: Boolean(product.has_variants),
     channels: Array.isArray(product.channels) ? product.channels : [],
@@ -897,9 +912,12 @@ export function addProduct(p: Product): void {
   persistProducts();
 }
 
-export function updateProduct(id: string, p: Partial<Product> & { id: string }): void {
-  _products = _products.map(x => x.id === id ? activateValidatedImport(normalizeStoredProduct({ ...x, ...p, ...(p.category !== undefined && p.category !== x.category && !Object.prototype.hasOwnProperty.call(p, 'categoryId') ? { categoryId: undefined } : {}), updated_at: new Date().toISOString() })) : x);
-  persistProducts();
+export function updateProduct(id: string, p: Partial<Product> & { id: string }, options?: { requirePersistence?: boolean }): void {
+  const next = _products.map(x => x.id === id ? activateValidatedImport(normalizeStoredProduct({ ...x, ...p, ...(p.category !== undefined && p.category !== x.category && !Object.prototype.hasOwnProperty.call(p, 'categoryId') ? { categoryId: undefined } : {}), updated_at: new Date().toISOString() })) : x);
+  // Stock transfers must persist the count and its audit record together before changing live state.
+  if (options?.requirePersistence && typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
+  _products = next;
+  if (!options?.requirePersistence) persistProducts();
 }
 
 export function deleteProduct(id: string): void {

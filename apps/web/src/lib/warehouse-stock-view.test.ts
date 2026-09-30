@@ -32,11 +32,24 @@ describe('warehouse stock semantics', () => {
       expect(single.inventory).toEqual({ wh_crjp: 3 });
     }
   });
-  it('rejects initialization for existing balances, external locations, variants and invalid counts', () => {
+  it('records an initial variant count, totals recorded siblings and preserves unknown balances', () => {
+    const missing = { ...product, inventory: { wh_crjp: 999 }, skus: [product.skus[0], { ...product.skus[1], stock_by_location: {} }] };
+    for (const quantity of [0, 8]) {
+      const next = initializeProductStockLocation(missing, 'wh_crjp', quantity, 'B');
+      expect(next.skus[0]).toBe(missing.skus[0]);
+      expect(next.skus[1].stock_by_location).toEqual({ wh_crjp: quantity });
+      expect(next.inventory.wh_crjp).toBe(5 + quantity);
+      expect(next.inventory.wh_rslsg).toBeUndefined();
+      expect(missing.skus[1].stock_by_location).toEqual({});
+    }
+  });
+  it('rejects initialization for existing balances, external locations, missing SKUs and invalid counts', () => {
     const single = { ...product, has_variants: false, inventory: { wh_crjp: 0 } };
     expect(() => initializeProductStockLocation(single, 'wh_crjp', 2)).toThrow(/already recorded/);
     for (const warehouseId of ['wh_fbajp', 'wh_fbsmy', 'unknown']) expect(() => initializeProductStockLocation(single, warehouseId, 2)).toThrow(/editable warehouse/);
     expect(() => initializeProductStockLocation(product, 'wh_3plvn', 2)).toThrow(/variant SKU/);
+    expect(() => initializeProductStockLocation(product, 'wh_crjp', 2, 'B')).toThrow(/already recorded/);
+    expect(() => initializeProductStockLocation(product, 'wh_3plvn', 2, 'wrong')).toThrow(/variant SKU/);
     for (const quantity of [-1, 0.5, NaN, Infinity]) expect(() => initializeProductStockLocation(single, 'wh_3plvn', quantity)).toThrow(/whole number/);
   });
 });

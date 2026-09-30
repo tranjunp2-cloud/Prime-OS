@@ -511,7 +511,10 @@ function seedInventory() {
       const perSkuOnHand = splitEvenly(totalOnHand, productSkus.length);
 
       productSkus.forEach((sku, skuIndex) => {
-        const onHand = perSkuOnHand[skuIndex] ?? 0;
+        const variantCount = product.skus.find(item => item.id === sku.skuId)?.stock_by_location?.[warehouseId];
+        // A variant position must use its own recorded count, never a share of the parent total.
+        if (product.has_variants && typeof variantCount !== 'number') return;
+        const onHand = product.has_variants ? variantCount! : perSkuOnHand[skuIndex] ?? 0;
         const reservedUnpaid = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.10 : 0.04)));
         const reservedPaid = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.08 : 0.04)));
         const allocated = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.05 : 0.02)));

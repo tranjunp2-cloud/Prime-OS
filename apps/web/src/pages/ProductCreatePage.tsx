@@ -44,6 +44,7 @@ import { ApplyMasterSheet } from '@/components/products/ApplyMasterSheet';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { getProductAttentionTarget } from '@/lib/product-attention-navigation';
 import { AdjustWarehouseStockDialog } from '@/components/inventory/AdjustWarehouseStockDialog';
+import { ManageStockHoldsButton } from '@/components/inventory/ManageStockHoldsDialog';
 import type { StockAdjustmentTarget } from '@/components/inventory/WarehouseStockTable';
 import { canEditWarehouseStock, recordedQuantity } from '@/lib/warehouse-stock-view';
 import { initialListingPricing, quoteListingPrice, pricingNeedsReview, formatPrice } from '@/lib/pricing-rules';
@@ -2940,6 +2941,7 @@ export default function ProductCreatePage() {
     return <div className="flex flex-wrap items-center justify-end gap-2 text-right">
       <span className="text-sm font-semibold tabular-nums">{value === undefined ? 'Not recorded' : `${value.toLocaleString()} units`}</span>
       {!writable ? <span className="text-xs text-muted-foreground">Read only</span> : needsSave ? <span className="text-xs text-muted-foreground">Save variant first</span> : canWrite && <Button type="button" variant="outline" size="sm" className="min-h-9" aria-label={`Adjust stock at ${getWarehouses().find(warehouse => warehouse.id === warehouseId)?.name}${item ? ` for ${item.key}` : ''}`} onClick={() => openStockAdjustment(warehouseId, item)}>Adjust stock</Button>}
+      {existingProduct && canWrite && writable && !needsSave && <ManageStockHoldsButton product={existingProduct} warehouseId={warehouseId} sku={saved?.sku_code} />}
     </div>;
   }
 

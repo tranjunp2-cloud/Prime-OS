@@ -2,6 +2,8 @@
 // Replaces Supabase queries for inventory positions
 // Phase 1.5: 5-state operational model per livecommerce research
 
+import { restoreStockHolds } from './stock-hold-history';
+
 export interface InventoryPosition {
   id: string;
   sku_id: string;
@@ -31,6 +33,12 @@ export interface ATPComponents {
 }
 
 let _positions: InventoryPosition[] = [];
+const listeners = new Set<() => void>();
+export function subscribeInventory(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+function notifyInventory() { listeners.forEach(listener => listener()); }
 
 export function getInventoryPositions(): InventoryPosition[] {
   return _positions;
@@ -80,15 +88,18 @@ export function getATPBySkuWarehouse(skuId: string, warehouseId: string): number
 }
 
 export function addInventoryPosition(p: InventoryPosition): void {
-  _positions = [..._positions, p];
+  _positions = [..._positions, restoreStockHolds(p)];
+  notifyInventory();
 }
 
 export function clearInventoryStore(): void {
   _positions = [];
+  notifyInventory();
 }
 
 export function updatePosition(id: string, updates: Partial<InventoryPosition>): void {
   _positions = _positions.map(p => p.id === id ? { ...p, ...updates, version: p.version + 1 } : p);
+  notifyInventory();
 }
 
 export function optimisticReserve(skuId: string, warehouseId: string, qty: number, expectedVersion: number): boolean {
@@ -114,6 +125,7 @@ export function optimisticReserve(skuId: string, warehouseId: string, qty: numbe
     updated_at: new Date().toISOString(),
   };
   _positions = updated;
+  notifyInventory();
   return true;
 }
 
@@ -129,6 +141,7 @@ export function confirmReservation(skuId: string, warehouseId: string, qty: numb
       }
       : p
   );
+  notifyInventory();
 }
 
 export function releaseReservation(skuId: string, warehouseId: string, qty: number): void {
@@ -142,6 +155,7 @@ export function releaseReservation(skuId: string, warehouseId: string, qty: numb
       }
       : p
   );
+  notifyInventory();
 }
 
 export function allocateStock(skuId: string, warehouseId: string, qty: number): void {
@@ -156,6 +170,7 @@ export function allocateStock(skuId: string, warehouseId: string, qty: number): 
       }
       : p
   );
+  notifyInventory();
 }
 
 export function deductStock(skuId: string, warehouseId: string, qty: number): void {
@@ -164,4 +179,5 @@ export function deductStock(skuId: string, warehouseId: string, qty: number): vo
       ? { ...p, on_hand: Math.max(0, (p.on_hand ?? 0) - qty), version: p.version + 1 }
       : p
   );
+  notifyInventory();
 }

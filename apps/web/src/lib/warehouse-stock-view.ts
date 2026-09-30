@@ -24,12 +24,18 @@ export function canEditWarehouseStock(id: string): boolean {
 }
 
 /** Record a first count without treating an unknown balance as zero or a stock movement. */
-export function initializeProductStockLocation(product: Product, warehouseId: string, quantity: number): Product {
+export function initializeProductStockLocation(product: Product, warehouseId: string, quantity: number, skuCode?: string): Product {
   if (!canEditWarehouseStock(warehouseId) || getWarehouseById(warehouseId)?.status !== 'active') throw new Error('Choose an active, editable warehouse.');
-  if (product.has_variants) throw new Error('Record stock for each variant SKU instead.');
-  if (recordedQuantity(product.inventory[warehouseId]) !== null) throw new Error('Stock is already recorded at this location. Use Adjust stock instead.');
+  const variant = product.has_variants ? product.skus.find(sku => sku.sku_code === skuCode) : undefined;
+  if (product.has_variants && !variant) throw new Error('Choose a variant SKU to record stock.');
+  const inventory = variant ? variant.stock_by_location ?? {} : product.inventory;
+  if (recordedQuantity(inventory[warehouseId]) !== null) throw new Error('Stock is already recorded at this location. Use Adjust stock instead.');
   if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error('Enter a whole number of 0 or more.');
-  return { ...product, inventory: { ...product.inventory, [warehouseId]: quantity } };
+  if (!variant) return { ...product, inventory: { ...inventory, [warehouseId]: quantity } };
+  const skus = product.skus.map(sku => sku.id === variant.id ? { ...sku, stock_by_location: { ...inventory, [warehouseId]: quantity } } : sku);
+  const next = { ...product, skus, inventory: { ...product.inventory } };
+  next.inventory[warehouseId] = stockAt(next, warehouseId).quantity!;
+  return next;
 }
 export const channelNames: Record<string, string> = { shopee: 'Shopee', lazada: 'Lazada', amazon: 'Amazon', tiktok: 'TikTok Shop', rakuten: 'Rakuten', website: 'Website', pos: 'POS', social: 'Social' };
 export const activeChannels = (product: Product) => [...new Set(product.channels.filter(channel => channel.status === 'active').map(channel => channel.channel))];

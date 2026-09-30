@@ -1,6 +1,9 @@
 import { AdjustWarehouseStockDialog } from '@/components/inventory/AdjustWarehouseStockDialog';
+import { ManageStockHoldsDialog } from '@/components/inventory/ManageStockHoldsDialog';
+import { StockActivityDrawer } from '@/components/inventory/StockActivityDrawer';
+import { recordWarehouseTransfer, type StockTransferInput } from '@/lib/warehouse-transfers';
 import type { StockAdjustmentTarget } from '@/components/inventory/WarehouseStockTable';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -12,14 +15,12 @@ import {
   Check,
   Info,
   ClipboardCheck,
-  Clock3,
   Link2,
   MapPin,
   MoreHorizontal,
   Plus,
   Search,
   ShieldCheck,
-  Truck,
   Warehouse as WarehouseIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,13 +32,16 @@ import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { MyWarehouses } from '@/components/inventory/MyWarehouses';
-import { applyWarehouseStockChange, canEditWarehouseStock, recordedQuantity } from '@/lib/warehouse-stock-view';
+import { canEditWarehouseStock, recordedQuantity } from '@/lib/warehouse-stock-view';
 import { getWarehouses, addWarehouse } from '@/lib/warehouse-store';
-import { getProducts, updateProduct, type Product } from '@/lib/product-store';
+import { getProducts, type Product } from '@/lib/product-store';
 import { getProductImage } from '@/lib/constants';
+import { getInventoryPositions, subscribeInventory } from '@/lib/inventory-store';
+import { warehouseAvailability, type AvailabilitySummary } from '@/lib/warehouse-availability';
+import { AvailabilityMetrics, InventoryAmount, StockGuide } from '@/components/inventory/StockAvailability';
 
 type MappingTab = 'channel' | 'physical';
-type StockTransferPayload = { type: 'transfer'; productId: string; sku: string; from: string; to: string; quantity: number };
+type StockTransferPayload = StockTransferInput;
 
 type PhysicalWarehouse = {
   id: string;
@@ -46,13 +50,8 @@ type PhysicalWarehouse = {
   address: string;
   region: string;
   type: 'Self-managed' | '3PL / Marketplace';
-  skus: number;
-  onHand: number;
-  reserved: number;
-  inTransit: number;
-  damaged: number;
-  safety: number;
-  channels: string[];
+  stock?: AvailabilitySummary;
+  channels?: string[];
   rank: number;
   role: string;
 };
@@ -66,34 +65,19 @@ const channelLocations = [
   { channel: 'Rakuten', mark: 'R', tone: 'text-red-600', location: 'Rakuten Tokyo Store', linked: null, pickup: false, returns: true },
 ];
 
-const inventoryMetrics = [
-  { skus: 1240, onHand: 52140, reserved: 5840, inTransit: 1860, damaged: 245, safety: 1100, channels: ['PW', 'A'], role: 'Primary' },
-  { skus: 986, onHand: 36720, reserved: 3980, inTransit: 2400, damaged: 184, safety: 900, channels: ['POS'], role: 'Regional' },
-  { skus: 742, onHand: 22480, reserved: 2630, inTransit: 970, damaged: 112, safety: 900, channels: ['S'], role: 'Marketplace' },
-  { skus: 318, onHand: 5480, reserved: 780, inTransit: 340, damaged: 35, safety: 420, channels: ['L'], role: '3PL' },
-  { skus: 684, onHand: 18940, reserved: 2140, inTransit: 620, damaged: 76, safety: 700, channels: ['A'], role: 'Marketplace' },
-];
-const initialWarehouses: PhysicalWarehouse[] = getWarehouses().map((warehouse, index) => {
-  const metrics = inventoryMetrics[index] ?? inventoryMetrics[0];
-  return { id: warehouse.id, name: warehouse.name, code: warehouse.code, address: warehouse.address ?? 'Address managed by marketplace', region: warehouse.country, type: warehouse.type === 'internal' ? 'Self-managed' : '3PL / Marketplace', ...metrics, rank: index + 1 };
-});
-
-const transfers = [
-  { id: 'TRF-2026-0084', from: 'HCM Central', to: 'Hanoi Hub', skus: 18, units: 640, status: 'In transit', eta: 'Aug 14, 16:00' },
-  { id: 'TRF-2026-0083', from: 'Binh Duong DC', to: 'District 1 Branch', skus: 7, units: 124, status: 'Awaiting dispatch', eta: 'Aug 13, 18:30' },
-  { id: 'TRF-2026-0082', from: 'Hanoi Hub', to: 'HCM Central', skus: 12, units: 310, status: 'Received', eta: 'Aug 12, 10:20' },
-];
-
-
-
-const getAtp = (warehouse: PhysicalWarehouse) => Math.max(0, warehouse.onHand - warehouse.reserved - warehouse.safety);
+const initialWarehouses: PhysicalWarehouse[] = getWarehouses().map((warehouse, index) => ({
+  id: warehouse.id, name: warehouse.name, code: warehouse.code,
+  address: warehouse.address ?? 'Address managed by marketplace', region: warehouse.country,
+  type: warehouse.type === 'internal' ? 'Self-managed' : '3PL / Marketplace',
+  rank: index + 1, role: index === 0 ? 'Primary' : 'Backup',
+}));
 
 const stockDefinitions: Record<string, string> = {
   'On Hand': 'Total units physically recorded at the warehouse, including units already reserved for orders.',
   Reserved: 'Units allocated to open orders and therefore unavailable for new sales.',
   'Safety Stock': 'Buffer units withheld from sales to reduce overselling and fulfillment risk.',
-  ATP: 'Available to Promise: units that can be sold now. Calculated as On Hand − Reserved − Safety Stock.',
-  'Available to Promise': 'Units available for new orders. Calculated as On Hand − Reserved − Safety Stock.',
+  ATP: 'Available to Promise: units that can be sold now. Calculated per SKU and location as On Hand − Order Holds − Other Holds.',
+  'Available to Promise': 'Units available for new orders. Calculated per SKU and location as On Hand − Order Holds − Other Holds.',
   'In Transit': 'Units moving between warehouses that have not yet been received at the destination.',
   Damaged: 'Units marked damaged or quarantined. These units are not sellable and are excluded from ATP.',
   'Damaged / Quarantine': 'Units marked damaged or awaiting inspection. These units are not sellable and are excluded from ATP.',
@@ -117,47 +101,56 @@ export default function Warehouses() {
   const [createOpen, setCreateOpen] = useState(false);
   const [adjustmentTarget, setAdjustmentTarget] = useState<Partial<StockAdjustmentTarget> | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [returnToHistory, setReturnToHistory] = useState(false);
+  const [holdActionOpen, setHoldActionOpen] = useState(false);
+  const [recentActivityId, setRecentActivityId] = useState<string | null>(null);
+  const finishAction = (recordId?: string) => {
+    if (recordId) setRecentActivityId(recordId);
+    if (returnToHistory) setHistoryOpen(true);
+    setReturnToHistory(false);
+  };
   const [detailWarehouse, setDetailWarehouse] = useState<PhysicalWarehouse | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [warehouses, setWarehouses] = useState(initialWarehouses);
+  const [warehouseDirectory, setWarehouses] = useState(initialWarehouses);
+  const positions = useSyncExternalStore(subscribeInventory, getInventoryPositions, getInventoryPositions);
   const [products, setProducts] = useState(() => getProducts());
 
+  const warehouses = useMemo(() => warehouseDirectory.map(warehouse => ({ ...warehouse, stock: warehouseAvailability(products, [warehouse.id], positions) })), [warehouseDirectory, products, positions]);
   const filteredWarehouses = useMemo(() => warehouses.filter((warehouse) => !search || `${warehouse.name} ${warehouse.code} ${warehouse.address} ${warehouse.region} ${warehouse.type}`.toLowerCase().includes(search.toLowerCase())), [search, warehouses]);
-  return <TooltipProvider delayDuration={150}><div className="space-y-5 p-4 md:p-6">
+  return <TooltipProvider delayDuration={150}><div className="min-w-0 space-y-5 overflow-x-clip p-4 md:p-6">
     <WorkspacePageHeader
       title="My warehouses"
       description="Your locations, products and linked shops — in one place."
       icon={WarehouseIcon}
-      actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setHistoryOpen(true)}><ArrowRightLeft className="size-4" />Stock actions &amp; history</Button><Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Add warehouse</Button></div>}
+      actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setHistoryOpen(true)}><ArrowRightLeft className="size-4" />Stock activity</Button><Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Add warehouse</Button></div>}
     />
 
-    <><MyWarehouses onAdjustStock={setAdjustmentTarget} warehouses={warehouses} products={products} initialSearch={new URLSearchParams(location.search).get('sku') ?? ''} /><details className="rounded-xl border border-border bg-card p-4"><summary className="cursor-pointer py-2 text-sm font-semibold">Advanced warehouse settings</summary><div className="mt-4"><MappingSection mappingTab={mappingTab} setMappingTab={setMappingTab} warehouses={warehouses} filteredWarehouses={filteredWarehouses} search={search} setSearch={setSearch} onOpenWarehouse={setDetailWarehouse} onLink={(locationName) => toast({ title: 'Warehouse linker opened', description: `Select a physical node for ${locationName}.` })} /></div></details></>
-    <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-4xl">
-        <SheetHeader><SheetTitle>Stock actions &amp; history</SheetTitle><SheetDescription>Transfer stock or record an adjustment without leaving your warehouses.</SheetDescription></SheetHeader>
-        <div className="mt-6 space-y-8">
-          <TransferList onCreate={() => { setHistoryOpen(false); setTransferOpen(true); }} />
-          <AdjustmentList products={products} warehouses={warehouses} onCreate={() => { setHistoryOpen(false); setAdjustmentTarget({}); }} />
-        </div>
-      </SheetContent>
-    </Sheet>
+    <><MyWarehouses positions={positions} onAdjustStock={setAdjustmentTarget} warehouses={warehouses} products={products} initialSearch={new URLSearchParams(location.search).get('sku') ?? ''} /><details className="rounded-xl border border-border bg-card p-4"><summary className="cursor-pointer py-2 text-sm font-semibold">Advanced warehouse settings</summary><div className="mt-4"><MappingSection mappingTab={mappingTab} setMappingTab={setMappingTab} warehouses={warehouses} filteredWarehouses={filteredWarehouses} search={search} setSearch={setSearch} onOpenWarehouse={setDetailWarehouse} onLink={(locationName) => toast({ title: 'Warehouse linker opened', description: `Select a physical node for ${locationName}.` })} /></div></details></>
+    <StockActivityDrawer open={historyOpen} onOpenChange={setHistoryOpen} products={products} warehouses={warehouses} recentId={recentActivityId} onNewAction={action => {
+      setHistoryOpen(false);
+      setReturnToHistory(true);
+      if (action === 'transfer') setTransferOpen(true);
+      else if (action === 'adjustment') setAdjustmentTarget({});
+      else setHoldActionOpen(true);
+    }} />
+    {holdActionOpen && <ManageStockHoldsDialog products={products} onClose={() => { setHoldActionOpen(false); finishAction(); }} onSaved={recordId => {
+      setHoldActionOpen(false); finishAction(recordId); toast({ title: 'Holds updated', description: 'The change was saved in stock activity.' });
+    }} />}
 
-    {adjustmentTarget && <AdjustWarehouseStockDialog target={adjustmentTarget} products={products} warehouses={warehouses} onClose={() => { setAdjustmentTarget(null); setProducts(getProducts()); }} onSaved={() => { setProducts(getProducts()); setAdjustmentTarget(null); toast({ title: 'Stock adjustment recorded', description: 'Stock totals and adjustment history have been updated.' }); }} />}
+    {adjustmentTarget && <AdjustWarehouseStockDialog lockProduct={Boolean(adjustmentTarget.product)} initializeLocation={adjustmentTarget.initializeLocation} target={adjustmentTarget} products={products} warehouses={warehouses} onClose={() => { setAdjustmentTarget(null); setProducts(getProducts()); finishAction(); }} onSaved={recordId => { setProducts(getProducts()); setAdjustmentTarget(null); finishAction(recordId); toast({ title: 'Stock adjustment recorded', description: 'Stock totals and adjustment history have been updated.' }); }} />}
     <CreateWarehouseDrawer open={createOpen} onClose={() => setCreateOpen(false)} onCreate={(warehouse) => {
       const saved = addWarehouse({ name: warehouse.name, code: warehouse.code, address: warehouse.address, country: 'VN', type: 'internal', is_virtual: false, capabilities: [], status: 'active' });
-      setWarehouses((current) => [...current, { ...warehouse, id: saved.id, type: 'Self-managed', skus: 0, onHand: 0, reserved: 0, inTransit: 0, damaged: 0, safety: 0, channels: [], role: warehouse.rank === 1 ? 'Primary' : 'Backup' }]);
+      setWarehouses((current) => [...current, { ...warehouse, id: saved.id, type: 'Self-managed', role: warehouse.rank === 1 ? 'Primary' : 'Backup' }]);
       setCreateOpen(false);
       toast({ title: 'Physical warehouse added', description: `${warehouse.name} is ready to link to sales channels.` });
     }} />
-    <WarehouseDetailDrawer warehouse={detailWarehouse} onClose={() => setDetailWarehouse(null)} onTransfer={() => { setDetailWarehouse(null); setTransferOpen(true); }} onAdjust={() => { setAdjustmentTarget({ warehouse: detailWarehouse ?? undefined }); setDetailWarehouse(null); }} />
-    {transferOpen && <TransferStockDrawer warehouses={warehouses} products={products} onClose={() => setTransferOpen(false)} onSubmit={(payload) => {
-      const product = getProducts().find((item) => item.id === payload.productId);
-      if (!product) return;
+    <WarehouseDetailDrawer warehouse={warehouses.find(warehouse => warehouse.id === detailWarehouse?.id) ?? null} onClose={() => setDetailWarehouse(null)} onTransfer={() => { setDetailWarehouse(null); setTransferOpen(true); }} onAdjust={() => { setAdjustmentTarget({ warehouse: detailWarehouse ?? undefined }); setDetailWarehouse(null); }} />
+    {transferOpen && <TransferStockDrawer warehouses={warehouses} products={products} onClose={() => { setTransferOpen(false); finishAction(); }} onSubmit={(payload) => {
       try {
-        const next = applyWarehouseStockChange(product, payload);
-        updateProduct(product.id, { id: product.id, inventory: next.inventory, skus: next.skus });
+        const record = recordWarehouseTransfer(payload);
         setProducts(getProducts());
         setTransferOpen(false);
+        finishAction(record.id);
         toast({ title: 'Stock transfer recorded', description: 'Recorded SKU quantities were updated. Channel quantities were not changed.' });
       } catch (error) {
         toast({ title: 'Stock was not changed', description: error instanceof Error ? error.message : 'Check the selected SKU and warehouses.', variant: 'destructive' });
@@ -169,7 +162,7 @@ export default function Warehouses() {
 function MappingSection({ mappingTab, setMappingTab, warehouses, filteredWarehouses, search, setSearch, onOpenWarehouse, onLink }: { mappingTab: MappingTab; setMappingTab: (tab: MappingTab) => void; warehouses: PhysicalWarehouse[]; filteredWarehouses: PhysicalWarehouse[]; search: string; setSearch: (value: string) => void; onOpenWarehouse: (warehouse: PhysicalWarehouse) => void; onLink: (name: string) => void }) {
   const [routingRules, setRoutingRules] = useState({ geographic: true, fallback: true, split: false });
   return <div className="space-y-4">
-    <div><h2 className="text-lg font-semibold text-slate-900">Warehouse Mapping & Routing</h2><p className="mt-1 text-sm text-slate-500">Connect channel locations to physical nodes and define fulfillment priority.</p></div>
+    <div><h2 className="text-lg font-semibold text-slate-900">Warehouse Mapping & Routing</h2><p className="mt-1 text-sm text-slate-500">Demo routing setup. Stock balances use the same records as the overview.</p></div>
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Warehouse mapping type">
       {[{ key: 'channel' as const, label: 'Channel Locations', count: channelLocations.length }, { key: 'physical' as const, label: 'Physical Warehouses', count: warehouses.length }].map((item) => <button key={item.key} type="button" onClick={() => setMappingTab(item.key)} className={cn('relative min-h-11 shrink-0 px-4 text-sm font-semibold transition-colors', mappingTab === item.key ? 'text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-slate-500 hover:text-slate-900')}>{item.label}<span className={cn('ml-2 text-xs tabular-nums', mappingTab === item.key ? 'text-primary/75' : 'text-slate-400')}>{item.count}</span></button>)}
     </nav>
@@ -194,29 +187,12 @@ function MappingSection({ mappingTab, setMappingTab, warehouses, filteredWarehou
 }
 
 function PhysicalWarehouseTable({ warehouses, onOpen }: { warehouses: PhysicalWarehouse[]; onOpen: (warehouse: PhysicalWarehouse) => void }) {
-  return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[1180px] text-left"><TableHead headers={['Physical Warehouse', 'Address & Type', 'Stock Breakdown', 'Linked Channels', 'Priority', 'Actions']} /><tbody className="divide-y divide-slate-100">{warehouses.map((warehouse) => <tr key={warehouse.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => onOpen(warehouse)}><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-indigo-50 text-indigo-600"><Building2 className="size-4" /></span><div><p className="text-sm font-semibold text-slate-900">{warehouse.name}</p><p className="mt-1 font-mono text-xs font-semibold text-slate-500">{warehouse.code}</p></div></div></td><td className="max-w-[280px] px-4 py-3"><p className="text-sm font-medium text-slate-700">{warehouse.address}</p><div className="mt-1 flex items-center gap-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><MapPin className="size-3" />{warehouse.region}</span><span>·</span><span>{warehouse.type}</span></div></td><td className="px-4 py-3"><p className="text-sm font-semibold tabular-nums text-slate-900">{getAtp(warehouse).toLocaleString()} ATP</p><p className="mt-1 text-xs tabular-nums text-slate-500">{warehouse.onHand.toLocaleString()} on hand · {warehouse.reserved.toLocaleString()} reserved</p></td><td className="px-4 py-3"><div className="flex -space-x-1">{warehouse.channels.map((mark) => <span key={mark} className="grid size-8 place-items-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-600">{mark}</span>)}</div></td><td className="px-4 py-3"><span className={cn('inline-flex rounded-md border px-2 py-1 text-xs font-semibold', warehouse.rank === 1 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600')}>#{warehouse.rank} {warehouse.role}</span></td><td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" className="size-9 text-indigo-700" onClick={() => onOpen(warehouse)} aria-label={`View ${warehouse.name}`}><ArrowRight className="size-4" /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="size-9" aria-label={`More actions for ${warehouse.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onOpen(warehouse)}>View warehouse details</DropdownMenuItem><DropdownMenuItem>Manage channel links</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-rose-600">Deactivate warehouse</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div></td></tr>)}</tbody></table></div>{warehouses.length === 0 && <EmptyState title="No matching warehouses found" />}</section>;
-}
-
-function TransferList({ onCreate }: { onCreate: () => void }) {
-  return <div className="space-y-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold text-slate-900">Stock Transfers</h2><p className="mt-1 text-sm text-slate-500">Track dispatch, in-transit, and receiving milestones between locations.</p></div><Button onClick={onCreate}><Plus className="size-4" />Transfer Stock</Button></div><section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><TableHead headers={['Transfer ID', 'Route', 'Inventory', 'Status', 'Expected / Completed']} /><tbody className="divide-y divide-slate-100">{transfers.map((item) => <tr key={item.id} className="hover:bg-slate-50/60"><td className="px-4 py-4 font-mono text-xs font-semibold text-indigo-700">{item.id}</td><td className="px-4 py-4"><div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><span>{item.from}</span><ArrowRight className="size-4 text-slate-400" /><span>{item.to}</span></div></td><td className="px-4 py-4 text-sm tabular-nums text-slate-700">{item.skus} SKUs · {item.units.toLocaleString()} units</td><td className="px-4 py-4"><StatusBadge status={item.status} /></td><td className="px-4 py-4 text-sm text-slate-600">{item.eta}</td></tr>)}</tbody></table></div></section></div>;
-}
-
-function AdjustmentList({ onCreate, products, warehouses }: { onCreate: () => void; products: Product[]; warehouses: PhysicalWarehouse[] }) {
-  const adjustments = products.flatMap(product => (product.inventory_adjustments ?? []).map(item => ({ ...item, warehouse: warehouses.find(w => w.id === item.warehouseId)?.name ?? item.warehouseId, delta: item.before === null ? null : item.after - item.before, owner: 'Local demo', time: new Date(item.createdAt).toLocaleString() }))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return <div className="space-y-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold text-slate-900">Stock Adjustments</h2><p className="mt-1 text-sm text-slate-500">Saved stock changes and reasons on this device.</p></div><Button onClick={onCreate}><Plus className="size-4" />New Adjustment</Button></div><div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span className="font-semibold">Inventory control:</span> adjustments change on-hand stock and require a reason code.</div><section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><TableHead headers={['Adjustment ID', 'Warehouse', 'SKU', 'Quantity Change', 'Reason', 'Operator & Time']} rightAlignedColumns={[3]} /><tbody className="divide-y divide-slate-100">{!adjustments.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No stock adjustments yet.</td></tr>}{adjustments.map((item) => <tr key={item.id} className="hover:bg-slate-50/60"><td className="px-4 py-4 font-mono text-xs font-semibold text-indigo-700">{item.id}</td><td className="px-4 py-4 text-sm font-medium text-slate-900">{item.warehouse}</td><td className="px-4 py-4 font-mono text-xs text-slate-600">{item.sku}</td><td className={cn('px-4 py-4 text-right text-sm font-bold tabular-nums', item.delta === null ? 'text-foreground' : item.delta > 0 ? 'text-emerald-700' : 'text-rose-700')}>{item.delta === null ? 'Initial count' : `${item.delta > 0 ? '+' : ''}${item.delta}`}<p className="mt-1 text-xs font-normal text-muted-foreground">{item.before ?? 'Not recorded'} → {item.after}</p></td><td className="px-4 py-4 text-sm text-slate-700">{item.reason}</td><td className="px-4 py-4"><p className="text-sm font-medium text-slate-700">{item.owner}</p><p className="mt-1 text-xs text-slate-500">{item.time}</p></td></tr>)}</tbody></table></div></section></div>;
+  return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[1180px] text-left"><TableHead headers={['Physical Warehouse', 'Address & Type', 'Stock Breakdown', 'Linked Channels', 'Priority', 'Actions']} /><tbody className="divide-y divide-slate-100">{warehouses.map((warehouse) => <tr key={warehouse.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => onOpen(warehouse)}><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-indigo-50 text-indigo-600"><Building2 className="size-4" /></span><div><p className="text-sm font-semibold text-slate-900">{warehouse.name}</p><p className="mt-1 font-mono text-xs font-semibold text-slate-500">{warehouse.code}</p></div></div></td><td className="max-w-[280px] px-4 py-3"><p className="text-sm font-medium text-slate-700">{warehouse.address}</p><div className="mt-1 flex items-center gap-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><MapPin className="size-3" />{warehouse.region}</span><span>·</span><span>{warehouse.type}</span></div></td><td className="px-4 py-3">{warehouse.stock && <div className="space-y-1"><p className="flex items-center gap-2 text-sm"><InventoryAmount value={warehouse.stock.atp} highlight /> available to sell</p><p className="text-xs text-muted-foreground">{warehouse.stock.onHand.quantity?.toLocaleString() ?? '—'} in warehouse · {warehouse.stock.held.quantity?.toLocaleString() ?? '—'} held for orders</p></div>}</td><td className="px-4 py-3"><div className="flex -space-x-1">{!warehouse.channels && <span className="text-xs text-muted-foreground">See Locations &amp; shops</span>}{(warehouse.channels ?? []).map((mark) => <span key={mark} className="grid size-8 place-items-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-600">{mark}</span>)}</div></td><td className="px-4 py-3"><span className={cn('inline-flex rounded-md border px-2 py-1 text-xs font-semibold', warehouse.rank === 1 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600')}>#{warehouse.rank} {warehouse.role}</span></td><td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" className="size-9 text-indigo-700" onClick={() => onOpen(warehouse)} aria-label={`View ${warehouse.name}`}><ArrowRight className="size-4" /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="size-9" aria-label={`More actions for ${warehouse.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onOpen(warehouse)}>View warehouse details</DropdownMenuItem><DropdownMenuItem>Manage channel links</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-rose-600">Deactivate warehouse</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div></td></tr>)}</tbody></table></div>{warehouses.length === 0 && <EmptyState title="No matching warehouses found" />}</section>;
 }
 
 function WarehouseDetailDrawer({ warehouse, onClose, onTransfer, onAdjust }: { warehouse: PhysicalWarehouse | null; onClose: () => void; onTransfer: () => void; onAdjust: () => void }) {
   if (!warehouse) return null;
-  const metrics = [
-    ['On Hand', warehouse.onHand, 'text-slate-900'],
-    ['Reserved', warehouse.reserved, 'text-amber-700'],
-    ['ATP', getAtp(warehouse), 'text-emerald-700'],
-    ['In Transit', warehouse.inTransit, 'text-indigo-700'],
-    ['Damaged', warehouse.damaged, 'text-rose-700'],
-    ['Safety Stock', warehouse.safety, 'text-slate-700'],
-  ];
-  return <Sheet open onOpenChange={(open) => !open && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-2xl"><SheetHeader className="border-b border-slate-200 p-5"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-lg bg-indigo-50 text-indigo-700"><WarehouseIcon className="size-5" /></span><div><SheetTitle>{warehouse.name}</SheetTitle><SheetDescription>{warehouse.code} · {warehouse.type} · {warehouse.region}</SheetDescription></div></div></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-5 pb-24"><section><h3 className="text-sm font-semibold text-slate-900">Stock breakdown</h3><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{metrics.map(([label, value, tone]) => <div key={String(label)} className="rounded-lg border border-slate-200 p-3"><p className="text-xs font-medium text-slate-500">{label}</p><p className={cn('mt-1 text-xl font-bold tabular-nums', tone)}>{Number(value).toLocaleString()}</p></div>)}</div><p className="mt-2 text-xs text-slate-500">ATP = On Hand − Reserved − Safety Stock</p></section><section><h3 className="text-sm font-semibold text-slate-900">Recent inventory activity</h3><div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">{[['Inbound receipt posted', '+240 units', 'Today, 09:32'], ['Order reservations created', '-86 ATP', 'Today, 08:45'], ['Cycle count completed', '3 variances', 'Yesterday, 16:20']].map(([title, value, time]) => <div key={title} className="flex items-center justify-between gap-4 p-3"><div><p className="text-sm font-medium text-slate-800">{title}</p><p className="mt-1 text-xs text-slate-500">{time}</p></div><span className="text-sm font-semibold tabular-nums text-slate-700">{value}</span></div>)}</div></section><section className="rounded-lg border border-slate-200 p-4"><h3 className="text-sm font-semibold text-slate-900">Fulfillment configuration</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><p className="text-sm text-slate-600"><span className="block text-xs text-slate-500">Priority</span>#{warehouse.rank} {warehouse.role}</p><p className="text-sm text-slate-600"><span className="block text-xs text-slate-500">Linked channels</span>{warehouse.channels.join(', ') || 'None'}</p></div></section></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button disabled={!canEditWarehouseStock(warehouse.id)} variant="outline" onClick={onAdjust}><ClipboardCheck className="size-4" />Adjust Stock</Button><Button disabled={!canEditWarehouseStock(warehouse.id)} onClick={onTransfer}><ArrowRightLeft className="size-4" />Transfer Stock</Button></div></SheetContent></Sheet>;
+  return <Sheet open onOpenChange={(open) => !open && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-2xl"><SheetHeader className="border-b border-slate-200 p-5"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-lg bg-indigo-50 text-indigo-700"><WarehouseIcon className="size-5" /></span><div><SheetTitle>{warehouse.name}</SheetTitle><SheetDescription>{warehouse.code} · {warehouse.type} · {warehouse.region}</SheetDescription></div></div></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-5 pb-24"><section className="space-y-3"><div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">Stock breakdown</h3><StockGuide /></div>{warehouse.stock && <AvailabilityMetrics summary={warehouse.stock} />}<p className="text-xs leading-5 text-muted-foreground">Calculated from the same product counts and inventory records as the warehouse overview. Missing ATP data is not treated as zero.</p></section><section className="rounded-lg border border-slate-200 p-4"><h3 className="text-sm font-semibold text-slate-900">Fulfillment configuration</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><p className="text-sm text-slate-600"><span className="block text-xs text-slate-500">Priority</span>#{warehouse.rank} {warehouse.role}</p><p className="text-sm text-slate-600"><span className="block text-xs text-slate-500">Linked channels</span>{warehouse.channels ? warehouse.channels.join(', ') || 'None' : 'See Locations & shops'}</p></div></section></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button disabled={!canEditWarehouseStock(warehouse.id)} variant="outline" onClick={onAdjust}><ClipboardCheck className="size-4" />Adjust Stock</Button><Button disabled={!canEditWarehouseStock(warehouse.id)} onClick={onTransfer}><ArrowRightLeft className="size-4" />Transfer Stock</Button></div></SheetContent></Sheet>;
 }
 
 function TransferStockDrawer({ warehouses, products, onClose, onSubmit }: { warehouses: PhysicalWarehouse[]; products: Product[]; onClose: () => void; onSubmit: (payload: StockTransferPayload) => void }) {
@@ -232,7 +208,7 @@ function TransferStockDrawer({ warehouses, products, onClose, onSubmit }: { ware
   const parsedQuantity = Number(quantity || 0);
   const invalidQuantity = currentStock === null || !Number.isSafeInteger(parsedQuantity) || parsedQuantity <= 0 || parsedQuantity > currentStock;
   return <Sheet open onOpenChange={open => !open && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl">
-    <SheetHeader className="border-b border-slate-200 p-5"><SheetTitle>Create Stock Transfer</SheetTitle><SheetDescription>Move stock between Prime OS warehouses and keep Master Stock synchronized.</SheetDescription></SheetHeader>
+    <SheetHeader className="border-b border-slate-200 p-5"><SheetTitle>Create Stock Transfer</SheetTitle><SheetDescription>Record a completed movement between warehouses. Both stock counts update immediately.</SheetDescription></SheetHeader>
     <div className="flex-1 space-y-5 overflow-y-auto p-5 pb-24">
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700"><strong>Inventory boundary:</strong> this operation updates Warehouse Stock and Master Stock only. No channel quantity will change.</div>
       {readOnly && <p role="alert" className="text-sm text-amber-600">External or unidentified warehouse stock is read only. Choose a managed warehouse.</p>}
@@ -242,7 +218,7 @@ function TransferStockDrawer({ warehouses, products, onClose, onSubmit }: { ware
         <SelectField label="Destination Warehouse" value={to} onChange={setTo} options={warehouses.filter(warehouse => warehouse.id !== from).map(warehouse => ({ value: warehouse.id, label: warehouse.name }))} />
       </div></FormSection>
       <FormSection title="Inventory"><div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1.5 text-sm font-semibold text-slate-700">Product or SKU<Input list="inventory-product-options" value={sku} onChange={event => setSku(event.target.value)} placeholder="Search name, Master SKU, or variant SKU" /><datalist id="inventory-product-options">{products.flatMap(product => [<option key={`${product.id}-master`} value={product.sku_code}>{product.name} · Master SKU</option>, ...product.skus.map(variant => <option key={`${product.id}-${variant.id}`} value={variant.sku_code}>{product.name} · {variant.variation_name}</option>)])}</datalist></label>
+        <label className="grid gap-1.5 text-sm font-semibold text-slate-700">Product or SKU<Input aria-label="Product or SKU" list="inventory-product-options" value={sku} onChange={event => setSku(event.target.value)} placeholder="Search name, Master SKU, or variant SKU" /><datalist id="inventory-product-options">{products.flatMap(product => [<option key={`${product.id}-master`} value={product.sku_code}>{product.name} · Master SKU</option>, ...product.skus.map(variant => <option key={`${product.id}-${variant.id}`} value={variant.sku_code}>{product.name} · {variant.variation_name}</option>)])}</datalist></label>
         <Field label="Transfer Quantity" value={quantity} onChange={setQuantity} placeholder="50" />
       </div>
         {selectedProduct ? <div className="mt-3 flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50/40 p-3"><img src={getProductImage(selectedProduct.id, selectedProduct.asin)} alt="" className="size-11 rounded-lg border border-slate-200 object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{selectedProduct.name}</p><p className="mt-0.5 text-xs text-slate-500">{selectedVariant?.variation_name || 'Master product'} · {sku}</p></div><div className="text-right"><p className="text-sm font-bold tabular-nums text-slate-900">{currentStock ?? 'Not recorded'}</p><p className="text-[11px] text-slate-500">current on hand</p></div></div> : sku ? <p role="alert" className="mt-2 text-sm font-medium text-rose-700">Select a valid Product Master or variant SKU.</p> : <p className="mt-2 text-xs text-slate-500">Product name and current stock will appear after selection.</p>}
@@ -250,19 +226,13 @@ function TransferStockDrawer({ warehouses, products, onClose, onSubmit }: { ware
       </FormSection>
       {from === to && <p className="text-sm font-medium text-rose-700">Source and destination warehouses must be different.</p>}
     </div>
-    <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selectedProduct || !quantity || invalidQuantity || readOnly || needsVariant || from === to} onClick={() => selectedProduct && onSubmit({ type: 'transfer', productId: selectedProduct.id, sku, from, to, quantity: parsedQuantity })}>Create Transfer</Button></div>
+    <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selectedProduct || !quantity || invalidQuantity || readOnly || needsVariant || from === to} onClick={() => selectedProduct && onSubmit({ productId: selectedProduct.id, sku, from, to, quantity: parsedQuantity, expectedFrom: currentStock, expectedTo: recordedQuantity(selectedProduct.has_variants ? selectedVariant?.stock_by_location?.[to] : selectedProduct.inventory[to]) })}>Create Transfer</Button></div>
   </SheetContent></Sheet>;
 }
 
 function CreateWarehouseDrawer({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (warehouse: Pick<PhysicalWarehouse, 'name' | 'code' | 'address' | 'region' | 'rank'>) => void }) {
   const [name, setName] = useState(''); const [code, setCode] = useState(''); const [manager, setManager] = useState(''); const [phone, setPhone] = useState(''); const [province, setProvince] = useState('Ho Chi Minh City'); const [district, setDistrict] = useState(''); const [ward, setWard] = useState(''); const [street, setStreet] = useState(''); const [zip, setZip] = useState(''); const [rank, setRank] = useState(2); const [negative, setNegative] = useState(false);
   return <Sheet open={open} onOpenChange={(value) => !value && onClose()}><SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl"><SheetHeader className="border-b border-slate-200 p-5"><SheetTitle>Add Physical Warehouse</SheetTitle><SheetDescription>Create an inventory node and configure its fulfillment priority.</SheetDescription></SheetHeader><div className="flex-1 space-y-5 overflow-y-auto p-5 pb-24"><FormSection title="General Information"><div className="grid gap-3 sm:grid-cols-2"><Field label="Warehouse Name" value={name} onChange={setName} placeholder="HCM Central Warehouse" /><Field label="Warehouse Code" value={code} onChange={setCode} placeholder="WH-HCM-01" /><Field label="Manager" value={manager} onChange={setManager} placeholder="Nguyen Van A" /><Field label="Phone Number" value={phone} onChange={setPhone} placeholder="0901 234 567" /></div></FormSection><FormSection title="Full Address"><div className="grid gap-3 sm:grid-cols-2"><SelectField label="Province / City" value={province} onChange={setProvince} options={['Ho Chi Minh City', 'Hanoi', 'Binh Duong', 'Da Nang'].map((value) => ({ value, label: value }))} /><Field label="District" value={district} onChange={setDistrict} placeholder="District 7" /><Field label="Ward" value={ward} onChange={setWard} placeholder="Tan Phong" /><Field label="Postal Code" value={zip} onChange={setZip} placeholder="700000" /><div className="sm:col-span-2"><Field label="Street Address" value={street} onChange={setStreet} placeholder="12 Nguyen Van Linh" /></div></div></FormSection><FormSection title="Fulfillment Settings"><div className="grid gap-3 sm:grid-cols-2"><SelectField label="Dispatch Priority" value={String(rank)} onChange={(value) => setRank(Number(value))} options={[{ value: '1', label: '#1 Primary' }, { value: '2', label: '#2 Backup' }, { value: '3', label: '#3 Regional' }, { value: '4', label: '#4 Store' }]} /><label className="flex min-h-10 items-center gap-3 self-end rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700"><input type="checkbox" checked={negative} onChange={(event) => setNegative(event.target.checked)} className="size-4" />Allow Negative Stock</label></div><p className="mt-2 text-xs text-slate-500">Negative stock is currently {negative ? 'enabled' : 'disabled'}.</p></FormSection></div><div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!name || !code || !street} onClick={() => onCreate({ name, code: code.toUpperCase(), address: `${street}, ${ward}, ${district}, ${province} ${zip}`.replace(/, ,/g, ','), region: province === 'Hanoi' ? 'North' : province === 'Da Nang' ? 'Central' : 'South', rank })}>Create Physical Warehouse</Button></div></SheetContent></Sheet>;
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const tone = status === 'Received' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : status === 'In transit' ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-amber-200 bg-amber-50 text-amber-700';
-  const Icon = status === 'Received' ? Check : status === 'In transit' ? Truck : Clock3;
-  return <span className={cn('inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold', tone)}><Icon className="size-3.5" />{status}</span>;
 }
 
 function SearchField({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) { return <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 pl-9" /></div>; }
