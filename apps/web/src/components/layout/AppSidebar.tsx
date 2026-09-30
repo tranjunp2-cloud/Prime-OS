@@ -86,6 +86,7 @@ const mainNavigation: NavGroup[] = [
       { id: 'general-business-settings', label: 'General & Business', href: '/settings/general', icon: Building2 },
       { id: 'team-access-settings', label: 'Team & Access', href: '/settings/team-access', icon: UsersRound },
       { id: 'payment-settings', label: 'Payments', href: '/settings/payments', icon: CreditCard },
+      { id: 'pricing-rules-settings', label: 'Pricing rules', href: '/settings/pricing-rules', icon: BadgePercent },
       { id: 'shipping-delivery-settings', label: 'Shipping & Delivery', href: '/settings/shipping-delivery', icon: Truck },
       { id: 'customer-data-settings', label: 'Customer Data & Privacy', href: '/settings/customer-data', icon: UsersRound },
       { id: 'template-notification-settings', label: 'Templates & Notifications', href: '/settings/templates-notifications', icon: Printer },

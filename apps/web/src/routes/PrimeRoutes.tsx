@@ -22,6 +22,7 @@ import { ConnectedChannelsPage } from "@/pages/SalesChannels";
 import LiveCommercePage from "@/pages/LiveCommerce";
 import { ChannelAuthCallback } from "@/pages/ChannelAuthCallback";
 import BusinessSettings from "@/pages/BusinessSettings";
+import PricingRules from "@/pages/PricingRules";
 import InvoiceManagement from "@/pages/InvoiceManagement";
 import PromotionsManagement from "@/pages/PromotionsManagement";
 import { TouchpointWorkspace } from "@/pages/TouchpointWorkspace";
@@ -119,6 +120,7 @@ export function PrimeRoutes() {
     <Route path="/settings/team-permissions" element={<Navigate to="/settings/team-access" replace />} />
     <Route path="/settings/crm-communications" element={<Navigate to="/settings/customer-data" replace />} />
     <Route path="/settings/templates-hardware" element={<Navigate to="/settings/templates-notifications" replace />} />
+    <Route path="/settings/pricing-rules" element={<PricingRules />} />
     <Route path="/settings/*" element={<BusinessSettings />} />
     
     <Route path="/customers" element={<PrimeCrmCustomersPage />} />

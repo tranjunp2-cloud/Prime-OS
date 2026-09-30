@@ -111,4 +111,16 @@ describe('Warehouse & Inventory workspace', () => {
     expect(screen.getByRole('columnheader', { name: 'Reason' })).not.toHaveClass('text-right');
     expect(screen.getByRole('columnheader', { name: 'Operator & Time' })).not.toHaveClass('text-right');
   });
+  it('labels an initial count without pretending that unknown stock was zero', () => {
+    const original = getProducts().find(product => !product.has_variants)!;
+    try {
+      updateProduct(original.id, { id: original.id, inventory_adjustments: [{ id: 'test-initial-count', warehouseId: 'wh_crjp', sku: original.sku_code, before: null, after: 5, reason: 'Physical stock count', createdAt: new Date().toISOString() }] });
+      renderPage('/warehouses');
+      fireEvent.click(screen.getByRole('button', { name: 'Stock actions & history' }));
+      const row = screen.getByText('test-initial-count').closest('tr')!;
+      expect(within(row).getByText('Initial count')).toBeInTheDocument();
+      expect(within(row).getByText('Not recorded → 5')).toBeInTheDocument();
+      expect(within(row).queryByText('+5')).not.toBeInTheDocument();
+    } finally { updateProduct(original.id, original); }
+  });
 });

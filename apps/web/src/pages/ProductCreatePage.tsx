@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { addProduct, updateProduct, getProductById, getAllSkus, getProducts, type Product, type ChannelListing, type ProductType, type MarketPrice, type PricePolicy, type ProductAssociation, type ProductRevision } from '@/lib/product-store';
+import { addProduct, updateProduct, getProductById, getAllSkus, getProducts, type Product, type ChannelListing, type ProductType, type ProductAssociation, type ProductRevision } from '@/lib/product-store';
 import { getWarehouses } from '@/lib/warehouse-store';
 import type { AmazonVariant } from '@/lib/amazon-catalog';
 import { uploadProductImage, validateImageFile } from '@/lib/product-images';
@@ -33,7 +33,10 @@ import { formatLocalizedNumber, formatMessage } from '@/lib/i18n/format';
 import { cn } from '@/lib/utils';
 import { ChannelListingWizard, type ChannelWizardDraft, type ExistingListingMatchData } from '@/components/products/ChannelListingWizard';
 import { ChannelListingEditorDrawer } from '@/components/products/ChannelListingEditorDrawer';
-import { getActiveCatalogBrands, getActiveCatalogCategories, getAttributesForCategory, getProductCatalogSettings, saveProductCatalogSettings, getActiveOrgLocales, type CatalogAttribute, type CatalogBrand, type OrgLocaleConfig } from '@/lib/product-catalog-settings-store';
+import { getActiveCatalogBrands, getActiveCatalogCategories, getAttributesForCategory, getProductCatalogSettings, saveProductCatalogSettings, getActiveOrgLocales, resolveCatalogCategory, type CatalogAttribute, type CatalogBrand, type OrgLocaleConfig } from '@/lib/product-catalog-settings-store';
+import { assignedCategoryAttributes, categorySchemaDiff, missingCategoryAttributes, reconcileSpecifications, retainedSpecifications, serializeSpecifications } from '@/lib/category-schema';
+import { rakutenBrandSuggestion } from '@/lib/brand-marketplace-demo';
+import { CategorySchemaChanges } from '@/components/products/CategorySchemaChanges';
 import { canonicalizeLocale, validateAttributeLocale } from '@/lib/locale-utils';
 import { CHANNEL_MARKET_LOCALES } from '@/lib/channel-market-locale';
 import { getCatalogImportItems } from '@/lib/catalog-import-store';
@@ -42,7 +45,9 @@ import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { getProductAttentionTarget } from '@/lib/product-attention-navigation';
 import { AdjustWarehouseStockDialog } from '@/components/inventory/AdjustWarehouseStockDialog';
 import type { StockAdjustmentTarget } from '@/components/inventory/WarehouseStockTable';
-import { canEditWarehouseStock } from '@/lib/warehouse-stock-view';
+import { canEditWarehouseStock, recordedQuantity } from '@/lib/warehouse-stock-view';
+import { initialListingPricing, quoteListingPrice, pricingNeedsReview, formatPrice } from '@/lib/pricing-rules';
+import { usePricingRevision } from '@/hooks/use-pricing';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -85,7 +90,7 @@ function resolveProductWorkspace(value: string | null): ProductWorkspace {
 }
 
 function completionWorkspaceFor(checkId: string): { id: ProductWorkspace; label: string } {
-  if (['identity', 'content', 'category', 'media', 'shipping'].includes(checkId)) return { id: 'product-data', label: 'Product data' };
+  if (['identity', 'content', 'category', 'attributes', 'media', 'shipping'].includes(checkId)) return { id: 'product-data', label: 'Product data' };
   if (['price', 'variants'].includes(checkId)) return { id: 'commerce', label: 'Pricing & Inventory' };
   return { id: 'distribution', label: 'Sales Channels' };
 }
@@ -103,6 +108,7 @@ interface FormState {
   product_type: ProductType;     // single | configurable variants
   description: string;
   category: string;
+  categoryId: string;
   condition: string;
   original_price: string;
   retail_price: string;
@@ -208,35 +214,10 @@ const WORLD_CURRENCIES: { code: string; name: string }[] = [
 ];
 /** Legacy 5-currency shortlist kept for the canonical price currency selector */
 const CURRENCIES = ['JPY', 'USD', 'SGD', 'MYR', 'VND'];
-// Price policy helpers
-const EMPTY_POLICY: Omit<PricePolicy, 'id' | 'name' | 'code'> = {
-  targetCurrency: 'USD', fxRate: 1, fxValidityHours: 0,
-  adjustmentPct: 0, marketplaceFeePct: 0, taxPct: 0,
-  roundingIncrement: 0.01, minPrice: 0, maxPrice: 0, enabled: true,
-};
-
-function computeEffectivePrice(basePrice: number, policy: PricePolicy): number {
-  if (!basePrice || !policy.fxRate) return 0;
-  let price = basePrice * policy.fxRate
-    * (1 + policy.adjustmentPct / 100)
-    * (1 + policy.marketplaceFeePct / 100)
-    * (1 + policy.taxPct / 100);
-  if (policy.roundingIncrement > 0) {
-    price = Math.floor(price / policy.roundingIncrement) * policy.roundingIncrement;
-  }
-  if (policy.minPrice > 0) price = Math.max(price, policy.minPrice);
-  if (policy.maxPrice > 0) price = Math.min(price, policy.maxPrice);
-  return Math.round(price * 100) / 100;
-}
-
-function slugifyCode(s: string): string {
-  return s.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
-}
 const COUNTRIES = ['JP', 'CN', 'KR', 'US', 'SG', 'MY', 'VN', 'TW', 'TH', 'ID'];
 // Associations stay in the product model, but are hidden until a customer-facing
 // recommendation, accessory, replacement, or upsell workflow consumes them.
 const SHOW_PRODUCT_ASSOCIATIONS = false;
-const SHOW_PRODUCT_ATTRIBUTES = false;
 type VersionHistoryEntry = ProductRevision & { changes: string[] };
 const DEMO_VERSION_HISTORY: VersionHistoryEntry[] = [
   { id: 'demo-rev-1', number: 1, status: 'published', createdAt: '2026-09-15T08:10:00+07:00', createdBy: 'PrimeOS Admin', summary: 'Created the canonical Product Master from imported listings', changes: ['Created master identity and SKU', 'Mapped the Headphones category', 'Linked PrimeWeb and PrimePOS listings'] },
@@ -346,37 +327,22 @@ function channelSetupComplete(key: OverrideChannel, value: ChannelOverrideForm) 
   if (key === 'rakuten') return Boolean(value.category.trim() && value.stock_quantity && value.identifier.trim());
   return Boolean(value.category.trim() && value.stock_quantity && value.shipping_option);
 }
-const DEFAULT_CATEGORY_TREE = [
-  { label: 'Fashion', children: [
-    { label: 'Apparel', children: ['Jacket', 'Shoe', 'Hat'] },
-    { label: 'Accessories', children: ['Bag', 'Watch', 'Sunglasses'] },
-  ] },
-  { label: 'Electronics', children: [
-    { label: 'Consumer Electronics', children: ['Electronics', 'Headphones'] },
-  ] },
-  { label: 'Lifestyle', children: [
-    { label: 'Home & Living', children: ['Home & Living', 'Food & Beverages'] },
-    { label: 'Leisure', children: ['Sports', 'Bicycle', 'Books', 'Toys'] },
-  ] },
-  { label: 'Personal Care', children: [
-    { label: 'Beauty', children: ['Beauty & Personal Care'] },
-  ] },
-];
-
 function buildCategoryTree() {
   const categories = getActiveCatalogCategories();
-  if (!categories.length) return DEFAULT_CATEGORY_TREE;
+  if (!categories.length) return [{ id: '', label: 'No categories', children: [{ id: '', label: 'No categories', children: [] as Array<{ id: string; name: string }> }] }];
   const childrenByParent = new Map<string | null, typeof categories>();
   categories.forEach(category => childrenByParent.set(category.parentId, [...(childrenByParent.get(category.parentId) ?? []), category]));
   const sorted = (items: typeof categories) => [...items].sort((a, b) => a.name.localeCompare(b.name));
-  return sorted(childrenByParent.get(null) ?? []).map(root => {
+  // Active children of an inactive parent remain selectable; never leave an empty tree.
+  return sorted(categories.filter(category => !category.parentId || !categories.some(parent => parent.id === category.parentId))).map(root => {
     const branches = sorted(childrenByParent.get(root.id) ?? []);
     return {
+      id: root.id,
       label: root.name,
       children: branches.length ? branches.map(branch => {
-        const leaves = sorted(childrenByParent.get(branch.id) ?? []).map(leaf => leaf.name);
-        return { label: branch.name, children: leaves.length ? leaves : [branch.name] };
-      }) : [{ label: root.name, children: [root.name] }],
+        const leaves = sorted(childrenByParent.get(branch.id) ?? []);
+        return { id: branch.id, label: branch.name, children: [branch, ...leaves] };
+      }) : [{ id: root.id, label: root.name, children: [root] }],
     };
   });
 }
@@ -390,7 +356,7 @@ const EMPTY_FORM: FormState = {
   asin: '', manufacturer: '',
   sku_code: '', name: '', product_type: 'single',
   description: '',
-  category: '', condition: 'new',
+  category: '', categoryId: '', condition: 'new',
   original_price: '', retail_price: '', price_currency: 'JPY',
   prod_length: '', prod_height: '', prod_width: '', prod_weight: '',
   pkg_length: '', pkg_height: '', pkg_width: '', pkg_weight: '',
@@ -465,7 +431,7 @@ function hydrateExistingVariants(product: Product | null): { groups: VariantGrou
     ? product.variant_options
     : Array.from({ length: optionCount }, (_, index) => {
       const values = Array.from(new Set(parsed.map(parts => parts[index]).filter(Boolean)));
-      const candidates = getAttributesForCategory(product.category).filter(attribute => {
+      const candidates = getAttributesForCategory(product.category, product.categoryId).filter(attribute => {
         if (attribute.type !== 'Single select' && attribute.type !== 'Multi-select') return false;
         const allowed = attribute.options.split(',').map(option => option.trim().toLowerCase()).filter(Boolean);
         return values.length > 0 && values.every(value => allowed.includes(value.toLowerCase()));
@@ -618,14 +584,10 @@ function BrandReferencePicker({ brands, brandId, brandName, onSelect, onCreate }
   const [createRoles, setCreateRoles] = useState<BrandRole[]>(['Brand']);
   const normalizedQuery = query.trim().toLowerCase();
   const results = brands.filter(brand => !normalizedQuery || [brand.name, brand.code, ...brand.aliases].some(value => value.toLowerCase().includes(normalizedQuery))).slice(0, 8);
-  const duplicate = Boolean(createName.trim()) && brands.some(brand => brand.name.trim().toLowerCase() === createName.trim().toLowerCase());
+  const duplicateBrand = createName.trim() ? getProductCatalogSettings().brands.find(brand => brand.name.trim().toLowerCase() === createName.trim().toLowerCase()) : undefined;
+  const duplicate = Boolean(duplicateBrand);
   const invalidWebsite = Boolean(createWebsite.trim()) && !/^https?:\/\/[^\s]+$/i.test(createWebsite.trim());
   const selected = brands.find(brand => brand.id === brandId) ?? brands.find(brand => brand.name === brandName);
-
-  // Spec: Commerce Entity lifecycle — 'Unverified' = 'candidate' in production schema.
-  // Publish Gate (B2): brand.status MUST be 'Verified' before product can be published.
-  const isCandidate = (b: CatalogBrand) => b.status !== 'Verified';
-  const selectedIsCandidate = selected ? isCandidate(selected) : false;
 
   const createBrand = () => {
     if (!createName.trim() || duplicate || invalidWebsite || createRoles.length === 0) return;
@@ -650,17 +612,11 @@ function BrandReferencePicker({ brands, brandId, brandName, onSelect, onCreate }
       <Popover open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
         <PopoverTrigger asChild>
           <Button
-            type="button" variant="outline" role="combobox" aria-expanded={open}
+            type="button" variant="outline" role="combobox" aria-label="Brand" aria-expanded={open}
             className={cn('h-auto min-h-10 w-full justify-between px-3 py-2 font-normal', !selected && 'text-muted-foreground')}
           >
             <span className="flex min-w-0 flex-col items-start gap-0.5">
               <span className="truncate">{selected?.name ?? 'Select canonical brand'}</span>
-              {selectedIsCandidate && (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600">
-                  <span className="inline-block size-1.5 rounded-full bg-amber-500" />
-                  Candidate — verify before publishing
-                </span>
-              )}
             </span>
             <ChevronDown className="size-4 shrink-0 opacity-60" />
           </Button>
@@ -684,14 +640,6 @@ function BrandReferencePicker({ brands, brandId, brandName, onSelect, onCreate }
                   <span className="block truncate font-mono text-[11px] text-muted-foreground">{brand.code}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5">
-                  {isCandidate(brand) && (
-                    <span
-                      title="Unverified brand — product cannot be published until verified in Brand Registry"
-                      className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    >
-                      Candidate
-                    </span>
-                  )}
                   {selected?.id === brand.id && <Check className="size-4 shrink-0 text-emerald-500" />}
                 </span>
               </button>
@@ -710,28 +658,19 @@ function BrandReferencePicker({ brands, brandId, brandName, onSelect, onCreate }
         </PopoverContent>
       </Popover>
 
-      {selectedIsCandidate && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
-          <span className="mt-0.5 shrink-0">&#9888;</span>
-          <span>
-            <strong>Brand is unverified (Candidate).</strong> You can save drafts but publishing is blocked until this brand is approved in the Brand Registry.
-          </span>
-        </p>
-      )}
-
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>New brand</DialogTitle>
             <DialogDescription>
-              Canonical Brand records map marketplace names, identifiers, rights, and per-channel authorizations.
+              Create a shared brand for your products. You can use it as soon as it is saved.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="inline-brand-name">Canonical name <span className="text-destructive">*</span></Label>
               <Input id="inline-brand-name" autoFocus value={createName} onChange={event => setCreateName(event.target.value)} placeholder="e.g. Sony" aria-invalid={duplicate} />
-              {duplicate ? <p className="text-xs font-medium text-destructive">This Brand already exists. Select it from the list instead.</p> : null}
+              {duplicate ? <p className="text-xs font-medium text-destructive">{duplicateBrand?.status === 'Inactive' ? 'This brand is inactive. Reactivate it in Brands instead of creating a duplicate.' : 'This Brand already exists. Select it from the list instead.'}</p> : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="inline-brand-legal-name">Legal name</Label>
@@ -761,7 +700,7 @@ function BrandReferencePicker({ brands, brandId, brandName, onSelect, onCreate }
               {createRoles.length === 0 ? <p className="text-xs font-medium text-destructive">Select at least one role.</p> : null}
             </fieldset>
             <div className="rounded-lg border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground sm:col-span-2">
-              New brands are saved as <strong className="text-foreground">Candidate</strong> and must be verified in Brand Registry before this Product Master can be published.
+              Available for Product Master immediately. Any marketplace approval requirements are handled separately for each listing.
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -781,6 +720,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   onChange: (value: string) => void;
 }) {
   const error = value.trim() ? validateAttributeValue(attribute, value) : null;
+  const controlProps = { 'aria-label': attribute.name, 'aria-required': attribute.required, 'aria-invalid': Boolean(error) || (attribute.required && !value.trim()) };
   const inputCls = cn(
     'flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -797,7 +737,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Single select' || attribute.type === 'Enum') {
     return (
       <>
-        <select value={value} onChange={e => onChange(e.target.value)} className={inputCls}>
+        <select {...controlProps} value={value} onChange={e => onChange(e.target.value)} className={inputCls}>
           <option value="">Select {attribute.name.toLowerCase()}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
@@ -810,7 +750,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Multi-select' || attribute.type === 'Array') {
     return (
       <>
-        <div className={cn('flex min-h-10 flex-wrap gap-2 rounded-md border border-input p-2', error && 'border-destructive')}>
+        <div role="group" {...controlProps} className={cn('flex min-h-10 flex-wrap gap-2 rounded-md border border-input p-2', error && 'border-destructive')}>
           {options.map(o => {
             const checked = selectedValues.includes(o);
             return (
@@ -831,7 +771,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Number') {
     return (
       <>
-        <Input type="number" value={value} onChange={e => onChange(e.target.value)} placeholder="Enter a number" className={error ? 'border-destructive focus-visible:ring-destructive' : ''} />
+        <Input {...controlProps} type="number" value={value} onChange={e => onChange(e.target.value)} placeholder="Enter a number" className={error ? 'border-destructive focus-visible:ring-destructive' : ''} />
         {errorEl}
       </>
     );
@@ -841,7 +781,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Integer') {
     return (
       <>
-        <Input
+        <Input {...controlProps}
           type="number" step="1" value={value}
           onChange={e => onChange(e.target.value)}
           placeholder="Enter a whole number"
@@ -858,7 +798,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          role="switch"
+          role="switch" {...controlProps}
           aria-checked={value === 'true'}
           onClick={() => onChange(value === 'true' ? 'false' : 'true')}
           className={cn(
@@ -879,7 +819,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Date') {
     return (
       <>
-        <Input
+        <Input {...controlProps}
           type="date" value={value} onChange={e => onChange(e.target.value)}
           className={error ? 'border-destructive focus-visible:ring-destructive' : ''}
         />
@@ -893,7 +833,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Datetime') {
     return (
       <>
-        <Input
+        <Input {...controlProps}
           type="datetime-local" value={value} onChange={e => onChange(e.target.value)}
           className={error ? 'border-destructive focus-visible:ring-destructive' : ''}
         />
@@ -912,13 +852,13 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
     return (
       <>
         <div className="grid grid-cols-[1fr_96px] gap-2">
-          <Input
+          <Input {...controlProps}
             type="number" min="0" value={amtVal}
             onChange={e => updateMoney(e.target.value, curVal)}
             placeholder="0.00"
             className={error ? 'border-destructive focus-visible:ring-destructive' : ''}
           />
-          <select
+          <select {...controlProps}
             value={curVal}
             onChange={e => updateMoney(amtVal, e.target.value)}
             className={cn(inputCls, 'px-2')}
@@ -939,7 +879,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
     return (
       <>
         <div className="grid grid-cols-[1fr_88px] gap-2">
-          <Input
+          <Input {...controlProps}
             type="number" min="0" value={numericValue}
             onChange={e => onChange(e.target.value ? `${e.target.value} ${unit}` : '')}
             placeholder="0"
@@ -956,7 +896,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Object') {
     return (
       <>
-        <Textarea
+        <Textarea {...controlProps}
           value={value} onChange={e => onChange(e.target.value)}
           rows={3} placeholder='{"key": "value"}'
           className={cn('font-mono text-xs', error && 'border-destructive focus-visible:ring-destructive')}
@@ -971,7 +911,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Asset ref' || attribute.type === 'asset_ref') {
     return (
       <>
-        <Input
+        <Input {...controlProps}
           value={value} onChange={e => onChange(e.target.value)}
           placeholder="https://... (prototype) or DAM asset ID (production)"
           className={error ? 'border-destructive focus-visible:ring-destructive' : ''}
@@ -986,7 +926,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Commerce entity ref' || attribute.type === 'commerce_entity_ref') {
     return (
       <>
-        <Input
+        <Input {...controlProps}
           value={value} onChange={e => onChange(e.target.value)}
           placeholder="cent_abc12345"
           className={cn('font-mono', error && 'border-destructive focus-visible:ring-destructive')}
@@ -1000,7 +940,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   // ── country selector ──────────────────────────────────────────────────────
   if (attribute.type === 'Country selector') {
     return (
-      <select value={value} onChange={e => onChange(e.target.value)} className={inputCls}>
+      <select {...controlProps} value={value} onChange={e => onChange(e.target.value)} className={inputCls}>
         <option value="">Select country</option>
         {['Japan', 'Singapore', 'Vietnam', 'China', 'South Korea', 'United States', 'United Kingdom', 'Other'].map(c => (
           <option key={c}>{c}</option>
@@ -1013,7 +953,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   if (attribute.type === 'Rich text') {
     return (
       <>
-        <Textarea value={value} onChange={e => onChange(e.target.value)} rows={3} placeholder={`Enter ${attribute.name.toLowerCase()}`} />
+        <Textarea {...controlProps} value={value} onChange={e => onChange(e.target.value)} rows={3} placeholder={`Enter ${attribute.name.toLowerCase()}`} />
         {errorEl}
       </>
     );
@@ -1022,7 +962,7 @@ function DynamicAttributeValueControl({ attribute, value, onChange }: {
   // ── string fallback ───────────────────────────────────────────────────────
   return (
     <>
-      <Input
+      <Input {...controlProps}
         value={value} onChange={e => onChange(e.target.value)}
         placeholder={`Enter ${attribute.name.toLowerCase()}`}
         className={error ? 'border-destructive focus-visible:ring-destructive' : ''}
@@ -1572,7 +1512,7 @@ function ListingMasterSyncBadge({ override, lastSyncedAt }: { override: ChannelO
   const syncGroups = [
     { label: 'Product data', synced: override.listing_mode === 'master' },
     { label: 'Images', synced: override.media_scope === 'all' },
-    { label: 'Price', synced: override.listing_mode === 'master' || override.listing_mode === 'markup' },
+    { label: 'Price · requires review when changed', synced: override.pricing_source === 'shop' },
     { label: 'Inventory', synced: override.sync_policy === 'automatic' },
   ];
   const syncedCount = syncGroups.filter(group => group.synced).length;
@@ -2024,24 +1964,20 @@ export default function ProductCreatePage() {
   );
   const existingProduct = storedProduct ?? recoveredImportProduct;
   const [stockAdjustment, setStockAdjustment] = useState<Partial<StockAdjustmentTarget> | null>(null);
+  const [addingStockLocation, setAddingStockLocation] = useState(false);
   const [importReviewIssues, setImportReviewIssues] = useState<string[]>(() => existingProduct?.import_issues ?? []);
   const [brandReviewChoice, setBrandReviewChoice] = useState<'master' | 'separate'>('separate');
   const [splitChannels, setSplitChannels] = useState<Array<ChannelListing['channel']>>(['amazon', 'lazada']);
   const existingListingMatches = useMemo(() => buildExistingListingMatches(existingProduct), [existingProduct]);
   const existingSkuList = getAllSkus();
   const [catalogBrands, setCatalogBrands] = useState<CatalogBrand[]>(() => getActiveCatalogBrands());
-  const categoryTree = useMemo(() => buildCategoryTree(), []);
 
   const [inventory, setInventory] = useState<Record<string, string>>(
     existingProduct
       ? Object.fromEntries(Object.entries(existingProduct.inventory).map(([k, v]) => [k, String(v)]))
       : Object.fromEntries(WAREHOUSES.map(w => [w.id, '0']))
   );
-  // marketPrices removed — replaced by pricePolicies (FX + fee + rounding calculation chains)
-  const [pricePolicies, setPricePolicies] = useState<PricePolicy[]>(() => existingProduct?.price_policies ?? []);
-  const [policyDialogOpen, setPolicyDialogOpen] = useState(false);
-  const [editingPolicy, setEditingPolicy] = useState<PricePolicy | null>(null);
-  const [policyDraft, setPolicyDraft] = useState<PricePolicy>({ id: '', name: '', code: '', ...EMPTY_POLICY });
+  // Legacy per-product policies are retained for migration in Settings; no longer edited here.
   const [associations, setAssociations] = useState<ProductAssociation[]>(existingProduct?.associations ?? []);
   const [associationProductId, setAssociationProductId] = useState('');
   const [associationType, setAssociationType] = useState<ProductAssociation['type']>('related');
@@ -2095,6 +2031,7 @@ export default function ProductCreatePage() {
         product_type: existingProduct.product_type ?? 'single',
         description: existingProduct.description,
         category: existingProduct.category,
+        categoryId: existingProduct.categoryId ?? '',
         condition: existingProduct.condition,
         original_price: existingProduct.original_price ? String(existingProduct.original_price) : '',
         retail_price: existingProduct.retail_price ? String(existingProduct.retail_price) : '',
@@ -2115,10 +2052,11 @@ export default function ProductCreatePage() {
         meta_description: existingProduct.meta_description ?? '',
       };
     }
-    return { ...EMPTY_FORM, sku_code: urlSku || '', category: urlFamily || '' };
+    return { ...EMPTY_FORM, sku_code: urlSku || '', category: urlFamily || '', categoryId: resolveCatalogCategory({ category: urlFamily }, getProductCatalogSettings().categories)?.id ?? '' };
   };
 
   const [form, setForm] = useState<FormState>(initForm);
+  const rakutenBrandName = rakutenBrandSuggestion(catalogBrands.find(brand => form.brandId ? brand.id === form.brandId : brand.name === form.brand), form.brand);
   const [advancedIdentityOpen, setAdvancedIdentityOpen] = useState(() => Boolean(
     existingProduct?.mpn || existingProduct?.model_number || existingProduct?.manufacturer,
   ));
@@ -2184,7 +2122,7 @@ export default function ProductCreatePage() {
       setForm(prev => ({
         ...prev,
         ...(urlSku ? { sku_code: urlSku } : {}),
-        ...(urlFamily ? { category: urlFamily } : {}),
+        ...(urlFamily ? { category: urlFamily, categoryId: resolveCatalogCategory({ category: urlFamily }, getProductCatalogSettings().categories)?.id ?? '' } : {}),
         ...(urlAsin ? { asin: urlAsin } : {}),
         ...(urlTitle ? { name: urlTitle } : {}),
         ...(urlBrand ? { brand: urlBrand, brandId: getActiveCatalogBrands().find(brand => [brand.name, brand.code, ...brand.aliases].some(value => value.toLowerCase() === urlBrand.toLowerCase()))?.id ?? '' } : {}),
@@ -2196,10 +2134,12 @@ export default function ProductCreatePage() {
   }, [location.search]);
 
   const [packageWeightUnit, setPackageWeightUnit] = useState<'g' | 'kg'>('g');
+  usePricingRevision();
   const [channelOverrides, setChannelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
     const saved = existingProduct?.channel_overrides;
     const syncStatusDemo = existingProduct?.id === 'prod_004';
     const make = (key: OverrideChannel): ChannelOverrideForm => ({
+      ...initialListingPricing(existingProduct, key, OVERRIDE_CHANNELS.find(channel => channel.key === key)?.account || key),
       enabled: saved?.[key]?.enabled ?? Boolean(existingProduct?.channels.some(listing => listing.channel === listingChannelByOverride[key])),
       title: saved?.[key]?.title ?? '',
       price_markup: saved?.[key]?.price_markup ? String(saved[key]?.price_markup) : '',
@@ -2208,12 +2148,13 @@ export default function ProductCreatePage() {
       category: syncStatusDemo && ['shopee', 'rakuten'].includes(key) ? 'Art & Collectibles' : saved?.[key]?.category ?? '',
       fulfillment: syncStatusDemo && key === 'amazon' ? 'FBA' : saved?.[key]?.fulfillment ?? '',
       variant_scope: saved?.[key]?.variant_scope ?? 'all',
+      selected_variant_ids: saved?.[key]?.selected_variant_ids,
       listing_mode: syncStatusDemo && key === 'rakuten' ? 'manual' : saved?.[key]?.listing_mode ?? 'master',
       identifier: saved?.[key]?.identifier ?? (key === 'amazon' ? existingProduct?.asin ?? '' : existingProduct?.gtin ?? ''),
       condition: saved?.[key]?.condition ?? (key === 'amazon' ? 'new_new' : ''),
       stock_quantity: syncStatusDemo && ['shopee', 'rakuten'].includes(key) ? (key === 'shopee' ? '100' : '95') : saved?.[key]?.stock_quantity ?? '',
       warehouse: saved?.[key]?.warehouse ?? defaultInventorySourceMode(key),
-      brand: saved?.[key]?.brand ?? existingProduct?.brand ?? '',
+      brand: saved?.[key]?.brand ?? (key === 'rakuten' ? '' : existingProduct?.brand ?? ''),
       shipping_option: syncStatusDemo && key === 'shopee' ? 'standard' : saved?.[key]?.shipping_option ?? '',
       bullet_points: saved?.[key]?.bullet_points ?? '',
       search_terms: saved?.[key]?.search_terms ?? '',
@@ -2242,6 +2183,25 @@ export default function ProductCreatePage() {
   const [channelRemovalTarget, setChannelRemovalTarget] = useState<OverrideChannel | null>(null);
   const [selectedChannelKeys, setSelectedChannelKeys] = useState<OverrideChannel[]>([]);
   const [channelListingDrafts, setChannelListingDrafts] = useState<Record<OverrideChannel, ChannelOverrideForm>>(channelOverrides);
+  function persistListingDrafts(drafts: Partial<Record<OverrideChannel, ChannelOverrideForm>>) {
+    if (!existingProduct || !canWrite) return;
+    const latest = getProductById(existingProduct.id) ?? existingProduct;
+    const overrides = { ...latest.channel_overrides };
+    const channels = [...latest.channels];
+    for (const [key, draft] of Object.entries(drafts)) {
+      if (!draft) continue;
+      overrides[key as OverrideChannel] = { ...draft, price_markup: num(draft.price_markup) };
+      const channel = listingChannelByOverride[key as OverrideChannel];
+      if (draft.enabled && !channels.some(item => item.channel === channel)) channels.push({ channel, external_id: null, status: 'pending', listing_url: null, last_synced_at: null });
+    }
+    updateProduct(latest.id, { id: latest.id, channel_overrides: overrides, channels });
+    // Listing-owned saves must not mark unrelated Master edits as saved (or dirty).
+    if (baselineSnapshotRef.current) {
+      const baseline = JSON.parse(baselineSnapshotRef.current);
+      baseline.channelOverrides = { ...baseline.channelOverrides, ...drafts };
+      baselineSnapshotRef.current = JSON.stringify(baseline);
+    }
+  }
   const listingInventorySources = useMemo(() => OVERRIDE_CHANNELS.flatMap(channel => {
     const draft = channelOverrides[channel.key];
     if (!draft.enabled || draft.sync_policy === 'disabled') return [];
@@ -2279,6 +2239,7 @@ export default function ProductCreatePage() {
   const [skuChangeError, setSkuChangeError] = useState('');
   const [, setDraftSaveGeneration] = useState(0);
   const [catalogSettingsVersion, setCatalogSettingsVersion] = useState(0);
+  const categoryTree = useMemo(() => buildCategoryTree(), [catalogSettingsVersion]);
   const [dirtyTrackingReady, setDirtyTrackingReady] = useState(false);
   const [hasScrolledFromTop, setHasScrolledFromTop] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(existingProduct?.updated_at ? new Date(existingProduct.updated_at) : null);
@@ -2297,34 +2258,19 @@ export default function ProductCreatePage() {
   const [uploadingImageCount, setUploadingImageCount] = useState(0);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
-  const [categoryLevelOne, setCategoryLevelOne] = useState(categoryTree[0].label);
-  const [categoryLevelTwo, setCategoryLevelTwo] = useState(categoryTree[0].children[0].label);
-  const [pendingCategory, setPendingCategory] = useState(form.category);
+  const [categoryLevelOne, setCategoryLevelOne] = useState(categoryTree[0].id);
+  const [categoryLevelTwo, setCategoryLevelTwo] = useState(categoryTree[0].children[0].id);
+  const [pendingCategory, setPendingCategory] = useState(form.categoryId);
+  const [categoryReviewOpen, setCategoryReviewOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<ProductWorkspace>(() => resolveProductWorkspace(new URLSearchParams(location.search).get('section')));
   const [specifications, setSpecifications] = useState<Array<{ id: string; attributeKey?: string; name: string; value: string }>>(
     existingProduct?.specifications?.map(item => ({ ...item, id: genId('spec') })) ?? []
   );
 
   useEffect(() => {
-    if (!form.category) {
-      setSpecifications(current => current.filter(item => !item.attributeKey));
-      return;
-    }
-    const categoryAttributes = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
-    setSpecifications(current => {
-      const canonical = categoryAttributes.map(attribute => {
-        const existing = current.find(item => item.attributeKey === attribute.key)
-          ?? current.find(item => !item.attributeKey && item.name.trim().toLowerCase() === attribute.name.toLowerCase());
-        return existing
-          ? { ...existing, attributeKey: attribute.key, name: attribute.name }
-          : { id: genId('spec'), attributeKey: attribute.key, name: attribute.name, value: '' };
-      });
-      const categoryKeys = new Set(categoryAttributes.map(attribute => attribute.key));
-      const categoryNames = new Set(categoryAttributes.map(attribute => attribute.name.toLowerCase()));
-      const custom = current.filter(item => !categoryKeys.has(item.attributeKey ?? '') && !categoryNames.has(item.name.trim().toLowerCase()));
-      return [...canonical, ...custom.filter(item => item.name || item.value)];
-    });
-  }, [form.category, catalogSettingsVersion]);
+    const categoryAttributes = getAttributesForCategory(form.category, form.categoryId).filter(item => item.key !== 'brand');
+    setSpecifications(current => reconcileSpecifications(current, categoryAttributes, attribute => ({ id: genId('spec'), attributeKey: attribute.key, name: attribute.name, value: '' })));
+  }, [form.category, form.categoryId, catalogSettingsVersion]);
 
   useEffect(() => {
     const refreshCatalogSettings = () => setCatalogSettingsVersion(current => current + 1);
@@ -2379,9 +2325,6 @@ export default function ProductCreatePage() {
 
   function createCanonicalBrand(input: NewBrandInput): CatalogBrand {
     const canonicalName = input.canonicalName.trim();
-    // Spec: all newly created brands start in 'candidate' (prototype: 'Unverified') lifecycle state.
-    // Gate: brand must be verified before product can be published.
-    // TODO (production): status should be 'candidate'; promoted to 'verified' via admin approval flow.
     const brand: CatalogBrand = {
       id: `${slugify(canonicalName)}-${Date.now().toString(36)}`,
       name: canonicalName,
@@ -2392,16 +2335,14 @@ export default function ProductCreatePage() {
       website: input.website,
       roles: input.roles,
       productCount: 0,
-      status: 'Unverified', source: 'internal', aliases: [], mappings: {},
+      status: 'Active', source: 'internal', aliases: [], mappings: {},
     };
     const settings = getProductCatalogSettings();
     saveProductCatalogSettings({ ...settings, brands: [...settings.brands, brand] });
     setCatalogBrands(current => [...current, brand]);
     toast({
-      title: 'Brand created as Candidate',
-      description: `"${brand.name}" added to the Brand Registry. Verify this brand before publishing — unverified brands are blocked at publish.`,
-      variant: 'destructive',
-      duration: 8000,
+      title: 'Brand created',
+      description: `"${brand.name}" is selected and ready to use in this Product Master.`,
     });
     return brand;
   }
@@ -2579,22 +2520,13 @@ export default function ProductCreatePage() {
     });
   }
 
-  function addVariantAttributeToCategory(attributeKey: string) {
-    if (!form.category) return;
-    const settings = getProductCatalogSettings();
-    const category = settings.categories.find(item => item.name === form.category);
-    const attribute = settings.attributes.find(item => item.key === attributeKey);
-    if (!category || !attribute || category.attributes.some(item => item.key === attributeKey)) return;
-    saveProductCatalogSettings({
-      ...settings,
-      categories: settings.categories.map(item => item.id === category.id
-        ? { ...item, attributes: [...item.attributes, { key: attributeKey, required: false }] }
-        : item),
-    });
-    setCatalogSettingsVersion(current => current + 1);
+  function notifyVariantAttributeSelected(attributeKey: string) {
+    const attribute = getProductCatalogSettings().attributes.find(item => item.key === attributeKey);
+    if (!attribute) return;
+    // A per-product variant choice must not silently change a shared category schema.
     toast({
-      title: `${attribute.name} added to ${category.name}`,
-      description: 'Select at least one value to generate the new variant combinations.',
+      title: `${attribute.name} selected for this product`,
+      description: 'Select values to generate variants. Shared category configuration is unchanged.',
     });
   }
 
@@ -2643,7 +2575,7 @@ export default function ProductCreatePage() {
   function openCompletionItem(checkId: string) {
     const workspace = completionWorkspaceFor(checkId).id;
     const targetByCheck: Record<string, string> = {
-      identity: 'product-name', content: 'product-description', category: 'product-category-trigger',
+      identity: 'product-name', content: 'product-description', category: 'product-category-trigger', attributes: missingRequiredCategoryAttributes[0] ? `product-attribute-${missingRequiredCategoryAttributes[0].key}` : 'product-attributes-title',
       shipping: 'product-section-shipping', price: 'product-section-pricing', variants: 'variant-attributes-title',
       media: 'product-media-panel', channels: 'product-section-channels',
     };
@@ -2651,7 +2583,8 @@ export default function ProductCreatePage() {
     window.setTimeout(() => {
       const target = document.getElementById(targetByCheck[checkId] ?? '');
       target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      target?.focus({ preventScroll: true });
+      const control = target?.querySelector<HTMLElement>('input, select, textarea, button') ?? target;
+      control?.focus({ preventScroll: true });
       if (target) {
         target.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background');
         window.setTimeout(() => target.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background'), 2400);
@@ -2763,6 +2696,7 @@ export default function ProductCreatePage() {
     if (!skuCheck.valid) e.sku_code = skuCheck.error ?? 'Invalid SKU';
     if (!form.name.trim()) e.name = copy.nameRequired;
     if (!form.category) e.category = copy.categoryRequired;
+    else if (!resolveCatalogCategory(form, getProductCatalogSettings().categories)) e.category = 'Select a category again to confirm its identity. Existing attribute values are preserved.';
 
     // Variant SKU duplicate check
     if (form.has_variants) {
@@ -2840,6 +2774,7 @@ export default function ProductCreatePage() {
       manufacturer: form.manufacturer.trim(),
       name: form.name.trim(),
       category: form.category,
+      categoryId: resolveCatalogCategory(form, getProductCatalogSettings().categories)?.id,
       condition: form.condition,
       description: form.description.trim(),
       localized_content: localizedContent,
@@ -2847,7 +2782,7 @@ export default function ProductCreatePage() {
       retail_price: form.has_variants && variantRetailPrices.length > 0 ? Math.min(...variantRetailPrices) : num(form.retail_price),
       price_currency: form.price_currency,
       market_prices: [], // @deprecated — use price_policies
-      price_policies: pricePolicies,
+      price_policies: existingProduct?.price_policies ?? [],
       prod_length: num(form.prod_length),
       prod_height: num(form.prod_height),
       prod_width: num(form.prod_width),
@@ -2863,7 +2798,7 @@ export default function ProductCreatePage() {
       slug: form.slug.trim() || slugify(form.name),
       meta_title: form.meta_title.trim(),
       meta_description: form.meta_description.trim(),
-      specifications: specifications.filter(item => item.attributeKey && categoryAttributesForProduct.some(attribute => attribute.key === item.attributeKey) && item.value.trim()).map(({ attributeKey, name, value }) => ({ attributeKey, name: name.trim(), value: value.trim() })),
+      specifications: serializeSpecifications(specifications),
       inventory: latestProduct?.inventory ?? Object.fromEntries(Object.entries(inventory).map(([k, v]) => [k, num(v)])),
       has_variants: form.has_variants,
       channels: selectedChannels,
@@ -2871,11 +2806,19 @@ export default function ProductCreatePage() {
         enabled: value.enabled,
         title: value.title.trim(),
         price_markup: num(value.price_markup),
+        pricing_shop_id: value.pricing_shop_id,
+        pricing_shop_label: value.pricing_shop_label,
+        pricing_source: value.pricing_source,
+        manual_price: value.manual_price,
+        channel_price: value.channel_price,
+        channel_currency: value.channel_currency,
+        pricing_signature: value.pricing_signature,
         description: value.description.trim(),
         listing_sku: value.listing_sku.trim(),
         category: value.category.trim(),
         fulfillment: value.fulfillment,
         variant_scope: value.variant_scope,
+        selected_variant_ids: value.selected_variant_ids,
         listing_mode: value.listing_mode,
         identifier: value.identifier.trim(),
         condition: value.condition,
@@ -2962,7 +2905,16 @@ export default function ProductCreatePage() {
     if (!latest) return;
     const variant = item ? latest.skus.find(sku => sku.id === item.id) : undefined;
     if (item && !variant) return;
+    setAddingStockLocation(false);
     setStockAdjustment({ product: latest, warehouse: getWarehouses().find(warehouse => warehouse.id === warehouseId), sku: variant?.sku_code });
+  }
+
+  function openAddStockLocation() {
+    if (!canWrite || !existingProduct || form.has_variants) return;
+    const latest = getProductById(existingProduct.id);
+    if (!latest) return;
+    setAddingStockLocation(true);
+    setStockAdjustment({ product: latest });
   }
 
   function refreshAdjustedStock() {
@@ -2977,6 +2929,7 @@ export default function ProductCreatePage() {
       }));
     }
     setStockAdjustment(null);
+    setAddingStockLocation(false);
   }
 
   function renderControlledStock(warehouseId: string, item?: VariantItem) {
@@ -2986,11 +2939,21 @@ export default function ProductCreatePage() {
     const needsSave = Boolean(item && !saved);
     return <div className="flex flex-wrap items-center justify-end gap-2 text-right">
       <span className="text-sm font-semibold tabular-nums">{value === undefined ? 'Not recorded' : `${value.toLocaleString()} units`}</span>
-      {!writable ? <span className="text-xs text-muted-foreground">Read only</span> : needsSave ? <span className="text-xs text-muted-foreground">Save variant first</span> : canWrite && <Button type="button" variant="outline" size="sm" className="min-h-9" aria-label={`Adjust stock at ${WAREHOUSES.find(warehouse => warehouse.id === warehouseId)?.label}${item ? ` for ${item.key}` : ''}`} onClick={() => openStockAdjustment(warehouseId, item)}>Adjust stock</Button>}
+      {!writable ? <span className="text-xs text-muted-foreground">Read only</span> : needsSave ? <span className="text-xs text-muted-foreground">Save variant first</span> : canWrite && <Button type="button" variant="outline" size="sm" className="min-h-9" aria-label={`Adjust stock at ${getWarehouses().find(warehouse => warehouse.id === warehouseId)?.name}${item ? ` for ${item.key}` : ''}`} onClick={() => openStockAdjustment(warehouseId, item)}>Adjust stock</Button>}
     </div>;
   }
 
   const totalStock = Object.values(inventory).reduce((s, v) => s + num(v), 0);
+  const stockLocations = getWarehouses();
+  const recordedLocationIds = Object.keys(existingProduct?.inventory ?? {}).filter(id => recordedQuantity(existingProduct?.inventory[id]) !== null);
+  const inventoryLocations = existingProduct
+    ? [
+      ...stockLocations.filter(warehouse => recordedLocationIds.includes(warehouse.id)).map(warehouse => ({ id: warehouse.id, label: warehouse.name, code: warehouse.code })),
+      ...recordedLocationIds.filter(id => !stockLocations.some(warehouse => warehouse.id === id)).map(id => ({ id, label: 'Unknown stock location', code: id })),
+    ]
+    : WAREHOUSES;
+  const availableStockLocations = stockLocations.filter(warehouse => warehouse.status === 'active' && canEditWarehouseStock(warehouse.id) && !recordedLocationIds.includes(warehouse.id));
+  const recordedStockTotal = recordedLocationIds.reduce((total, id) => total + existingProduct!.inventory[id], 0);
   const masterSkuLocked = Boolean(existingProduct && (
     existingProduct.status !== 'draft' || existingProduct.channels.length > 0 || totalStock > 0
   ));
@@ -2998,6 +2961,19 @@ export default function ProductCreatePage() {
   const listingEditorVariants = useMemo(() => form.product_type === 'variant'
     ? variantItems.filter(item => item.selected).map(item => ({ id: item.key, label: item.key, sku: item.sku_code }))
     : [{ id: 'default', label: 'Default SKU', sku: form.sku_code }], [form.product_type, form.sku_code, variantItems]);
+  const listingEditorInventorySources = editingChannel ? [
+    { value: 'all', label: 'All recorded stock locations' },
+    { value: 'primary', label: 'Primary fulfillment warehouse' },
+    { value: 'channel', label: `${OVERRIDE_CHANNELS.find(channel => channel.key === editingChannel)?.label} dedicated stock` },
+    ...stockLocations.filter(warehouse => warehouse.status === 'active' && !warehouse.is_virtual).map(warehouse => ({ value: warehouse.id, label: warehouse.name })),
+  ].map(source => {
+    const warehouseIds = resolveListingWarehouseIds(editingChannel, source.value, stockLocations.filter(warehouse => warehouse.status === 'active' && !warehouse.is_virtual));
+    const sumRecorded = (stock: Record<string, string | number>) => {
+      const values = warehouseIds.map(id => stock[id]).filter(value => value !== undefined && String(value).trim() !== '' && Number.isFinite(Number(value)));
+      return values.length ? values.reduce<number>((sum, value) => sum + Number(value), 0) : null;
+    };
+    return { ...source, quantity: sumRecorded(inventory), ...(form.product_type === 'variant' ? { byVariant: Object.fromEntries(selectedVariantItems.map(item => [item.key, sumRecorded(item.stock_by_location ?? {})])) } : {}) };
+  }) : [];
   const hasGeneratedVariants = form.has_variants && selectedVariantItems.length > 0;
   const variantPricingReady = hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim() && num(item.price) > 0) && selectedVariantItems.reduce((sum, item) => sum + num(item.stock), 0) > 0;
   const pricingAndInventoryReady = hasGeneratedVariants ? variantPricingReady : num(form.retail_price) > 0 && totalStock > 0;
@@ -3005,7 +2981,22 @@ export default function ProductCreatePage() {
   const shippingPackageRequired = OVERRIDE_CHANNELS.some(channel =>
     channelOverrides[channel.key].enabled && !['pos', 'social'].includes(channel.key)
   );
-  const categoryAttributesForProduct = getAttributesForCategory(form.category).filter(item => item.key !== 'brand');
+  const catalogSettings = getProductCatalogSettings();
+  const selectedCatalogCategory = resolveCatalogCategory(form, catalogSettings.categories);
+  const categoryAttributesForProduct = assignedCategoryAttributes(selectedCatalogCategory, catalogSettings.attributes);
+  const attributeValues = { specifications, has_variants: form.has_variants, variant_options: variantGroups.map(group => ({ attributeKey: categoryAttributesForProduct.find(attribute => attribute.name.toLowerCase() === group.name.toLowerCase())?.key ?? '', name: group.name, values: group.values })) };
+  const missingRequiredCategoryAttributes = missingCategoryAttributes(categoryAttributesForProduct, attributeValues);
+  const retainedAttributes = retainedSpecifications(specifications, categoryAttributesForProduct).filter(spec => spec.value.trim());
+  const pendingCatalogCategory = catalogSettings.categories.find(category => category.id === pendingCategory && category.status === 'Active');
+  const pendingCategoryDiff = pendingCatalogCategory ? categorySchemaDiff(selectedCatalogCategory, pendingCatalogCategory) : null;
+  const pendingCategoryMissing = missingCategoryAttributes(assignedCategoryAttributes(pendingCatalogCategory, catalogSettings.attributes), { ...attributeValues, variant_options: variantGroups.map(group => ({ attributeKey: catalogSettings.attributes.find(attribute => attribute.name.toLowerCase() === group.name.toLowerCase())?.key ?? '', name: group.name, values: group.values })) });
+  function stageCategoryChange() {
+    if (!pendingCatalogCategory) return;
+    setForm(current => ({ ...current, categoryId: pendingCatalogCategory.id, category: pendingCatalogCategory.name }));
+    setCategoryReviewOpen(false);
+    setCategoryOpen(false);
+    setCategorySearch('');
+  }
   const requiredLocalizableAttributes = categoryAttributesForProduct.filter(attribute => attribute.isLocalizable && attribute.required);
   const getLocaleCompletionStatus = (locale: OrgLocaleConfig): 'primary' | 'complete' | 'partial' | 'missing' => {
     if (locale.isPrimary) return 'primary';
@@ -3029,7 +3020,7 @@ export default function ProductCreatePage() {
       Object.values(channelOverrides).some(item => item.enabled) &&
       form.name.trim().length >= 3 &&
       richTextPlainText(form.description).length >= 100 &&
-      Boolean(form.category) &&
+      selectedCatalogCategory?.status === 'Active' && missingRequiredCategoryAttributes.length === 0 &&
       images.length >= 3 &&
       pricingAndInventoryReady &&
       (!shippingPackageRequired || logisticsReady);
@@ -3037,9 +3028,10 @@ export default function ProductCreatePage() {
       { id: 'identity', label: 'Add product name and master SKU', done: form.name.trim().length >= 3 && Boolean(form.sku_code.trim()) },
       { id: 'media', label: 'Add at least 3 product images', done: images.length >= 3 },
       { id: 'content', label: 'Write a detailed description (100+ characters)', done: richTextPlainText(form.description).length >= 100 },
-      { id: 'category', label: 'Select an accurate product category', done: Boolean(form.category) },
+      { id: 'category', label: 'Select an active product category', done: selectedCatalogCategory?.status === 'Active' },
       { id: 'price', label: form.has_variants ? 'Configure variant pricing and stock' : 'Configure base price and inventory', done: pricingAndInventoryReady },
     ];
+    if (categoryAttributesForProduct.some(attribute => attribute.required)) checks.push({ id: 'attributes', label: missingRequiredCategoryAttributes.length ? `Complete required attributes: ${missingRequiredCategoryAttributes.map(attribute => attribute.name).join(', ')}` : 'Complete required category attributes', done: missingRequiredCategoryAttributes.length === 0 });
 
     if (shippingPackageRequired) checks.push({ id: 'shipping', label: 'Configure shipping package dimensions and weight', done: logisticsReady });
 
@@ -3057,24 +3049,9 @@ export default function ProductCreatePage() {
       });
     }
 
-    // Spec: Brand Publish Revision Gate — brand.status MUST be 'verified' before publish.
-    // Brands created via 'Create new brand' start as 'Unverified' (spec: 'candidate').
-    // Fail-closed: if a brand is selected and is not Verified, block publish entirely.
-    if (form.brandId) {
-      const selectedBrand = catalogBrands.find(b => b.id === form.brandId);
-      const brandVerified = !selectedBrand || selectedBrand.status === 'Verified';
-      checks.push({
-        id: 'brand_verified',
-        label: brandVerified
-          ? `Brand "${selectedBrand?.name ?? form.brand}" is verified`
-          : `Brand "${selectedBrand?.name ?? form.brand}" is unverified — go to Brand Registry to verify before publishing`,
-        done: brandVerified,
-      });
-    }
-
     checks.push({ id: 'channels', label: 'Prepare at least one channel for publishing', done: channelReadyForPublishing });
     return checks;
-  }, [catalogBrands, channelOverrides, form, hasGeneratedVariants, images.length, invalidVariantGroups.length, localizedContent, logisticsReady, pricingAndInventoryReady, selectedVariantItems, shippingPackageRequired, variantGroups, variantOptionsReady]);
+  }, [channelOverrides, form, hasGeneratedVariants, images.length, invalidVariantGroups.length, localizedContent, logisticsReady, pricingAndInventoryReady, selectedVariantItems, shippingPackageRequired, variantGroups, variantOptionsReady, catalogSettingsVersion, specifications]);
   const completion = Math.round((completionChecks.filter(check => check.done).length / completionChecks.length) * 100);
   const masterListingChecks = completionChecks.filter(check => check.id !== 'channels');
   const firstMissingMasterListingCheck = masterListingChecks.find(check => !check.done);
@@ -3085,12 +3062,12 @@ export default function ProductCreatePage() {
   useEffect(() => {
     if (!form.has_variants || !form.category) return;
 
-    const seedKey = `${form.category}:${form.product_type}:${catalogSettingsVersion}`;
+    const seedKey = `${form.categoryId || form.category}:${form.product_type}:${catalogSettingsVersion}`;
     if (variantAutoSeedKeyRef.current === seedKey) return;
     variantAutoSeedKeyRef.current = seedKey;
     if (variantGroups.length > 0) return;
 
-    const eligibleAttributes = getAttributesForCategory(form.category).filter(attribute =>
+    const eligibleAttributes = getAttributesForCategory(form.category, form.categoryId).filter(attribute =>
       attribute.key !== 'brand'
       && (attribute.type === 'Single select' || attribute.type === 'Multi-select')
       && attribute.options.trim()
@@ -3106,17 +3083,15 @@ export default function ProductCreatePage() {
       ?? specifications.find(spec => !spec.attributeKey && spec.name.trim().toLowerCase() === suggestedAttribute.name.toLowerCase());
     const currentValue = specification?.value.trim() ?? '';
     setVariantGroups([{ id: genId('variant-group'), name: suggestedAttribute.name, values: currentValue ? [currentValue] : [] }]);
-  }, [catalogSettingsVersion, form.category, form.has_variants, form.product_type, specifications, variantGroups.length]);
-  const missingRequiredCategoryAttributes = requiredCategoryAttributes.filter(attribute => !specificationForAttribute(attribute)?.value.trim());
-  const catalogCategories = getActiveCatalogCategories();
-  const selectedCatalogCategory = catalogCategories.find(category => category.name === form.category);
+  }, [catalogSettingsVersion, form.category, form.categoryId, form.has_variants, form.product_type, specifications, variantGroups.length]);
+  const catalogCategories = catalogSettings.categories;
   const categoryParent = selectedCatalogCategory?.parentId ? catalogCategories.find(category => category.id === selectedCatalogCategory.parentId) : undefined;
   const categoryRoot = categoryParent?.parentId ? catalogCategories.find(category => category.id === categoryParent.parentId) : categoryParent;
   const categoryPath = [categoryRoot?.name, categoryParent?.name, selectedCatalogCategory?.name].filter((value, index, values) => value && values.indexOf(value) === index);
-  const selectedCategoryGroup = categoryTree.find(item => item.label === categoryLevelOne) ?? categoryTree[0];
-  const selectedCategorySubgroup = selectedCategoryGroup.children.find(item => item.label === categoryLevelTwo) ?? selectedCategoryGroup.children[0];
-  const matchingCategoryPaths = categoryTree.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group: group.label, subgroup: subgroup.label, leaf })))).filter(item => !categorySearch.trim() || `${item.group} ${item.subgroup} ${item.leaf}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
-  const currentSnapshot = JSON.stringify({ form, localizedContent, inventory: existingProduct ? undefined : inventory, pricePolicies, images, imageAltTexts, variantGroups, variantItems: variantItems.map(({ id, stock, stock_by_location, ...item }) => existingProduct ? item : { ...item, stock, stock_by_location }), channelOverrides, associations, specifications });
+  const selectedCategoryGroup = categoryTree.find(item => item.id === categoryLevelOne) ?? categoryTree[0];
+  const selectedCategorySubgroup = selectedCategoryGroup.children.find(item => item.id === categoryLevelTwo) ?? selectedCategoryGroup.children[0];
+  const matchingCategoryPaths = categoryTree.flatMap(group => group.children.flatMap(subgroup => subgroup.children.map(leaf => ({ group, subgroup, leaf })))).filter(item => !categorySearch.trim() || `${item.group.label} ${item.subgroup.label} ${item.leaf.name}`.toLowerCase().includes(categorySearch.trim().toLowerCase()));
+  const currentSnapshot = JSON.stringify({ form, localizedContent, inventory: existingProduct ? undefined : inventory, images, imageAltTexts, variantGroups, variantItems: variantItems.map(({ id, stock, stock_by_location, ...item }) => existingProduct ? item : { ...item, stock, stock_by_location }), channelOverrides, associations, specifications });
   latestSnapshotRef.current = currentSnapshot;
   const isDirty = dirtyTrackingReady && currentSnapshot !== baselineSnapshotRef.current;
 
@@ -3222,10 +3197,11 @@ export default function ProductCreatePage() {
     if (richTextPlainText(draft.description).trim() !== richTextPlainText(form.description).trim()) changes.push({ label: 'Description', current: shortText(draft.description), next: shortText(form.description) });
     if (draft.brand.trim() !== form.brand.trim()) changes.push({ label: 'Brand', current: draft.brand.trim() || 'Not set', next: form.brand.trim() || 'Not set' });
     if (draft.media_scope !== 'all') changes.push({ label: 'Images', current: 'Listing-specific media', next: `${images.length} Master image${images.length === 1 ? '' : 's'}` });
-    if (draft.listing_mode !== 'master' || (draft.price_markup && draft.price_markup !== '0')) changes.push({
-      label: 'Pricing',
-      current: draft.listing_mode === 'master' ? `${draft.price_markup}% markup` : 'Listing-specific price',
-      next: `${form.retail_price || '0'} ${form.price_currency} from Master`,
+    const priceQuote = quoteListingPrice(num(form.retail_price), form.price_currency, draft);
+    if (draft.pricing_source === 'shop' && pricingNeedsReview(draft, priceQuote)) changes.push({
+      label: 'Pricing · review in listing',
+      current: formatPrice(draft.channel_price, draft.channel_currency),
+      next: priceQuote.error || formatPrice(priceQuote.amount, priceQuote.currency),
     });
     const nextCompliance = [
       form.pkg_length && form.pkg_width && form.pkg_height ? `Package: ${form.pkg_length}x${form.pkg_width}x${form.pkg_height}cm · ${form.pkg_weight}g` : '',
@@ -3496,9 +3472,9 @@ export default function ProductCreatePage() {
                 <p className="text-xs leading-5 text-muted-foreground">Review the canonical product status and continue with the next required task.</p>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="flex flex-col gap-4 rounded-xl border bg-muted/15 p-4 sm:flex-row sm:items-center"><div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-lg border bg-background">{images[0] ? <img src={images[0]} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-semibold">{form.name || 'Untitled Product Master'}</h2><Badge variant="outline" className="capitalize">{existingProduct?.status ?? 'draft'}</Badge></div><p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{form.sku_code || 'SKU not assigned'}</span>{form.brand ? ` · ${form.brand}` : ''}{form.category ? ` · ${form.category}` : ''}</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('product-data')}>Edit product data</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('commerce')}>Manage pricing</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('distribution')}>Review channels</Button></div></div></div>
+                <div className="flex flex-col gap-4 rounded-xl border bg-muted/15 p-4 sm:flex-row sm:items-center"><div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-lg border bg-background">{images[0] ? <img src={images[0]} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-semibold">{form.name || 'Untitled Product Master'}</h2><Badge variant="outline" className="capitalize">{existingProduct?.status ?? 'draft'}</Badge></div><p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{form.sku_code || 'SKU not assigned'}</span>{form.brand ? ` · ${form.brand}` : ''}{form.category ? ` · ${form.category}` : ''}</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('product-data')}>Edit product data</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('commerce')}>Manage pricing &amp; stock</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('distribution')}>Review channels</Button></div></div></div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">SKUs & inventory</p><p className="mt-1 text-sm font-semibold">{form.has_variants ? selectedVariantItems.length : 1} SKU{(form.has_variants ? selectedVariantItems.length : 1) === 1 ? '' : 's'} · {totalStock} units</p></div>
+                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Inventory</p><p className="mt-1 text-sm font-semibold">{form.has_variants ? `${selectedVariantItems.length} variant${selectedVariantItems.length === 1 ? '' : 's'} · ` : ''}{totalStock} units</p></div>
                   <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Base price</p><p className="mt-1 text-sm font-semibold">{num(form.retail_price) > 0 ? `${formatLocalizedNumber(locale, num(form.retail_price))} ${form.price_currency}` : 'Not configured'}</p></div>
                   <button type="button" onClick={() => selectWorkspace('product-data')} className="rounded-lg border p-3 text-left transition-colors hover:bg-muted/30"><p className="text-xs text-muted-foreground">Translations</p><p className="mt-1 text-sm font-semibold">{activeOrgLocales.filter(item => !item.isPrimary && getLocaleCompletionStatus(item) === 'complete').length}/{activeOrgLocales.filter(item => !item.isPrimary).length} complete</p></button>
                   <button type="button" onClick={() => openCompletionItem('media')} className="rounded-lg border p-3 text-left transition-colors hover:bg-muted/30"><p className="text-xs text-muted-foreground">Product media</p><p className="mt-1 text-sm font-semibold">{images.length}/3 required images</p></button>
@@ -3552,14 +3528,9 @@ export default function ProductCreatePage() {
                       && new Date(existingProduct.updated_at).getTime() > new Date(listing.last_synced_at).getTime()
                     );
                     const includedVariantCount = form.has_variants ? selectedVariantItems.length : 1;
-                    const base = num(form.retail_price);
-                    const markup = num(override.price_markup);
-                    const effective = base > 0 ? (markup ? Math.round(base * (1 + markup / 100)) : base) : 0;
-                    const marketPrice = channel.key === 'shopee'
-                      ? { amount: 350000, currency: 'VND' }
-                      : channel.key === 'lazada'
-                        ? { amount: 59, currency: 'MYR' }
-                        : { amount: effective, currency: form.price_currency };
+                    const marketPrice = { amount: override.channel_price, currency: override.channel_currency };
+                    const pricingQuote = quoteListingPrice(num(form.retail_price), form.price_currency, override);
+                    const priceReviewNeeded = pricingNeedsReview(override, pricingQuote);
                     const stockCount = form.has_variants
                       ? selectedVariantItems.filter(i => i.selected).reduce((t, i) => t + num(i.stock), 0)
                       : totalStock;
@@ -3588,13 +3559,9 @@ export default function ProductCreatePage() {
                         <span className="flex shrink-0 flex-wrap items-center gap-2">
                           <span className="flex flex-col items-end">
                             <span className="text-sm font-semibold tabular-nums">
-                              {marketPrice.amount > 0 ? `${formatLocalizedNumber(channel.key === 'shopee' ? 'vi-VN' : locale, marketPrice.amount)} ${marketPrice.currency}` : <span className="text-xs text-muted-foreground">No price</span>}
+                              {formatPrice(marketPrice.amount, marketPrice.currency)}
+                              {priceReviewNeeded && <span className="mt-1 block text-xs font-normal text-muted-foreground">Price needs review</span>}
                             </span>
-                            {markup !== 0 && (
-                              <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', markup > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400')}>
-                                {markup > 0 ? `+${markup}%` : `${markup}%`} markup
-                              </span>
-                            )}
                           </span>
                           <span className={cn('flex items-center gap-1.5 px-1 text-[11px] font-medium', override.sync_policy === 'disabled' ? 'text-muted-foreground' : stockColor)}><Package className="size-3 shrink-0" />{override.sync_policy === 'disabled' ? 'Stock sync inactive' : stockCount === 0 ? 'Out of stock' : `Allocated ${allocatedStock} / ${stockCount} Master`}</span>
                         </span>
@@ -3763,8 +3730,9 @@ export default function ProductCreatePage() {
 
                   <div className="sm:col-span-6">
                     <Field label={copy.category} required error={errors.category}>
-                      <Button id="product-category-trigger" type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(form.category); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
+                      <Button id="product-category-trigger" type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => { setPendingCategory(selectedCatalogCategory?.id ?? ''); setCategoryReviewOpen(false); setCategoryOpen(true); }} aria-haspopup="dialog"><span className={form.category ? '' : 'text-muted-foreground'}>{selectedCatalogCategory?.name || form.category || copy.selectCategory}</span><ChevronRight className="size-4 rotate-90" /></Button>
                       {selectedCatalogCategory ? <p className="text-xs text-muted-foreground">{categoryPath.join(' / ')}</p> : null}
+                      {form.category && !selectedCatalogCategory ? <p className="text-xs text-destructive">Select a category again to confirm its identity. Existing attribute values are preserved.</p> : null}
                     </Field>
                   </div>
                   <div className="sm:col-span-6">
@@ -3836,125 +3804,30 @@ export default function ProductCreatePage() {
                   <button type="button" aria-expanded={advancedIdentityOpen} onClick={() => setAdvancedIdentityOpen(open => !open)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', advancedIdentityOpen ? 'rotate-180' : '')} /><span>More identifiers</span><span className="ml-auto text-xs font-normal text-muted-foreground">Manufacturer, MPN and model</span></button>
                   {advancedIdentityOpen ? <div className="grid grid-cols-1 gap-4 border-t bg-muted/10 p-4 md:grid-cols-3"><Field label="Manufacturer"><Input value={form.manufacturer} onChange={e => setField('manufacturer', e.target.value)} placeholder={copy.manufacturerPlaceholder} /></Field><Field label="MPN"><Input value={form.mpn} onChange={e => setField('mpn', e.target.value)} placeholder={copy.mpnPlaceholder} /></Field><Field label="Model number"><Input value={form.model_number} onChange={e => setField('model_number', e.target.value)} placeholder={copy.modelPlaceholder} /></Field></div> : null}
                 </div>
-                {SHOW_PRODUCT_ATTRIBUTES && <section className="mt-5 space-y-4 border-t pt-5" aria-labelledby="product-attributes-title">
+                {(categoryAttributesForProduct.length > 0 || retainedAttributes.length > 0) && <section className="mt-5 space-y-4 border-t pt-5" aria-labelledby="product-attributes-title">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div><h3 id="product-attributes-title" className="text-sm font-semibold">Product attributes</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Fields are loaded automatically from the selected category.</p></div>
                     {missingRequiredCategoryAttributes.length ? <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50">{missingRequiredCategoryAttributes.length} required {missingRequiredCategoryAttributes.length === 1 ? 'field' : 'fields'} missing</Badge> : requiredCategoryAttributes.length ? <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">Required fields complete</Badge> : null}
                   </div>
-                  {!form.category ? <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">Attributes will appear after selecting a category</p><p className="mt-1 text-xs text-muted-foreground">Use the Product category field above to load its required attributes.</p></div> : categoryAttributesForProduct.length ? <div className="divide-y overflow-hidden rounded-lg border">{categoryAttributesForProduct.map(attribute => { const spec = specificationForAttribute(attribute); const managedGroup = form.has_variants ? variantGroups.find(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase()) : undefined; const missingRequired = attribute.required && !spec?.value.trim() && !managedGroup?.values.length; return <div key={attribute.key} className="grid gap-3 p-4 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.3fr)] sm:items-start"><div><div className="flex items-center gap-2"><Label htmlFor={`product-attribute-${attribute.key}`} className="text-sm font-semibold">{attribute.name}</Label>{managedGroup ? <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">Variant attribute</Badge> : attribute.required ? <span className="text-xs font-semibold text-destructive">Required</span> : <span className="text-xs text-muted-foreground">Optional</span>}</div><p className="mt-1 text-xs text-muted-foreground">{attribute.type}</p></div><div className="space-y-1.5" id={`product-attribute-${attribute.key}`}>{managedGroup ? <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2"><div><p className="text-sm font-medium">Managed by variants</p><p className="mt-0.5 text-xs text-muted-foreground">{managedGroup.values.length ? managedGroup.values.join(', ') : 'Add at least one value in Commerce'}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => selectWorkspace('commerce')}>Manage variants<ChevronRight className="size-3.5" /></Button></div> : <><DynamicAttributeValueControl attribute={attribute} value={spec?.value ?? ''} onChange={nextValue => setSpecifications(current => current.map(item => item.attributeKey === attribute.key || (!item.attributeKey && item.name.toLowerCase() === attribute.name.toLowerCase()) ? { ...item, attributeKey: attribute.key, name: attribute.name, value: nextValue } : item))}  />{attribute.isLocalizable && contentLocale !== primaryLocale ? <div className="mt-2 space-y-2 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3"><div className="flex flex-wrap items-center gap-2"><Globe2 className="size-3.5 text-primary" /><span className="text-xs font-semibold">{activeOrgLocales.find(locale => locale.locale === contentLocale)?.nativeLabel ?? contentLocale} translation</span><span className="ml-auto text-[11px] text-muted-foreground">{localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() ? 'Complete' : `Using ${primaryLocaleConfig?.nativeLabel ?? 'primary'} fallback`}</span></div><DynamicAttributeValueControl attribute={attribute} value={localizedContent[contentLocale]?.attributeValues?.[attribute.key] ?? ''} onChange={value => updateLocalizedAttributeValue(attribute.key, value)} />{!localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() && spec?.value.trim() ? <p className="text-[11px] leading-4 text-muted-foreground">Reference: {spec.value}</p> : null}</div> : null}{missingRequired ? <p className="text-xs font-medium text-destructive">Enter a value before saving.</p> : attribute.required && attribute.validation ? <p className="text-xs text-muted-foreground">{attribute.validation}</p> : null}</>}</div></div>; })}</div> : <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">No additional attributes required</p><p className="mt-1 text-xs text-muted-foreground">This category does not require extra product information.</p></div>}
+                  {retainedAttributes.length ? <details className="rounded-lg border bg-muted/10 p-4"><summary className="cursor-pointer text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Saved values outside this category ({retainedAttributes.length})</summary><p className="mt-2 text-xs text-muted-foreground">These values are kept, but are not required by the current category. They are restored if you switch back. Translations are also preserved.</p><dl className="mt-3 space-y-2">{retainedAttributes.map((spec, index) => <div key={`${spec.attributeKey ?? spec.name}-${index}`} className="grid gap-1 text-sm sm:grid-cols-2"><dt className="text-muted-foreground">{spec.name}</dt><dd className="break-words">{spec.value}</dd></div>)}</dl></details> : null}
+                  {!form.category ? <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">Attributes will appear after selecting a category</p><p className="mt-1 text-xs text-muted-foreground">Use the Product category field above to load its required attributes.</p></div> : categoryAttributesForProduct.length ? <div className="divide-y overflow-hidden rounded-lg border">{categoryAttributesForProduct.map(attribute => { const spec = specificationForAttribute(attribute); const managedGroup = form.has_variants ? variantGroups.find(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase()) : undefined; const missingRequired = attribute.required && !spec?.value.trim() && !managedGroup?.values.length; return <div key={attribute.key} className="grid gap-3 p-4 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.3fr)] sm:items-start"><div><div className="flex items-center gap-2"><Label htmlFor={`product-attribute-${attribute.key}`} className="text-sm font-semibold">{attribute.name}</Label>{managedGroup ? <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">Variant attribute</Badge> : attribute.required ? <span className="text-xs font-semibold text-destructive">Required</span> : <span className="text-xs text-muted-foreground">Optional</span>}</div><p className="mt-1 text-xs text-muted-foreground">{attribute.type}</p></div><div className="space-y-1.5" id={`product-attribute-${attribute.key}`}>{managedGroup ? <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2"><div><p className="text-sm font-medium">Managed by variants</p><p className="mt-0.5 text-xs text-muted-foreground">{managedGroup.values.length ? managedGroup.values.join(', ') : 'Add at least one value in Commerce'}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => selectWorkspace('commerce')}>Manage variants<ChevronRight className="size-3.5" /></Button></div> : <><DynamicAttributeValueControl attribute={attribute} value={spec?.value ?? ''} onChange={nextValue => setSpecifications(current => current.map(item => item.attributeKey === attribute.key || (!item.attributeKey && item.name.toLowerCase() === attribute.name.toLowerCase()) ? { ...item, attributeKey: attribute.key, name: attribute.name, value: nextValue } : item))}  />{attribute.isLocalizable && contentLocale !== primaryLocale ? <div className="mt-2 space-y-2 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3"><div className="flex flex-wrap items-center gap-2"><Globe2 className="size-3.5 text-primary" /><span className="text-xs font-semibold">{activeOrgLocales.find(locale => locale.locale === contentLocale)?.nativeLabel ?? contentLocale} translation</span><span className="ml-auto text-[11px] text-muted-foreground">{localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() ? 'Complete' : `Using ${primaryLocaleConfig?.nativeLabel ?? 'primary'} fallback`}</span></div><DynamicAttributeValueControl attribute={attribute} value={localizedContent[contentLocale]?.attributeValues?.[attribute.key] ?? ''} onChange={value => updateLocalizedAttributeValue(attribute.key, value)} />{!localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() && spec?.value.trim() ? <p className="text-[11px] leading-4 text-muted-foreground">Reference: {spec.value}</p> : null}</div> : null}{missingRequired ? <p className="text-xs font-medium text-destructive">Enter a value before publishing. Drafts can be saved without it.</p> : attribute.required && attribute.validation ? <p className="text-xs text-muted-foreground">{attribute.validation}</p> : null}</>}</div></div>; })}</div> : <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">No additional attributes required</p><p className="mt-1 text-xs text-muted-foreground">This category does not require extra product information.</p></div>}
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div><p className="text-xs font-medium">Attribute setup</p><p className="mt-1 text-xs text-muted-foreground">Changes open in Catalog Setup. Save there to return to this product.</p></div><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm" disabled={!form.category || !canWrite}>Manage attribute setup<ChevronDown className="size-3.5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-80"><DropdownMenuLabel>Manage {form.category || 'category'} attributes</DropdownMenuLabel>{categoryAttributesForProduct.filter(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select').map(attribute => <DropdownMenuItem key={attribute.key} className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ attribute: attribute.key })}><Tags className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Edit {attribute.name} values</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Add or edit selectable values used across products.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem>)}{categoryAttributesForProduct.some(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select') ? <DropdownMenuSeparator /> : null}<DropdownMenuItem className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ category: form.category })}><Layers className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Manage attributes for {form.category}</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Assign fields and set which ones are required.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div><p className="text-xs font-medium">Attribute setup</p><p className="mt-1 text-xs text-muted-foreground">Changes open in Catalog Setup. Save there to return to this product.</p></div><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm" disabled={!form.category || !canWrite}>Manage attribute setup<ChevronDown className="size-3.5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-80"><DropdownMenuLabel>Manage {form.category || 'category'} attributes</DropdownMenuLabel>{categoryAttributesForProduct.filter(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select').map(attribute => <DropdownMenuItem key={attribute.key} className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ attribute: attribute.key })}><Tags className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Edit {attribute.name} values</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Add or edit selectable values used across products.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem>)}{categoryAttributesForProduct.some(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select') ? <DropdownMenuSeparator /> : null}<DropdownMenuItem className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ category: selectedCatalogCategory?.id ?? form.category })}><Layers className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Manage attributes for {form.category}</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Assign fields and set which ones are required.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </section>}
               </CardContent>
             </Card>
 
 
-            {/* ── Create / Edit Price Policy Dialog ──────────────────────────── */}
-            {(() => {
-              const isEdit = Boolean(editingPolicy);
-              const setPD = (k: keyof PricePolicy, v: string | number | boolean) =>
-                setPolicyDraft(p => ({ ...p, [k]: v }));
-              const basePrice = num(form.retail_price);
-              const preview = computeEffectivePrice(basePrice, policyDraft);
-
-              function handleSavePolicy() {
-                if (!policyDraft.name.trim() || !policyDraft.code.trim() || !policyDraft.targetCurrency || policyDraft.fxRate <= 0) return;
-                if (isEdit && editingPolicy) {
-                  setPricePolicies(ps => ps.map(p => p.id === editingPolicy.id ? { ...policyDraft, id: editingPolicy.id } : p));
-                } else {
-                  setPricePolicies(ps => [...ps, { ...policyDraft, id: `pp_${Date.now()}` }]);
-                }
-                setPolicyDialogOpen(false);
-                setEditingPolicy(null);
-              }
-
-              return (
-                <Dialog open={policyDialogOpen} onOpenChange={open => { if (!open) { setPolicyDialogOpen(false); setEditingPolicy(null); } }}>
-                  <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle>{isEdit ? 'Edit price policy' : 'Create price policy'}</DialogTitle>
-                      <DialogDescription>A reusable calculation chain: FX, adjustment, fees, tax, rounding and guardrails applied on top of the canonical price.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid grid-cols-2 gap-3 py-2">
-                      <Field label="Policy name" required>
-                        <Input value={policyDraft.name} onChange={e => { setPD('name', e.target.value); if (!isEdit) setPD('code', slugifyCode(e.target.value)); }} placeholder="VN Standard" />
-                      </Field>
-                      <Field label="Policy code" required>
-                        <Input value={policyDraft.code} onChange={e => setPD('code', slugifyCode(e.target.value))} placeholder="VN-STANDARD" className="font-mono uppercase" />
-                      </Field>
-                      <Field label="Target currency" required>
-                        <CurrencyPicker value={policyDraft.targetCurrency} onChange={code => setPD('targetCurrency', code)} />
-                      </Field>
-                      <div>
-                        <Field label="FX rate">
-                          <Input type="number" min="0" step="0.0001" value={policyDraft.fxRate || ''} onChange={e => setPD('fxRate', parseFloat(e.target.value) || 0)} placeholder="1" />
-                        </Field>
-                        <p className="mt-1 text-[11px] text-muted-foreground">1 {form.price_currency} = ? {policyDraft.targetCurrency}</p>
-                      </div>
-                      <div>
-                        <Field label="FX validity (hours)">
-                          <Input type="number" min="0" value={policyDraft.fxValidityHours || ''} onChange={e => setPD('fxValidityHours', parseInt(e.target.value) || 0)} placeholder="0" />
-                        </Field>
-                        <p className="mt-1 text-[11px] text-muted-foreground">0 = fixed rate</p>
-                      </div>
-                      <div>
-                        <Field label="Adjustment (%)">
-                          <Input type="number" step="0.1" value={policyDraft.adjustmentPct || ''} onChange={e => setPD('adjustmentPct', parseFloat(e.target.value) || 0)} placeholder="0" />
-                        </Field>
-                        <p className="mt-1 text-[11px] text-muted-foreground">+ markup / − markdown</p>
-                      </div>
-                      <Field label="Marketplace fee (%)">
-                        <Input type="number" min="0" step="0.1" value={policyDraft.marketplaceFeePct || ''} onChange={e => setPD('marketplaceFeePct', parseFloat(e.target.value) || 0)} placeholder="0" />
-                      </Field>
-                      <Field label="Tax (%)">
-                        <Input type="number" min="0" step="0.1" value={policyDraft.taxPct || ''} onChange={e => setPD('taxPct', parseFloat(e.target.value) || 0)} placeholder="0" />
-                      </Field>
-                      <div>
-                        <Field label="Rounding increment">
-                          <Input type="number" min="0" step="0.01" value={policyDraft.roundingIncrement || ''} onChange={e => setPD('roundingIncrement', parseFloat(e.target.value) || 0.01)} placeholder="0.01" />
-                        </Field>
-                        <p className="mt-1 text-[11px] text-muted-foreground">e.g. 1000 for VND · 0.1 for SGD</p>
-                      </div>
-                      <div className="col-span-2">
-                        {basePrice > 0 && policyDraft.fxRate > 0 ? (
-                          <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                            <span className="text-muted-foreground">Effective price preview</span>
-                            <strong className="tabular-nums">{formatLocalizedNumber(locale, preview)} {policyDraft.targetCurrency}</strong>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div>
-                        <Field label="Minimum price">
-                          <Input type="number" min="0" value={policyDraft.minPrice || ''} onChange={e => setPD('minPrice', parseFloat(e.target.value) || 0)} placeholder="0" />
-                        </Field>
-                        <p className="mt-1 text-[11px] text-muted-foreground">0 = no floor</p>
-                      </div>
-                      <div>
-                        <Field label="Maximum price">
-                          <Input type="number" min="0" value={policyDraft.maxPrice || ''} onChange={e => setPD('maxPrice', parseFloat(e.target.value) || 0)} placeholder="0" />
-                        </Field>
-                        <p className="mt-1 text-[11px] text-muted-foreground">0 = no ceiling</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 border-t pt-4">
-                      <Button type="button" variant="outline" onClick={() => { setPolicyDialogOpen(false); setEditingPolicy(null); }}>Cancel</Button>
-                      <Button type="button" disabled={!policyDraft.name.trim() || !policyDraft.code.trim() || !policyDraft.targetCurrency || policyDraft.fxRate <= 0}
-                        onClick={handleSavePolicy}>{isEdit ? 'Save changes' : 'Create and activate'}</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              );
-            })()}
 
             {/* Variant setup and pricing */}
             <Card id="product-section-pricing" tabIndex={-1} className={cn('order-1', activeSection !== 'commerce' && 'hidden')}>
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />{form.has_variants ? 'Variants & Pricing' : 'Pricing & Inventory'}</CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">{form.has_variants ? 'Configure the variant attributes, SKU matrix and pricing for this Product Master.' : 'Configure the canonical price and inventory for this single-SKU Product Master.'}</p>
+                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />Pricing &amp; Inventory</CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">{form.has_variants ? 'Manage variants, pricing and stock for this product.' : <>Manage pricing and stock for SKU <span className="break-all font-mono text-foreground">{form.sku_code || 'Not assigned'}</span>.</>}</p>
               </CardHeader>
               <CardContent className="space-y-5">
                 {form.has_variants ? <section className="space-y-4" aria-labelledby="variant-attributes-title">
-                  <div className="flex items-start justify-between gap-3"><div><h3 id="variant-attributes-title" className="text-sm font-semibold">Variant options</h3><p className="mt-1 text-xs text-muted-foreground">Select the Color, Size or other category values that create sellable SKUs.</p></div><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{variantGroups.length} of 2</span></div>
+                  <div className="flex items-start justify-between gap-3"><div><h3 id="variant-attributes-title" className="text-sm font-semibold">Variants</h3><p className="mt-1 text-xs text-muted-foreground">Select the Color, Size or other category values that create sellable SKUs.</p></div><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{variantGroups.length} of 2</span></div>
                   <VariantSection
                     groups={variantGroups}
                     onGroupsChange={setVariantGroups}
@@ -3966,7 +3839,7 @@ export default function ProductCreatePage() {
                     existingSkus={existingSkuList}
                     availableAttributes={allSelectableVariantAttributes.map(attribute => ({ key: attribute.key, name: attribute.name, options: attribute.options.split(',').map(option => option.trim()).filter(Boolean) }))}
                     onAttributeValueAdded={addCatalogAttributeValue}
-                    onVariantAttributeAdded={addVariantAttributeToCategory}
+                    onVariantAttributeAdded={notifyVariantAttributeSelected}
                     copy={{
                       duplicateAttribute: copy.duplicateAttribute,
                       addValuePlaceholder: copy.addValuePlaceholder,
@@ -4016,20 +3889,16 @@ export default function ProductCreatePage() {
 
                 {/* ── Inventory by location ───────────────────────────────── */}
                 {!form.has_variants ? <section className="space-y-3 border-t pt-5" aria-labelledby="inventory-title">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 id="inventory-title" className="text-sm font-semibold">Inventory by location</h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{existingProduct ? 'Adjust stock here. Each change is saved with its reason in adjustment history.' : 'Set the initial stock at each warehouse for this SKU.'}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{existingProduct ? 'Locations with recorded stock, including zero. Each change is saved in adjustment history.' : 'Set the initial stock at each warehouse for this SKU.'}</p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Package className="size-3.5" />
-                      <span className="tabular-nums font-semibold text-foreground">{formatLocalizedNumber(locale, totalStock)}</span>
-                      <span>{copy.units} total</span>
-                    </div>
+                    {existingProduct && canWrite && availableStockLocations.length > 0 && <Button type="button" variant="outline" size="sm" className="min-h-9 shrink-0" onClick={openAddStockLocation}><Plus className="size-3.5" />Add stock location</Button>}
                   </div>
-                  <div className="overflow-hidden rounded-lg border">
-                    {WAREHOUSES.map((warehouse, idx) => (
-                      <div key={warehouse.id} className={cn('grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4', idx < WAREHOUSES.length - 1 && 'border-b')}>
+                  {inventoryLocations.length ? <div className="overflow-hidden rounded-lg border">
+                    {inventoryLocations.map((warehouse, idx) => (
+                      <div key={warehouse.id} className={cn('grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4', idx < inventoryLocations.length - 1 && 'border-b')}>
                         <div>
                           <p className="text-sm font-medium">{warehouse.label}</p>
                           <p className="text-[11px] text-muted-foreground">{warehouse.code}</p>
@@ -4047,65 +3916,12 @@ export default function ProductCreatePage() {
                       </div>
                     ))}
                     <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-2.5 text-sm">
-                      <span className="text-muted-foreground">{copy.totalStock}</span>
-                      <strong className="tabular-nums">{formatLocalizedNumber(locale, totalStock)} {copy.units}</strong>
+                      <span className="text-muted-foreground">{existingProduct ? 'Total recorded stock' : copy.totalStock}</span>
+                      <strong className="tabular-nums">{formatLocalizedNumber(locale, existingProduct ? recordedStockTotal : totalStock)} {copy.units}</strong>
                     </div>
-                  </div>
+                  </div> : <div className="rounded-lg border border-dashed px-4 py-6 text-center"><p className="text-sm font-medium">No stock recorded yet</p><p className="mt-1 text-xs text-muted-foreground">{canWrite && availableStockLocations.length ? 'Add a stock location to record this product’s first count.' : 'Stock will appear here once recorded.'}</p></div>}
                 </section> : null}
 
-                {/* ── Cross-currency policies ─────────────────────────────── */}
-                {!form.has_variants ? <section className="border-t pt-5" aria-labelledby="policy-title">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <h3 id="policy-title" className="text-sm font-semibold">Cross-currency policies</h3>
-                      <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">Selling in a different currency? Set FX rates, fees, and rounding to auto-calculate the price.</p>
-                    </div>
-                    {pricePolicies.length > 0 && (
-                      <Button type="button" variant="outline" size="sm" className="shrink-0"
-                        onClick={() => { setEditingPolicy(null); setPolicyDraft({ id: '', name: '', code: '', ...EMPTY_POLICY }); setPolicyDialogOpen(true); }}>
-                        <Plus className="size-3.5" />New policy
-                      </Button>
-                    )}
-                  </div>
-                  {pricePolicies.length === 0 ? (
-                    <div className="flex items-center gap-4 rounded-lg border border-dashed bg-muted/10 px-4 py-4">
-                      <Globe2 className="size-7 shrink-0 text-muted-foreground/30" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">Not needed for single-currency stores</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">All channels sell in <strong>{form.price_currency}</strong>? You're all set. Create a policy only when selling in VND, SGD, or other currencies.</p>
-                      </div>
-                      <Button type="button" variant="outline" size="sm" className="shrink-0"
-                        onClick={() => { setEditingPolicy(null); setPolicyDraft({ id: '', name: '', code: '', ...EMPTY_POLICY }); setPolicyDialogOpen(true); }}>
-                        <Plus className="size-3.5" />Create
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="overflow-hidden rounded-lg border">
-                      <div className="hidden grid-cols-[minmax(140px,1fr)_80px_minmax(100px,0.8fr)_70px_80px] gap-2 border-b bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
-                        <span>Policy</span><span>Currency</span><span>Effective price</span><span>Status</span><span className="text-right">Actions</span>
-                      </div>
-                      {pricePolicies.map(policy => {
-                        const effective = computeEffectivePrice(num(form.retail_price), policy);
-                        return (
-                          <div key={policy.id} className="grid gap-2 border-b px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(140px,1fr)_80px_minmax(100px,0.8fr)_70px_80px] sm:items-center">
-                            <div><p className="text-sm font-semibold">{policy.name}</p><p className="text-[11px] text-muted-foreground">{policy.code}</p></div>
-                            <span className="text-sm font-mono">{policy.targetCurrency}</span>
-                            <span className="text-sm font-semibold tabular-nums">{effective > 0 ? formatLocalizedNumber(locale, effective) : <span className="text-muted-foreground">—</span>}</span>
-                            <button type="button" role="switch" aria-checked={policy.enabled}
-                              onClick={() => setPricePolicies(ps => ps.map(p => p.id === policy.id ? { ...p, enabled: !p.enabled } : p))}
-                              className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-fit', policy.enabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground')}>
-                              {policy.enabled ? 'Active' : 'Off'}
-                            </button>
-                            <div className="flex justify-end gap-1">
-                              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setEditingPolicy(policy); setPolicyDraft({ ...policy }); setPolicyDialogOpen(true); }}>Edit</Button>
-                              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setPricePolicies(ps => ps.filter(p => p.id !== policy.id))}>Remove</Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section> : null}
 
               </CardContent>
             </Card>
@@ -4295,7 +4111,10 @@ export default function ProductCreatePage() {
         onOpenChange={setChannelListingWizardOpen}
         channels={OVERRIDE_CHANNELS.filter(channel => channel.connectionStatus === 'connected')}
         drafts={channelListingDrafts}
+        rakutenBrandName={rakutenBrandName}
         masterSku={form.sku_code}
+        basePrice={num(form.retail_price)}
+        baseCurrency={form.price_currency}
         productName={form.name}
         productCategory={form.category}
         availableStock={totalStock}
@@ -4308,6 +4127,7 @@ export default function ProductCreatePage() {
           [channel]: { ...current[channel as OverrideChannel], ...patch },
         }))}
         onSubmitted={() => {
+          persistListingDrafts(channelListingDrafts);
           setChannelOverrides(Object.fromEntries(Object.entries(channelListingDrafts).map(([key, value]) => [key, { ...value }])) as Record<OverrideChannel, ChannelOverrideForm>);
           toast({ title: 'Channel listing drafts created', description: 'Review readiness and provider validation before publishing.' });
         }}
@@ -4318,8 +4138,18 @@ export default function ProductCreatePage() {
         onOpenChange={open => { if (!open) setEditingChannel(null); }}
         channel={editingChannel ? OVERRIDE_CHANNELS.find(channel => channel.key === editingChannel) ?? null : null}
         draft={editingChannel ? channelOverrides[editingChannel] : null}
+        rakutenBrandName={rakutenBrandName}
         masterSku={form.sku_code}
+        productName={form.name}
+        basePrice={num(form.retail_price)}
+        baseCurrency={form.price_currency}
         productVariants={listingEditorVariants}
+        inventorySources={listingEditorInventorySources}
+        masterImages={images}
+        onUploadMasterImage={canWrite ? file => handleImageUpload(file, 'gallery') : undefined}
+        uploadingImages={uploadingImageCount > 0}
+        masterMissingItems={masterListingChecks.filter(check => !check.done)}
+        onEditMaster={checkId => { setEditingChannel(null); openCompletionItem(checkId); }}
         masterPersisted={Boolean(existingProduct)}
         masterHasUnsavedChanges={isDirty}
         masterDataComplete={masterReadyForListings}
@@ -4327,6 +4157,7 @@ export default function ProductCreatePage() {
         onSaveMaster={() => handleSave(undefined, { navigateAfter: false })}
         onSave={patch => {
           if (!editingChannel) return;
+          persistListingDrafts({ [editingChannel]: { ...channelOverrides[editingChannel], ...patch } });
           setChannelOverrides(current => ({
             ...current,
             [editingChannel]: { ...current[editingChannel], ...patch },
@@ -4338,10 +4169,11 @@ export default function ProductCreatePage() {
       {stockAdjustment && existingProduct && <AdjustWarehouseStockDialog
         target={stockAdjustment}
         products={[stockAdjustment.product ?? existingProduct]}
-        warehouses={getWarehouses()}
+        warehouses={addingStockLocation ? availableStockLocations : getWarehouses()}
         lockProduct
+        initializeLocation={addingStockLocation}
         onClose={refreshAdjustedStock}
-        onSaved={() => { refreshAdjustedStock(); toast({ title: 'Stock adjustment recorded', description: 'Stock updated. Your other product changes are still here.' }); }}
+        onSaved={() => { refreshAdjustedStock(); toast({ title: addingStockLocation ? 'Stock location added' : 'Stock adjustment recorded', description: 'Stock updated. Your other product changes are still here.' }); }}
       />}
 
       <ConfirmDialog
@@ -4411,17 +4243,22 @@ export default function ProductCreatePage() {
         </DialogContent>
       </Dialog>
       <Dialog open={categoryOpen} onOpenChange={setCategoryOpen}>
-        <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-3xl">
-          <DialogHeader className="border-b p-5"><DialogTitle>Select product category</DialogTitle><DialogDescription>Choose the most accurate master category. Channel mappings can be configured during publishing.</DialogDescription></DialogHeader>
-          <div className="p-5">
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="shrink-0 border-b p-5"><DialogTitle>{categoryReviewOpen ? 'Review category change' : 'Select product category'}</DialogTitle><DialogDescription>{categoryReviewOpen ? 'Review the fields before applying this change to your draft.' : 'Choose a stable product type. Use tags or collections for promotions and seasonal groups.'}</DialogDescription></DialogHeader>
+          {categoryReviewOpen && pendingCategoryDiff ? <div className="min-h-0 space-y-4 overflow-y-auto p-5">
+            <p className="text-sm"><span className="text-muted-foreground">{selectedCatalogCategory?.name || form.category || 'No category'}</span> → <strong>{pendingCatalogCategory?.name}</strong></p>
+            <CategorySchemaChanges diff={pendingCategoryDiff} attributes={catalogSettings.attributes} specifications={specifications} />
+            {pendingCategoryMissing.length ? <div className="rounded-lg border border-amber-500/30 p-4 text-sm"><p className="font-medium text-amber-700 dark:text-amber-300">{pendingCategoryMissing.length} required {pendingCategoryMissing.length === 1 ? 'field' : 'fields'} to complete</p><p className="mt-1">{pendingCategoryMissing.map(attribute => attribute.name).join(', ')}</p><p className="mt-2 text-xs text-muted-foreground">You can save a draft now and fill these fields before publishing.</p></div> : null}
+            <p className="text-sm text-muted-foreground">Existing values and translations are kept. This change is staged until you save the Master. Live listings stay unchanged.</p>
+          </div> : <div className="min-h-0 overflow-y-auto p-5">
             <div className="relative mb-4"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={categorySearch} onChange={event => setCategorySearch(event.target.value)} placeholder="Search categories..." className="pl-9" /></div>
-            {categorySearch.trim() ? <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border p-2">{matchingCategoryPaths.map(item => <button key={`${item.group}-${item.subgroup}-${item.leaf}`} type="button" onClick={() => { setCategoryLevelOne(item.group); setCategoryLevelTwo(item.subgroup); setPendingCategory(item.leaf); }} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${pendingCategory === item.leaf ? 'bg-primary/10 text-primary' : ''}`}><span>{item.group} / {item.subgroup} / <strong>{item.leaf}</strong></span>{pendingCategory === item.leaf ? <Check className="size-4" /> : null}</button>)}</div> : <div className="grid min-h-72 grid-cols-1 overflow-hidden rounded-lg border sm:grid-cols-3">
-              <div className="border-b p-2 sm:border-b-0 sm:border-r">{categoryTree.map(group => <button key={group.label} type="button" onClick={() => { setCategoryLevelOne(group.label); setCategoryLevelTwo(group.children[0].label); }} className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelOne === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
-              <div className="border-b p-2 sm:border-b-0 sm:border-r">{selectedCategoryGroup.children.map(group => <button key={group.label} type="button" onClick={() => setCategoryLevelTwo(group.label)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelTwo === group.label ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
-              <div className="p-2">{selectedCategorySubgroup.children.map(category => <button key={category} type="button" onClick={() => setPendingCategory(category)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${pendingCategory === category ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{category}{pendingCategory === category ? <Check className="size-4" /> : null}</button>)}</div>
+            {categorySearch.trim() ? <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border p-2">{matchingCategoryPaths.map(item => <button key={item.leaf.id} type="button" aria-pressed={pendingCategory === item.leaf.id} onClick={() => { setCategoryLevelOne(item.group.id); setCategoryLevelTwo(item.subgroup.id); setPendingCategory(item.leaf.id); }} className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring ${pendingCategory === item.leaf.id ? 'bg-primary/10 text-primary' : ''}`}><span>{item.group.label} / {item.subgroup.label} / <strong>{item.leaf.name}</strong></span>{pendingCategory === item.leaf.id ? <Check className="size-4" /> : null}</button>)}</div> : <div className="grid min-h-72 grid-cols-1 overflow-hidden rounded-lg border sm:grid-cols-3">
+              <div className="border-b p-2 sm:border-b-0 sm:border-r">{categoryTree.map(group => <button key={group.id} type="button" onClick={() => { setCategoryLevelOne(group.id); setCategoryLevelTwo(group.children[0].id); }} className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelOne === group.id ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
+              <div className="border-b p-2 sm:border-b-0 sm:border-r">{selectedCategoryGroup.children.map(group => <button key={group.id} type="button" onClick={() => setCategoryLevelTwo(group.id)} className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${categoryLevelTwo === group.id ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{group.label}<ChevronRight className="size-4" /></button>)}</div>
+              <div className="p-2">{selectedCategorySubgroup.children.map(category => <button key={category.id} type="button" aria-pressed={pendingCategory === category.id} onClick={() => setPendingCategory(category.id)} className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${pendingCategory === category.id ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted'}`}>{category.name}{pendingCategory === category.id ? <Check className="size-4" /> : null}</button>)}</div>
             </div>}
-          </div>
-          <div className="flex flex-col gap-3 border-t p-5 sm:flex-row sm:items-center"><p className="mr-auto truncate text-xs text-muted-foreground">Selected: <strong className="text-foreground">{pendingCategory || 'None'}</strong></p><Button variant="outline" onClick={() => setCategoryOpen(false)}>Cancel</Button><Button disabled={!pendingCategory} onClick={() => { setField('category', pendingCategory); setCategoryOpen(false); setCategorySearch(''); }}>Confirm Category</Button></div>
+          </div>}
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-t p-5"><p className="mr-auto text-xs text-muted-foreground">Selected: <strong className="text-foreground">{pendingCatalogCategory?.name || 'None'}</strong></p>{categoryReviewOpen ? <Button variant="ghost" onClick={() => setCategoryReviewOpen(false)}>Back</Button> : null}<Button variant="outline" onClick={() => setCategoryOpen(false)}>Cancel</Button><Button disabled={!pendingCatalogCategory} onClick={() => { if (!categoryReviewOpen && form.category && pendingCategory !== selectedCatalogCategory?.id) setCategoryReviewOpen(true); else stageCategoryChange(); }}>{categoryReviewOpen ? 'Apply to draft' : 'Confirm Category'}</Button></div>
         </DialogContent>
       </Dialog>
       <ConfirmDialog

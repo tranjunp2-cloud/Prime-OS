@@ -22,6 +22,15 @@ export function canEditWarehouseStock(id: string): boolean {
   const warehouse = getWarehouseById(id);
   return Boolean(warehouse && !warehouse.is_virtual && ['internal', '3pl'].includes(warehouse.type));
 }
+
+/** Record a first count without treating an unknown balance as zero or a stock movement. */
+export function initializeProductStockLocation(product: Product, warehouseId: string, quantity: number): Product {
+  if (!canEditWarehouseStock(warehouseId) || getWarehouseById(warehouseId)?.status !== 'active') throw new Error('Choose an active, editable warehouse.');
+  if (product.has_variants) throw new Error('Record stock for each variant SKU instead.');
+  if (recordedQuantity(product.inventory[warehouseId]) !== null) throw new Error('Stock is already recorded at this location. Use Adjust stock instead.');
+  if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error('Enter a whole number of 0 or more.');
+  return { ...product, inventory: { ...product.inventory, [warehouseId]: quantity } };
+}
 export const channelNames: Record<string, string> = { shopee: 'Shopee', lazada: 'Lazada', amazon: 'Amazon', tiktok: 'TikTok Shop', rakuten: 'Rakuten', website: 'Website', pos: 'POS', social: 'Social' };
 export const activeChannels = (product: Product) => [...new Set(product.channels.filter(channel => channel.status === 'active').map(channel => channel.channel))];
 

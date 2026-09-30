@@ -53,10 +53,12 @@ export interface CatalogBrand {
   website: string;
   roles?: Array<'Brand' | 'Manufacturer' | 'Rights holder' | 'Distributor' | 'Reseller'>;
   productCount: number;
-  status: 'Verified' | 'Unverified' | 'Inactive';
+  status: 'Active' | 'Inactive';
   source: CatalogRecordSource;
   aliases: string[];
   mappings: Partial<Record<CatalogChannel, string>>;
+  /** Optional local-demo selection context; not marketplace approval. */
+  mappingSelections?: Partial<Record<CatalogChannel, import('./brand-marketplace-demo').BrandMappingSelection>>;
 }
 
 export interface CatalogCategory {
@@ -72,6 +74,19 @@ export interface CatalogCategory {
   attributes: Array<{ key: string; required: boolean }>;
   mappings: Record<CatalogChannel, ReviewStatus>;
   channelMappings?: Partial<Record<CatalogChannel, CategoryChannelMapping>>;
+}
+
+type StoredCatalogBrand = Omit<CatalogBrand, 'status'> & {
+  status: CatalogBrand['status'] | 'Verified' | 'Unverified';
+};
+
+function restoreCatalogBrand(brand: StoredCatalogBrand): CatalogBrand {
+  // Legacy verification described internal records, not marketplace approval.
+  // Preserve inactive brands, identities and mappings when removing that gate.
+  return {
+    ...brand,
+    status: brand.status === 'Verified' || brand.status === 'Unverified' ? 'Active' : brand.status,
+  };
 }
 
 const STORAGE_KEY = 'prime-product-catalog-settings-v2';
@@ -97,16 +112,16 @@ export const defaultCatalogAttributes: CatalogAttribute[] = [
 ];
 
 export const defaultCatalogBrands: CatalogBrand[] = [
-  { id: 'cyber-records', name: 'CYBER-RECORDS', code: 'CYBR', manufacturer: 'CyberRecord Japan Co.', country: 'Japan', website: 'https://cyber-records.example', productCount: 5, status: 'Verified', source: 'internal', aliases: ['CyberRecords', 'CYBER RECORDS'], mappings: { amazon: 'CYBER RECORDS', shopee: '1009234', lazada: 'BR-20418' } },
-  { id: 'prime-essentials', name: 'Prime Essentials', code: 'PRME', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 12, status: 'Verified', source: 'internal', aliases: [], mappings: { shopee: '1008871' } },
-  { id: 'prime-craft', name: 'Prime Craft', code: 'PRCR', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 8, status: 'Verified', source: 'internal', aliases: [], mappings: { shopee: '1008872', lazada: 'BR-20419' } },
-  { id: 'prime-art', name: 'Prime Art', code: 'PRAT', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 4, status: 'Verified', source: 'internal', aliases: [], mappings: { shopee: '1008873' } },
-  { id: 'kuretake', name: 'Kuretake', code: 'KRTK', manufacturer: 'Kuretake Co., Ltd.', country: 'Japan', website: 'https://kuretake.co.jp', productCount: 1, status: 'Verified', source: 'internal', aliases: ['呉竹', 'ZIG'], mappings: { amazon: 'Kuretake', shopee: '1012045', lazada: 'BR-20445' } },
-  { id: 'da-vinci', name: 'Da Vinci', code: 'DVNC', manufacturer: 'Da Vinci Brushes GmbH', country: 'Germany', website: 'https://da-vinci-brushes.com', productCount: 3, status: 'Verified', source: 'internal', aliases: ['DaVinci', 'da vinci brushes'], mappings: { amazon: 'Da Vinci', shopee: '1010881' } },
-  { id: 'kai-industries', name: 'Kai Industries', code: 'KAII', manufacturer: 'Kai Industries Co., Ltd.', country: 'Japan', website: 'https://kai-group.com', productCount: 2, status: 'Verified', source: 'internal', aliases: ['KAI', '貝印'], mappings: { amazon: 'KAI', rakuten: 'kai-group', lazada: 'BR-20501' } },
-  { id: 'mijello', name: 'Mijello', code: 'MJLO', manufacturer: 'Mijello Co., Ltd.', country: 'South Korea', website: 'https://mijello.com', productCount: 2, status: 'Unverified', source: 'imported', aliases: ['미젤로'], mappings: { amazon: 'Mijello', shopee: '1013201' } },
-  { id: 'copic', name: 'Copic', code: 'COPC', manufacturer: 'Too Copic', country: 'Japan', website: 'https://copic.jp', productCount: 1, status: 'Unverified', source: 'imported', aliases: ['Too Copic', 'コピック'], mappings: { amazon: 'Copic' } },
-  { id: 'no-brand', name: 'No Brand', code: 'GENERIC', manufacturer: '', country: '', website: '', productCount: 8, status: 'Unverified', source: 'imported', aliases: ['Generic'], mappings: { amazon: 'Generic', shopee: '0', lazada: 'No Brand' } },
+  { id: 'cyber-records', name: 'CYBER-RECORDS', code: 'CYBR', manufacturer: 'CyberRecord Japan Co.', country: 'Japan', website: 'https://cyber-records.example', productCount: 5, status: 'Active', source: 'internal', aliases: ['CyberRecords', 'CYBER RECORDS'], mappings: { amazon: 'CYBER RECORDS', shopee: '1009234', lazada: 'BR-20418' } },
+  { id: 'prime-essentials', name: 'Prime Essentials', code: 'PRME', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 12, status: 'Active', source: 'internal', aliases: [], mappings: { shopee: '1008871' } },
+  { id: 'prime-craft', name: 'Prime Craft', code: 'PRCR', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 8, status: 'Active', source: 'internal', aliases: [], mappings: { shopee: '1008872', lazada: 'BR-20419' } },
+  { id: 'prime-art', name: 'Prime Art', code: 'PRAT', manufacturer: 'Prime Commerce', country: 'Singapore', website: 'https://prime.example', productCount: 4, status: 'Active', source: 'internal', aliases: [], mappings: { shopee: '1008873' } },
+  { id: 'kuretake', name: 'Kuretake', code: 'KRTK', manufacturer: 'Kuretake Co., Ltd.', country: 'Japan', website: 'https://kuretake.co.jp', productCount: 1, status: 'Active', source: 'internal', aliases: ['呉竹', 'ZIG'], mappings: { amazon: 'Kuretake', shopee: '1012045', lazada: 'BR-20445' } },
+  { id: 'da-vinci', name: 'Da Vinci', code: 'DVNC', manufacturer: 'Da Vinci Brushes GmbH', country: 'Germany', website: 'https://da-vinci-brushes.com', productCount: 3, status: 'Active', source: 'internal', aliases: ['DaVinci', 'da vinci brushes'], mappings: { amazon: 'Da Vinci', shopee: '1010881' } },
+  { id: 'kai-industries', name: 'Kai Industries', code: 'KAII', manufacturer: 'Kai Industries Co., Ltd.', country: 'Japan', website: 'https://kai-group.com', productCount: 2, status: 'Active', source: 'internal', aliases: ['KAI', '貝印'], mappings: { amazon: 'KAI', rakuten: 'kai-group', lazada: 'BR-20501' } },
+  { id: 'mijello', name: 'Mijello', code: 'MJLO', manufacturer: 'Mijello Co., Ltd.', country: 'South Korea', website: 'https://mijello.com', productCount: 2, status: 'Active', source: 'imported', aliases: ['미젤로'], mappings: { amazon: 'Mijello', shopee: '1013201' } },
+  { id: 'copic', name: 'Copic', code: 'COPC', manufacturer: 'Too Copic', country: 'Japan', website: 'https://copic.jp', productCount: 1, status: 'Active', source: 'imported', aliases: ['Too Copic', 'コピック'], mappings: { amazon: 'Copic' } },
+  { id: 'no-brand', name: 'No Brand', code: 'GENERIC', manufacturer: '', country: '', website: '', productCount: 8, status: 'Active', source: 'imported', aliases: ['Generic'], mappings: { amazon: 'Generic', shopee: '0', lazada: 'No Brand' } },
 ];
 
 const defs = [
@@ -172,10 +187,11 @@ export const defaultCatalogAttributeGroups: CatalogAttributeGroup[] = [
   { id: 'product-content', name: 'Product content', description: 'Care instructions and customer-facing details', purpose: 'specification' },
 ];
 
-export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[]; attributeGroups?: CatalogAttributeGroup[] }
+export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[]; attributeGroups?: CatalogAttributeGroup[]; taxonomyVersion?: number }
 
 function defaults(): ProductCatalogSettings {
   return {
+    taxonomyVersion: 1,
     categories: defaultCatalogCategories.map(category => ({ ...category, attributes: category.attributes.map(attribute => ({ ...attribute })), mappings: { ...category.mappings }, channelMappings: { ...category.channelMappings } })),
     attributes: defaultCatalogAttributes.map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })),
     brands: defaultCatalogBrands.map(brand => ({ ...brand, aliases: [...brand.aliases], mappings: { ...brand.mappings } })),
@@ -213,13 +229,8 @@ function migrateLegacyCategories(input: CatalogCategory[]): CatalogCategory[] {
 
 function ensureDemoTaxonomy(categories: CatalogCategory[]): CatalogCategory[] {
   const existingIds = new Set(categories.map(category => category.id));
-  const upgraded = categories.map(category => {
-    const currentDefault = defaultCatalogCategories.find(candidate => candidate.id === category.id);
-    if (!currentDefault) return category;
-    const assignedKeys = new Set(category.attributes.map(attribute => attribute.key));
-    return { ...category, attributes: [...category.attributes, ...currentDefault.attributes.filter(attribute => !assignedKeys.has(attribute.key))] };
-  });
-  return [...upgraded, ...defaultCatalogCategories.filter(category => !existingIds.has(category.id))];
+  // Upgrade old demo taxonomies once. Never restore assignments the user removed.
+  return [...categories, ...defaultCatalogCategories.filter(category => !existingIds.has(category.id))];
 }
 
 function ensureDemoAttributes(attributes: CatalogAttribute[]): CatalogAttribute[] {
@@ -249,20 +260,30 @@ export function getProductCatalogSettings(): ProductCatalogSettings {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return defaults();
-    const parsed = { ...defaults(), ...JSON.parse(stored) } as ProductCatalogSettings;
-    return { ...parsed, categories: ensureDemoTaxonomy(migrateLegacyCategories(parsed.categories)), attributes: ensureDemoAttributes(parsed.attributes).map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })), attributeGroups: parsed.attributeGroups?.length ? parsed.attributeGroups : defaultCatalogAttributeGroups.map(group => ({ ...group })) };
+    const parsed = { ...defaults(), taxonomyVersion: 0, ...JSON.parse(stored) } as Omit<ProductCatalogSettings, 'brands'> & { brands: StoredCatalogBrand[] };
+    const categories = migrateLegacyCategories(parsed.categories);
+    return { ...parsed, taxonomyVersion: 1, brands: parsed.brands.map(restoreCatalogBrand), categories: parsed.taxonomyVersion ? categories : ensureDemoTaxonomy(categories), attributes: ensureDemoAttributes(parsed.attributes).map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })), attributeGroups: parsed.attributeGroups?.length ? parsed.attributeGroups : defaultCatalogAttributeGroups.map(group => ({ ...group })) };
   } catch { return defaults(); }
 }
 
 export function saveProductCatalogSettings(settings: ProductCatalogSettings) {
-  if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, taxonomyVersion: 1 }));
 }
 
 export function getActiveCatalogBrands() { return getProductCatalogSettings().brands.filter(item => item.status !== 'Inactive'); }
 export function getActiveCatalogCategories() { return getProductCatalogSettings().categories.filter(item => item.status === 'Active'); }
-export function getAttributesForCategory(categoryName: string) {
+/** An explicit ID is authoritative; ambiguous legacy names must be chosen again. */
+export function resolveCatalogCategory(reference: { category?: string; categoryId?: string }, categories: CatalogCategory[]) {
+  if (reference.categoryId) return categories.find(item => item.id === reference.categoryId);
+  const name = reference.category?.trim().toLowerCase();
+  if (!name) return undefined;
+  const matches = categories.filter(item => item.name.trim().toLowerCase() === name);
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+export function getAttributesForCategory(categoryName: string, categoryId?: string) {
   const settings = getProductCatalogSettings();
-  const category = settings.categories.find(item => item.name === categoryName);
+  const category = resolveCatalogCategory({ category: categoryName, categoryId }, settings.categories);
   return (category?.attributes ?? []).map(assignment => ({ ...settings.attributes.find(item => item.key === assignment.key)!, required: assignment.required })).filter(item => item.id);
 }
 

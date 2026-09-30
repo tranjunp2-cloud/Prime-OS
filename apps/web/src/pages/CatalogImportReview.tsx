@@ -164,11 +164,11 @@ export default function CatalogImportReview() {
   }
 
   /**
-   * Spec: Brand Auto-Resolve on Import (Option A)
+   * Resolve an imported brand without a separate internal verification step.
    * - Lookup registry by canonical name (case-insensitive)
-   * - If found → return existing brand (reuse, even if Unverified)
-   * - If not found → create new CatalogBrand with status 'Unverified' (= spec 'candidate')
-   *   and source 'imported' — never 'Verified' on auto-create
+   * - If found → reuse the existing brand and preserve its availability.
+   * - If not found → create an Active brand with source 'imported'.
+   * Marketplace approval is separate from internal brand availability.
    * Returns { brand, created: boolean } or null when no brand name provided.
    */
   function resolveBrandForImport(brandName: string | undefined): { brand: CatalogBrand; created: boolean } | null {
@@ -177,14 +177,13 @@ export default function CatalogImportReview() {
     const settings = getProductCatalogSettings();
     const existing = settings.brands.find(b => b.name.toLowerCase() === name.toLowerCase());
     if (existing) return { brand: existing, created: false };
-    // Auto-create as Candidate (Unverified) — never pre-verified
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     const newBrand: CatalogBrand = {
       id: `${slug}-${Date.now().toString(36)}`,
       name,
       code: name.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12),
       manufacturer: '', country: '', website: '', productCount: 0,
-      status: 'Unverified', source: 'imported', aliases: [], mappings: {},
+      status: 'Active', source: 'imported', aliases: [], mappings: {},
     };
     saveProductCatalogSettings({ ...settings, brands: [...settings.brands, newBrand] });
     return { brand: newBrand, created: true };
@@ -216,9 +215,8 @@ export default function CatalogImportReview() {
       });
       // Show appropriate toast based on brand resolution outcome
       if (brandResult?.created) {
-        toast.warning(`Brand "${brandResult.brand.name}" auto-created as Candidate`, {
-          description: 'Verify this brand in Brand Registry before publishing.',
-          duration: 7000,
+        toast.success(`Brand "${brandResult.brand.name}" created`, {
+          description: 'Ready to use in Product Master. Marketplace approval is handled per listing.',
         });
       }
     }
@@ -263,9 +261,8 @@ export default function CatalogImportReview() {
     updateItems(items.map(item => selectedIds.includes(item.id) ? { ...item, resolution: 'create', resolvedProductId: `prod_import_${item.id}`, confirmed: true } : item));
     toast.success(`${selected.length} Product Master drafts created`);
     if (newBrandsCreated > 0) {
-      toast.warning(`${newBrandsCreated} brand${newBrandsCreated > 1 ? 's' : ''} auto-created as Candidate`, {
-        description: `Verify before publishing: ${newBrandNames.slice(0, 3).join(', ')}${newBrandNames.length > 3 ? ` +${newBrandNames.length - 3} more` : ''}`,
-        duration: 8000,
+      toast.success(`${newBrandsCreated} brand${newBrandsCreated > 1 ? 's' : ''} created`, {
+        description: `Ready to use: ${newBrandNames.slice(0, 3).join(', ')}${newBrandNames.length > 3 ? ` +${newBrandNames.length - 3} more` : ''}`,
       });
     }
     setSelectedIds([]);

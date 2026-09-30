@@ -1,4 +1,6 @@
 import { normalizeDemoStockLocations } from './demo-warehouse-locations';
+import { getProductCatalogSettings, resolveCatalogCategory } from './product-catalog-settings-store';
+import type { ListingPricing } from './pricing-rules';
 // Shared product store — singleton in-memory for local mockup
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
@@ -24,7 +26,7 @@ export interface VariantOptionDefinition {
   values: string[];
 }
 
-export interface ChannelOverride {
+export interface ChannelOverride extends ListingPricing {
   enabled: boolean;
   title: string;
   price_markup: number;
@@ -35,6 +37,7 @@ export interface ChannelOverride {
   category?: string;
   fulfillment?: string;
   variant_scope?: string;
+  selected_variant_ids?: string[];
   listing_mode?: string;
   identifier?: string;
   condition?: string;
@@ -149,6 +152,8 @@ export interface Product {
   manufacturer: string;  // [→ dynamic attr, surface: 'basic']
   // Details
   category: string;      // Taxonomy ref — kept as-is (prototype: doubles as Family proxy)
+  /** Stable schema reference. `category` remains a display/legacy name, not identity. */
+  categoryId?: string;
   condition: string;
   description: string;   // [→ dynamic attr, surface: 'basic', isLocalizable: true, isRequired: true]
   localized_content?: Partial<Record<string, LocalizedProductContent>>; // key = BCP-47 locale, e.g. 'ja-JP'
@@ -185,7 +190,7 @@ export interface Product {
   specifications?: Array<{ attributeKey?: string; name: string; value: string }>;
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
 
-  inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number; after: number; reason: string; createdAt: string }>;
+  inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number | null; after: number; reason: string; createdAt: string }>;
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
@@ -654,6 +659,7 @@ const INCOMPLETE_IMPORT_DEMO_IDS = new Set(['prod_import_test_incomplete_02', 'p
 
 function normalizeStoredProduct(product: Product): Product {
   const now = new Date().toISOString();
+  const category = resolveCatalogCategory(product, getProductCatalogSettings().categories);
   const rawSpecifications = Array.isArray(product.specifications) ? product.specifications : [];
   const specifications = rawSpecifications
     .filter((item): item is { attributeKey?: string; name: string; value: string } => Boolean(
@@ -673,7 +679,8 @@ function normalizeStoredProduct(product: Product): Product {
     brandId: typeof product.brandId === 'string' ? product.brandId : undefined,
     asin: typeof product.asin === 'string' ? product.asin : '',
     manufacturer: typeof product.manufacturer === 'string' ? product.manufacturer : '',
-    category: typeof product.category === 'string' ? product.category : '',
+    category: category?.name ?? (typeof product.category === 'string' ? product.category : ''),
+    categoryId: product.categoryId || category?.id,
     condition: typeof product.condition === 'string' ? product.condition : 'new',
     description: typeof product.description === 'string' ? product.description : '',
     localized_content: product.localized_content && typeof product.localized_content === 'object' ? product.localized_content : {},
@@ -824,10 +831,10 @@ function loadStoredProducts(): Product[] {
         : withImportDemo.id === 'prod_import_review_demo' || withImportDemo.id === 'prod_003'
           ? { ...withImportDemo, inventory: { wh_crjp: 40, wh_rslsg: 20, wh_fbsmy: 12, wh_fbajp: 0 } }
           : withImportDemo;
-      return withOperationalDemoStock.id === 'prod_003' && withOperationalDemoStock.category === 'Art Supplies'
-        ? { ...withOperationalDemoStock, category: 'Painting Accessories' }
-        : withOperationalDemoStock.id === 'prod_demo_electronics' && withOperationalDemoStock.category === 'Electronics'
-          ? { ...withOperationalDemoStock, category: 'Headphones' }
+      return !storedProduct.categoryId && withOperationalDemoStock.id === 'prod_003' && withOperationalDemoStock.category === 'Art Supplies'
+        ? { ...withOperationalDemoStock, category: 'Painting Accessories', categoryId: 'painting-accessories' }
+        : !storedProduct.categoryId && withOperationalDemoStock.id === 'prod_demo_electronics' && withOperationalDemoStock.category === 'Electronics'
+          ? { ...withOperationalDemoStock, category: 'Headphones', categoryId: 'headphones' }
           : withOperationalDemoStock;
     });
     if (shouldResetDemoLocales) window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
@@ -848,11 +855,39 @@ function persistProducts(): void {
   }
 }
 
+/** Migrate references only; reading a product must not persist unrelated demo normalization. */
+function persistCategoryReferences(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PRODUCT_STORAGE_KEY) ?? 'null') as Product[] | null;
+    if (!Array.isArray(stored)) return;
+    let changed = false;
+    const migrated = stored.map(product => {
+      const resolved = _products.find(candidate => candidate.id === product.id);
+      if (!resolved?.categoryId || (product.categoryId === resolved.categoryId && product.category === resolved.category)) return product;
+      changed = true;
+      return { ...product, categoryId: resolved.categoryId, category: resolved.category };
+    });
+    if (changed) window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(migrated));
+  } catch { /* Leave the original storage untouched if migration cannot be persisted. */ }
+}
+
 const loadedProducts = loadStoredProducts();
 let _products: Product[] = loadedProducts.map(activateValidatedImport);
+let categoryReferencesPersisted = false;
 if (_products.some((product, index) => product !== loadedProducts[index])) persistProducts();
 
 export function getProducts(): Product[] {
+  const categories = getProductCatalogSettings().categories;
+  let changed = false;
+  const resolved = _products.map(product => {
+    const category = resolveCatalogCategory(product, categories);
+    if (!category || (product.categoryId === category.id && product.category === category.name)) return product;
+    changed = true;
+    return { ...product, categoryId: category.id, category: category.name };
+  });
+  if (changed) _products = resolved;
+  if (changed || !categoryReferencesPersisted) { persistCategoryReferences(); categoryReferencesPersisted = true; }
   return _products;
 }
 
@@ -863,7 +898,7 @@ export function addProduct(p: Product): void {
 }
 
 export function updateProduct(id: string, p: Partial<Product> & { id: string }): void {
-  _products = _products.map(x => x.id === id ? activateValidatedImport(normalizeStoredProduct({ ...x, ...p, updated_at: new Date().toISOString() })) : x);
+  _products = _products.map(x => x.id === id ? activateValidatedImport(normalizeStoredProduct({ ...x, ...p, ...(p.category !== undefined && p.category !== x.category && !Object.prototype.hasOwnProperty.call(p, 'categoryId') ? { categoryId: undefined } : {}), updated_at: new Date().toISOString() })) : x);
   persistProducts();
 }
 
@@ -882,7 +917,7 @@ export function deleteProduct(id: string): void {
 }
 
 export function getProductById(id: string): Product | undefined {
-  return _products.find(x => x.id === id);
+  return getProducts().find(x => x.id === id);
 }
 
 export function getResolvedProductSkuById(skuId: string): ResolvedProductSku | undefined {

@@ -11,7 +11,7 @@ import type { ChannelWizardDraft } from '@/components/products/ChannelListingWiz
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
-type FieldGroupKey = 'content' | 'media' | 'pricing' | 'shipping';
+type FieldGroupKey = 'content' | 'media' | 'shipping';
 
 interface FormState {
   name: string;
@@ -89,18 +89,6 @@ const FIELD_GROUPS: FieldGroup[] = [
     buildPatch: () => ({ media_scope: 'all' }),
   },
   {
-    key: 'pricing',
-    label: 'Pricing',
-    risk: 'caution',
-    cautionNote: 'This will override any manual channel prices you have configured.',
-    defaultChecked: false,
-    fieldPreviews: (form) => [
-      { label: 'Retail price', value: form.retail_price ? `${form.retail_price} ${form.price_currency}` : '—' },
-      { label: 'Price source', value: 'Inherit from Product Master' },
-    ],
-    buildPatch: () => ({ listing_mode: 'master', price_markup: '0' }),
-  },
-  {
     key: 'shipping',
     label: 'Shipping & Compliance',
     risk: 'caution',
@@ -155,10 +143,6 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
       if (fieldLabel === 'Brand') return draft.brand || 'Not set';
     }
     if (groupKey === 'media') return draft.media_scope === 'all' ? 'All Master images' : 'Listing-specific media';
-    if (groupKey === 'pricing') {
-      if (fieldLabel === 'Retail price') return draft.listing_mode === 'master' ? `Master price${draft.price_markup && draft.price_markup !== '0' ? ` + ${draft.price_markup}%` : ''}` : 'Manual channel price';
-      return draft.listing_mode === 'master' ? 'Inherit from Product Master' : 'Listing-specific price';
-    }
     if (groupKey === 'shipping') {
       const prefix = fieldLabel === 'Package dimensions' ? 'Package:' : fieldLabel === 'Country of origin' ? 'Origin:' : 'HS:';
       const value = draft.compliance_notes.split('\n').find(line => line.startsWith(prefix));
@@ -216,7 +200,7 @@ export function ApplyMasterSheet({ open, onOpenChange, form, images, enabledChan
             Review changes before sync
           </SheetTitle>
           <SheetDescription>
-            Compare the current listing data with the latest Product Master. Select the groups to update, then confirm the sync.
+            Compare the current listing data with the latest Product Master. Select the groups to update, then confirm the sync. Prices are reviewed separately in the listing’s Price & inventory section; manual prices are preserved.
           </SheetDescription>
         </SheetHeader>
 

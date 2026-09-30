@@ -83,8 +83,69 @@ describe('stock adjustments without leaving Product Master', () => {
   it('does not expose adjustment actions for a viewer or external warehouse', async () => {
     mount('&mode=viewer'); await ready();
     expect(screen.queryByRole('button', { name: /^Adjust stock/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add stock location' })).not.toBeInTheDocument();
     cleanup(); mount();
     expect(screen.queryByRole('button', { name: 'Adjust stock at Fulfillment By Amazon Japan' })).not.toBeInTheDocument();
+  });
+  it('shows only recorded locations, preserves zero and external stock, and displays one total', async () => {
+    mount(); await ready();
+    const inventory = within(screen.getByRole('region', { name: 'Inventory by location' }));
+    expect(inventory.getByText('CyberRecord Japan HQ')).toBeInTheDocument();
+    expect(inventory.getByText('Reseller Singapore')).toBeInTheDocument();
+    expect(inventory.getByText('Fulfillment By Amazon Japan')).toBeInTheDocument();
+    expect(inventory.getByText('0 units')).toBeInTheDocument();
+    expect(inventory.getByText('Read only')).toBeInTheDocument();
+    expect(inventory.queryByText('Vietnam 3PL Partner')).not.toBeInTheDocument();
+    expect(inventory.queryByText('Fulfillment By Shopee Malaysia')).not.toBeInTheDocument();
+    expect(inventory.queryByText('Not recorded')).not.toBeInTheDocument();
+    expect(inventory.getAllByText('10 units')).toHaveLength(1);
+    expect(inventory.getByText('Total recorded stock')).toBeInTheDocument();
+  });
+  it('adds a location with an explicit zero count and preserves unsaved edits and other balances', async () => {
+    mount(); await ready();
+    fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Still editing this product' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add stock location' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Add stock location' }));
+    expect(within(dialog.getByLabelText('Warehouse')).getAllByRole('option').map(option => option.textContent)).toEqual(['Select a warehouse', 'Vietnam 3PL Partner']);
+    expect(dialog.getByRole('button', { name: 'Save location & stock' })).toBeDisabled();
+    fireEvent.change(dialog.getByLabelText('Warehouse'), { target: { value: 'wh_3plvn' } });
+    fireEvent.change(dialog.getByLabelText('Initial stock'), { target: { value: '0' } });
+    fireEvent.change(dialog.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    updateProduct(id, { id, inventory: { ...product.inventory, wh_rslsg: 9 } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Save location & stock' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adjust stock at Vietnam 3PL Partner' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add stock location' })).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue('Still editing this product')).toBeInTheDocument();
+    const saved = getProductById(id)!;
+    expect(saved.inventory).toEqual({ ...product.inventory, wh_rslsg: 9, wh_3plvn: 0 });
+    expect(saved.inventory_adjustments?.[0]).toMatchObject({ warehouseId: 'wh_3plvn', before: null, after: 0, reason: 'Physical stock count' });
+    expect(saved.channels).toEqual(product.channels);
+    expect(saved.channel_overrides).toEqual(product.channel_overrides);
+    saveMetadata();
+    expect(getProductById(id)?.inventory.wh_3plvn).toBe(0);
+  });
+  it('does not create a location on cancel and shows an honest empty state', async () => {
+    updateProduct(id, { id, inventory: {} });
+    mount(); await ready();
+    const inventory = within(screen.getByRole('region', { name: 'Inventory by location' }));
+    expect(inventory.getByText('No stock recorded yet')).toBeInTheDocument();
+    expect(inventory.queryByText('0 units')).not.toBeInTheDocument();
+    fireEvent.click(inventory.getByRole('button', { name: 'Add stock location' }));
+    fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: 'wh_crjp' } });
+    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(getProductById(id)?.inventory).toEqual({});
+    expect(inventory.getByText('No stock recorded yet')).toBeInTheDocument();
+  });
+  it('retains recorded inventory for a location no longer in the registry', async () => {
+    updateProduct(id, { id, inventory: { deleted_location: 6 } });
+    mount(); await ready();
+    const inventory = within(screen.getByRole('region', { name: 'Inventory by location' }));
+    expect(inventory.getByText('Unknown stock location')).toBeInTheDocument();
+    expect(inventory.getByText('deleted_location')).toBeInTheDocument();
+    expect(inventory.getByText('Read only')).toBeInTheDocument();
+    expect(inventory.getAllByText('6 units')).toHaveLength(2);
   });
   it('updates stock inside the product list drawer without navigating to Warehouse', async () => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Path /><Products /></MemoryRouter>);
