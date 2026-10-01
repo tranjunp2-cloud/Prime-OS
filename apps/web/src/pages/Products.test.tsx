@@ -18,24 +18,26 @@ function Harness() {
 afterEach(cleanup);
 
 describe('Product Master list default tab', () => {
-  it('opens All by default and still allows switching to Needs attention', () => {
+  it('opens All by default and reveals work filters only inside To do', () => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>);
     const all = screen.getByRole('button', { name: /^All\s*\d+$/ });
+    expect(screen.getByRole('columnheader', { name: /^MASTER STATUS/ })).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'About Master status' })).toHaveLength(1);
     expect(all).toHaveClass('text-primary');
-    expect(screen.queryByText('Priority queue')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Needs attention/ }));
-    expect(screen.getByText('Priority queue')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'To do filters' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^To do/ }));
+    expect(screen.getByRole('group', { name: 'To do filters' })).toBeInTheDocument();
     fireEvent.click(all);
-    expect(screen.queryByText('Priority queue')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'To do filters' })).not.toBeInTheDocument();
   });
 
   it('resets to All when entering the list with a new URL', () => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Harness /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: /^Needs attention/ }));
-    expect(screen.getByText('Priority queue')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^To do/ }));
+    expect(screen.getByRole('group', { name: 'To do filters' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reopen product list' }));
     expect(screen.getByRole('button', { name: /^All\s*\d+$/ })).toHaveClass('text-primary');
-    expect(screen.queryByText('Priority queue')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'To do filters' })).not.toBeInTheDocument();
   });
 });
 

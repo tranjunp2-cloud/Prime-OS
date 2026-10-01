@@ -40,6 +40,10 @@ export function getOrderItems(orderId: string): OrderItem[] {
   return _orderItems.filter(i => i.order_id === orderId);
 }
 
+export function getAllOrderItems(): OrderItem[] {
+  return _orderItems;
+}
+
 export function addOrderItem(item: OrderItem): void {
   _orderItems = [..._orderItems, item];
 }

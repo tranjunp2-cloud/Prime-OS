@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="Japanese Design Reference — Hardcover edition">
+<rect width="900" height="900" fill="#f5f2ec"/><rect x="40" y="40" width="820" height="820" rx="28" fill="#fff"/>
+<text x="80" y="105" font-family="Arial,sans-serif" font-size="22" fill="#64748b" letter-spacing="2">PRIME • PROTOTYPE REFERENCE</text>
+<ellipse cx="455" cy="693" rx="200" ry="20" fill="#e2e8f0"/><path d="M260 204h345l45 41v410l-45 32H260z" fill="#d8d1c2" stroke="#8d918a" stroke-width="3"/><rect x="247" y="201" width="359" height="460" rx="5" fill="#183e43"/><rect x="264" y="201" width="15" height="460" fill="#2e5558"/><circle cx="443" cy="430" r="92" fill="#d6c390"/><path d="M370 463 428 364 499 463z" fill="#183e43"/><text x="310" y="281" font-family="Arial" font-size="26" fill="#fff">JAPANESE DESIGN</text><text x="311" y="317" font-family="Arial" font-size="18" fill="#b9c8c7">A VISUAL REFERENCE</text><path d="M613 262h26m-26 13h26m-26 13h26m-26 13h26" stroke="#a8a99e" stroke-width="2"/>
+<text x="80" y="785" font-family="Arial,sans-serif" font-size="32" font-weight="700" fill="#172033">Japanese Design Reference</text>
+<text x="80" y="823" font-family="Arial,sans-serif" font-size="21" fill="#64748b">Hardcover edition • Illustrative demo asset</text>
+</svg>

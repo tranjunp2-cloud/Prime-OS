@@ -1,7 +1,7 @@
 import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Info, Image, Package, Truck, Layers, Check, Lock,
+  ArrowLeft, Archive, RotateCcw, Info, Image, Package, Truck, Layers, Check, Lock,
   Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes, PackageCheck,
   Globe2, Circle, CircleCheck, CircleAlert, CloudUpload, Search, ChevronDown, ChevronRight, ExternalLink,
   ShoppingBag, Store, MonitorSmartphone, MessageSquare, Radio, Tags, Star, MoreHorizontal, ArrowUpFromLine,
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
+import { ProductLifecycleMenuItems } from '@/components/products/ProductLifecycleActions';
+import { useProductLifecycleActions } from '@/hooks/use-product-lifecycle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -49,26 +51,10 @@ import type { StockAdjustmentTarget } from '@/components/inventory/WarehouseStoc
 import { canEditWarehouseStock, recordedQuantity } from '@/lib/warehouse-stock-view';
 import { initialListingPricing, quoteListingPrice, pricingNeedsReview, formatPrice } from '@/lib/pricing-rules';
 import { usePricingRevision } from '@/hooks/use-pricing';
+import { getMasterReadinessChecks, hydrateExistingVariants, richTextPlainText, type VariantGroup, type VariantItem } from '@/lib/product-master-readiness';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface VariantGroup {
-  id: string;
-  name: string;
-  values: string[];
-}
-
-interface VariantItem {
-  id?: string;
-  key: string;          // e.g. "Red / M"
-  sku_code: string;
-  price: string;
-  stock: string;
-  stock_by_location: Record<string, string>;
-  selected: boolean;
-  image_url: string;
-}
 
 type OverrideChannel = 'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
 interface ChannelOverrideForm extends ChannelWizardDraft {}
@@ -424,49 +410,6 @@ function cartesian<T>(arrs: T[][]): T[][] {
   );
 }
 
-function hydrateExistingVariants(product: Product | null): { groups: VariantGroup[]; items: VariantItem[] } {
-  if (!product?.has_variants || product.skus.length === 0) return { groups: [], items: [] };
-  const parsed = product.skus.map(sku => sku.variation_name.split('/').map(value => value.trim()).filter(Boolean));
-  const optionCount = Math.min(2, Math.max(...parsed.map(values => values.length), 1));
-  const canonicalOptions = product.variant_options?.length
-    ? product.variant_options
-    : Array.from({ length: optionCount }, (_, index) => {
-      const values = Array.from(new Set(parsed.map(parts => parts[index]).filter(Boolean)));
-      const candidates = getAttributesForCategory(product.category, product.categoryId).filter(attribute => {
-        if (attribute.type !== 'Single select' && attribute.type !== 'Multi-select') return false;
-        const allowed = attribute.options.split(',').map(option => option.trim().toLowerCase()).filter(Boolean);
-        return values.length > 0 && values.every(value => allowed.includes(value.toLowerCase()));
-      });
-      const inferred = candidates.length === 1 ? candidates[0] : undefined;
-      return { attributeKey: inferred?.key ?? '', name: inferred?.name ?? `Option ${index + 1}`, values };
-    });
-  const groups = canonicalOptions.slice(0, 2).map((option, index) => ({
-    id: `existing-option-${index + 1}`,
-    name: option.name,
-    values: [...option.values],
-  }));
-  // Fallback: split aggregate inventory evenly if no per-SKU data
-  const aggregateStock = Object.values(product.inventory).reduce((total, value) => total + Number(value || 0), 0);
-  const baseStock = Math.floor(aggregateStock / product.skus.length);
-  const remainder = aggregateStock % product.skus.length;
-  const items = product.skus.map((sku, index) => ({
-    id: sku.id,
-    key: sku.variation_name || sku.sku_code,
-    sku_code: sku.sku_code,
-    price: String(sku.price ?? product.retail_price),
-    stock: String(
-      sku.stock_by_location
-        ? Object.values(sku.stock_by_location).reduce((t, v) => t + v, 0)
-        : sku.stock ?? baseStock + (index < remainder ? 1 : 0)
-    ),
-    stock_by_location: Object.fromEntries(
-      Object.entries(sku.stock_by_location ?? {}).map(([k, v]) => [k, String(v)])
-    ),
-    selected: sku.status === 'active',
-    image_url: sku.image_url ?? '',
-  }));
-  return { groups, items };
-}
 
 // ─── Field Helpers ─────────────────────────────────────────────────────────────
 
@@ -995,18 +938,6 @@ function RowField({ label, fields }: {
   );
 }
 
-function richTextPlainText(value: string) {
-  return value
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>|<\/div>|<\/li>|<\/blockquote>|<\/h[1-6]>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 function editorHtml(value: string) {
   if (!value) return '';
@@ -2009,7 +1940,10 @@ export default function ProductCreatePage() {
     return isActive ? canonical : primaryLocale;
   })();
 
-  const canWrite = searchParams.get('mode') !== 'viewer' && !isHistorical;
+  const canManageProduct = searchParams.get('mode') !== 'viewer' && !isHistorical;
+  const isArchived = existingProduct?.status === 'archived';
+  const canWrite = canManageProduct && !isArchived;
+  const [, refreshLifecycle] = useState(0);
   const [localizedContent, setLocalizedContent] = useState(existingProduct?.localized_content ?? {});
   const [focusTranslationField, setFocusTranslationField] = useState<'name' | 'description' | null>(null);
   const [mobileReferenceOpen, setMobileReferenceOpen] = useState(true);
@@ -2193,7 +2127,7 @@ export default function ProductCreatePage() {
       if (!draft) continue;
       overrides[key as OverrideChannel] = { ...draft, price_markup: num(draft.price_markup) };
       const channel = listingChannelByOverride[key as OverrideChannel];
-      if (draft.enabled && !channels.some(item => item.channel === channel)) channels.push({ channel, external_id: null, status: 'pending', listing_url: null, last_synced_at: null });
+      if (draft.enabled && !channels.some(item => item.channel === channel)) channels.push({ channel, external_id: null, status: 'draft', listing_url: null, last_synced_at: null });
     }
     updateProduct(latest.id, { id: latest.id, channel_overrides: overrides, channels });
     // Listing-owned saves must not mark unrelated Master edits as saved (or dirty).
@@ -2616,6 +2550,7 @@ export default function ProductCreatePage() {
   }, [activeSection, requestedAttentionFocus, isHistorical, existingProduct?.id]);
 
   async function handleImageUpload(file: File, mode: 'primary' | 'gallery') {
+    if (!canWrite) return;
     const validation = validateImageFile(file);
     if (!validation.valid) {
       toast({ title: copy.uploadFailed, description: validation.error, variant: 'destructive' });
@@ -2757,7 +2692,7 @@ export default function ProductCreatePage() {
         } : {
           channel: listingChannel,
           external_id: channelOverrides[channel.key].listing_sku.trim() || null,
-          status: 'pending' as const,
+          status: 'draft' as const,
           listing_url: null,
           last_synced_at: null,
         };
@@ -2976,10 +2911,6 @@ export default function ProductCreatePage() {
     };
     return { ...source, quantity: sumRecorded(inventory), ...(form.product_type === 'variant' ? { byVariant: Object.fromEntries(selectedVariantItems.map(item => [item.key, sumRecorded(item.stock_by_location ?? {})])) } : {}) };
   }) : [];
-  const hasGeneratedVariants = form.has_variants && selectedVariantItems.length > 0;
-  const variantPricingReady = hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim() && num(item.price) > 0) && selectedVariantItems.reduce((sum, item) => sum + num(item.stock), 0) > 0;
-  const pricingAndInventoryReady = hasGeneratedVariants ? variantPricingReady : num(form.retail_price) > 0 && totalStock > 0;
-  const logisticsReady = Boolean(form.pkg_length && form.pkg_width && form.pkg_height && form.pkg_weight);
   const shippingPackageRequired = OVERRIDE_CHANNELS.some(channel =>
     channelOverrides[channel.key].enabled && !['pos', 'social'].includes(channel.key)
   );
@@ -3011,51 +2942,11 @@ export default function ProductCreatePage() {
   const allSelectableVariantAttributes = getProductCatalogSettings().attributes.filter(attribute =>
     attribute.status === 'Active' && (attribute.type === 'Single select' || attribute.type === 'Multi-select') && attribute.options.trim()
   );
-  const invalidVariantGroups = variantGroups.filter(group =>
-    !allSelectableVariantAttributes.some(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase())
-  );
-  const variantOptionsReady = variantGroups.length > 0
-    && invalidVariantGroups.length === 0
-    && variantGroups.every(group => group.values.length > 0);
-  const completionChecks = useMemo(() => {
-    const channelReadyForPublishing =
-      Object.values(channelOverrides).some(item => item.enabled) &&
-      form.name.trim().length >= 3 &&
-      richTextPlainText(form.description).length >= 100 &&
-      selectedCatalogCategory?.status === 'Active' && missingRequiredCategoryAttributes.length === 0 &&
-      images.length >= 3 &&
-      pricingAndInventoryReady &&
-      (!shippingPackageRequired || logisticsReady);
-    const checks = [
-      { id: 'identity', label: 'Add product name and master SKU', done: form.name.trim().length >= 3 && Boolean(form.sku_code.trim()) },
-      { id: 'media', label: 'Add at least 3 product images', done: images.length >= 3 },
-      { id: 'content', label: 'Write a detailed description (100+ characters)', done: richTextPlainText(form.description).length >= 100 },
-      { id: 'category', label: 'Select an active product category', done: selectedCatalogCategory?.status === 'Active' },
-      { id: 'price', label: form.has_variants ? 'Configure variant pricing and stock' : 'Configure base price and inventory', done: pricingAndInventoryReady },
-    ];
-    if (categoryAttributesForProduct.some(attribute => attribute.required)) checks.push({ id: 'attributes', label: missingRequiredCategoryAttributes.length ? `Complete required attributes: ${missingRequiredCategoryAttributes.map(attribute => attribute.name).join(', ')}` : 'Complete required category attributes', done: missingRequiredCategoryAttributes.length === 0 });
-
-    if (shippingPackageRequired) checks.push({ id: 'shipping', label: 'Configure shipping package dimensions and weight', done: logisticsReady });
-
-    if (form.has_variants) {
-      checks.push({
-        id: 'variants',
-        label: invalidVariantGroups.length > 0
-          ? `Replace ${invalidVariantGroups.length} invalid variant option ${invalidVariantGroups.length === 1 ? 'type' : 'types'}`
-          : variantGroups.length === 0
-            ? 'Add at least one valid variant option'
-            : variantGroups.some(group => group.values.length === 0)
-              ? 'Select values for every variant option'
-              : 'Complete all selected variants',
-        done: variantOptionsReady && hasGeneratedVariants && selectedVariantItems.every(item => item.sku_code.trim()),
-      });
-    }
-
-    checks.push({ id: 'channels', label: 'Prepare at least one channel for publishing', done: channelReadyForPublishing });
-    return checks;
-  }, [channelOverrides, form, hasGeneratedVariants, images.length, invalidVariantGroups.length, localizedContent, logisticsReady, pricingAndInventoryReady, selectedVariantItems, shippingPackageRequired, variantGroups, variantOptionsReady, catalogSettingsVersion, specifications]);
+  const completionChecks = useMemo(() => getMasterReadinessChecks({
+    ...form, images, inventory, variantGroups, variantItems, specifications, shippingPackageRequired,
+  }), [form, images, inventory, variantGroups, variantItems, specifications, shippingPackageRequired, catalogSettingsVersion]);
   const completion = Math.round((completionChecks.filter(check => check.done).length / completionChecks.length) * 100);
-  const masterListingChecks = completionChecks.filter(check => check.id !== 'channels');
+  const masterListingChecks = completionChecks;
   const firstMissingMasterListingCheck = masterListingChecks.find(check => !check.done);
   const masterReadyForListings = masterListingChecks.every(check => check.done);
   const requiredCategoryAttributes = categoryAttributesForProduct.filter(attribute => attribute.required);
@@ -3096,6 +2987,16 @@ export default function ProductCreatePage() {
   const currentSnapshot = JSON.stringify({ form, localizedContent, inventory: existingProduct ? undefined : inventory, images, imageAltTexts, variantGroups, variantItems: variantItems.map(({ id, stock, stock_by_location, ...item }) => existingProduct ? item : { ...item, stock, stock_by_location }), channelOverrides, associations, specifications });
   latestSnapshotRef.current = currentSnapshot;
   const isDirty = dirtyTrackingReady && currentSnapshot !== baselineSnapshotRef.current;
+  const lifecycle = useProductLifecycleActions(action => {
+    if (action === 'restore') {
+      loadedVersionRef.current = getProductById(existingProduct!.id)?.record_version ?? 1;
+      setReadinessStatus('unchecked');
+      refreshLifecycle(value => value + 1);
+    } else {
+      setDirtyTrackingReady(false);
+      navigate('/products/master-catalog', { replace: true });
+    }
+  }, isDirty);
 
   useEffect(() => {
     if (!openChannelListingAfterSave || !existingProduct || isDirty) return;
@@ -3131,19 +3032,8 @@ export default function ProductCreatePage() {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isDirty]);
 
-  useEffect(() => {
-    const shouldDisable = !canWrite && activeSection !== 'activity';
-    const controls = document.querySelectorAll<HTMLElement>('[data-editor-fields] input, [data-editor-fields] textarea, [data-editor-fields] select, [data-editor-fields] button');
-    controls.forEach(control => {
-      if ('disabled' in control) (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement).disabled = shouldDisable;
-    });
-    return () => controls.forEach(control => {
-      if ('disabled' in control) (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement).disabled = false;
-    });
-  }, [activeSection, canWrite]);
-
   function beginPublish() {
-    if (readinessStatus !== 'ready' || isDirty) return;
+    if (!canWrite || readinessStatus !== 'ready' || isDirty || !completionChecks.every(check => check.done)) return;
     setPublishConfirmationOpen(false);
     setPublishOpen(true);
     setPublishPercent(8);
@@ -3173,6 +3063,7 @@ export default function ProductCreatePage() {
         : 'publish';
 
   function handlePrimaryAction() {
+    if (!canWrite) return;
     if (primaryAction === 'published') return;
     if (primaryAction === 'complete') {
       if (isDirty) handleSave('draft', { navigateAfter: false, silent: true });
@@ -3379,20 +3270,31 @@ export default function ProductCreatePage() {
             getStatus={getLocaleCompletionStatus}
             onSelect={selectContentLocale}
           />
-          {!canWrite && !isHistorical ? <Badge variant="outline">View only</Badge> : null}
-          {isHistorical ? <Button type="button" variant="outline" onClick={returnToCurrentDraft}><ArrowLeft className="size-4" />Return to current draft</Button> : canWrite ? <Button
+          {!canManageProduct && !isHistorical ? <Badge variant="outline">View only</Badge> : null}
+          {isHistorical ? <Button type="button" variant="outline" onClick={returnToCurrentDraft}><ArrowLeft className="size-4" />Return to current draft</Button> : isArchived && canManageProduct ? <Button type="button" onClick={() => lifecycle.requestAction(existingProduct!, 'restore')}><RotateCcw className="size-4" />Restore product</Button> : canWrite ? <Button
             onClick={handlePrimaryAction}
             disabled={uploadingImageCount > 0 || publishOpen || primaryAction === 'published'}
           >
             {uploadingImageCount > 0 ? <Loader2 className="size-4 animate-spin" /> : primaryAction === 'complete' ? <CircleAlert className="size-4" /> : <CloudUpload className="size-4" />}
             {uploadingImageCount > 0 ? 'Saving images…' : primaryAction === 'complete' ? 'Complete product' : primaryAction === 'publish-updates' ? 'Publish updates' : primaryAction === 'published' ? 'Published' : 'Publish product'}
           </Button> : null}
+          {existingProduct && canManageProduct && <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" aria-label="Product actions"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <ProductLifecycleMenuItems product={existingProduct} onAction={lifecycle.requestAction} disabled={uploadingImageCount > 0 || publishOpen} />
+            </DropdownMenuContent>
+          </DropdownMenu>}
         </div>
       </div>
 
+      {lifecycle.dialog}
+      {isArchived && !isHistorical && <div className="mx-4 mt-4 flex items-start gap-3 rounded-lg border bg-muted/20 p-4 text-sm sm:mx-6">
+        <Archive className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="font-medium">This product is archived</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Restore it to Draft to edit or publish. Existing channel listings are unchanged.</p></div>
+      </div>}
+
       {isHistorical ? <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm sm:mx-6"><Info className="size-4 text-amber-600" /><strong>Viewing revision {selectedRevision?.number}</strong><span className="text-muted-foreground">This historical revision is read-only.</span></div> : null}
 
-      {existingProduct?.import_result && !(existingProduct.import_result === 'incomplete' && masterReadyForListings) ? <div id="product-import-review" tabIndex={-1} className={cn('mx-4 mt-4 rounded-xl border p-4 sm:mx-6', existingProduct.import_result === 'needs_review' && importReviewIssues.length ? 'border-border bg-card' : existingProduct.import_result === 'incomplete' ? 'border-rose-500/30 bg-rose-500/10' : 'border-emerald-500/30 bg-emerald-500/10')}><div className="flex items-start gap-3"><CircleAlert className={cn('mt-0.5 size-5 shrink-0', existingProduct.import_result === 'needs_review' && importReviewIssues.length ? 'text-amber-500' : existingProduct.import_result === 'incomplete' ? 'text-rose-600' : 'text-emerald-600')} /><div className="min-w-0 flex-1">{existingProduct.import_result === 'needs_review' && importReviewIssues.length ? <ImportNeedsReviewPanel product={existingProduct} issue={importReviewIssues[0]} decision={brandReviewChoice} onDecisionChange={setBrandReviewChoice} splitChannels={splitChannels} onToggleChannel={(channel) => setSplitChannels(current => current.includes(channel) ? current.filter(item => item !== channel) : [...current, channel])} onDecideLater={() => navigate('/products/master-catalog')} onConfirm={confirmBrandReview} /> : <><p className="text-sm font-semibold">{existingProduct.import_result === 'incomplete' ? 'Complete missing master data' : existingProduct.import_result === 'matched' ? 'Listing matched to this Product Master' : 'Imported data is ready'}</p><p className="mt-1 text-xs text-muted-foreground">Source: {existingProduct.import_source}</p>{existingProduct.import_result === 'matched' ? <p className="mt-2 text-xs">The Shopee listing was linked by matching SKU <span className="font-mono font-semibold">{existingProduct.sku_code}</span>. No duplicate master was created.</p> : null}{existingProduct.import_result === 'ready' ? <p className="mt-2 text-xs">All required fields were supplied by the listing. Review the master and publish when ready.</p> : null}{existingProduct.import_result === 'incomplete' ? <p className="mt-2 text-xs font-medium text-rose-700">Missing required field: Product image. Upload an image in the Media section to continue.</p> : null}</>}</div></div></div> : null}
+      {!isArchived && existingProduct?.import_result && !(existingProduct.import_result === 'incomplete' && masterReadyForListings) ? <div id="product-import-review" tabIndex={-1} className={cn('mx-4 mt-4 rounded-xl border p-4 sm:mx-6', existingProduct.import_result === 'needs_review' && importReviewIssues.length ? 'border-border bg-card' : existingProduct.import_result === 'incomplete' ? 'border-rose-500/30 bg-rose-500/10' : 'border-emerald-500/30 bg-emerald-500/10')}><div className="flex items-start gap-3"><CircleAlert className={cn('mt-0.5 size-5 shrink-0', existingProduct.import_result === 'needs_review' && importReviewIssues.length ? 'text-amber-500' : existingProduct.import_result === 'incomplete' ? 'text-rose-600' : 'text-emerald-600')} /><div className="min-w-0 flex-1">{existingProduct.import_result === 'needs_review' && importReviewIssues.length ? <ImportNeedsReviewPanel product={existingProduct} issue={importReviewIssues[0]} decision={brandReviewChoice} onDecisionChange={setBrandReviewChoice} splitChannels={splitChannels} onToggleChannel={(channel) => setSplitChannels(current => current.includes(channel) ? current.filter(item => item !== channel) : [...current, channel])} onDecideLater={() => navigate('/products/master-catalog')} onConfirm={confirmBrandReview} /> : <><p className="text-sm font-semibold">{existingProduct.import_result === 'incomplete' ? 'Complete missing master data' : existingProduct.import_result === 'matched' ? 'Listing matched to this Product Master' : 'Imported data is ready'}</p><p className="mt-1 text-xs text-muted-foreground">Source: {existingProduct.import_source}</p>{existingProduct.import_result === 'matched' ? <p className="mt-2 text-xs">The Shopee listing was linked by matching SKU <span className="font-mono font-semibold">{existingProduct.sku_code}</span>. No duplicate master was created.</p> : null}{existingProduct.import_result === 'ready' ? <p className="mt-2 text-xs">All required fields were supplied by the listing. Review the master and publish when ready.</p> : null}{existingProduct.import_result === 'incomplete' ? <p className="mt-2 text-xs font-medium text-rose-700">Missing required field: Product image. Upload an image in the Media section to continue.</p> : null}</>}</div></div></div> : null}
 
       {uploadingImageCount > 0 && (
         <div className="mx-6 mt-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
@@ -3415,7 +3317,7 @@ export default function ProductCreatePage() {
 
       {/* Content */}
       <div data-testid="product-editor-content">
-        <div className="grid w-full grid-cols-1 gap-6 px-4 py-6 sm:px-6 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
+        <div className={cn('grid w-full grid-cols-1 gap-6 px-4 py-6 sm:px-6', isArchived && activeSection !== 'activity' ? 'xl:grid-cols-[220px_minmax(0,1fr)]' : 'xl:grid-cols-[220px_minmax(0,1fr)_300px]')}>
 
           <nav className="h-fit overflow-x-auto xl:sticky xl:top-20" aria-label="Product editor workspaces">
             <div className="flex min-w-max gap-1 xl:min-w-0 xl:flex-col">
@@ -3431,7 +3333,7 @@ export default function ProductCreatePage() {
           </nav>
 
           {/* Left Column */}
-          <div data-editor-fields className="flex flex-col gap-5">
+          <fieldset data-editor-fields disabled={!canWrite && activeSection !== 'activity'} className="flex min-w-0 flex-col gap-5">
 
             {/* Locale Context Banner — shown when editing a secondary locale */}
             {contentLocale !== primaryLocale && activeSection === 'product-data' && (() => {
@@ -3471,22 +3373,22 @@ export default function ProductCreatePage() {
             {activeSection === 'overview' ? <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base"><Package className="size-4 text-primary" />Product overview</CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">Review the canonical product status and continue with the next required task.</p>
+                <p className="text-xs leading-5 text-muted-foreground">{isArchived ? 'View saved product data. Restore to Draft to make changes.' : 'Review the canonical product status and continue with the next required task.'}</p>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="flex flex-col gap-4 rounded-xl border bg-muted/15 p-4 sm:flex-row sm:items-center"><div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-lg border bg-background">{images[0] ? <img src={images[0]} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-semibold">{form.name || 'Untitled Product Master'}</h2><Badge variant="outline" className="capitalize">{existingProduct?.status ?? 'draft'}</Badge></div><p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{form.sku_code || 'SKU not assigned'}</span>{form.brand ? ` · ${form.brand}` : ''}{form.category ? ` · ${form.category}` : ''}</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('product-data')}>Edit product data</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('commerce')}>Manage pricing &amp; stock</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('distribution')}>Review channels</Button></div></div></div>
+                <div className="flex flex-col gap-4 rounded-xl border bg-muted/15 p-4 sm:flex-row sm:items-center"><div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-lg border bg-background">{images[0] ? <img src={images[0]} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-semibold">{form.name || 'Untitled Product Master'}</h2><Badge variant="outline" className="capitalize">{existingProduct?.status ?? 'draft'}</Badge></div><p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{form.sku_code || 'SKU not assigned'}</span>{form.brand ? ` · ${form.brand}` : ''}{form.category ? ` · ${form.category}` : ''}</p>{!isArchived && <div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('product-data')}>Edit product data</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('commerce')}>Manage pricing &amp; stock</Button><Button type="button" size="sm" variant="outline" onClick={() => selectWorkspace('distribution')}>Review channels</Button></div>}</div></div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Inventory</p><p className="mt-1 text-sm font-semibold">{form.has_variants ? `${selectedVariantItems.length} variant${selectedVariantItems.length === 1 ? '' : 's'} · ` : ''}{totalStock} units</p></div>
                   <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Base price</p><p className="mt-1 text-sm font-semibold">{num(form.retail_price) > 0 ? `${formatLocalizedNumber(locale, num(form.retail_price))} ${form.price_currency}` : 'Not configured'}</p></div>
                   <button type="button" onClick={() => selectWorkspace('product-data')} className="rounded-lg border p-3 text-left transition-colors hover:bg-muted/30"><p className="text-xs text-muted-foreground">Translations</p><p className="mt-1 text-sm font-semibold">{activeOrgLocales.filter(item => !item.isPrimary && getLocaleCompletionStatus(item) === 'complete').length}/{activeOrgLocales.filter(item => !item.isPrimary).length} complete</p></button>
                   <button type="button" onClick={() => openCompletionItem('media')} className="rounded-lg border p-3 text-left transition-colors hover:bg-muted/30"><p className="text-xs text-muted-foreground">Product media</p><p className="mt-1 text-sm font-semibold">{images.length}/3 required images</p></button>
                   <button type="button" onClick={() => selectWorkspace('distribution')} className="rounded-lg border p-3 text-left transition-colors hover:bg-muted/30"><p className="text-xs text-muted-foreground">Channel listings</p><p className="mt-1 text-sm font-semibold">{Object.values(channelOverrides).filter(item => item.enabled).length} configured</p></button>
-                  <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Overall readiness</p><p className={cn('mt-1 text-sm font-semibold', completion === 100 ? 'text-emerald-500' : 'text-amber-500')}>{completion}% · {completionChecks.filter(check => !check.done).length ? `${completionChecks.filter(check => !check.done).length} need attention` : 'Ready'}</p></div>
+                  {!isArchived && <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Overall readiness</p><p className={cn('mt-1 text-sm font-semibold', completion === 100 ? 'text-emerald-500' : 'text-amber-500')}>{completion}% · {completionChecks.filter(check => !check.done).length ? `${completionChecks.filter(check => !check.done).length} need attention` : 'Ready'}</p></div>}
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                {!isArchived && <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
                   <div><p className="text-sm font-semibold">{completionChecks.filter(check => !check.done).length ? `${completionChecks.filter(check => !check.done).length} items need attention` : 'Required details are complete'}</p><p className="mt-1 text-xs text-muted-foreground">Master readiness and channel readiness are checked separately.</p></div>
                   <Button type="button" variant="outline" onClick={() => { const nextCheck = completionChecks.find(check => !check.done); if (nextCheck) openCompletionItem(nextCheck.id); else selectWorkspace('distribution'); }}>{completionChecks.some(check => !check.done) ? 'Fix next issue' : 'Review channels'}<ChevronRight className="size-4" /></Button>
-                </div>
+                </div>}
               </CardContent>
             </Card> : null}
 
@@ -3507,15 +3409,15 @@ export default function ProductCreatePage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Sales Channels</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">Manage channel listings, SKU mapping, overrides and provider sync separately from canonical Product Master data.</p></div>
                   <div className="flex flex-wrap gap-2">
-                    {hasAvailableChannelToCreate ? <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><span className={cn('inline-flex', !masterReadyForListings && 'cursor-not-allowed')} tabIndex={!masterReadyForListings ? 0 : undefined}><Button type="button" aria-disabled={!masterReadyForListings} tabIndex={!masterReadyForListings ? -1 : undefined} className={cn(!masterReadyForListings && 'pointer-events-none !border-border !bg-muted !text-muted-foreground !shadow-none')} disabled={!masterReadyForListings} onClick={!existingProduct || isDirty ? saveAndOpenChannelListingSetup : openChannelListingSetup}><Plus className="size-4" />Link another channel</Button></span></TooltipTrigger>{!masterReadyForListings ? <TooltipContent side="bottom" className="max-w-72"><p className="font-medium">Cannot link another channel yet</p><p className="mt-1 text-xs text-muted-foreground">Complete the required Master data first: {firstMissingMasterListingCheck?.label ?? 'required product information'}.</p></TooltipContent> : null}</Tooltip></TooltipProvider> : null}
+                    {!isArchived && hasAvailableChannelToCreate ? <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><span className={cn('inline-flex', !masterReadyForListings && 'cursor-not-allowed')} tabIndex={!masterReadyForListings ? 0 : undefined}><Button type="button" aria-disabled={!masterReadyForListings} tabIndex={!masterReadyForListings ? -1 : undefined} className={cn(!masterReadyForListings && 'pointer-events-none !border-border !bg-muted !text-muted-foreground !shadow-none')} disabled={!masterReadyForListings} onClick={!existingProduct || isDirty ? saveAndOpenChannelListingSetup : openChannelListingSetup}><Plus className="size-4" />Link another channel</Button></span></TooltipTrigger>{!masterReadyForListings ? <TooltipContent side="bottom" className="max-w-72"><p className="font-medium">Cannot link another channel yet</p><p className="mt-1 text-xs text-muted-foreground">Complete the required Master data first: {firstMissingMasterListingCheck?.label ?? 'required product information'}.</p></TooltipContent> : null}</Tooltip></TooltipProvider> : null}
                   </div>
                 </div>
 
               </CardHeader>
               <CardContent>
-                {!masterReadyForListings ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3 text-sm"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" /><div className="min-w-0 flex-1"><p className="font-semibold">Complete required Master data before creating or publishing listings</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Next required item: {firstMissingMasterListingCheck?.label ?? 'Complete Product Master data'}.</p><Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0 text-amber-600" onClick={() => firstMissingMasterListingCheck && openCompletionItem(firstMissingMasterListingCheck.id)}>Fix this requirement<ChevronRight className="size-3.5" /></Button></div></div> : null}
-                {masterReadyForListings && (!existingProduct || isDirty) ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-500/25 bg-blue-500/[0.06] p-3 text-sm"><Info className="mt-0.5 size-4 shrink-0 text-blue-500" /><div><p className="font-semibold">Your Product Master will be saved automatically</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Continue to link a channel. Prime OS will save the current product data before opening channel setup.</p></div></div> : null}
-                {Object.values(channelOverrides).every(channel => !channel.enabled) ? <div className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground"><Radio className="size-5" /><span><strong className="block text-foreground">No channel listings configured</strong><span className="mt-1 block text-xs">Choose connected stores and configure their listing details without leaving this Product Master.</span></span></div> : <><div className="mb-3 flex min-h-11 flex-wrap items-center gap-3 rounded-lg border bg-muted/15 px-3"><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs font-medium"><Checkbox checked={allEnabledChannelsSelected} onCheckedChange={() => setSelectedChannelKeys(allEnabledChannelsSelected ? [] : enabledChannelKeys)} /><span>{allEnabledChannelsSelected ? 'Deselect all' : `Select all (${enabledChannelKeys.length})`}</span></label><span className="text-xs text-muted-foreground">{selectedChannelKeys.length ? `${selectedChannelKeys.length} selected` : 'Select listings for a batch sync'}</span><TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><span className={cn('ml-auto inline-flex', (!selectedChannelKeys.length || !masterReadyForListings) && 'cursor-not-allowed')} tabIndex={!selectedChannelKeys.length || !masterReadyForListings ? 0 : undefined}><Button type="button" size="sm" variant="outline" aria-disabled={!selectedChannelKeys.length || !masterReadyForListings} tabIndex={!selectedChannelKeys.length || !masterReadyForListings ? -1 : undefined} disabled={!selectedChannelKeys.length || !masterReadyForListings} onClick={() => {
+                {!isArchived && !masterReadyForListings ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3 text-sm"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" /><div className="min-w-0 flex-1"><p className="font-semibold">Complete required Master data before creating or publishing listings</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Next required item: {firstMissingMasterListingCheck?.label ?? 'Complete Product Master data'}.</p><Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0 text-amber-600" onClick={() => firstMissingMasterListingCheck && openCompletionItem(firstMissingMasterListingCheck.id)}>Fix this requirement<ChevronRight className="size-3.5" /></Button></div></div> : null}
+                {!isArchived && masterReadyForListings && (!existingProduct || isDirty) ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-500/25 bg-blue-500/[0.06] p-3 text-sm"><Info className="mt-0.5 size-4 shrink-0 text-blue-500" /><div><p className="font-semibold">Your Product Master will be saved automatically</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Continue to link a channel. Prime OS will save the current product data before opening channel setup.</p></div></div> : null}
+                {Object.values(channelOverrides).every(channel => !channel.enabled) ? <div className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground"><Radio className="size-5" /><span><strong className="block text-foreground">No channel listings configured</strong><span className="mt-1 block text-xs">{isArchived ? 'No channel listings are linked to this archived product.' : 'Link a channel when you are ready to sell. You can publish the Product Master without a listing.'}</span></span></div> : <><div className="mb-3 flex min-h-11 flex-wrap items-center gap-3 rounded-lg border bg-muted/15 px-3"><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs font-medium"><Checkbox checked={allEnabledChannelsSelected} onCheckedChange={() => setSelectedChannelKeys(allEnabledChannelsSelected ? [] : enabledChannelKeys)} /><span>{allEnabledChannelsSelected ? 'Deselect all' : `Select all (${enabledChannelKeys.length})`}</span></label><span className="text-xs text-muted-foreground">{selectedChannelKeys.length ? `${selectedChannelKeys.length} selected` : 'Select listings for a batch sync'}</span><TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><span className={cn('ml-auto inline-flex', (!selectedChannelKeys.length || !masterReadyForListings) && 'cursor-not-allowed')} tabIndex={!selectedChannelKeys.length || !masterReadyForListings ? 0 : undefined}><Button type="button" size="sm" variant="outline" aria-disabled={!selectedChannelKeys.length || !masterReadyForListings} tabIndex={!selectedChannelKeys.length || !masterReadyForListings ? -1 : undefined} disabled={!selectedChannelKeys.length || !masterReadyForListings} onClick={() => {
                   setApplyMasterTarget(null);
                   setApplyMasterBatchTargets(selectedChannelKeys);
                   setApplyMasterOpen(true);
@@ -3686,7 +3588,7 @@ export default function ProductCreatePage() {
                         id="product-name"
                         value={form.name}
                         onChange={e => contentLocale === primaryLocale ? updateProductName(e.target.value) : undefined}
-                        readOnly={contentLocale !== primaryLocale}
+                        readOnly={!canWrite || contentLocale !== primaryLocale}
                         placeholder={copy.namePlaceholder}
                         minLength={3}
                         maxLength={120}
@@ -3755,7 +3657,7 @@ export default function ProductCreatePage() {
                         id="product-description"
                         value={form.description}
                         onChange={value => { if (contentLocale === primaryLocale) updateProductDescription(value); }}
-                        readOnly={contentLocale !== primaryLocale}
+                        readOnly={!canWrite || contentLocale !== primaryLocale}
                         placeholder={copy.descriptionPlaceholder}
                       />
                       {contentLocale !== primaryLocale
@@ -3770,6 +3672,7 @@ export default function ProductCreatePage() {
                         <Field label={`${copy.description} · ${localeLabel}`}>
                       <RichTextEditor
                         id="localized-product-description"
+                        readOnly={!canWrite}
                         autoFocus={focusTranslationField === 'description'}
                         onFocus={() => setFocusTranslationField(null)}
                         value={displayedProductDescription}
@@ -3990,23 +3893,23 @@ export default function ProductCreatePage() {
               <CardHeader><CardTitle className="text-base">Version history</CardTitle><p className="text-xs leading-5 text-muted-foreground">Review canonical publication history. Published revisions cannot be edited.</p></CardHeader>
               <CardContent className="space-y-4">
                 <button type="button" onClick={() => setRevisionDetail(null)} aria-pressed={!revisionDetail} className={cn('flex min-h-16 w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', !revisionDetail ? 'border-primary/40 bg-primary/5' : 'hover:bg-muted/30')}><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">D</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Current draft</p><p className="text-xs text-muted-foreground">Updated {new Date(existingProduct?.updated_at ?? Date.now()).toLocaleString()}</p></div><Badge>Current</Badge></button>
-                {versionHistoryEntries.length ? <div className="overflow-hidden rounded-lg border"><div className="grid grid-cols-3 gap-3 border-b bg-muted/20 px-4 py-3 text-xs"><div><p className="text-muted-foreground">Published revisions</p><p className="mt-1 text-lg font-semibold text-foreground">{versionHistoryEntries.length}</p></div><div><p className="text-muted-foreground">Latest revision</p><p className="mt-1 text-lg font-semibold text-foreground">v{versionHistoryEntries.at(-1)?.number}</p></div><div><p className="text-muted-foreground">Last published by</p><p className="mt-1 truncate text-sm font-semibold text-foreground">{versionHistoryEntries.at(-1)?.createdBy}</p></div></div><div className="divide-y">{[...versionHistoryEntries].reverse().map(revision => <button type="button" key={revision.id} onClick={() => setRevisionDetail(revision)} aria-pressed={revisionDetail?.id === revision.id} className={cn('flex min-h-20 w-full items-center gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', revisionDetail?.id === revision.id ? 'bg-primary/5' : 'hover:bg-muted/30')}><span className={cn('grid size-10 shrink-0 place-items-center rounded-full border bg-background text-xs font-bold', revisionDetail?.id === revision.id && 'border-primary text-primary')}>v{revision.number}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{revision.summary}</p><Badge variant={revision.status === 'restored' ? 'secondary' : 'outline'}>{revision.status === 'restored' ? 'Restored' : 'Published'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{revision.createdBy} · {new Date(revision.createdAt).toLocaleString()}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{revision.changes.join(' · ')}</p></div><ChevronRight className="size-4 shrink-0 text-muted-foreground" /></button>)}</div></div> : <div className="rounded-lg border border-dashed p-8 text-center"><p className="text-sm font-semibold">No published revisions yet</p><p className="mt-1 text-xs text-muted-foreground">Complete readiness and publish the Product Master to create revision 1.</p></div>}
+                {versionHistoryEntries.length ? <div className="overflow-hidden rounded-lg border"><div className="grid grid-cols-3 gap-3 border-b bg-muted/20 px-4 py-3 text-xs"><div><p className="text-muted-foreground">Published revisions</p><p className="mt-1 text-lg font-semibold text-foreground">{versionHistoryEntries.length}</p></div><div><p className="text-muted-foreground">Latest revision</p><p className="mt-1 text-lg font-semibold text-foreground">v{versionHistoryEntries.at(-1)?.number}</p></div><div><p className="text-muted-foreground">Last published by</p><p className="mt-1 truncate text-sm font-semibold text-foreground">{versionHistoryEntries.at(-1)?.createdBy}</p></div></div><div className="divide-y">{[...versionHistoryEntries].reverse().map(revision => <button type="button" key={revision.id} onClick={() => setRevisionDetail(revision)} aria-pressed={revisionDetail?.id === revision.id} className={cn('flex min-h-20 w-full items-center gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', revisionDetail?.id === revision.id ? 'bg-primary/5' : 'hover:bg-muted/30')}><span className={cn('grid size-10 shrink-0 place-items-center rounded-full border bg-background text-xs font-bold', revisionDetail?.id === revision.id && 'border-primary text-primary')}>v{revision.number}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{revision.summary}</p><Badge variant={revision.status === 'restored' ? 'secondary' : 'outline'}>{revision.status === 'restored' ? 'Restored' : 'Published'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{revision.createdBy} · {new Date(revision.createdAt).toLocaleString()}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{revision.changes.join(' · ')}</p></div><ChevronRight className="size-4 shrink-0 text-muted-foreground" /></button>)}</div></div> : <div className="rounded-lg border border-dashed p-8 text-center"><p className="text-sm font-semibold">No published revisions yet</p><p className="mt-1 text-xs text-muted-foreground">{isArchived ? 'No revisions were published before this product was archived.' : 'Complete readiness and publish the Product Master to create revision 1.'}</p></div>}
                 <div className="rounded-lg bg-muted/30 p-3 text-xs leading-5 text-muted-foreground"><strong className="text-foreground">Channel activity is separate.</strong> Publishing a Product Master revision does not automatically publish marketplace listings.</div>
               </CardContent>
             </Card> : null}
-          </div>
+          </fieldset>
 
           {/* Right Column */}
-          <div data-editor-fields className="space-y-5 xl:sticky xl:top-20 xl:h-fit">
+          <fieldset data-editor-fields disabled={!canWrite && activeSection !== 'activity'} className={cn('min-w-0 space-y-5 xl:sticky xl:top-20 xl:h-fit', isArchived && activeSection !== 'activity' && 'hidden')}>
 
             {activeSection === 'activity' ? <Card>
               <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{revisionDetail ? `Revision ${revisionDetail.number}` : 'Current draft'}</CardTitle><p className="mt-1 text-xs leading-5 text-muted-foreground">{revisionDetail ? 'Read-only Product Master snapshot' : 'Latest editable Product Master state'}</p></div>{revisionDetail ? <Badge variant={revisionDetail.status === 'restored' ? 'secondary' : 'outline'}>{revisionDetail.status === 'restored' ? 'Restored' : 'Published'}</Badge> : <Badge>Current</Badge>}</div></CardHeader>
               <CardContent className="space-y-4">
-                {revisionDetail ? <><div className="grid gap-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-xs text-muted-foreground">Published by</p><p className="mt-1 text-sm font-semibold">{revisionDetail.createdBy}</p></div><div><p className="text-xs text-muted-foreground">Published at</p><p className="mt-1 text-sm">{new Date(revisionDetail.createdAt).toLocaleString()}</p></div></div><div><p className="text-sm font-semibold">Summary</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{revisionDetail.summary}</p></div><div><p className="text-sm font-semibold">Changes in this revision</p><ul className="mt-2 space-y-2">{revisionDetail.changes.map(change => <li key={change} className="flex items-start gap-2 text-sm text-muted-foreground"><CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" /><span>{change}</span></li>)}</ul></div><div className="rounded-lg bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Channel listing changes are not included in this Product Master revision.</div></> : <><div className="grid gap-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-xs text-muted-foreground">Master SKU</p><p className="mt-1 font-mono text-sm font-semibold">{form.sku_code || 'Not assigned'}</p></div><div><p className="text-xs text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{new Date(existingProduct?.updated_at ?? Date.now()).toLocaleString()}</p></div></div><div><p className="text-sm font-semibold">Draft status</p><p className="mt-1 text-sm leading-6 text-muted-foreground">This draft can still be edited. Run readiness checks and publish it to create the next immutable revision.</p></div><Button type="button" variant="outline" className="w-full" onClick={() => selectWorkspace('overview')}>Review readiness</Button></>}
+                {revisionDetail ? <><div className="grid gap-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-xs text-muted-foreground">Published by</p><p className="mt-1 text-sm font-semibold">{revisionDetail.createdBy}</p></div><div><p className="text-xs text-muted-foreground">Published at</p><p className="mt-1 text-sm">{new Date(revisionDetail.createdAt).toLocaleString()}</p></div></div><div><p className="text-sm font-semibold">Summary</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{revisionDetail.summary}</p></div><div><p className="text-sm font-semibold">Changes in this revision</p><ul className="mt-2 space-y-2">{revisionDetail.changes.map(change => <li key={change} className="flex items-start gap-2 text-sm text-muted-foreground"><CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" /><span>{change}</span></li>)}</ul></div><div className="rounded-lg bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">Channel listing changes are not included in this Product Master revision.</div></> : <><div className="grid gap-3 rounded-lg border bg-muted/20 p-4"><div><p className="text-xs text-muted-foreground">Master SKU</p><p className="mt-1 font-mono text-sm font-semibold">{form.sku_code || 'Not assigned'}</p></div><div><p className="text-xs text-muted-foreground">Last updated</p><p className="mt-1 text-sm">{new Date(existingProduct?.updated_at ?? Date.now()).toLocaleString()}</p></div></div><div><p className="text-sm font-semibold">Draft status</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{isArchived ? 'This archived product is read only. Restore it to Draft to edit or publish.' : 'This draft can still be edited. Run readiness checks and publish it to create the next immutable revision.'}</p></div>{!isArchived && <Button type="button" variant="outline" className="w-full" onClick={() => selectWorkspace('overview')}>Review readiness</Button>}</>}
               </CardContent>
             </Card> : null}
 
-            <Card className={cn(activeSection === 'activity' && 'hidden')}>
+            {!isArchived && <Card className={cn(activeSection === 'activity' && 'hidden')}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-sm">{completionChecks.every(check => check.done) ? <CircleCheck className="size-4 text-emerald-500" aria-label="Complete" /> : <CircleAlert className="size-4 text-amber-500" aria-label="Needs attention" />}Product readiness</CardTitle><p className="mt-1 text-xs leading-5 text-muted-foreground">Single source for unresolved Product Master requirements.</p></div><span className={cn('text-xs font-semibold tabular-nums', completionChecks.every(check => check.done) ? 'text-emerald-500' : 'text-muted-foreground')}>{completionChecks.filter(check => check.done).length}/{completionChecks.length}</span></div>
                 <Progress value={completion} className="mt-3 h-1.5" aria-label={`${completion}% of product requirements complete`} />
@@ -4015,7 +3918,7 @@ export default function ProductCreatePage() {
                 {completionChecks.some(check => !check.done) ? <ul className="space-y-1">{completionChecks.filter(check => !check.done).map(check => { const workspace = completionWorkspaceFor(check.id); return <li key={check.id}><button type="button" onClick={() => openCompletionItem(check.id)} className="flex min-h-11 w-full items-start gap-2 rounded-md px-2 py-2 text-left text-xs leading-5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" /><span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase tracking-wide text-primary">{workspace.label}</span><span className="block">{check.label}</span></span><ChevronRight className="mt-2 size-3.5 shrink-0" /></button></li>; })}</ul> : <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 p-3 text-xs font-medium text-emerald-700"><CircleCheck className="size-4" />Ready to publish.</div>}
                 <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setReadinessReviewOpen(true)}>View all readiness checks</Button>
               </CardContent>
-            </Card>
+            </Card>}
 
             {/* Media */}
             <Card id="product-media-panel-legacy" tabIndex={-1} className="hidden">
@@ -4104,12 +4007,12 @@ export default function ProductCreatePage() {
               </CardContent>
             </Card>
 
-          </div>
+          </fieldset>
         </div>
       </div>
 
       <ChannelListingWizard
-        open={channelListingWizardOpen}
+        open={!isArchived && channelListingWizardOpen}
         onOpenChange={setChannelListingWizardOpen}
         channels={OVERRIDE_CHANNELS.filter(channel => channel.connectionStatus === 'connected')}
         drafts={channelListingDrafts}
@@ -4136,7 +4039,7 @@ export default function ProductCreatePage() {
       />
 
       <ChannelListingEditorDrawer
-        open={editingChannel !== null}
+        open={!isArchived && editingChannel !== null}
         onOpenChange={open => { if (!open) setEditingChannel(null); }}
         channel={editingChannel ? OVERRIDE_CHANNELS.find(channel => channel.key === editingChannel) ?? null : null}
         draft={editingChannel ? channelOverrides[editingChannel] : null}
@@ -4273,7 +4176,7 @@ export default function ProductCreatePage() {
         cancelText={copy.keepVariants}
         variant="destructive"
       />
-      <Sheet open={readinessReviewOpen} onOpenChange={setReadinessReviewOpen}>
+      <Sheet open={!isArchived && readinessReviewOpen} onOpenChange={setReadinessReviewOpen}>
         <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
           <SheetHeader className="border-b pb-4">
             <SheetTitle>Complete this product</SheetTitle>
@@ -4303,9 +4206,9 @@ export default function ProductCreatePage() {
 
       <Dialog open={publishConfirmationOpen} onOpenChange={setPublishConfirmationOpen}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Publish this Product revision?</DialogTitle><DialogDescription>Choose whether the new canonical data should also be applied to your configured listing drafts.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Publish this Product revision?</DialogTitle><DialogDescription>{configuredChannelCount > 0 ? 'Choose whether the new canonical data should also be applied to your configured listing drafts.' : 'This makes the Product Master Active in your catalog. It does not publish to any sales channel. You can link channels later.'}</DialogDescription></DialogHeader>
           <div className="rounded-lg border bg-muted/30 p-4 text-sm"><div className="flex items-center justify-between"><span className="text-muted-foreground">Master SKU</span><strong className="font-mono">{form.sku_code}</strong></div></div>
-          <div className="space-y-2" role="radiogroup" aria-label="Listing update behavior">
+          {configuredChannelCount > 0 && <div className="space-y-2" role="radiogroup" aria-label="Listing update behavior">
             <button type="button" role="radio" aria-checked={publishListingMode === 'master-only'} onClick={() => setPublishListingMode('master-only')} className={cn('flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', publishListingMode === 'master-only' ? 'border-primary bg-primary/5' : 'hover:bg-muted/30')}>
               <span className={cn('mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border', publishListingMode === 'master-only' && 'border-primary')}><span className={cn('size-2 rounded-full', publishListingMode === 'master-only' && 'bg-primary')} /></span>
               <span><strong className="block text-sm">Publish Product Master only</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">Create the canonical revision and leave all listing drafts unchanged.</span></span>
@@ -4314,7 +4217,7 @@ export default function ProductCreatePage() {
               <span className={cn('mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border', publishListingMode === 'apply-listings' && 'border-primary')}><span className={cn('size-2 rounded-full', publishListingMode === 'apply-listings' && 'bg-primary')} /></span>
               <span><strong className="block text-sm">Publish & apply to listings</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">Publish the Master, then review and confirm the exact fields sent to each listing.</span>{configuredChannelCount === 0 ? <span className="mt-1 block text-xs text-muted-foreground">No channel listings are configured yet.</span> : <span className="mt-1 block text-xs font-medium text-primary">{publishListingChangeCount} field change{publishListingChangeCount === 1 ? '' : 's'} across {configuredChannelCount} listing{configuredChannelCount === 1 ? '' : 's'}</span>}</span>
             </button>
-          </div>
+          </div>}
           {publishListingMode === 'apply-listings' && configuredChannelCount > 0 ? <div className="overflow-hidden rounded-lg border">
             <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2.5"><div><p className="text-xs font-semibold">Listing changes detected</p><p className="mt-0.5 text-[11px] text-muted-foreground">Nothing is synced until you confirm these changes.</p></div><Badge variant="outline" className="text-[10px]">{publishListingChangeCount} changes</Badge></div>
             <div className="max-h-56 space-y-3 overflow-y-auto p-3">

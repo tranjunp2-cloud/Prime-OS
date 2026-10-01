@@ -5,7 +5,7 @@
 // Fulfillment: fulfillment-store.ts schema (FulfillmentJob)
 // etc.
 
-import { getProducts } from './product-store';
+import { getProducts, isDemoProduct } from './product-store';
 import { addWarehouse, clearWarehouseStore } from './warehouse-store';
 import { addInventoryPosition, clearInventoryStore } from './inventory-store';
 import {
@@ -195,7 +195,7 @@ function seedWarehouses() {
 function seedProducts() {
   SKU_REFS.length = 0;
 
-  for (const product of getProducts()) {
+  for (const product of getProducts().filter(product => isDemoProduct(product.id))) {
     const skus = product.skus.length > 0
       ? product.skus
       : [{
@@ -875,7 +875,7 @@ function seedListings() {
     product.channels
       .filter((channelConfig) => supportedChannels.has(channelConfig.channel))
       .forEach((channelConfig, channelIndex) => {
-        const listingStatus = product.status === 'draft'
+        const listingStatus = channelConfig.status === 'draft'
           ? 'draft'
           : channelConfig.status === 'active'
           ? 'published'
@@ -899,7 +899,7 @@ function seedListings() {
           },
           images: product.images,
           status: listingStatus,
-          error_message: listingStatus === 'draft' ? 'Awaiting publishing approval in Product Master.' : null,
+          error_message: null,
           published_at: listingStatus === 'published' ? daysAgo(productIndex + channelIndex + 2) : null,
           last_synced_at: listingStatus !== 'draft' ? daysAgo((productIndex + channelIndex) % 4) : null,
           created_at: product.created_at,

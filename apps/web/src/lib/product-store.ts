@@ -1,6 +1,9 @@
 import { normalizeDemoStockLocations } from './demo-warehouse-locations';
 import { getProductCatalogSettings, resolveCatalogCategory } from './product-catalog-settings-store';
 import type { ListingPricing } from './pricing-rules';
+import { repairDraftListingDemo } from './draft-listing-demo';
+import { getSavedAmazonListing } from './amazon-listing-store';
+import { completeActiveProductDemo } from './active-product-demo';
 // Shared product store — singleton in-memory for local mockup
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
@@ -81,7 +84,7 @@ export interface ChannelOverride extends ListingPricing {
 export interface ChannelListing {
   channel: 'website' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten';
   external_id: string | null;
-  status: 'active' | 'inactive' | 'pending';
+  status: 'draft' | 'active' | 'inactive' | 'pending';
   listing_url: string | null;
   last_synced_at: string | null;
 }
@@ -218,6 +221,8 @@ export interface Product {
   status: 'draft' | 'review' | 'published' | 'archived';
   import_result?: 'needs_review' | 'incomplete' | 'ready' | 'matched' | 'published';
   import_source?: string;
+  /** Restoring to Draft is explicit; import validation must not republish it on save/reload. */
+  import_activation_paused?: boolean;
   import_issues?: string[];
   import_sources?: Array<{ channel: ChannelListing['channel']; store: string; brand: string; price: number; currency: string }>;
   created_at: string;
@@ -455,8 +460,8 @@ const SEED_PRODUCTS: Product[] = [
     inventory: { wh_crjp: 0, wh_rslsg: 4 },
     has_variants: false,
     channels: [
-      { channel: 'rakuten', external_id: 'R001002002', status: 'active', listing_url: null, last_synced_at: null },
-      { channel: 'website', external_id: null, status: 'active', listing_url: '/products/CR-TAI-BSZ', last_synced_at: null },
+      { channel: 'rakuten', external_id: null, status: 'draft', listing_url: null, last_synced_at: null },
+      { channel: 'website', external_id: null, status: 'draft', listing_url: null, last_synced_at: null },
     ],
     status: 'draft',
     created_at: '2026-04-01T08:00:00Z',
@@ -488,6 +493,7 @@ const CATEGORY_DEMO_PRODUCTS: Product[] = [
     category: 'Headphones',
     description: 'Second demo Product Master linked to the Headphones category.',
     status: 'draft',
+    channels: [{ channel: 'amazon', external_id: null, status: 'draft', listing_url: null, last_synced_at: null }],
     variant_options: [{ attributeKey: 'color', name: 'Color', values: ['Cloud White'] }],
     skus: [{ ...SEED_PRODUCTS[0].skus[0], id: 'sku_demo_headphones_002', sku_code: 'DEMO-ELC-002', variation_name: 'Cloud White' }],
   },
@@ -661,7 +667,8 @@ const ADDITIONAL_IMPORT_TEST_PRODUCTS: Product[] = [
 
 const DEFAULT_PRODUCTS = [...ADDITIONAL_IMPORT_TEST_PRODUCTS, ...IMPORTED_DEMO_PRODUCTS.map(product => ({ ...product, import_result: 'incomplete' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: ['Product image is required'] })), ...IMPORT_REVIEW_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS]
   .map(product => product.id === 'prod_001' ? { ...product, channels: [...product.channels, { channel: 'shopee' as const, external_id: 'SHP-9012281', status: 'active' as const, listing_url: null, last_synced_at: '2026-09-28T08:38:00Z' }], import_result: 'matched' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: [], updated_at: '2026-09-28T08:38:00Z' } : product)
-  .map(withDemoLocales);
+  .map(withDemoLocales)
+  .map(product => completeActiveProductDemo(product));
 
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
@@ -669,6 +676,9 @@ const PRODUCT_STORAGE_KEY = 'primeos-product-master-v5';
 const DELETED_PRODUCT_STORAGE_KEY = 'primeos-product-master-deleted-v1';
 const DEMO_LOCALE_MIGRATION_KEY = 'primeos-demo-locale-shape-v2';
 const DEMO_IMPORT_DRAFT_MIGRATION_KEY = 'primeos-incomplete-import-drafts-v1';
+const DEMO_LISTING_DRAFT_MIGRATION_KEY = 'primeos-draft-listing-fixtures-v1';
+const ACTIVE_DEMO_COMPLETION_KEY = 'primeos-active-demo-completed-v1';
+const ACTIVE_DEMO_BACKUP_KEY = 'primeos-active-demo-before-completion-v1';
 const INCOMPLETE_IMPORT_DEMO_IDS = new Set(['prod_import_test_incomplete_02', 'prod_import_imp-003']);
 
 function normalizeStoredProduct(product: Product): Product {
@@ -729,6 +739,7 @@ function normalizeStoredProduct(product: Product): Product {
     revisions: Array.isArray(product.revisions) ? product.revisions : [],
     record_version: Number(product.record_version) || 1,
     status: ['draft', 'review', 'published', 'archived'].includes(product.status) ? product.status : 'draft',
+    import_activation_paused: product.import_activation_paused === true,
     import_result: ['needs_review', 'incomplete', 'ready', 'matched', 'published'].includes(product.import_result ?? '') ? product.import_result : undefined,
     import_source: typeof product.import_source === 'string' ? product.import_source : undefined,
     import_issues: Array.isArray(product.import_issues) ? product.import_issues.filter((issue): issue is string => typeof issue === 'string') : undefined,
@@ -747,7 +758,7 @@ function activateValidatedImport(product: Product): Product {
   // The import validator owns readiness. Never bypass unresolved mapping or
   // missing-data decisions, and never reactivate an archived product.
   const importPassed = product.import_result === 'ready' || product.import_result === 'published';
-  if (!importPassed || product.import_issues?.length || product.status === 'archived') return product;
+  if (!importPassed || product.import_issues?.length || product.status === 'archived' || product.import_activation_paused) return product;
   if (product.status === 'published' && product.import_result === 'published') return product;
 
   const now = new Date().toISOString();
@@ -775,6 +786,7 @@ function loadStoredProducts(): Product[] {
     if (!raw) {
       window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
       window.localStorage.setItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY, '1');
+      window.localStorage.setItem(DEMO_LISTING_DRAFT_MIGRATION_KEY, '1');
       return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
     }
     const stored = JSON.parse(raw) as unknown;
@@ -784,7 +796,9 @@ function loadStoredProducts(): Product[] {
     // Reset the two requested incomplete demo cases to Draft once, preserving
     // their revision history and listings. Future publications stay untouched.
     const shouldResetImportDrafts = window.localStorage.getItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY) !== '1';
+    const shouldRepairDraftListings = window.localStorage.getItem(DEMO_LISTING_DRAFT_MIGRATION_KEY) !== '1';
     const valid = storedProducts.map(product => {
+      if (shouldRepairDraftListings && !getSavedAmazonListing(product.id)) product = repairDraftListingDemo(product);
       return shouldResetImportDrafts && INCOMPLETE_IMPORT_DEMO_IDS.has(product.id)
         && product.status === 'published'
         && product.import_result === 'incomplete'
@@ -795,6 +809,7 @@ function loadStoredProducts(): Product[] {
       window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(valid));
     }
     if (shouldResetImportDrafts) window.localStorage.setItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY, '1');
+    if (shouldRepairDraftListings) window.localStorage.setItem(DEMO_LISTING_DRAFT_MIGRATION_KEY, '1');
     const migrated = valid.map(storedProduct => {
       const product = normalizeStoredProduct(storedProduct);
       const normalized = (product as Product & { product_type?: string }).product_type === 'bundle'
@@ -855,7 +870,7 @@ function loadStoredProducts(): Product[] {
     if (shouldResetDemoLocales) window.localStorage.setItem(DEMO_LOCALE_MIGRATION_KEY, '1');
     const storedIds = new Set(migrated.map(product => product.id));
     const deletedIds = new Set<string>(JSON.parse(window.localStorage.getItem(DELETED_PRODUCT_STORAGE_KEY) ?? '[]'));
-    return [...migrated, ...DEFAULT_PRODUCTS.filter(product => !storedIds.has(product.id) && !deletedIds.has(product.id)).map(normalizeStoredProduct)];
+    return [...migrated.filter(product => !deletedIds.has(product.id)), ...DEFAULT_PRODUCTS.filter(product => !storedIds.has(product.id) && !deletedIds.has(product.id)).map(normalizeStoredProduct)];
   } catch {
     return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
   }
@@ -887,10 +902,34 @@ function persistCategoryReferences(): void {
   } catch { /* Leave the original storage untouched if migration cannot be persisted. */ }
 }
 
+function completeStoredActiveDemo(products: Product[]): Product[] {
+  if (typeof window === 'undefined' || window.localStorage.getItem(ACTIVE_DEMO_COMPLETION_KEY) === '1') return products;
+  const completed = products.map(product => completeActiveProductDemo(product));
+  const changed = completed.filter((product, index) => product !== products[index]);
+  try {
+    if (changed.length) {
+      const stored = JSON.parse(window.localStorage.getItem(PRODUCT_STORAGE_KEY) ?? 'null') as Product[] | null;
+      const changedIds = new Set(changed.map(product => product.id));
+      // Keep the original target records for recovery; never overwrite other browser records.
+      window.localStorage.setItem(ACTIVE_DEMO_BACKUP_KEY, JSON.stringify((stored ?? products).filter(product => changedIds.has(product.id))));
+      const persisted = stored
+        ? stored.map(product => changed.find(candidate => candidate.id === product.id) ?? product)
+        : completed;
+      window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(persisted));
+    }
+    window.localStorage.setItem(ACTIVE_DEMO_COMPLETION_KEY, '1');
+    return completed;
+  } catch {
+    // Do not report fixture changes that could not be saved.
+    return products;
+  }
+}
+
 const loadedProducts = loadStoredProducts();
-let _products: Product[] = loadedProducts.map(activateValidatedImport);
+const activatedProducts = loadedProducts.map(activateValidatedImport);
+let _products: Product[] = completeStoredActiveDemo(activatedProducts);
 let categoryReferencesPersisted = false;
-if (_products.some((product, index) => product !== loadedProducts[index])) persistProducts();
+if (activatedProducts.some((product, index) => product !== loadedProducts[index])) persistProducts();
 
 export function getProducts(): Product[] {
   const categories = getProductCatalogSettings().categories;
@@ -920,7 +959,14 @@ export function updateProduct(id: string, p: Partial<Product> & { id: string }, 
   if (!options?.requirePersistence) persistProducts();
 }
 
-export function deleteProduct(id: string): void {
+export function deleteProduct(id: string, options?: { requirePersistence?: boolean }): void {
+  // The tombstone is authoritative on reload, even if saving the filtered list fails.
+  // Lifecycle UI must not report success when deletion could not be persisted.
+  if (options?.requirePersistence && typeof window !== 'undefined') {
+    const deletedIds = new Set<string>(JSON.parse(window.localStorage.getItem(DELETED_PRODUCT_STORAGE_KEY) ?? '[]'));
+    deletedIds.add(id);
+    window.localStorage.setItem(DELETED_PRODUCT_STORAGE_KEY, JSON.stringify([...deletedIds]));
+  }
   _products = _products.filter(x => x.id !== id);
   if (typeof window !== 'undefined') {
     try {
@@ -936,6 +982,11 @@ export function deleteProduct(id: string): void {
 
 export function getProductById(id: string): Product | undefined {
   return getProducts().find(x => x.id === id);
+}
+
+/** Operational demo generators must never invent orders or holds for user-created masters. */
+export function isDemoProduct(id: string): boolean {
+  return DEFAULT_PRODUCTS.some(product => product.id === id);
 }
 
 export function getResolvedProductSkuById(skuId: string): ResolvedProductSku | undefined {

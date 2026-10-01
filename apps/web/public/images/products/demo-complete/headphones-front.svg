@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="Wireless Studio Headphones — Front view">
+<rect width="900" height="900" fill="#f5f2ec"/><rect x="40" y="40" width="820" height="820" rx="28" fill="#fff"/>
+<text x="80" y="105" font-family="Arial,sans-serif" font-size="22" fill="#64748b" letter-spacing="2">PRIME • PROTOTYPE REFERENCE</text>
+<ellipse cx="450" cy="684" rx="210" ry="24" fill="#e2e8f0"/><path d="M250 485V400a200 200 0 0 1 400 0v85" fill="none" stroke="#182333" stroke-width="54"/><path d="M268 416a182 182 0 0 1 364 0" fill="none" stroke="#64748b" stroke-width="17"/><rect x="210" y="444" width="105" height="203" rx="48" fill="#172033"/><rect x="238" y="460" width="55" height="170" rx="27" fill="#475569"/><rect x="585" y="444" width="105" height="203" rx="48" fill="#172033"/><rect x="607" y="460" width="55" height="170" rx="27" fill="#475569"/>
+<text x="80" y="785" font-family="Arial,sans-serif" font-size="32" font-weight="700" fill="#172033">Wireless Studio Headphones</text>
+<text x="80" y="823" font-family="Arial,sans-serif" font-size="21" fill="#64748b">Front view • Illustrative demo asset</text>
+</svg>
