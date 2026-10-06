@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowRight,
   Boxes,
   CheckCircle2,
   CircleAlert,
@@ -145,6 +146,7 @@ export function ConnectedChannelsPage() {
   const [showErrorStores, setShowErrorStores] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [newlyConnected, setNewlyConnected] = useState<ConnectedChannelRecord | null>(null);
 
   const loadChannels = useCallback(async () => {
     try {
@@ -171,8 +173,13 @@ export function ConnectedChannelsPage() {
   }, [loadChannels]);
 
   const handleConnected = (record: ConnectedChannelRecord) => {
+    setNewlyConnected(record);
     setChannels((current) => [toStoreChannel(record), ...current.filter((item) => item.id !== record.id)]);
-    toast.success('Store successfully connected!');
+    toast.success('Store connected. Next, prepare your products.', {
+      description: 'Review existing shop listings or create your first Product Master.',
+      action: { label: 'Go to Products', onClick: () => navigate(`/products/master-catalog?getting-started=1&shop=${encodeURIComponent(record.id)}`) },
+      duration: 12000,
+    });
     pollNewChannel(record.id);
   };
 
@@ -211,6 +218,7 @@ export function ConnectedChannelsPage() {
       <div className="mx-auto max-w-[1600px] space-y-5">
         <WorkspacePageHeader title="Connected Channels" description="Manage every connected storefront, marketplace store, and retail location from one directory." icon={Store} actions={<Button type="button" onClick={() => setWizardOpen(true)}><Plus className="size-4" />Connect Store</Button>} />
 
+        {newlyConnected && <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4" aria-label="Next step after connecting a shop"><div><h2 className="text-sm font-semibold">Shop connected. Next: prepare your products.</h2><p className="mt-1 text-sm text-muted-foreground">Use existing shop listings or create a new Product Master. You choose what gets linked.</p></div><div className="flex gap-2"><Button variant="ghost" onClick={() => setNewlyConnected(null)}>Later</Button><Button onClick={() => navigate(`/products/master-catalog?getting-started=1&shop=${encodeURIComponent(newlyConnected.id)}`)}>Go to Products<ArrowRight className="size-4" /></Button></div></section>}
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Channel summary">
           <KpiCard label="Connected Stores" value={String(channels.length)} detail={`${healthyCount} healthy connections`} icon={Store} />
           <KpiCard label="Published Listings" value={publishedListings.toLocaleString('en-US')} detail="Across all connected stores" icon={Boxes} tone="emerald" />

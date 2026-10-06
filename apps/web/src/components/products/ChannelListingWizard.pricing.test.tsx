@@ -16,11 +16,12 @@ afterEach(() => { cleanup(); localStorage.removeItem(PRICING_STORAGE_KEY); });
 describe('wizard price gate', () => {
   it('blocks review until price confirmation, then shows the actual price in final review', () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 channel' }));
-    expect(screen.getByRole('button', { name: 'Review channel changes' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Select Test shop · PrimeWeb' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 shop' }));
+    expect(screen.getByRole('button', { name: 'Review new listings' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm listing price' }));
-    expect(screen.getByRole('button', { name: 'Review channel changes' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Review channel changes' }));
+    expect(screen.getByRole('button', { name: 'Review new listings' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Review new listings' }));
     expect(screen.getByText('1,000 JPY')).toBeInTheDocument();
   });
 });

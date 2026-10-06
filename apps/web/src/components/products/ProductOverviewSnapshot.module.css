@@ -1,0 +1,33 @@
+.root {
+  container-type: inline-size;
+}
+
+.body {
+  display: grid;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@container (min-width: 620px) {
+  .body {
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+@container (max-width: 400px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics > button + button {
+    border-left: 0;
+    border-top: 1px solid hsl(var(--border));
+    padding-top: 10px;
+    margin-top: 4px;
+  }
+}

@@ -6,6 +6,7 @@ interface WorkspacePageHeaderProps {
   title: string;
   description: string;
   icon: LucideIcon;
+  titleAccessory?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
@@ -14,6 +15,7 @@ export function WorkspacePageHeader({
   title,
   description,
   icon: Icon,
+  titleAccessory,
   actions,
   className,
 }: WorkspacePageHeaderProps) {
@@ -22,6 +24,7 @@ export function WorkspacePageHeader({
       title={title}
       description={description}
       icon={Icon}
+      status={titleAccessory}
       secondaryActions={actions}
       variant="workspace"
       className={className}

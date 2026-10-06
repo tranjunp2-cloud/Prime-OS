@@ -14,7 +14,7 @@ beforeEach(() => {
   saveProductCatalogSettings({ ...settings, categories: [...settings.categories, category] });
   product = { ...getProducts()[0], id: 'readiness-fixture', name: 'Complete Master', sku_code: 'COMPLETE-MASTER',
     category: category.name, categoryId: category.id, status: 'draft', has_variants: false, product_type: 'single',
-    images: ['/one.jpg', '/two.jpg', '/three.jpg'], description: 'Complete product description for the catalog. '.repeat(5),
+    images: ['/one.jpg'], description: 'Complete product description for the catalog. '.repeat(5),
     retail_price: 1000, inventory: { wh_crjp: 50 }, skus: [], variant_options: [], specifications: [],
     channels: [], channel_overrides: {}, pkg_length: 0, pkg_width: 0, pkg_height: 0, pkg_weight: 0,
     import_result: undefined, import_source: undefined, import_sources: [], import_issues: [] };
@@ -49,13 +49,14 @@ describe('Catalog lifecycle views', () => {
     expect(JSON.stringify(records)).toBe(before);
   });
 
-  it('requires an unpublished, complete and reviewed Master for Ready to publish', () => {
+  it('requires an unpublished, complete Master independently from listing review', () => {
     expect(isMasterReadyToPublish(product)).toBe(true);
     expect(isMasterReadyToPublish({ ...product, status: 'published' })).toBe(false);
-    expect(isMasterReadyToPublish({ ...product, status: 'review' })).toBe(false);
+    expect(isMasterReadyToPublish({ ...product, status: 'review' })).toBe(true);
     expect(isMasterReadyToPublish({ ...product, status: 'archived' })).toBe(false);
-    expect(isMasterReadyToPublish({ ...product, import_result: 'needs_review' })).toBe(false);
-    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: ['/one.jpg'] })).toBe(false);
+    expect(isMasterReadyToPublish({ ...product, import_result: 'needs_review' })).toBe(true);
+    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: ['/one.jpg'] })).toBe(true);
+    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: [] })).toBe(false);
   });
 
   it('does not classify a manually-published Master as imported', () => {
@@ -85,7 +86,7 @@ describe('Shared Master readiness', () => {
   });
 
   it('checks image count and visible description text, not stale import flags', () => {
-    const incomplete = { ...product, import_result: 'ready' as const, images: ['/one.jpg'], description: '<p title="'.padEnd(150, 'x') + '">Short</p>' };
+    const incomplete = { ...product, import_result: 'ready' as const, images: [], description: '<p title="'.padEnd(150, 'x') + '">Short</p>' };
     expect(getStoredMasterReadiness(incomplete).checks.filter(check => !check.done).map(check => check.id)).toEqual(['media', 'content']);
   });
 

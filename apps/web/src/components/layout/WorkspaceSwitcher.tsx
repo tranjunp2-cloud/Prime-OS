@@ -20,7 +20,7 @@ export function WorkspaceSwitcher() {
   const workspaces = [
     { id: 'main', name: 'Main Workspace', shortName: 'Main', detail: 'Back-office Operations', role: user?.role === 'admin' ? 'Admin' : 'Operator', href: '/admin/dashboard', icon: Building2, accent: 'bg-indigo-600 text-white', accessGranted: true },
     { id: 'inbox', name: 'Prime Inbox Workspace', shortName: 'Prime Inbox', detail: 'Conversation & Social Commerce Desk', role: user?.role === 'admin' ? 'Admin' : 'CS Agent', href: '/inbox/conversation', icon: MessageCircle, accent: 'bg-violet-100 text-violet-700', accessGranted: true },
-    { id: 'primeweb', name: 'PrimeWeb Workspace', shortName: 'PrimeWeb', detail: 'Storefront Builder', role: user?.role === 'admin' ? 'Admin' : 'Editor', href: '/builder/theme', icon: Globe2, accent: 'bg-emerald-100 text-emerald-700', accessGranted: true },
+    { id: 'primeweb', name: 'PrimeWeb Workspace', shortName: 'PrimeWeb', detail: 'Storefront Builder', role: user?.role === 'admin' ? 'Admin' : 'Editor', href: '/builder/sites', icon: Globe2, accent: 'bg-emerald-100 text-emerald-700', accessGranted: true },
     { id: 'pos', name: 'POS Workspace', shortName: 'POS', detail: 'Register Mode', role: user?.role === 'admin' ? 'Admin' : 'Cashier', href: '/pos/register', icon: Store, accent: 'bg-amber-100 text-amber-700', accessGranted: true },
   ].filter((workspace) => workspace.accessGranted);
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];

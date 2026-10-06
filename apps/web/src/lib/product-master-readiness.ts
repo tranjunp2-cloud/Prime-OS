@@ -1,6 +1,7 @@
 import type { Product } from './product-store';
 import { getAttributesForCategory, getProductCatalogSettings, resolveCatalogCategory, type ProductCatalogSettings } from './product-catalog-settings-store';
 import { assignedCategoryAttributes, missingCategoryAttributes, type Specification } from './category-schema';
+import { getMasterMediaReadiness, MIN_MASTER_IMAGES } from './product-master-media';
 
 export interface VariantGroup { id: string; name: string; values: string[] }
 export interface VariantItem {
@@ -104,19 +105,28 @@ export function getMasterReadinessChecks(input: MasterReadinessInput, settings: 
   const missingAttributes = missingCategoryAttributes(attributes, { specifications: input.specifications, has_variants: input.has_variants, variant_options: options });
   const selected = input.variantItems.filter(item => item.selected);
   const generated = input.has_variants && selected.length > 0;
-  const variantPricingReady = generated && selected.every(item => item.sku_code.trim() && Number(item.price) > 0)
-    && selected.reduce((total, item) => total + Number(item.stock || 0), 0) > 0;
-  const totalStock = Object.values(input.inventory).reduce<number>((total, value) => total + Number(value || 0), 0);
+  const positive = (value: NumericInput) => Number.isFinite(Number(value)) && Number(value) > 0;
+  const variantPricingReady = generated && selected.every(item => item.sku_code.trim() && positive(item.price));
   const selectable = settings.attributes.filter(attribute => attribute.status === 'Active'
     && ['Single select', 'Multi-select'].includes(attribute.type) && attribute.options.trim());
   const invalidGroups = input.variantGroups.filter(group => !selectable.some(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase()));
+  const validValues = input.variantGroups.every(group => {
+    const attribute = selectable.find(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase());
+    const allowed = attribute?.options.split(',').map(value => value.trim().toLowerCase()) ?? [];
+    const values = group.values.map(value => value.trim().toLowerCase());
+    return values.length > 0 && new Set(values).size === values.length && values.every(value => allowed.includes(value));
+  });
+  const validCombinations = selected.every(item => {
+    const parts = item.key.split('/').map(part => part.trim().toLowerCase());
+    return parts.length === input.variantGroups.length && parts.every((part, index) => input.variantGroups[index].values.some(value => value.trim().toLowerCase() === part));
+  }) && new Set(selected.map(item => item.key.trim().toLowerCase())).size === selected.length;
   const checks: MasterReadinessCheck[] = [
     { id: 'identity', label: 'Add product name and master SKU', done: input.name.trim().length >= 3 && Boolean(input.sku_code.trim()) },
-    { id: 'media', label: 'Add at least 3 product images', done: input.images.length >= 3 },
+    { id: 'media', label: `Add at least ${MIN_MASTER_IMAGES} product image`, done: getMasterMediaReadiness(input.images).ready },
     { id: 'content', label: 'Write a detailed description (100+ characters)', done: richTextPlainText(input.description).length >= 100 },
     { id: 'category', label: 'Select an active product category', done: category?.status === 'Active' },
-    { id: 'price', label: input.has_variants ? 'Configure variant pricing and stock' : 'Configure base price and inventory',
-      done: generated ? variantPricingReady : Number(input.retail_price) > 0 && totalStock > 0 },
+    { id: 'price', label: input.has_variants ? 'Configure variant prices' : 'Configure base price',
+      done: input.has_variants ? variantPricingReady : positive(input.retail_price) },
   ];
   if (attributes.some(attribute => attribute.required)) checks.push({
     id: 'attributes', label: missingAttributes.length ? `Complete required attributes: ${missingAttributes.map(attribute => attribute.name).join(', ')}` : 'Complete required category attributes',
@@ -124,15 +134,15 @@ export function getMasterReadinessChecks(input: MasterReadinessInput, settings: 
   });
   if (input.shippingPackageRequired) checks.push({
     id: 'shipping', label: 'Configure shipping package dimensions and weight',
-    done: Boolean(Number(input.pkg_length) && Number(input.pkg_width) && Number(input.pkg_height) && Number(input.pkg_weight)),
+    done: [input.pkg_length, input.pkg_width, input.pkg_height, input.pkg_weight].every(positive),
   });
   if (input.has_variants) checks.push({
     id: 'variants',
     label: invalidGroups.length > 0 ? `Replace ${invalidGroups.length} invalid variant option ${invalidGroups.length === 1 ? 'type' : 'types'}`
       : input.variantGroups.length === 0 ? 'Add at least one valid variant option'
-        : input.variantGroups.some(group => group.values.length === 0) ? 'Select values for every variant option' : 'Complete all selected variants',
+        : !validValues ? 'Select valid values for every variant option' : 'Complete unique SKUs and option values for all selected variants',
     done: input.variantGroups.length > 0 && invalidGroups.length === 0 && input.variantGroups.every(group => group.values.length > 0)
-      && generated && selected.every(item => Boolean(item.sku_code.trim())),
+      && validValues && validCombinations && generated && selected.every(item => Boolean(item.sku_code.trim())),
   });
   return checks;
 }

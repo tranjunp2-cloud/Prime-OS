@@ -28,6 +28,22 @@ function selectCategory(path = 'Art / Tools') {
 }
 
 describe('Create Product Master category', () => {
+  it('keeps the entered form and reports an unsuccessful save instead of claiming success', () => {
+    render(<CreateProductDialog open onOpenChange={vi.fn()} existingSkus={[]} onConfirm={() => { throw new Error('Storage unavailable'); }} />);
+    fillIdentity();
+    fireEvent.click(screen.getByRole('button', { name: 'Create draft & continue' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Storage unavailable');
+    expect(screen.getByLabelText(/Product name/)).toHaveValue(' New product ');
+  });
+  it('generates an unused SKU and offers an existing product without forcing reuse', () => {
+    const onOpenExisting = vi.fn();
+    render(<CreateProductDialog open onOpenChange={vi.fn()} existingSkus={['PRD-0001']} existingProducts={[{ id: 'existing', name: 'Blue notebook', sku_code: 'BOOK-1' }]} onOpenExisting={onOpenExisting} onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate SKU' }));
+    expect(screen.getByLabelText(/Master SKU/)).toHaveValue('PRD-0002');
+    fireEvent.change(screen.getByLabelText(/Product name/), { target: { value: 'Blue note' } });
+    fireEvent.click(screen.getByRole('button', { name: /Blue notebook/ }));
+    expect(onOpenExisting).toHaveBeenCalledWith('existing');
+  });
   it('searches active category paths and saves the selected ID, not an ambiguous name', () => {
     const onConfirm = vi.fn();
     render(<CreateProductDialog open onOpenChange={vi.fn()} existingSkus={[]} onConfirm={onConfirm} />);

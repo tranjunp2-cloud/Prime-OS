@@ -96,14 +96,20 @@ const mainNavigation: NavGroup[] = [
   ] },
 ];
 
-const primeWebNavigation: NavGroup[] = [{ id: 'primeweb', label: 'Storefront Builder', items: [
-  { id: 'theme-editor', label: 'Theme Editor', href: '/builder/theme', icon: LayoutGrid },
-  { id: 'pages-content', label: 'Pages & Content', href: '/builder/pages', icon: FilePlus2 },
-  { id: 'navigation-menus', label: 'Navigation & Menus', href: '/builder/navigation', icon: Menu },
-  { id: 'banners-popups', label: 'Banners & Popups', href: '/builder/banners', icon: Image },
-  { id: 'domains-seo', label: 'Custom Domains & SEO', href: '/builder/domains', icon: Globe2 },
-  { id: 'pixel-integrations', label: 'Pixel Integrations', href: '/builder/integrations', icon: Link2 },
-] }];
+const primeWebNavigation: NavGroup[] = [
+  { id: 'primeweb-sites', label: 'PrimeWeb', items: [
+    { id: 'websites', label: 'My Websites', href: '/builder/sites', icon: Globe2 },
+  ] },
+  { id: 'primeweb', label: 'Your website', items: [
+    { id: 'website-overview', label: 'Overview', href: '/builder/overview', icon: Home },
+    { id: 'theme-editor', label: 'Website Editor', href: '/builder/theme', icon: LayoutGrid },
+    { id: 'pages-content', label: 'Pages & Blog', href: '/builder/pages', icon: FilePlus2 },
+    { id: 'storefront', label: 'Storefront', href: '/builder/storefront', icon: ShoppingBag },
+    { id: 'domains-seo', label: 'Domains & Publishing', href: '/builder/domains', icon: Globe2 },
+    { id: 'seo-analytics', label: 'SEO & Analytics', href: '/builder/seo', icon: BarChart3 },
+    { id: 'website-settings', label: 'Website Settings', href: '/builder/settings', icon: Settings2 },
+  ] },
+];
 
 const posNavigation: NavGroup[] = [{ id: 'pos', label: 'Point of Sale', items: [
   { id: 'fast-checkout', label: 'Fast Checkout', href: '/pos/register', icon: MonitorSmartphone },

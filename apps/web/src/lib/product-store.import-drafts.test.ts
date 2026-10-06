@@ -44,11 +44,14 @@ describe('incomplete imported Product Master drafts', () => {
     stale.forEach(product => {
       const repaired = loaded.find(item => item.id === product.id)!;
       expect(repaired.status).toBe('draft');
-      expect(repaired.channels).toEqual(product.channels);
+      repaired.channels.forEach(({ shop_snapshot, ...retained }, index) => {
+        expect(retained).toEqual(product.channels[index]);
+        if (shop_snapshot) expect(shop_snapshot.listing_id).toBe(retained.external_id);
+      });
       expect(repaired.channel_overrides).toEqual(product.channel_overrides);
       expect(repaired.import_issues).toEqual(product.import_issues);
     });
-    expect(JSON.parse(window.localStorage.getItem(storageKey)!)).toEqual(stale.map(product => ({ ...product, status: 'draft' })));
+    expect(JSON.parse(window.localStorage.getItem(storageKey)!)).toEqual(stale.map(product => ({ ...product, status: 'draft', channels: JSON.parse(JSON.stringify(loaded.find(item => item.id === product.id)!.channels)) })));
   });
 
   it.each(['published', 'restored'] as const)('retains the existing %s revision when resetting the requested demo', async status => {

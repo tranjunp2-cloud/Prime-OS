@@ -21,7 +21,7 @@ export function isImportedMaster(product: Product) {
 }
 
 export function isMasterReadyToPublish(product: Product) {
-  return product.status === 'draft' && product.import_result !== 'needs_review' && getStoredMasterReadiness(product).ready;
+  return isDraftMaster(product) && getStoredMasterReadiness(product).ready;
 }
 
 export function matchesCatalogView(product: Product, view: CatalogView, needsAttention: boolean) {

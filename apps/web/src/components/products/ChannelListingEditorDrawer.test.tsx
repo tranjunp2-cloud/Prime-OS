@@ -7,6 +7,7 @@ import { ChannelListingEditorDrawer } from './ChannelListingEditorDrawer';
 import type { ChannelWizardDraft } from './ChannelListingWizard';
 import { listingEditorIssues, listingInventoryPreview } from './listing-editor-state';
 import { PRICING_STORAGE_KEY } from '@/lib/pricing-rules';
+import { getProducts, type ChannelListing } from '@/lib/product-store';
 
 const channel = { key: 'webstore', label: 'PrimeWeb', account: 'Test shop', description: '', icon: Store, iconClassName: '' };
 const blank = Object.fromEntries('title price_markup description listing_sku category fulfillment variant_scope listing_mode identifier condition stock_quantity warehouse brand shipping_option bullet_points search_terms preorder_days warranty certification video_url web_slug pos_barcode visibility sync_policy safety_buffer allocation_cap media_scope compliance_notes tax_code attribute_material attribute_color'.split(' ').map(key => [key, '']));
@@ -17,6 +18,38 @@ beforeEach(() => { localStorage.removeItem(PRICING_STORAGE_KEY); Element.prototy
 afterEach(() => { cleanup(); localStorage.removeItem(PRICING_STORAGE_KEY); });
 
 describe('guided listing editor', () => {
+  it('uses the unified policy instead of legacy automatic stock and inherited media controls', () => {
+    const listing: ChannelListing = { channel: 'website', external_id: 'sync-linked', status: 'active', listing_url: null, last_synced_at: null };
+    const master = { ...getProducts()[0], channels: [listing], product_type: 'single' as const, has_variants: false, skus: [], import_sources: [], channel_overrides: {} };
+    const onConfigure = vi.fn();
+    render(<ChannelListingEditorDrawer {...defaultProps} syncSettings={{ master, listing, preference: { enabled: false, fields: ['content', 'media', 'price', 'inventory', 'shipping'] }, onConfigure }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Price & inventory/ }));
+    expect(screen.queryByText('Automatic sync', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Stock sync policy')).not.toBeInTheDocument();
+    expect(screen.getByText('Independent shop data · Sync off')).toBeVisible();
+    expect(screen.getByRole('option', { name: 'Calculate once from Master' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Variants & channel media' }));
+    expect(screen.queryByLabelText('Media selection')).not.toBeInTheDocument();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage sync settings' }));
+    expect(onConfigure).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage sync settings' }));
+    expect(onConfigure).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+  it('shows the same Master price and stock previews without writing calculated values to the draft', () => {
+    const listing: ChannelListing = { channel: 'website', external_id: 'sync-linked', status: 'active', listing_url: null, last_synced_at: null };
+    const master = { ...getProducts()[0], channels: [listing], product_type: 'single' as const, has_variants: false, skus: [], import_sources: [], channel_overrides: {}, retail_price: 700, price_currency: 'JPY', inventory: { wh_crjp: 14 } };
+    render(<ChannelListingEditorDrawer {...defaultProps} syncSettings={{ master, listing, preference: { enabled: true, fields: ['price', 'inventory'], pricing: { currency: 'JPY' }, inventory: { warehouse_id: 'wh_crjp', safety_buffer: 4, allocation_cap: 8 } }, onConfigure: vi.fn() }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Price & inventory/ }));
+    expect(screen.getByText('700 JPY')).toBeVisible();
+    expect(screen.getByText('8 units')).toBeVisible();
+    expect(screen.queryByLabelText('Price source')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(defaultProps.onSave.mock.calls[0][0].stock_quantity).toBe('');
+    expect(defaultProps.onSave.mock.calls[0][0].channel_price).toBeUndefined();
+  });
   it('prefills an empty Rakuten brand and keeps edits local until the draft is saved', () => {
     render(<ChannelListingEditorDrawer {...defaultProps} channel={{ ...channel, key: 'rakuten', label: 'Rakuten' }} rakutenBrandName="サイバーレコード" />);
     fireEvent.click(screen.getByRole('button', { name: /Channel requirements/ }));
@@ -51,7 +84,7 @@ describe('guided listing editor', () => {
     expect(screen.getByRole('button', { name: 'Review & publish' })).toBeEnabled();
   });
   it('counts actual blockers once and focuses the missing field without losing edits', () => {
-    render(<ChannelListingEditorDrawer {...defaultProps} masterDataComplete={false} masterMissingItems={[{ id: 'media', label: 'Add at least 3 product images' }]} draft={{ ...draft, listing_sku: 'EXISTING', web_slug: '/existing', channel_currency: 'VND' }} />);
+    render(<ChannelListingEditorDrawer {...defaultProps} masterDataComplete={false} masterMissingItems={[{ id: 'media', label: 'Add at least 1 product image' }]} draft={{ ...draft, listing_sku: 'EXISTING', web_slug: '/existing', channel_currency: 'VND' }} />);
     expect(screen.getByLabelText('PrimeWeb parent listing SKU *')).toHaveValue('EXISTING');
     expect(screen.getByText('2 items to complete')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('SEO title'), { target: { value: 'Unsaved title' } });
@@ -104,11 +137,13 @@ describe('guided listing editor', () => {
   });
   it('keeps the listing open while images are added to Master and updates blockers immediately', async () => {
     const upload = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = render(<ChannelListingEditorDrawer {...defaultProps} masterDataComplete={false} masterMissingItems={[{ id: 'media', label: 'Add at least 3 product images' }]} onUploadMasterImage={upload} masterImages={['one.png']} />);
+    const { rerender } = render(<ChannelListingEditorDrawer {...defaultProps} masterDataComplete={false} masterMissingItems={[{ id: 'media', label: 'Add at least 1 product image' }]} onUploadMasterImage={upload} masterImages={[]} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add images' }));
-    await act(async () => fireEvent.change(screen.getByLabelText('Add Master images'), { target: { files: [new File(['image'], 'two.png', { type: 'image/png' })] } }));
+    expect(screen.getByText('0 images · 1 required · 9 max')).toBeVisible();
+    await act(async () => fireEvent.change(screen.getByLabelText('Add Master images'), { target: { files: [new File(['image'], 'one.png', { type: 'image/png' })] } }));
     expect(upload).toHaveBeenCalledOnce(); expect(defaultProps.onOpenChange).not.toHaveBeenCalled();
-    rerender(<ChannelListingEditorDrawer {...defaultProps} masterImages={['one.png', 'two.png', 'three.png']} onUploadMasterImage={upload} />);
+    rerender(<ChannelListingEditorDrawer {...defaultProps} masterImages={['one.png']} onUploadMasterImage={upload} />);
+    expect(screen.getByText('1 image · 1 required · 9 max')).toBeVisible();
     expect(screen.getByText('Master requirements complete.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Review & publish' })).toBeEnabled();
   });

@@ -4,6 +4,9 @@ import type { ListingPricing } from './pricing-rules';
 import { repairDraftListingDemo } from './draft-listing-demo';
 import { getSavedAmazonListing } from './amazon-listing-store';
 import { completeActiveProductDemo } from './active-product-demo';
+import { withProductActivity, type ProductActivity } from './product-activity';
+import { getCatalogImportItems } from './catalog-import-store';
+import { recoverListingShopSnapshots } from './listing-shop-data';
 // Shared product store — singleton in-memory for local mockup
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
@@ -87,6 +90,63 @@ export interface ChannelListing {
   status: 'draft' | 'active' | 'inactive' | 'pending';
   listing_url: string | null;
   last_synced_at: string | null;
+  /** Read-only import identity; mapping is not a publish/sync operation. */
+  store_name?: string;
+  shop_sku?: string;
+  reported_stock?: number;
+  /** Durable shop-owned values. Never populated from Master prices or warehouse stock. */
+  shop_snapshot?: ShopListingSnapshot;
+  /** Listing-owned edits, not a provider snapshot or a successful shop update. */
+  local_draft?: { values: ListingDraftValues; updated_at: string };
+  /** Creation setup belongs to this exact shop, never to every listing on the channel. */
+  creation_config?: ChannelOverride;
+  publication_unconfirmed?: boolean;
+  /** Fingerprint of the legacy mapping issues explicitly reviewed for this exact listing. */
+  identity_review_signature?: string;
+  variant_mappings?: Array<{ shop_sku: string; master_sku_id: string }>;
+  /** Explicit, listing-owned Master data preference. Never a remote sync receipt. */
+  master_data_sync?: {
+    enabled: boolean;
+    fields: Array<'content' | 'media' | 'price' | 'inventory' | 'shipping'>;
+    pricing?: { currency: string; rule_id?: string };
+    inventory?: { warehouse_id: string; safety_buffer: number; allocation_cap?: number; fulfillment?: 'FBA' | 'FBM' };
+    updated_at: string;
+  };
+}
+
+export interface ListingDraftValues {
+  title?: string;
+  description?: string;
+  brand?: string;
+  category?: string;
+  images?: string[];
+  price?: { amount: number; currency: string };
+  stock?: number;
+  shipping?: { length?: number; width?: number; height?: number; weight?: number; country?: string; hs_code?: string; notes?: string };
+  channel_settings?: Partial<Pick<ChannelOverride, 'condition' | 'search_terms' | 'bullet_points' | 'preorder_days' | 'warranty' | 'certification' | 'video_url' | 'web_slug' | 'pos_barcode' | 'visibility' | 'tax_code' | 'attribute_material' | 'attribute_color'>>;
+}
+
+export interface ShopListingSnapshot {
+  channel: ChannelListing['channel'];
+  store_name: string;
+  listing_id: string;
+  shop_sku: string;
+  title: string;
+  description?: string;
+  brand?: string;
+  images: string[];
+  category: string;
+  price?: { amount: number; currency: string };
+  stock?: number;
+  shipping?: ListingDraftValues['shipping'];
+  channel_settings?: ListingDraftValues['channel_settings'];
+  variant_items?: Array<{ sku: string; label: string; price?: { amount: number; currency: string }; stock?: number }>;
+  variant_count?: number;
+  listing_url?: string;
+  identifiers?: { gtin?: string; mpn?: string; model?: string };
+  /** Provider retrieval time, if recorded. Do not substitute mapping/save time. */
+  retrieved_at?: string;
+  recorded_at: string;
 }
 
 export interface MarketPrice {
@@ -161,6 +221,8 @@ export interface Product {
   gtin: string;          // [→ product_identifiers, shared namespace with ean/upc/isbn/jan]
   mpn: string;           // [→ product_identifiers, unique per type]
   model_number: string;  // [→ dynamic attr, surface: 'basic']
+  /** Units in a sellable pack, when explicitly recorded (not units per carton). */
+  pack_quantity?: number;
   brand: string;         // [→ dynamic attr, surface: 'basic', type: enum, option governance]
   /** Stable reference to the canonical Brand registry entry. Legacy records may only have `brand`. */
   brandId?: string;
@@ -215,6 +277,8 @@ export interface Product {
   channel_overrides?: Partial<Record<'webstore' | 'pos' | 'shopee' | 'lazada' | 'tiktok' | 'amazon' | 'social' | 'rakuten', ChannelOverride>>;
   associations?: ProductAssociation[];
   revisions?: ProductRevision[];
+  /** Local prototype event log; persisted atomically with the changed product/listing data. */
+  activity?: ProductActivity[];
   /** Incremented on every save and used for optimistic concurrency checks. */
   record_version?: number;
   // Workflow
@@ -224,7 +288,9 @@ export interface Product {
   /** Restoring to Draft is explicit; import validation must not republish it on save/reload. */
   import_activation_paused?: boolean;
   import_issues?: string[];
-  import_sources?: Array<{ channel: ChannelListing['channel']; store: string; brand: string; price: number; currency: string }>;
+  import_sources?: Array<{ channel: ChannelListing['channel']; store: string; brand: string; price: number; currency: string; listing_id?: string; shop_sku?: string }>;
+  /** Preserve reviewed/moved legacy links instead of reseeding the old demo relationships on reload. */
+  listing_review_migrated?: boolean;
   created_at: string;
   updated_at: string;
   // Variants
@@ -699,6 +765,7 @@ function normalizeStoredProduct(product: Product): Product {
     gtin: typeof product.gtin === 'string' ? product.gtin : '',
     mpn: typeof product.mpn === 'string' ? product.mpn : '',
     model_number: typeof product.model_number === 'string' ? product.model_number : '',
+    pack_quantity: Number.isInteger(product.pack_quantity) && product.pack_quantity! > 0 ? product.pack_quantity : undefined,
     brand: typeof product.brand === 'string' ? product.brand : '',
     brandId: typeof product.brandId === 'string' ? product.brandId : undefined,
     asin: typeof product.asin === 'string' ? product.asin : '',
@@ -737,6 +804,7 @@ function normalizeStoredProduct(product: Product): Product {
     channel_overrides: product.channel_overrides && typeof product.channel_overrides === 'object' ? product.channel_overrides : {},
     associations: Array.isArray(product.associations) ? product.associations : [],
     revisions: Array.isArray(product.revisions) ? product.revisions : [],
+    activity: Array.isArray(product.activity) ? product.activity : [],
     record_version: Number(product.record_version) || 1,
     status: ['draft', 'review', 'published', 'archived'].includes(product.status) ? product.status : 'draft',
     import_activation_paused: product.import_activation_paused === true,
@@ -744,6 +812,7 @@ function normalizeStoredProduct(product: Product): Product {
     import_source: typeof product.import_source === 'string' ? product.import_source : undefined,
     import_issues: Array.isArray(product.import_issues) ? product.import_issues.filter((issue): issue is string => typeof issue === 'string') : undefined,
     import_sources: Array.isArray(product.import_sources) ? product.import_sources : undefined,
+    listing_review_migrated: product.listing_review_migrated === true,
     created_at: typeof product.created_at === 'string' ? product.created_at : now,
     updated_at: typeof product.updated_at === 'string' ? product.updated_at : now,
     variant_options: Array.isArray(product.variant_options)
@@ -792,7 +861,14 @@ function loadStoredProducts(): Product[] {
     const stored = JSON.parse(raw) as unknown;
     if (!Array.isArray(stored)) return DEFAULT_PRODUCTS.map(normalizeStoredProduct);
     const shouldResetDemoLocales = window.localStorage.getItem(DEMO_LOCALE_MIGRATION_KEY) !== '1';
-    const storedProducts = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
+    const rawProducts = stored.filter((item): item is Product => Boolean(item && typeof item === 'object' && 'id' in item && 'sku_code' in item));
+    const importItems = getCatalogImportItems({ requireConfirmation: true });
+    const storedProducts = rawProducts.map(product => Array.isArray(product.channels) ? recoverListingShopSnapshots(product, importItems) : product);
+    if (storedProducts.some((product, index) => product !== rawProducts[index])) {
+      // Persist only recovered listing snapshots, not unrelated normalization or new timestamps.
+      try { window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(storedProducts)); }
+      catch { /* Keep recovered values visible without discarding the original products on a storage failure. */ }
+    }
     // Reset the two requested incomplete demo cases to Draft once, preserving
     // their revision history and listings. Future publications stay untouched.
     const shouldResetImportDrafts = window.localStorage.getItem(DEMO_IMPORT_DRAFT_MIGRATION_KEY) !== '1';
@@ -829,6 +905,7 @@ function loadStoredProducts(): Product[] {
       const defaultImport = DEFAULT_PRODUCTS.find(candidate => candidate.id === withLocalizedContent.id);
       // Editable drafts and completed imports are not fixtures to reset on load.
       // In particular, preserve uploaded media and the linked listings' own state.
+      if (withLocalizedContent.listing_review_migrated) return withLocalizedContent;
       if (INCOMPLETE_IMPORT_DEMO_IDS.has(withLocalizedContent.id)
         || withLocalizedContent.import_result === 'ready'
         || withLocalizedContent.import_result === 'published') {
@@ -945,18 +1022,55 @@ export function getProducts(): Product[] {
   return _products;
 }
 
-export function addProduct(p: Product): void {
-  const normalized = activateValidatedImport(normalizeStoredProduct(p));
-  _products = [normalized, ..._products.filter(product => product.id !== normalized.id)];
-  persistProducts();
+export function addProduct(p: Product): void;
+export function addProduct(p: Product, options: { requirePersistence?: boolean }): void;
+export function addProduct(p: Product, options?: { requirePersistence?: boolean }): void {
+  const normalized = withProductActivity(_products.find(product => product.id === p.id), activateValidatedImport(normalizeStoredProduct(p)));
+  const next = [normalized, ..._products.filter(product => product.id !== normalized.id)];
+  if (options?.requirePersistence && typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
+  _products = next;
+  if (!options?.requirePersistence) persistProducts();
 }
 
 export function updateProduct(id: string, p: Partial<Product> & { id: string }, options?: { requirePersistence?: boolean }): void {
-  const next = _products.map(x => x.id === id ? activateValidatedImport(normalizeStoredProduct({ ...x, ...p, ...(p.category !== undefined && p.category !== x.category && !Object.prototype.hasOwnProperty.call(p, 'categoryId') ? { categoryId: undefined } : {}), updated_at: new Date().toISOString() })) : x);
+  const next = _products.map(x => x.id === id ? withProductActivity(x, activateValidatedImport(normalizeStoredProduct({ ...x, ...p, ...(p.category !== undefined && p.category !== x.category && !Object.prototype.hasOwnProperty.call(p, 'categoryId') ? { categoryId: undefined } : {}), updated_at: new Date().toISOString() }))) : x);
   // Stock transfers must persist the count and its audit record together before changing live state.
   if (options?.requirePersistence && typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
   if (!options?.requirePersistence) persistProducts();
+}
+
+/** Commit several listing relationships in one write, before exposing any live-state change. */
+export function updateProductLinksAtomically(updates: Array<Pick<Product, 'id' | 'channels' | 'import_sources' | 'record_version'> & Partial<Pick<Product, 'channel_overrides'>>>, options?: { activateMasters?: boolean }): void {
+  const byId = new Map(updates.map(update => [update.id, update]));
+  if (!updates.length || byId.size !== updates.length || updates.some(update => !_products.some(product => product.id === update.id))) {
+    throw new Error('The selected Masters changed. Return to review and try again.');
+  }
+  if (options?.activateMasters && _products.some(product => byId.has(product.id) && product.status === 'archived')) {
+    throw new Error('Archived products must be restored before confirming listing links.');
+  }
+  const now = new Date().toISOString();
+  const next = _products.map(product => {
+    const update = byId.get(product.id);
+    return update ? withProductActivity(product, { ...product, channels: update.channels, import_sources: update.import_sources, record_version: update.record_version, ...(update.channel_overrides ? { channel_overrides: update.channel_overrides } : {}), listing_review_migrated: true, ...(options?.activateMasters ? { status: 'published' as const, import_activation_paused: false } : {}), updated_at: now }, now) : product;
+  });
+  if (typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
+  _products = next;
+}
+
+/** A reviewed reassignment and an optional new Master must succeed or fail together. */
+export function commitListingReviewProducts(updates: Product[], created?: Product): void {
+  const byId = new Map(updates.map(product => [product.id, product]));
+  if (byId.size !== updates.length || updates.some(product => !_products.some(current => current.id === product.id))
+    || (created && (_products.some(product => product.id === created.id) || byId.has(created.id)))) {
+    throw new Error('The selected Masters changed. Return to review and try again.');
+  }
+  const now = new Date().toISOString();
+  const next = _products.map(product => byId.has(product.id) ? withProductActivity(product, normalizeStoredProduct({ ...byId.get(product.id)!, updated_at: now }), now) : product);
+  if (created) next.unshift(withProductActivity(undefined, normalizeStoredProduct(created), now));
+  // Preserve the caller's explicit lifecycle decision; never infer status from completeness.
+  if (typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
+  _products = next;
 }
 
 export function deleteProduct(id: string, options?: { requirePersistence?: boolean }): void {

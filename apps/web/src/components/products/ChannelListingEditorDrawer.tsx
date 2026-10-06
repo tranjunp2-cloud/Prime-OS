@@ -11,7 +11,10 @@ import type { ChannelWizardDraft, WizardChannel } from './ChannelListingWizard';
 import { ListingPricingFields } from './ListingPricingFields';
 import { confirmedPricing, formatPrice, quoteListingPrice } from '@/lib/pricing-rules';
 import { usePricingRevision } from '@/hooks/use-pricing';
+import { getMasterMediaReadiness, MIN_MASTER_IMAGES } from '@/lib/product-master-media';
 import { listingEditorIssues, listingInventoryPreview, prefillListingDraft, type ListingEditorTab, type ListingInventorySource, type ListingIssue } from './listing-editor-state';
+import { MASTER_SYNC_FIELDS, masterSyncPlan, syncsField, type MasterSyncField, type MasterSyncPreference } from '@/lib/listing-master-sync';
+import type { ChannelListing, Product } from '@/lib/product-store';
 
 type EditorTab = ListingEditorTab;
 
@@ -39,6 +42,7 @@ interface Props {
   onSaveMaster: () => boolean;
   onSave: (patch: Partial<ChannelWizardDraft>) => void;
   onPublish?: (draft: ChannelWizardDraft) => Promise<void>;
+  syncSettings?: { preference: MasterSyncPreference; master: Product; listing: ChannelListing; onConfigure: () => void };
 }
 
 const TABS: Array<{ value: EditorTab; label: string }> = [
@@ -50,8 +54,9 @@ const TABS: Array<{ value: EditorTab; label: string }> = [
 ];
 const FieldIssuesContext = createContext<ListingIssue[]>([]);
 
-export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft, masterSku, productName = '', rakutenBrandName = '', basePrice, baseCurrency = 'JPY', productVariants = [], inventorySources = [], masterImages = [], onUploadMasterImage, uploadingImages = false, masterMissingItems, onEditMaster, masterPersisted, masterHasUnsavedChanges, masterDataComplete, masterBlockingReason, onSaveMaster, onSave, onPublish }: Props) {
+export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft, masterSku, productName = '', rakutenBrandName = '', basePrice, baseCurrency = 'JPY', productVariants = [], inventorySources = [], masterImages = [], onUploadMasterImage, uploadingImages = false, masterMissingItems, onEditMaster, masterPersisted, masterHasUnsavedChanges, masterDataComplete, masterBlockingReason, onSaveMaster, onSave, onPublish, syncSettings }: Props) {
   usePricingRevision();
+  const masterMedia = getMasterMediaReadiness(masterImages);
   const [form, setForm] = useState<ChannelWizardDraft | null>(draft);
   const listingVariants = useMemo(() => productVariants.length ? productVariants : [{ id: 'default', label: 'Default SKU', sku: masterSku }], [masterSku, productVariants]);
   const [variants, setVariants] = useState<string[]>([]);
@@ -102,8 +107,14 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
   const isMarketplace = ['amazon', 'shopee', 'lazada', 'tiktok', 'rakuten'].includes(channel.key);
   const patch = (next: Partial<ChannelWizardDraft>) => { setForm(current => current ? { ...current, ...next } : current); setPublished(false); setProviderError(null); };
   const quote = basePrice === undefined ? undefined : quoteListingPrice(basePrice, baseCurrency, form);
-  const inventory = listingInventoryPreview(form, inventorySources, variants, channel.key);
-  const blockers = listingEditorIssues(form, channel.key, variants, quote, inventory);
+  const followsMaster = (field: MasterSyncField) => Boolean(syncSettings && syncsField(syncSettings.preference, field));
+  const syncPlan = syncSettings && masterSyncPlan(syncSettings.master, syncSettings.listing, syncSettings.preference);
+  const syncValues = (field: MasterSyncField) => syncPlan?.groups.find(group => group.field === field)?.proposed.join(' · ');
+  const reviewPrice = followsMaster('price') ? syncValues('price') : quote?.error || (quote ? formatPrice(quote.amount, quote.currency) : formatPrice(form.channel_price, form.channel_currency));
+  // Legacy automatic-stock switches no longer override a listing-owned sync policy.
+  const inventory = listingInventoryPreview(syncSettings ? { ...form, sync_policy: 'disabled' } : form, inventorySources, variants, channel.key);
+  const blockers = listingEditorIssues(form, channel.key, variants, followsMaster('price') ? undefined : quote, inventory);
+  if (syncPlan?.error) blockers.push({ field: 'master-sync', label: 'Master sync settings', tab: 'price-inventory', message: syncPlan.error });
   const missingMaster = masterDataComplete ? [] : masterMissingItems?.length ? masterMissingItems : [{ id: 'master', label: masterBlockingReason || 'Complete required Product Master data' }];
   const remainingCount = blockers.length + missingMaster.length;
   const goToIssue = (issue: ListingIssue) => { if (issue.tab === 'price-inventory' && issue.field !== 'price') setInventoryExpanded(true); setTab(issue.tab); setFocusField(issue.field); };
@@ -122,13 +133,19 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
     if (hasUnsavedChanges && !window.confirm('Discard unsaved listing changes? Master edits remain in the product draft.')) return;
     onOpenChange(false);
   };
-  const reviewSignature = JSON.stringify([quote, inventory.quantity, masterImages, masterHasUnsavedChanges, masterSku, productName]);
+  const configureSync = () => {
+    if (hasUnsavedChanges && !window.confirm('Discard unsaved listing changes and open sync settings?')) return;
+    onOpenChange(false);
+    syncSettings?.onConfigure();
+  };
+  const syncSummary = (field: MasterSyncField) => <section className="rounded-xl border p-5"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">{MASTER_SYNC_FIELDS[field]}</h3><Button type="button" variant="outline" size="sm" onClick={configureSync}>Manage sync settings</Button></div><p className="mt-2 text-sm">{followsMaster(field) ? 'Following Product Master' : 'Independent shop data · Sync off'}</p>{followsMaster(field) && <div className="mt-3 space-y-1 text-sm text-muted-foreground">{syncPlan?.groups.find(group => group.field === field)?.proposed.map((value, index) => <p key={index}>{value}</p>)}</div>}<p className="mt-2 text-xs text-muted-foreground">Controlled by this listing’s Master sync settings. Saving this draft does not send a shop update.</p></section>;
+  const reviewSignature = JSON.stringify([quote, inventory.quantity, masterImages, masterHasUnsavedChanges, masterSku, productName, syncPlan?.signature]);
   const openReview = () => { reviewedSignatureRef.current = reviewSignature; setReviewError(''); setTab('review'); };
   const confirmReview = async () => {
     if (remainingCount) { goToNext(); return; }
     if (reviewedSignatureRef.current !== reviewSignature) { reviewedSignatureRef.current = reviewSignature; setReviewError('Source data changed. Review the updated values below, then confirm again.'); return; }
     if ((!masterPersisted || masterHasUnsavedChanges) && !onSaveMaster()) { setReviewError('Product Master could not be saved. Your listing draft is still here.'); return; }
-    const reviewed = { ...draftPatch(), ...(quote && !quote.error ? confirmedPricing(form, quote) : {}), ...(inventory.quantity !== null ? { stock_quantity: String(inventory.quantity) } : {}) };
+    const reviewed = { ...draftPatch(), ...(!followsMaster('price') && quote && !quote.error ? confirmedPricing(form, quote) : {}), ...(inventory.quantity !== null ? { stock_quantity: String(inventory.quantity) } : {}) };
     setProviderError(null); setPublishing(true);
     try {
       onSave(reviewed); setForm(reviewed); setBaseline(JSON.stringify({ form: reviewed, variants: [...variants].sort() })); setSavedAt(Date.now());
@@ -158,7 +175,8 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
         </nav>
         <div ref={contentRef} className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto p-4 md:p-6" aria-label="Listing setup content">
           {blockers.some(issue => issue.tab === tab) && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"><span className="text-muted-foreground">Complete in this section:</span>{blockers.filter(issue => issue.tab === tab).map(issue => <button key={issue.field} type="button" onClick={() => goToIssue(issue)} className="min-h-9 rounded px-1 text-amber-800 underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300">{issue.label}</button>)}</div>}
-          {tab === 'listing' && <Section title="Listing identity & content" description="Inherited Product Master values remain unchanged; edits apply only to this store listing.">
+          {tab === 'listing' && followsMaster('content') && <div className="space-y-5">{syncSummary('content')}<Section title="Listing identity" description="Identifiers stay independent from Master sync."><Field label="Master SKU"><Input readOnly value={masterSku} /></Field><Field label={`${channel.label} parent listing SKU *`}><Input value={form.listing_sku} onChange={event => patch({ listing_sku: event.target.value.toUpperCase() })} /></Field>{channel.key === 'webstore' && <Field label="Storefront URL *"><Input value={form.web_slug} onChange={event => patch({ web_slug: event.target.value })} /></Field>}{channel.key === 'pos' && <Field label="POS barcode *"><Input value={form.pos_barcode} onChange={event => patch({ pos_barcode: event.target.value })} /></Field>}{channel.key === 'social' && <Field label="Sales visibility *"><SelectControl value={form.visibility} onChange={value => patch({ visibility: value })} options={[["agents", "All sales agents"], ["teams", "Selected teams"], ["hidden", "Hidden"]]} /></Field>}</Section></div>}
+          {tab === 'listing' && !followsMaster('content') && <Section title="Listing identity & content" description="Edits apply only to this store listing. Master sync is configured separately.">
             <Field label="Master SKU"><Input readOnly value={masterSku} className="bg-muted/40 font-mono" /></Field>
             <Field label={`${channel.label} parent listing SKU *`} helper="The parent-owned identifier for this channel listing."><Input value={form.listing_sku} onChange={event => patch({ listing_sku: event.target.value.toUpperCase() })} className="font-mono uppercase" /></Field>
             {channel.key === 'webstore' && <><Field label="Storefront URL *"><Input value={form.web_slug} onChange={event => patch({ web_slug: event.target.value })} placeholder="/products/product-name" /></Field><Field label="Visibility"><SelectControl value={form.visibility} onChange={value => patch({ visibility: value })} options={[['public', 'Public'], ['scheduled', 'Scheduled'], ['hidden', 'Hidden']]} /></Field><Field label="SEO title" wide><Input value={form.title} onChange={event => patch({ title: event.target.value })} /></Field><Field label="SEO description" wide><Textarea rows={4} value={form.description} onChange={event => patch({ description: event.target.value })} placeholder="Leave empty to inherit Product Master content" /></Field></>}
@@ -187,15 +205,15 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
               <div data-field="variants" className="space-y-3 sm:col-span-2">{listingVariants.map(variant => { const checked = variants.includes(variant.id); return <label key={variant.id} className="flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border p-4 hover:bg-muted/20"><Checkbox checked={checked} onCheckedChange={next => setVariants(current => next ? [...new Set([...current, variant.id])] : current.filter(id => id !== variant.id))} /><span className="grid size-9 place-items-center rounded-lg border bg-muted"><Circle className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{variant.label}</strong><span className="font-mono text-xs text-muted-foreground">{variant.sku}</span></span><span className="text-xs text-muted-foreground">{checked ? 'Included' : 'Excluded'}</span></label>; })}</div>
               {!variants.length && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:col-span-2">Include at least one variant before publishing.</p>}
             </Section>
-            <Section title="Channel media override" description="Inherit canonical Product Master media by default, or define a channel-specific selection.">
+            {syncSettings ? syncSummary('media') : <Section title="Channel media override" description="Inherit canonical Product Master media by default, or define a channel-specific selection.">
               <Field label="Media selection"><SelectControl value={form.media_scope} onChange={value => patch({ media_scope: value })} options={[['all', 'Use all Product Master images'], ['selected', 'Choose Product Master images'], ['custom', 'Use channel-only media']]} /></Field>
               {['tiktok', 'rakuten'].includes(channel.key) && <Field label={channel.key === 'tiktok' ? 'Product video' : 'R-Cabinet media'}><Input value={form.video_url} onChange={event => patch({ video_url: event.target.value })} placeholder="Select an asset or enter a URL" /></Field>}
-            </Section>
+            </Section>}
           </div>}
 
           {tab === 'price-inventory' && <div className="space-y-5">
-            {basePrice !== undefined && <div data-field="price"><ListingPricingFields draft={form} basePrice={basePrice} baseCurrency={baseCurrency} shopLabel={channel.account || channel.label} onChange={patch} reviewMode="submit" /></div>}
-            <section className="rounded-xl border p-5">
+            {followsMaster('price') ? syncSummary('price') : basePrice !== undefined && <div data-field="price"><ListingPricingFields draft={form} basePrice={basePrice} baseCurrency={baseCurrency} shopLabel={channel.account || channel.label} onChange={patch} reviewMode="submit" syncManaged={Boolean(syncSettings)} /></div>}
+            {syncSettings ? syncSummary('inventory') : <section className="rounded-xl border p-5">
               <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold">Inventory & fulfillment</h3><p className="mt-2 text-lg font-semibold tabular-nums">{inventory.external ? 'Amazon manages FBA stock' : inventory.disabled ? 'Stock sync is off' : inventory.quantity === null ? 'Choose an available stock source' : `${inventory.quantity.toLocaleString()} units to send`}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{inventory.external ? 'Master stock will not overwrite Amazon inventory.' : inventory.disabled ? 'No inventory update will be sent.' : `${inventory.source?.label || 'No source selected'} · ${form.sync_policy === 'manual' ? 'Manual quantity' : 'Automatic sync'}`}</p></div><Button type="button" variant="ghost" size="sm" aria-expanded={inventoryExpanded} onClick={() => setInventoryExpanded(!inventoryExpanded)}>Adjust inventory<ChevronDown className={`size-4 ${inventoryExpanded ? 'rotate-180' : ''}`} /></Button></div>
               {(inventoryExpanded || blockers.some(issue => issue.tab === 'price-inventory' && issue.field !== 'price')) && <div className="mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
                 {channel.key === 'amazon' && <Field label="Fulfillment *"><SelectControl value={form.fulfillment} onChange={value => patch({ fulfillment: value })} options={[['FBA', 'FBA · Amazon fulfilled'], ['FBM', 'FBM · Merchant fulfilled']]} /></Field>}
@@ -208,19 +226,20 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
                   {form.sync_policy === 'automatic' && <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">{inventory.available === null ? 'No complete stock record for this source.' : `${inventory.available} recorded units − ${form.safety_buffer || 0} buffer${form.allocation_cap.trim() ? `, capped at ${form.allocation_cap}` : ''}. Preview only; warehouse stock stays unchanged.`}</p>}
                 </>}
               </div>}
-            </section>
+            </section>}
           </div>}
 
           {tab === 'requirements' && <div className="space-y-5">
+            {syncSettings && syncSummary('shipping')}
             {!isMarketplace && <div className="rounded-xl border border-dashed p-6 text-center"><p className="font-semibold">No additional marketplace requirements</p><p className="mt-1 text-sm text-muted-foreground">This channel is ready once its listing, variant, media, price and inventory setup is complete.</p></div>}
             {isMarketplace && <Section title={`${channel.label} requirements`} description="These fields are channel-owned and change with the selected provider category.">
               {channel.key === 'amazon' && <><Field label="Amazon listing mode"><SelectControl value={form.listing_mode} onChange={value => patch({ listing_mode: value })} options={[['offer_only', 'Offer on existing ASIN'], ['new_listing', 'Create a new Amazon listing']]} /></Field><Field label="ASIN / catalog match *"><Input value={form.identifier} onChange={event => patch({ identifier: event.target.value.toUpperCase() })} placeholder="ASIN, EAN, UPC, GTIN, JAN or ISBN" /></Field><Field label="Condition *"><SelectControl value={form.condition} onChange={value => patch({ condition: value })} options={[['new_new', 'New'], ['used_like_new', 'Used — Like new'], ['used_very_good', 'Used — Very good']]} /></Field><Field label="Search terms"><Input value={form.search_terms} onChange={event => patch({ search_terms: event.target.value })} /></Field><Field label="Bullet points" wide><Textarea rows={4} value={form.bullet_points} onChange={event => patch({ bullet_points: event.target.value })} placeholder="One benefit per line" /></Field></>}
               {channel.key !== 'amazon' && <Field label={`${channel.label} category *`} helper="Determines the required provider attributes."><Input value={form.category} onChange={event => patch({ category: event.target.value })} placeholder={`Search ${channel.label} category`} /></Field>}
               {['shopee', 'lazada'].includes(channel.key) && <Field label="Shipping option *"><SelectControl value={form.shipping_option} onChange={value => patch({ shipping_option: value })} options={channel.key === 'shopee' ? [['shopee_xpress', 'Shopee Xpress'], ['seller', 'Seller shipping'], ['pickup', 'Store pickup']] : [['fbl', 'Fulfilled by Lazada'], ['seller', 'Seller fulfilled']]} /></Field>}
               {channel.key === 'shopee' && <Field label="Pre-order days"><Input type="number" min="0" value={form.preorder_days} onChange={event => patch({ preorder_days: event.target.value })} /></Field>}
-              {channel.key === 'lazada' && <><Field label="Brand"><Input value={form.brand} onChange={event => patch({ brand: event.target.value })} /></Field><Field label="Warranty"><Input value={form.warranty} onChange={event => patch({ warranty: event.target.value })} /></Field></>}
+              {channel.key === 'lazada' && <><Field label="Brand"><Input readOnly={followsMaster('content')} value={followsMaster('content') ? syncSettings!.master.brand : form.brand} onChange={event => patch({ brand: event.target.value })} /></Field><Field label="Warranty"><Input value={form.warranty} onChange={event => patch({ warranty: event.target.value })} /></Field></>}
               {channel.key === 'tiktok' && <Field label="Certification"><Input value={form.certification} onChange={event => patch({ certification: event.target.value })} /></Field>}
-              {channel.key === 'rakuten' && <><Field label="Rakuten brand name" helper="Suggestion only — not checked with Rakuten. Edit for this listing without changing Brand settings."><Input value={form.brand} onChange={event => patch({ brand: event.target.value })} /></Field><Field label="Catalog ID *"><Input value={form.identifier} onChange={event => patch({ identifier: event.target.value })} placeholder="JAN, GTIN or Rakuten catalog ID" /></Field></>}
+              {channel.key === 'rakuten' && <><Field label="Rakuten brand name" helper={followsMaster('content') ? 'Controlled by Master sync settings.' : 'Suggestion only — not checked with Rakuten.'}><Input readOnly={followsMaster('content')} value={followsMaster('content') ? syncSettings!.master.brand : form.brand} onChange={event => patch({ brand: event.target.value })} /></Field><Field label="Catalog ID *"><Input value={form.identifier} onChange={event => patch({ identifier: event.target.value })} placeholder="JAN, GTIN or Rakuten catalog ID" /></Field></>}
               <Field label="Material"><Input value={form.attribute_material} onChange={event => patch({ attribute_material: event.target.value })} placeholder="Loaded from selected category" /></Field>
               <Field label="Color / pattern"><Input value={form.attribute_color} onChange={event => patch({ attribute_color: event.target.value })} placeholder="Loaded from selected category" /></Field>
               <Field label="Tax code"><Input value={form.tax_code} onChange={event => patch({ tax_code: event.target.value })} /></Field>
@@ -229,7 +248,7 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
           </div>}
 
           {tab === 'master' && <section className="space-y-5 rounded-xl border p-5"><div><h3 className="font-semibold">Complete Product Master</h3><p className="mt-1 text-sm text-muted-foreground">Your listing edits stay here. Master changes are shared with other listings and are saved only when you confirm.</p></div>
-            {(missingMaster.some(item => item.id === 'media') || onUploadMasterImage) && <div className="space-y-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">Product images</p><span className="text-xs text-muted-foreground">{masterImages.length}/3 required · 9 max</span></div><div className="grid grid-cols-3 gap-3 sm:grid-cols-5">{masterImages.map((url, index) => <img key={`${url}:${index}`} src={url} alt={`Master product image ${index + 1}`} className="aspect-square w-full rounded-lg border object-cover" />)}</div>
+            {(missingMaster.some(item => item.id === 'media') || onUploadMasterImage) && <div className="space-y-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">Product images</p><span className="text-xs text-muted-foreground">{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · {MIN_MASTER_IMAGES} required · 9 max</span></div><div className="grid grid-cols-3 gap-3 sm:grid-cols-5">{masterImages.map((url, index) => <img key={`${url}:${index}`} src={url} alt={`Master product image ${index + 1}`} className="aspect-square w-full rounded-lg border object-cover" />)}</div>
               {onUploadMasterImage && masterImages.length < 9 && <label className={`flex min-h-24 items-center justify-center gap-3 rounded-lg border border-dashed px-4 text-sm focus-within:ring-2 focus-within:ring-ring ${uploadingImages ? 'text-muted-foreground' : 'cursor-pointer hover:bg-muted/30'}`}><Upload className="size-5" /><span>{uploadingImages ? 'Uploading images…' : 'Add product images'}</span><input type="file" multiple accept="image/*" aria-label="Add Master images" disabled={uploadingImages} className="sr-only" onChange={async event => { const files = Array.from(event.currentTarget.files ?? []).slice(0, 9 - masterImages.length); event.currentTarget.value = ''; for (const file of files) await onUploadMasterImage(file); }} /></label>}
               <p className="text-xs text-muted-foreground">Images are added to the Master draft, not just this listing.</p>
             </div>}
@@ -238,8 +257,8 @@ export function ChannelListingEditorDrawer({ open, onOpenChange, channel, draft,
           </section>}
           {tab === 'review' && <section className="space-y-5"><div><h3 className="text-lg font-semibold">Review {channel.label} listing</h3><p className="mt-1 text-sm text-muted-foreground">Check the values below before confirming. Nothing is sent while you edit.</p></div>
             {remainingCount > 0 && <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">Source data changed. Complete the remaining requirements before confirming.</p>}
-            <div className="grid gap-4 rounded-xl border p-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Listing SKU</p><p className="mt-1 break-all text-sm font-medium">{form.listing_sku}</p></div><div><p className="text-xs text-muted-foreground">Selling price</p><p className="mt-1 text-sm font-medium">{quote?.error || (quote ? formatPrice(quote.amount, quote.currency) : formatPrice(form.channel_price, form.channel_currency))}</p></div><div><p className="text-xs text-muted-foreground">Quantity to send</p><p className="mt-1 text-sm font-medium">{inventory.external ? 'Managed by Amazon FBA' : inventory.disabled ? 'Stock sync off' : inventory.quantity === null ? 'Unavailable' : `${inventory.quantity} units`}</p></div><div><p className="text-xs text-muted-foreground">Included SKUs</p><p className="mt-1 text-sm font-medium">{variants.length} of {listingVariants.length}</p></div></div>
-            <ReviewChanges before={originalFormRef.current} after={form} price={quote && !quote.error ? formatPrice(quote.amount, quote.currency) : undefined} />
+            <div className="grid gap-4 rounded-xl border p-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Listing SKU</p><p className="mt-1 break-all text-sm font-medium">{form.listing_sku}</p></div><div><p className="text-xs text-muted-foreground">Selling price</p><p className="mt-1 text-sm font-medium">{reviewPrice}</p></div><div><p className="text-xs text-muted-foreground">Quantity to send</p><p className="mt-1 text-sm font-medium">{followsMaster('inventory') ? syncValues('inventory') : inventory.external ? 'Managed by Amazon FBA' : inventory.disabled ? 'Stock sync off' : inventory.quantity === null ? 'Unavailable' : `${inventory.quantity} units`}</p></div><div><p className="text-xs text-muted-foreground">Included SKUs</p><p className="mt-1 text-sm font-medium">{variants.length} of {listingVariants.length}</p></div></div>
+            <ReviewChanges before={originalFormRef.current} after={form} price={followsMaster('price') ? undefined : quote && !quote.error ? formatPrice(quote.amount, quote.currency) : undefined} />
             {(!masterPersisted || masterHasUnsavedChanges) && <p className="rounded-lg border p-4 text-sm">Confirming also saves your current Product Master edits, including any images added here. These are shared Master data.</p>}
             {!onPublish && <p className="text-sm text-muted-foreground">Live publishing is not connected in this preview. You can save the reviewed draft; no update will be sent to the channel.</p>}
             {reviewError && <p role="status" className="text-sm">{reviewError}</p>}

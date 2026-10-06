@@ -1,4 +1,5 @@
 import type { Product } from './product-store';
+import { legacyMappingIssues } from './legacy-listing-review';
 
 const attentionTargets = {
   'import-review': { section: 'overview', elementId: 'product-import-review' },
@@ -38,11 +39,9 @@ export function getProductAttentionTarget(value: string | null) {
 export function getProductAttentionHref(product: AttentionProduct, missingFields: string[] = []) {
   const base = `/products/${encodeURIComponent(product.id)}/edit`;
   let target: AttentionTarget;
-  if (product.import_result === 'needs_review') {
-    target = 'import-review';
-  } else if (product.import_result === 'incomplete' || (!product.import_result && missingFields.length > 0)) {
+  if (product.import_result === 'incomplete' || missingFields.length > 0 || (product.import_issues ?? []).some(issue => !legacyMappingIssues(product).includes(issue))) {
     // Prefer the issue displayed in the import badge over unrelated quality checks.
-    const issues = [...(product.import_issues ?? []), ...missingFields];
+    const issues = [...(product.import_issues ?? []).filter(issue => !legacyMappingIssues(product).includes(issue)), ...missingFields];
     target = issues.map(issue => issueTargets.find(([pattern]) => pattern.test(issue))?.[1]).find(Boolean) ?? 'basic';
   } else {
     return base;

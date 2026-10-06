@@ -15,7 +15,7 @@ async function mount() {
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
 }
 function openPricing() {
-  fireEvent.click(screen.getByRole('button', { name: 'Manage listing' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Continue setup' }));
   const drawer = within(screen.getByRole('dialog', { name: 'Shopee listing' }));
   fireEvent.click(drawer.getByRole('button', { name: /Price & inventory/ }));
   return drawer;
@@ -46,7 +46,10 @@ describe('Master and listing pricing integration', () => {
     fireEvent.click(drawer.getAllByRole('button', { name: 'Close' })[0]);
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
     cleanup(); await mount();
-    expect(openPricing().getByLabelText('Manual price (VND)')).toHaveValue(260000);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage listing' }));
+    const reopened = within(screen.getByRole('dialog', { name: 'Manage listing' }));
+    fireEvent.click(reopened.getByRole('tab', { name: 'Price & stock' }));
+    expect(reopened.getByLabelText('Listing price')).toHaveValue(260000);
   });
   it('does not save pending Master edits when saving a listing', async () => {
     await mount();

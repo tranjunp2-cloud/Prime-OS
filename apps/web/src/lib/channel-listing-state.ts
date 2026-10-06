@@ -20,7 +20,7 @@ export function getChannelListingState(product: Product, channel: CatalogChannel
   const submission = channel === 'amazon' ? amazon : null;
   // A completed Amazon submission alone is not marketplace approval. Only the
   // listing's publication status establishes whether it is live.
-  const publication = listing?.status === 'active' ? 'live'
+  const publication = listing?.publication_unconfirmed ? 'unconfirmed' : listing?.status === 'active' ? 'live'
     : listing?.status === 'inactive' ? 'inactive'
     : listing?.status === 'pending' ? 'unconfirmed'
     : submission && (submission.lastSyncedAt || submission.status !== 'draft') ? 'unconfirmed'

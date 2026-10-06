@@ -1,0 +1,32 @@
+@media (max-height: 500px) {
+  .sheet .header {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    gap: 0;
+  }
+
+  .sheet .header > * + * { margin-top: 4px; }
+
+  .sheet .header [aria-label="Listing summary"] > img,
+  .sheet .header [aria-label="Listing summary"] > [role="img"] { width: 40px; height: 40px; }
+
+  .sheet .body { padding-top: 12px; padding-bottom: 12px; }
+
+  .sheet .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .sheet .footer > * + * { margin-top: 0; }
+  .sheet .footer > div { flex-shrink: 0; }
+}
+
+@media (max-width: 639px) {
+  .sheet .header { padding-top: 12px; padding-bottom: 12px; }
+  .sheet .body input,
+  .sheet .body textarea { font-size: 16px; }
+}

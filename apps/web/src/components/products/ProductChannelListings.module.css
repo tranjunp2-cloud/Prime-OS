@@ -1,0 +1,27 @@
+.root { container-type: inline-size; }
+.table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.table th { padding: 10px 8px; border-bottom: 1px solid hsl(var(--border)); text-align: left; font-size: 12px; font-weight: 400; color: hsl(var(--muted-foreground)); }
+.table td { padding: 20px 12px; vertical-align: middle; overflow-wrap: anywhere; }
+.table th { padding-inline: 12px; }
+.table tbody tr:hover { background: hsl(var(--muted) / .18); }
+.table tbody tr[data-newly-linked="true"] { background: hsl(var(--primary) / .06); }
+.table tbody tr + tr { border-top: 1px solid hsl(var(--border)); }
+.table th:last-child { text-align: right; }
+.priceColumn { width: 15%; }
+.stockColumn { width: 13%; }
+.statusColumn { width: 23%; }
+.actionsColumn { width: 192px; }
+.mobileLabel { display: none; }
+
+@container (max-width: 820px) {
+  .table, .table tbody { display: block; }
+  .table thead, .table colgroup { display: none; }
+  .table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 12px; padding: 20px 8px; }
+  .table td { display: block; padding: 0; }
+  .table .identity { grid-column: 1 / -1; }
+  .table td:nth-child(2) { grid-column: 1; }
+  .table td:nth-child(3) { grid-column: 2; }
+  .table .status { grid-column: 1 / -1; }
+  .table .actions { grid-column: 1 / -1; }
+  .mobileLabel { display: block; margin-bottom: 5px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+}

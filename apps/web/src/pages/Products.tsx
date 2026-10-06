@@ -1,6 +1,6 @@
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
-import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, AlertTriangle, Archive, Boxes, CheckCircle2, ChevronDown, CircleDot, Columns3, Copy, Download, ExternalLink, FileSpreadsheet, Info, Layers3, MoreHorizontal, PackageX, Pencil, Plus, RotateCcw, Search, Send, ShoppingBag, SlidersHorizontal, Store, Tags, Trash2, Unplug, Upload, Warehouse, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, AlertTriangle, Archive, Boxes, CheckCircle2, ChevronDown, CircleDot, Columns3, Copy, Download, ExternalLink, FileSpreadsheet, Info, Layers3, Link2, MoreHorizontal, PackageX, Pencil, Plus, RotateCcw, Search, Send, ShoppingBag, SlidersHorizontal, Store, Tags, Trash2, Unplug, Upload, Warehouse, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +23,19 @@ import { getProductImage } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { getSavedAmazonListing } from '@/lib/amazon-listing-store';
 import { CreateProductDialog, type CreateProductDraftInput } from '@/components/products/CreateProductDialog';
+import { ProductGettingStarted } from '@/components/products/ProductGettingStarted';
+import { ConnectStoreWizardModal } from '@/components/channels/ConnectStoreWizardModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ProductListingIntake } from '@/components/products/ProductListingIntake';
+import type { IntakeStage } from '@/components/products/ListingMasterReview';
+import { ListingReviewBanner } from '@/components/products/ListingReviewBanner';
+import { useProductChannelSetup } from '@/hooks/use-product-channel-setup';
+import { pendingListingReviews } from '@/lib/product-listing-intake';
+import { legacyMappingIssues } from '@/lib/legacy-listing-review';
+import { productIntroMode, type ProductOnboardingPreview } from '@/lib/product-onboarding';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
+import { getCatalogImportItems } from '@/lib/catalog-import-store';
 import { getProductAttentionHref } from '@/lib/product-attention-navigation';
 import { AdjustWarehouseStockDialog } from '@/components/inventory/AdjustWarehouseStockDialog';
 import { ManageStockHoldsButton } from '@/components/inventory/ManageStockHoldsDialog';
@@ -42,33 +51,30 @@ type StockFilter = 'all' | 'in-stock' | 'low-stock' | 'out-of-stock';
 type WorkspaceMode = 'master' | 'listings';
 type MasterStatusFilter = 'all' | Product['status'];
 type MasterColumn = 'status' | 'base-price' | 'stock' | 'linked-listings' | 'updated';
-type AttentionFilter = 'all' | 'stock' | 'sync' | 'review' | 'incomplete';
+type AttentionFilter = 'all' | 'stock' | 'sync' | 'incomplete';
 
 function getProductQuality(product: Product) {
   return getStoredMasterReadiness(product);
 }
 
-const importResultConfig = {
-  needs_review: { label: 'Needs review', tone: 'border-amber-300 bg-amber-50 text-amber-800', action: 'Review master' },
-  incomplete: { label: 'Incomplete', tone: 'border-rose-300 bg-rose-50 text-rose-700', action: 'Complete master' },
-  ready: { label: 'Ready', tone: 'border-emerald-300 bg-emerald-50 text-emerald-700', action: 'View master' },
-  matched: { label: 'New match', tone: 'border-sky-300 bg-sky-50 text-sky-700', action: '' },
-  published: { label: 'Imported', tone: 'border-sky-300 bg-sky-50 text-sky-700', action: '' },
-} as const;
-
 function getProductDisplayName(name: string) {
   return name.replace(/^\[Test \d+\]\s*/, '').replace(/\s+— Imported$/, '');
 }
 
-function getImportBadgeLabel(product: Product) {
-  if (product.status === 'archived' && ['incomplete', 'needs_review', 'ready'].includes(product.import_result ?? '')) return null;
-  const issueCount = product.import_issues?.length ?? 0;
-  const visibleCount = Math.max(issueCount, 1);
-  if (product.import_result === 'incomplete') return `${product.status === 'published' ? 'Draft incomplete' : 'Incomplete'} · ${visibleCount} missing`;
-  if (product.import_result === 'needs_review') return `Needs review · ${visibleCount} decision${visibleCount === 1 ? '' : 's'}`;
-  if (product.import_result === 'matched') return 'New match';
-  if (product.import_result === 'ready') return 'Ready';
-  if (product.import_result === 'published') return isImportedMaster(product) ? 'Imported' : null;
+function getProductDataIssue(product: Product) {
+  if (product.status === 'archived') return null;
+  const quality = getProductQuality(product);
+  const count = Math.max(product.import_issues?.length ?? 0, 1);
+  const dataIssues = (product.import_issues ?? []).filter(issue => !legacyMappingIssues(product).includes(issue));
+  if (product.import_result === 'needs_review' && dataIssues.length) {
+    return { label: `${dataIssues.length} data issues`, action: 'Fix data', detail: dataIssues.join(', ') };
+  }
+  if (product.import_result === 'incomplete') {
+    return { label: `Incomplete · ${count} missing`, action: 'Fix data', detail: product.import_issues?.join(', ') || quality.missing.join(', ') };
+  }
+  if (!quality.ready) {
+    return { label: `${quality.missing.length} data issue${quality.missing.length === 1 ? '' : 's'}`, action: 'Fix data', detail: `Missing: ${quality.missing.join(', ')}` };
+  }
   return null;
 }
 
@@ -125,9 +131,14 @@ function ChannelOverflow({ matrix, onClick }: { matrix: Record<ChannelKey, Listi
 }
 
 function StockStatusCell({ product, matrix, inventorySyncKeys, onClick, onChannelIssue }: { product: Product; matrix: Record<ChannelKey, ListingIndicator>; inventorySyncKeys: string[]; onClick: () => void; onChannelIssue: (channel: ChannelKey, listingId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+  const keepOpen = () => { clearTimeout(closeTimer.current); setOpen(true); };
+  const closeAfterPointerLeaves = () => { closeTimer.current = setTimeout(() => setOpen(false), 180); };
   const { available, status } = getStockSummary(product);
   const stockNotSet = product.status === 'draft' && available === 0;
-  const valueTone = status === 'out-of-stock' ? 'text-rose-700' : status === 'low-stock' ? 'text-amber-700' : 'text-slate-900';
+  const valueTone = status === 'out-of-stock' ? 'text-rose-700 dark:text-rose-300' : status === 'low-stock' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground';
   const channelIssues = product.channels.flatMap((listing, listingIndex) => {
     const channelKey = listing.channel === 'website' ? 'primeweb' : listing.channel;
     const channel = channels.find((item) => item.key === channelKey);
@@ -137,50 +148,44 @@ function StockStatusCell({ product, matrix, inventorySyncKeys, onClick, onChanne
     if (!hasStockIssue) return [];
     const matchingSources = product.import_sources?.filter((source) => source.channel === listing.channel) ?? [];
     const sameChannelIndex = product.channels.slice(0, listingIndex).filter((item) => item.channel === listing.channel).length;
-    const store = matchingSources[sameChannelIndex]?.store ?? matchingSources[0]?.store ?? `${channel.label} shop`;
+    const store = listing.store_name ?? matchingSources[sameChannelIndex]?.store ?? matchingSources[0]?.store ?? `${channel.label} shop`;
     return [{ channel, stock, store, listing }];
   });
   const outOfStockShops = channelIssues.filter(({ stock }) => stock.reported === 0);
-  const showShopIssues = channelIssues.length > 0;
-  const primaryShopIssue = outOfStockShops[0] ?? channelIssues[0];
-  const shopIssueLabel = channelIssues.length === 1
-    ? `${primaryShopIssue.channel.label} · ${primaryShopIssue.stock.reported ?? 0} left`
-    : `${channelIssues.length} shops · ${outOfStockShops.length} out · ${channelIssues.length - outOfStockShops.length} low`;
+  const shopIssueLabel = outOfStockShops.length === channelIssues.length
+    ? `${channelIssues.length} shop${channelIssues.length === 1 ? '' : 's'} out of stock`
+    : `Stock ${outOfStockShops.length ? 'risk' : 'low'} at ${channelIssues.length} shop${channelIssues.length === 1 ? '' : 's'}`;
 
-  return <div className="flex min-w-40 flex-col items-start gap-1.5">
-    <button type="button" onClick={onClick} className="group/stock min-h-7 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" aria-label={`${product.name}: ${stockNotSet ? 'master stock not set' : `${available} master stock available`}. Manage master stock.`}><span className={cn('block text-base font-bold tabular-nums leading-5', stockNotSet ? 'text-slate-600' : valueTone)}>{stockNotSet ? 'Not set' : available.toLocaleString()}</span></button>
-    {!stockNotSet && status !== 'in-stock' ? <button type="button" onClick={onClick} className={cn('inline-flex min-h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500', status === 'out-of-stock' ? 'border-rose-300 bg-rose-50 text-rose-800 hover:border-rose-400 hover:bg-rose-100 hover:text-rose-950 dark:border-rose-400/50 dark:bg-rose-400/10 dark:text-rose-300 dark:hover:bg-rose-400/20 dark:hover:text-rose-100' : 'border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-400/50 dark:bg-amber-400/10 dark:text-amber-300 dark:hover:bg-amber-400/20 dark:hover:text-amber-100')}>{status === 'out-of-stock' ? <PackageX className="size-3" /> : <AlertTriangle className="size-3" />}{status === 'out-of-stock' ? 'Out of stock' : 'Low stock'}</button> : null}
-    {showShopIssues ? <HoverCard openDelay={150} closeDelay={150}><HoverCardTrigger asChild><button type="button" className={cn('flex min-h-7 max-w-52 items-center gap-1 rounded-md border px-2 text-left text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500', outOfStockShops.length ? 'border-rose-300 bg-rose-50 text-rose-800 hover:border-rose-400 hover:bg-rose-100 hover:text-rose-950 dark:border-rose-400/50 dark:bg-rose-400/10 dark:text-rose-300 dark:hover:bg-rose-400/20 dark:hover:text-rose-100' : 'border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-400/50 dark:bg-amber-400/10 dark:text-amber-300 dark:hover:bg-amber-400/20 dark:hover:text-amber-100')} aria-label={`${shopIssueLabel}. Show affected shops.`}>{outOfStockShops.length ? <PackageX className="size-3.5 shrink-0" /> : <AlertTriangle className="size-3.5 shrink-0" />}<span className="truncate">{shopIssueLabel}</span></button></HoverCardTrigger><HoverCardContent align="start" className="w-80 p-0"><div className="border-b px-4 py-3"><p className="text-sm font-semibold">Shop stock needs attention</p><p className="mt-1 text-xs text-muted-foreground">Master stock: <strong className="text-foreground">{available}</strong>{status !== 'in-stock' ? <span className={cn('font-semibold', status === 'out-of-stock' ? 'text-rose-700' : 'text-amber-700')}> · {status === 'out-of-stock' ? 'Out of stock' : 'Low stock'}</span> : null}</p></div><div className="max-h-72 space-y-1 overflow-y-auto p-2">{channelIssues.map(({ channel, stock, store, listing }) => <button key={`${channel.key}-${listing.external_id}`} type="button" onClick={() => onChannelIssue(channel.key, listing.external_id)} className="flex min-h-14 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChannelLogo channel={channel} size="sm" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{store}</p><p className="text-[10px] text-muted-foreground">{channel.label}</p></div><div className="text-right"><p className={cn('text-xs font-bold tabular-nums', stock.reported === 0 ? 'text-rose-700' : 'text-amber-700')}>{stock.reported} stock</p><p className="text-[10px] text-muted-foreground">{stock.reported === 0 ? 'Out of stock' : 'Low stock'} · Update →</p></div></button>)}</div><button type="button" onClick={() => onChannelIssue(primaryShopIssue.channel.key, primaryShopIssue.listing.external_id)} className="min-h-10 w-full border-t px-4 text-left text-xs font-semibold text-primary hover:bg-muted/50">View all channel inventory</button></HoverCardContent></HoverCard> : null}
+  return <div className="flex min-w-32 flex-col items-end">
+    <button type="button" onClick={onClick} className="min-h-7 rounded text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${product.name}: ${stockNotSet ? 'master stock not set' : `${available} master stock available`}. Manage master stock.`}>
+      <span className={cn('block text-sm font-semibold tabular-nums', stockNotSet ? 'text-muted-foreground' : valueTone)}>{stockNotSet ? 'Not set' : available.toLocaleString()}</span>
+    </button>
+    {channelIssues.length > 0 ? <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild><button type="button" onMouseEnter={keepOpen} onMouseLeave={closeAfterPointerLeaves} onClick={event => { event.preventDefault(); keepOpen(); }} className={cn('inline-flex min-h-6 items-center gap-1 rounded text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', outOfStockShops.length ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300')} aria-label={`${shopIssueLabel}. Show affected shops.`}><AlertTriangle aria-hidden="true" className="size-3 shrink-0" />{shopIssueLabel}</button></PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0" onMouseEnter={keepOpen} onMouseLeave={closeAfterPointerLeaves} onOpenAutoFocus={event => event.preventDefault()} onEscapeKeyDown={() => clearTimeout(closeTimer.current)}>
+        <div className="border-b px-4 py-3"><p className="text-sm font-semibold">Shop stock needs attention</p><p className="mt-1 text-xs text-muted-foreground">Master stock: <strong className={valueTone}>{available}</strong>{status !== 'in-stock' ? ` · ${status === 'out-of-stock' ? 'Out of stock' : 'Low stock'}` : ''}</p></div>
+        <div className="max-h-72 space-y-1 overflow-y-auto p-2">{channelIssues.map(({ channel, stock, store, listing }) => <button key={`${channel.key}-${listing.external_id}`} type="button" onClick={() => onChannelIssue(channel.key, listing.external_id ?? '')} className="flex min-h-14 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChannelLogo channel={channel} size="sm" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{store}</p><p className="text-[11px] text-muted-foreground">{channel.label}</p></div><div className="text-right"><p className={cn('text-xs font-semibold tabular-nums', stock.reported === 0 ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300')}>{stock.reported} units</p><p className="text-[11px] text-muted-foreground">{stock.reported === 0 ? 'Out of stock' : 'Low stock'} · Manage →</p></div></button>)}</div>
+      </PopoverContent>
+    </Popover> : !stockNotSet && status !== 'in-stock' ? <button type="button" onClick={onClick} className={cn('min-h-6 rounded text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', valueTone)}>{status === 'out-of-stock' ? 'Out of stock' : 'Low stock'}</button> : null}
   </div>;
 }
 
-function DataIssueBadge({ product, onClick }: { product: Product; onClick: () => void }) {
-  const quality = getProductQuality(product);
-  if (product.status === 'archived' || quality.ready) return null;
-  return <Tooltip><TooltipTrigger asChild><button type="button" onClick={onClick} className="mt-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-[11px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><AlertTriangle className="size-3" />{quality.missing.length} data {quality.missing.length === 1 ? 'issue' : 'issues'}</button></TooltipTrigger><TooltipContent side="top" align="start" className="max-w-64"><p className="font-semibold">Complete this master product</p><p className="mt-1 text-xs opacity-80">Missing: {quality.missing.join(', ')}</p><p className="mt-1 text-xs opacity-70">Click to edit the required data.</p></TooltipContent></Tooltip>;
-}
-
-function ImportProvenanceBadge({ product }: { product: Product }) {
+function ProductSources({ product }: { product: Product }) {
   const sources = product.import_sources ?? [];
   const legacySource = product.import_source?.trim();
   const isLegacyProvenance = Boolean(legacySource?.includes('·') && !/(linked|separated|mismatch|conflict)/i.test(legacySource));
-  if (sources.length === 0 && !isLegacyProvenance) return null;
-  const sourceLabels = sources.map(source => {
-    const channel = channels.find(item => item.key === (source.channel === 'website' ? 'primeweb' : source.channel));
-    return channel?.label ?? source.channel;
-  });
-  const label = sourceLabels.length > 0 ? [...new Set(sourceLabels)].join(', ') : legacySource?.split('·')[0].trim();
-  const prefix = sourceLabels.length > 1 ? `Imported ${sourceLabels.length} listings from ` : 'Imported from ';
-  return <p title={`${prefix}${label}`} className="mt-1 max-w-[420px] truncate text-[11px] font-medium text-sky-500 dark:text-sky-400">{prefix}{label}</p>;
+  const sourceChannels = sources.length ? sources.map(source => source.channel) : product.channels.map(listing => listing.channel);
+  const labels = [...new Set(sourceChannels.map(key => channels.find(item => item.key === (key === 'website' ? 'primeweb' : key))?.label ?? key))];
+  if (!labels.length && isLegacyProvenance) labels.push(legacySource!.split('·')[0].trim());
+  if (!labels.length) return null;
+  const detail = `${sources.length || isLegacyProvenance ? 'Imported from' : 'Linked listings:'} ${labels.join(', ')}`;
+  return <><span aria-hidden="true">·</span><Tooltip><TooltipTrigger asChild><span tabIndex={0} aria-label={detail} className="inline-flex min-w-0 items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Link2 aria-hidden="true" className="size-3 shrink-0" /><span className="truncate">{labels.slice(0, 2).join(', ')}{labels.length > 2 ? ` (+${labels.length - 2})` : ''}</span></span></TooltipTrigger><TooltipContent>{detail}</TooltipContent></Tooltip></>;
 }
 
 function ListingCoverage({ product, matrix, inventorySyncKeys, onClick }: { product: Product; matrix: Record<ChannelKey, ListingIndicator>; inventorySyncKeys: string[]; onClick: () => void }) {
   const usedChannels = channels.filter((channel) => matrix[channel.key] !== 'missing');
   const visibleChannels = usedChannels.slice(0, 3);
   const overflow = usedChannels.slice(3);
-  const issues = usedChannels.filter((channel) => matrix[channel.key] === 'error').length;
-  const processing = usedChannels.filter((channel) => matrix[channel.key] === 'pending').length;
-  const attentionLabel = issues ? `${issues} need attention` : processing ? `${processing} processing` : null;
   const getListingDetails = (channel: (typeof channels)[number]) => {
     const sourceChannel = channel.key === 'primeweb' ? 'website' : channel.key;
     const listing = product.channels.find(item => item.channel === sourceChannel);
@@ -191,16 +196,16 @@ function ListingCoverage({ product, matrix, inventorySyncKeys, onClick }: { prod
     const override = product.channel_overrides?.[overrideKey as keyof NonNullable<Product['channel_overrides']>];
     const stock = getChannelStock(product, channel.key, matrix[channel.key], inventorySyncKeys.includes(`${product.id}:${channel.key}`));
     return {
-      store: source?.store ?? legacyStore ?? `${channel.label} shop`,
-      sku: override?.listing_sku || listing?.external_id || 'Not configured',
-      stock,
+      store: listing?.store_name ?? source?.store ?? legacyStore ?? `${channel.label} shop`,
+      sku: listing?.shop_sku || override?.listing_sku || listing?.external_id || 'Not configured',
+      stock: { ...stock, reported: listing?.reported_stock ?? stock.reported },
       state: getChannelListingState(product, channel.key, channel.key === 'amazon' ? getSavedAmazonListing(product.id) : null),
     };
   };
   const channelButton = (channel: (typeof channels)[number]) => {
     const details = getListingDetails(channel);
     const stockValue = details.stock.reported === null ? 'Not reported' : `${details.stock.reported} units`;
-    return <Tooltip key={channel.key}><TooltipTrigger asChild><button type="button" onClick={onClick} className="relative grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-slate-200 bg-white transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${channel.label}, ${details.store}, SKU ${details.sku}, stock ${stockValue}, ${details.state.publicationLabel}, Master ${details.state.masterLabel}, ${details.state.updateLabel}. Open Channel Listings`}><ChannelLogo channel={channel} /><span className={cn('absolute -right-0.5 -top-0.5 size-3 rounded-full border-2 border-white', statusTone[matrix[channel.key]])} /></button></TooltipTrigger><TooltipContent side="top" align="start" className="w-72 p-3">
+    return <Tooltip key={channel.key}><TooltipTrigger asChild><button type="button" onClick={onClick} className="relative grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-2 border-card bg-muted transition-colors hover:z-10 hover:bg-accent focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&>span:first-child]:rounded-full" aria-label={`${channel.label}, ${details.store}, SKU ${details.sku}, stock ${stockValue}, ${details.state.publicationLabel}, Master ${details.state.masterLabel}, ${details.state.updateLabel}. Open Channel Listings`}><ChannelLogo channel={channel} size="sm" /><span className={cn('absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-card', statusTone[matrix[channel.key]])} /></button></TooltipTrigger><TooltipContent side="top" align="start" className="w-72 p-3">
       <div className="flex items-center gap-2"><ChannelLogo channel={channel} size="sm" /><div className="min-w-0"><p className="truncate text-xs font-semibold text-foreground">{details.store}</p><p className="text-[10px] text-muted-foreground">{channel.label}</p></div></div>
       <dl className="mt-2 grid grid-cols-[88px_1fr] gap-x-2 gap-y-1 border-t border-border pt-2 text-[11px]">
         <dt className="text-muted-foreground">Shop SKU</dt><dd className="truncate font-mono font-medium text-foreground">{details.sku}</dd>
@@ -214,9 +219,9 @@ function ListingCoverage({ product, matrix, inventorySyncKeys, onClick }: { prod
     </TooltipContent></Tooltip>;
   };
 
-  if (usedChannels.length === 0) return <button type="button" onClick={onClick} className="min-h-11 cursor-pointer rounded-lg text-left text-xs font-semibold text-slate-500 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">No channels yet<br /><span className="font-normal">Create a listing</span></button>;
+  if (usedChannels.length === 0) return <button type="button" onClick={onClick} className="min-h-9 rounded text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="No linked listings. Create a listing.">No listings</button>;
 
-  return <div className="min-w-44"><div className="flex items-center gap-1.5">{visibleChannels.map(channelButton)}{overflow.length ? <Tooltip><TooltipTrigger asChild><button type="button" onClick={onClick} className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Show ${overflow.length} more channels`}>+{overflow.length}</button></TooltipTrigger><TooltipContent side="top" align="start" className="w-60 p-2"><p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">More channels using this master</p><div className="space-y-0.5">{overflow.map((channel) => <div key={channel.key} className="flex items-center gap-2 rounded-md px-2 py-1.5"><ChannelLogo channel={channel} size="sm" /><span className="flex-1 text-xs font-medium text-slate-700">{channel.label}</span><span className={cn('size-2 rounded-full', statusTone[matrix[channel.key]])} /><span className="text-[10px] text-slate-500">{statusLabel[matrix[channel.key]]}</span></div>)}</div><p className="mt-1 border-t border-slate-100 px-2 pt-1.5 text-[10px] text-slate-400">Click to manage all channel listings</p></TooltipContent></Tooltip> : null}</div>{attentionLabel ? <button type="button" onClick={onClick} aria-label={`${attentionLabel}. Open Channel Listings`} className={cn('mt-1.5 cursor-pointer rounded text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', issues ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300')}>{attentionLabel}</button> : null}</div>;
+  return <div className="flex min-w-28 items-center -space-x-1" aria-label="Linked channel listings">{visibleChannels.map(channelButton)}{overflow.length ? <Tooltip><TooltipTrigger asChild><button type="button" onClick={onClick} className="relative grid size-9 shrink-0 place-items-center rounded-full border-2 border-card bg-muted text-xs font-medium text-muted-foreground hover:z-10 hover:bg-accent hover:text-foreground focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Show ${overflow.length} more channels`}>+{overflow.length}</button></TooltipTrigger><TooltipContent side="top" align="start" className="w-60 p-3"><p className="mb-2 text-xs font-semibold">More linked channels</p><div className="space-y-2">{overflow.map((channel) => <div key={channel.key} className="flex items-center gap-2"><ChannelLogo channel={channel} size="sm" /><span className="flex-1 text-xs">{channel.label}</span><span className={cn('size-2 rounded-full', statusTone[matrix[channel.key]])} /><span className="text-[11px] text-muted-foreground">{statusLabel[matrix[channel.key]]}</span></div>)}</div></TooltipContent></Tooltip> : null}</div>;
 }
 
 function getChannelStock(product: Product, channel: ChannelKey, status: ListingIndicator, syncEnabled = false) {
@@ -236,7 +241,7 @@ function hasOperationalAttention(product: Product, matrix: Record<ChannelKey, Li
   // but never demand Master completeness or import review on an archived record.
   const archived = product.status === 'archived';
   const hasListing = Object.values(matrix).some(status => status !== 'missing');
-  if (archived && (!hasListing || type === 'review' || type === 'incomplete')) return false;
+  if (archived && (!hasListing || type === 'incomplete')) return false;
   const masterStock = getStockSummary(product);
   const listingStockRisk = channels.some((channel) => {
     if (matrix[channel.key] === 'missing') return false;
@@ -248,14 +253,12 @@ function hasOperationalAttention(product: Product, matrix: Record<ChannelKey, Li
   const draftStockNotSet = isDraftMaster(product) && masterStock.available === 0;
   if (type === 'stock') return (!draftStockNotSet && masterStock.status !== 'in-stock') || listingStockRisk;
   if (type === 'sync') return Object.values(matrix).some(status => status === 'error' || status === 'pending');
-  if (type === 'review') return product.status === 'review' || product.import_result === 'needs_review';
-  return !getProductQuality(product).ready;
+  return !getProductQuality(product).ready || (product.import_result === 'needs_review' && (product.import_issues ?? []).some(issue => !legacyMappingIssues(product).includes(issue)));
 }
 
 function getOperationalIssue(product: Product, matrix: Record<ChannelKey, ListingIndicator>, inventorySyncKeys: string[]) {
   if (hasOperationalAttention(product, matrix, inventorySyncKeys, 'stock')) return { type: 'stock' as const, priority: 1 };
   if (hasOperationalAttention(product, matrix, inventorySyncKeys, 'sync')) return { type: 'sync' as const, priority: 2 };
-  if (hasOperationalAttention(product, matrix, inventorySyncKeys, 'review')) return { type: 'review' as const, priority: 3 };
   if (hasOperationalAttention(product, matrix, inventorySyncKeys, 'incomplete')) return { type: 'incomplete' as const, priority: 4 };
   return null;
 }
@@ -265,39 +268,6 @@ function ChannelStockCell({ product, channel, status, syncEnabled, onClick }: { 
   if (stock.state === 'independent') return <button type="button" onClick={onClick} className="min-h-11 cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><p className="text-sm font-semibold text-slate-700">Managed independently</p><p className="mt-1 text-xs font-medium text-indigo-600">Configure inventory sync</p></button>;
   if (stock.state === 'not-connected') return <button type="button" onClick={onClick} className="min-h-11 cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><p className="text-sm font-semibold text-slate-500">Not allocated</p><p className="mt-1 text-xs text-indigo-600">Review inventory setup</p></button>;
   return <button type="button" onClick={onClick} className="min-h-11 cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-baseline gap-2"><span className="text-sm font-semibold tabular-nums text-slate-900">{stock.allocated} allocated</span><span className="text-xs tabular-nums text-slate-500">{stock.reported === null ? '— reported' : `${stock.reported} reported`}</span></div><p className={cn('mt-1 text-xs font-medium', stock.state === 'mismatch' ? 'text-rose-700' : stock.state === 'processing' ? 'text-amber-700' : 'text-emerald-700')}>{stock.state === 'mismatch' ? `${stock.difference} mismatch` : stock.state === 'processing' ? 'Sync processing' : 'Stock synced'}</p></button>;
-}
-
-function attachImportedListing(product: Product, item: CatalogImportItem) {
-  const now = new Date().toISOString();
-  updateProduct(product.id, {
-    id: product.id,
-    name: product.name || item.title,
-    brand: product.brand || item.brand || '',
-    retail_price: product.retail_price || item.price,
-    price_currency: product.price_currency || item.currency,
-    images: product.images.length || !item.image ? product.images : [item.image],
-    channels: [...product.channels.filter(listing => listing.channel !== item.channel), { channel: item.channel, external_id: item.listingId, status: 'active', listing_url: null, last_synced_at: now }],
-    channel_overrides: { ...product.channel_overrides, [item.channel]: { enabled: true, title: item.title, description: '', price_markup: 0, listing_sku: item.channelSku, category: item.channelCategory, stock_quantity: String(item.channelStock), variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: String(item.channelStock), media_scope: 'all' } },
-    updated_at: now,
-  });
-}
-
-function createImportedProduct(item: CatalogImportItem) {
-  const id = `prod_import_${item.id}`;
-  if (getProducts().some(product => product.id === id)) return id;
-  const now = new Date().toISOString();
-  addProduct({
-    id, name: item.title, sku_code: item.channelSku, product_type: item.variants > 1 ? 'variant' : 'single',
-    gtin: '', mpn: '', model_number: '', brand: item.brand || '', asin: item.channel === 'amazon' ? item.listingId : '', manufacturer: '',
-    category: '', condition: 'new', description: '', original_price: 0, retail_price: item.price, price_currency: item.currency,
-    prod_length: item.prod_length ?? 0, prod_height: item.prod_height ?? 0, prod_width: item.prod_width ?? 0, prod_weight: item.prod_weight ?? 0,
-    pkg_length: item.pkg_length ?? 0, pkg_height: item.pkg_height ?? 0, pkg_width: item.pkg_width ?? 0, pkg_weight: item.pkg_weight ?? 0,
-    country_of_origin: '', hs_code: '', images: item.image ? [item.image] : [], inventory: Object.fromEntries(Object.keys(warehouseNames).map(warehouseId => [warehouseId, 0])),
-    has_variants: item.variants > 1, channels: [{ channel: item.channel, external_id: item.listingId, status: 'active', listing_url: null, last_synced_at: now }],
-    channel_overrides: { [item.channel]: { enabled: true, title: item.title, description: '', price_markup: 0, listing_sku: item.channelSku, category: item.channelCategory, stock_quantity: String(item.channelStock), variant_scope: 'all', listing_mode: 'master', sync_policy: 'automatic', safety_buffer: '0', allocation_cap: String(item.channelStock), media_scope: 'all' } },
-    status: 'draft', created_at: now, updated_at: now, skus: [],
-  });
-  return id;
 }
 
 export default function Products() {
@@ -325,6 +295,42 @@ export default function Products() {
   const [listingChannel, setListingChannel] = useState<ChannelKey>(channels.some(({ key }) => key === initialChannel) ? initialChannel as ChannelKey : 'amazon');
   const [legendFilter, setLegendFilter] = useState<'all' | ListingIndicator>('all');
   const [createOpen, setCreateOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [intakeOpen, setIntakeOpen] = useState(queryParams.get('review') === 'links');
+  const [intakeStage, setIntakeStage] = useState<IntakeStage>('queue');
+  const [intakeGuideActions, setIntakeGuideActions] = useState<HTMLDivElement | null>(null);
+  const [intakeDirty, setIntakeDirty] = useState(false);
+  const [discardIntake, setDiscardIntake] = useState(false);
+  const [recentMasterIds, setRecentMasterIds] = useState<string[]>([]);
+  const savedInIntake = useRef<'linked' | 'created' | null>(null);
+  useEffect(() => {
+    if (intakeOpen || !recentMasterIds.length) return;
+    const timer = setTimeout(() => setRecentMasterIds([]), 60_000);
+    return () => clearTimeout(timer);
+  }, [intakeOpen, recentMasterIds]);
+  const closeIntake = () => {
+    setIntakeOpen(false);
+    if (!savedInIntake.current) return;
+    clearCatalogFilters();
+    setCatalogView(savedInIntake.current === 'created' ? 'active' : 'all');
+    setHiddenMasterColumns(columns => columns.filter(column => column !== 'updated'));
+    requestAnimationFrame(() => catalogSearchRef.current?.scrollIntoView?.({ block: 'center', behavior: 'instant' }));
+  };
+  const intakeReturnRef = useRef<HTMLElement | null>(null);
+  const catalogSearchRef = useRef<HTMLInputElement | null>(null);
+  const openIntake = () => {
+    savedInIntake.current = null;
+    intakeReturnRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelectedIds([]);
+    setIntakeStage('queue');
+    setIntakeOpen(true);
+  };
+  const previewMode: ProductOnboardingPreview | undefined = workspaceMode !== 'master' ? undefined : queryParams.get('preview') === 'no-channels' ? 'no-channels' : queryParams.get('preview') === 'first-product' ? 'no-products' : undefined;
+  const previewIntro = Boolean(previewMode);
+  const [hasCreatedMaster, setHasCreatedMaster] = useState(() => {
+    try { return localStorage.getItem('prime-product-intro-completed-v1') === '1'; }
+    catch { return false; }
+  });
   const [importOpen, setImportOpen] = useState(false);
   const [manualImportFileName, setManualImportFileName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -359,6 +365,29 @@ export default function Products() {
   };
 
   const products = getProducts();
+  const pendingListings = pendingListingReviews(products);
+  const introMode = productIntroMode(products.length, hasCreatedMaster, previewIntro);
+  const showingIntro = introMode === 'intro';
+  const showQueueBanner = introMode === 'catalog' && pendingListings.length > 0;
+  const channelSetup = useProductChannelSetup(showingIntro && workspaceMode === 'master' && !previewIntro, queryParams.get('shop'));
+  const selectedDemo = previewMode ?? (introMode === 'catalog' ? 'with-data' : channelSetup.snapshot.status === 'loaded' && channelSetup.snapshot.channels.length === 0 ? 'no-channels' : 'no-products');
+  useEffect(() => {
+    if (!products.length || hasCreatedMaster || previewIntro || workspaceMode !== 'master') return;
+    setHasCreatedMaster(true);
+    try { localStorage.setItem('prime-product-intro-completed-v1', '1'); } catch { /* Keep the in-session state. */ }
+  }, [products.length, hasCreatedMaster, previewIntro, workspaceMode]);
+  function selectProductDemo(mode: 'with-data' | ProductOnboardingPreview) {
+    const params = new URLSearchParams(location.search);
+    if (mode === 'with-data') params.delete('preview');
+    else params.set('preview', mode === 'no-channels' ? 'no-channels' : 'first-product');
+    params.delete('q');
+    setIntakeOpen(false);
+    setSelectedIds([]);
+    setCatalogView('all');
+    clearCatalogFilters();
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }
+  const openProductDraft = (id: string) => navigate(`/products/${encodeURIComponent(id)}/edit?section=product-data`);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 120);
@@ -391,13 +420,15 @@ export default function Products() {
     .filter((product) => !hiddenIds.includes(product.id))
     .map(product => ({ product, matrix: { ...getChannelMatrix(product), ...statusOverrides[product.id] } }))
     .sort((a, b) => {
+      if (catalogView !== 'todo') return new Date(b.product.updated_at).getTime() - new Date(a.product.updated_at).getTime()
+        || Number(recentMasterIds.includes(b.product.id)) - Number(recentMasterIds.includes(a.product.id));
       const aIssue = getOperationalIssue(a.product, a.matrix, inventorySyncKeys);
       const bIssue = getOperationalIssue(b.product, b.matrix, inventorySyncKeys);
       if ((aIssue?.priority ?? 99) !== (bIssue?.priority ?? 99)) return (aIssue?.priority ?? 99) - (bIssue?.priority ?? 99);
       const importPriority = Number(Boolean(b.product.import_result)) - Number(Boolean(a.product.import_result));
       if (importPriority !== 0) return importPriority;
       return new Date(b.product.updated_at).getTime() - new Date(a.product.updated_at).getTime();
-    }), [hiddenIds, inventorySyncKeys, products, statusOverrides, catalogSettingsRevision]);
+    }), [hiddenIds, inventorySyncKeys, products, statusOverrides, catalogView, catalogSettingsRevision, recentMasterIds]);
   const categories = useMemo(() => Array.from(new Set(products.map((product) => product.category).filter(Boolean))).sort(), [products]);
   const catalogCounts = useMemo(() => ({
     all: rows.length,
@@ -412,7 +443,6 @@ export default function Products() {
     all: catalogCounts.attention,
     stock: rows.filter(({ product, matrix }) => hasOperationalAttention(product, matrix, inventorySyncKeys, 'stock')).length,
     sync: rows.filter(({ product, matrix }) => hasOperationalAttention(product, matrix, inventorySyncKeys, 'sync')).length,
-    review: rows.filter(({ product, matrix }) => hasOperationalAttention(product, matrix, inventorySyncKeys, 'review')).length,
     incomplete: rows.filter(({ product, matrix }) => hasOperationalAttention(product, matrix, inventorySyncKeys, 'incomplete')).length,
   }), [catalogCounts.attention, inventorySyncKeys, rows]);
   const filtered = useMemo(() => rows.filter(({ product, matrix }) => {
@@ -520,6 +550,7 @@ export default function Products() {
   }
 
   function createProductDraft(input: CreateProductDraftInput) {
+    if (getProducts().some(product => [product.sku_code, ...product.skus.map(sku => sku.sku_code)].some(sku => sku.trim().toUpperCase() === input.sku.trim().toUpperCase()))) throw new Error('This SKU already exists. Generate another SKU or open the existing product.');
     const now = new Date().toISOString();
     const id = `prod_${crypto.randomUUID().slice(0, 8)}`;
     addProduct({
@@ -538,62 +569,60 @@ export default function Products() {
       prod_length: 0, prod_height: 0, prod_width: 0, prod_weight: 0,
       pkg_length: 0, pkg_height: 0, pkg_width: 0, pkg_weight: 0,
       country_of_origin: '', hs_code: '', images: [],
-      inventory: Object.fromEntries(Object.keys(warehouseNames).map((warehouseId) => [warehouseId, 0])),
+      inventory: {},
       has_variants: input.productType === 'variant',
       channels: [],
       status: 'draft',
       created_at: now,
       updated_at: now,
       skus: [],
-    });
+    }, { requirePersistence: true });
     setCreateOpen(false);
     toast({ title: 'Product Master draft created', description: `${input.name} · ${input.sku} is ready for enrichment.` });
-    navigate(`/products/${id}/edit`);
+    navigate(`/products/${id}/edit?section=product-data`);
   }
 
   function confirmPublishMaster() {
     if (!publishTarget) return;
-    updateProduct(publishTarget.id, { id: publishTarget.id, status: 'published', import_result: 'published' });
+    updateProduct(publishTarget.id, { id: publishTarget.id, status: 'published', import_result: publishTarget.import_result === 'needs_review' ? 'needs_review' : 'published' });
     setPublishTarget(null);
     setStockRevision((value) => value + 1);
-    toast({ title: 'Product Master published', description: 'The master is active. No channel listings were created or changed.' });
+    toast({ title: 'Product Master activated', description: 'The master is active. No channel listings were created or changed.' });
   }
 
   function processManualImport() {
-    const importItems = getCatalogImportItems();
-    let created = 0;
-    let linked = 0;
-    const nextItems = importItems.map(item => {
-      if (item.resolution === 'ignore' || item.status === 'ignored') return item;
-      const existingId = item.suggestedProductId && item.confidence >= 85 ? item.suggestedProductId : undefined;
-      const existing = existingId ? getProducts().find(product => product.id === existingId) : undefined;
-      if (existing) {
-        attachImportedListing(existing, item);
-        linked += 1;
-        return { ...item, resolution: 'link' as const, resolvedProductId: existing.id, confirmed: true };
-      }
-      const id = createImportedProduct(item);
-      created += 1;
-      return { ...item, resolution: 'create' as const, resolvedProductId: id, confirmed: true };
-    });
-    saveCatalogImportItems(nextItems);
-    setStockRevision(value => value + 1);
-    setCatalogView('all');
+    openIntake();
     setImportOpen(false);
     setManualImportFileName('');
-    toast({ title: 'Manual import processed', description: `${created} Product Masters created · ${linked} listings linked to existing products.` });
+    toast({ title: 'Review prototype import data', description: 'No products were created or linked. Confirm your choices in Listings to link.' });
   }
 
   return <div className="space-y-5 p-4 md:p-6">
     <WorkspacePageHeader
       title={workspaceMode === 'master' ? 'Product Master' : 'Channel Listings'}
-      description={workspaceMode === 'master' ? 'Manage shared product data and each channel listing from one Product Master workspace.' : `Manage ${selectedListingChannel.label} content, readiness and sync without changing Product Master.`}
+      description={workspaceMode === 'master' ? 'Manage shared product data across your shops.' : `Manage ${selectedListingChannel.label} content, readiness and sync without changing Product Master.`}
       icon={workspaceMode === 'master' ? ShoppingBag : Layers3}
-      actions={workspaceMode === 'master' ? <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="size-4" />Manual import</Button><Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Create Product Master</Button></div> : undefined}
+      titleAccessory={workspaceMode === 'master' ? <div className="flex flex-wrap items-center gap-2 sm:ml-3" role="group" aria-label="Product demo mode">
+        <span className="text-xs font-medium text-muted-foreground">Demo</span>
+        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+          {([{ mode: 'with-data', label: 'With data', hint: 'Show your saved products. No data is changed.' }, { mode: 'no-products', label: 'No products', hint: 'Preview no Product Masters with shop listings to review. Saved data is kept.' }, { mode: 'no-channels', label: 'No channels', hint: 'Preview no Product Masters and no connected channels. Saved data and connections are kept.' }] as const).map(({ mode, label, hint }) => {
+            const selected = selectedDemo === mode;
+            return <Button key={mode} size="sm" variant="ghost" aria-pressed={selected} disabled={mode === 'with-data' && products.length === 0} title={hint} onClick={() => selectProductDemo(mode)} className={cn('h-8 border px-3 text-xs motion-reduce:transition-none', selected ? 'border-primary/50 bg-primary/10 text-foreground hover:bg-primary/15' : 'border-transparent text-muted-foreground hover:text-foreground')}>{label}</Button>;
+          })}
+        </div>
+      </div> : undefined}
+      actions={workspaceMode === 'master' && !showingIntro ? <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="outline" className="h-11" onClick={() => setImportOpen(true)}><Upload className="size-4" />Import products</Button><Button className="h-11" onClick={() => setCreateOpen(true)}><Plus className="size-4" />Create Product Master</Button></div> : undefined}
     />
 
+    {workspaceMode === 'master' && <>
+      {showQueueBanner && <ListingReviewBanner listings={pendingListings} onReview={openIntake} />}
+      {showingIntro && <ProductGettingStarted snapshot={channelSetup.snapshot} preview={previewMode} pendingCount={pendingListings.length} sourceChannels={channels.filter(channel => pendingListings.some(listing => listing.channel === channel.key))} onReview={openIntake} onImport={() => setImportOpen(true)} onCreate={() => setCreateOpen(true)} onRetry={channelSetup.retry} onShops={() => navigate('/sales-channels/connected-channels')} onConnect={() => setConnectOpen(true)} />}
+      {introMode === 'empty' && <section aria-labelledby="empty-products-title" className="rounded-xl border border-border bg-card px-6 py-12 text-center"><h2 id="empty-products-title" className="text-base font-semibold">No Product Masters yet</h2><p className="mt-2 text-sm text-muted-foreground">Use Import products or Create Product Master above to add products.</p>{pendingListings.length > 0 && <Button variant="outline" className="mt-5" onClick={openIntake}>Review shop listings ({pendingListings.length})</Button>}</section>}
+
+    </>}
+
     {workspaceMode === 'listings' ? <section aria-labelledby="channel-coverage-title">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="channel-coverage-title" className="text-sm font-semibold text-foreground">{workspaceMode === 'master' ? 'Listing coverage by channel' : 'Choose a channel workspace'}</h2><p className="mt-1 text-xs text-muted-foreground">{workspaceMode === 'master' ? 'Select a channel to open its listing workspace. Master data remains shared.' : 'Each channel has its own fields, validation rules and publishing lifecycle.'}</p></div>{workspaceMode === 'listings' ? <Badge variant="outline">Editing listings only · Master data protected</Badge> : null}</div>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="channel-coverage-title" className="text-sm font-semibold text-foreground">Choose a channel workspace</h2><p className="mt-1 text-xs text-muted-foreground">Each channel has its own fields, validation rules and publishing lifecycle.</p></div>{workspaceMode === 'listings' ? <Badge variant="outline">Editing listings only · Master data protected</Badge> : null}</div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
       {readiness.map((channel) => {
         const percentage = channel.total ? Math.round((channel.published / channel.total) * 100) : 0;
@@ -608,7 +637,7 @@ export default function Products() {
 
     {workspaceMode === 'listings' ? <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center"><ChannelLogo channel={selectedListingChannel} size="lg" /><div className="min-w-0 flex-1"><h2 className="font-semibold text-foreground">{selectedListingChannel.label} Listings</h2><p className="mt-1 text-xs text-muted-foreground">Changes here apply only to {selectedListingChannel.label}. Open a listing to edit channel-specific content and run its readiness check.</p></div><Button variant="outline" onClick={() => navigate('/products/master-catalog')}><Boxes className="size-4" />Return to Product Master</Button></div> : null}
 
-    <section className="overflow-hidden rounded-xl border border-border bg-card">
+    {(workspaceMode !== 'master' || introMode === 'catalog') && <section className="overflow-hidden rounded-xl border border-border bg-card">
       {workspaceMode === 'master' ? <><nav className="flex gap-1 overflow-x-auto border-b border-border px-3" aria-label="Catalog status">
         {([['all', 'All'], ['todo', 'To do'], ['active', 'Active'], ['archived', 'Archived']] as Array<[CatalogView, string]>).map(([key, label]) => <button key={key} type="button" aria-pressed={catalogView === key} onClick={() => selectCatalogView(key)} className={cn('relative min-h-11 shrink-0 cursor-pointer px-3 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', catalogView === key ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-muted-foreground hover:text-foreground')}>{label}<span className={cn('ml-1.5 rounded-full px-1.5 py-0.5 text-xs tabular-nums', catalogView === key ? 'text-primary/80' : 'text-muted-foreground')}>{catalogCounts[key]}</span></button>)}
       </nav>{catalogView === 'todo' ? <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-4 py-2">
@@ -618,11 +647,11 @@ export default function Products() {
           </button>)}
         </div>
         {todoFilter === 'issues' ? <select aria-label="Issue type" value={attentionFilter} onChange={event => { setAttentionFilter(event.target.value as AttentionFilter); setSelectedIds([]); }} className="h-10 max-w-full rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {([['all', 'All issue types'], ['stock', 'Stock risk'], ['sync', 'Sync issue'], ['review', 'Review import'], ['incomplete', 'Missing data']] as Array<[AttentionFilter, string]>).map(([key, label]) => <option key={key} value={key}>{label} ({attentionCounts[key]})</option>)}
+          {([['all', 'All issue types'], ['stock', 'Stock risk'], ['sync', 'Sync issue'], ['incomplete', 'Missing data']] as Array<[AttentionFilter, string]>).map(([key, label]) => <option key={key} value={key}>{label} ({attentionCounts[key]})</option>)}
         </select> : null}
       </div> : null}</> : <div className="flex min-h-11 items-center gap-2 border-b border-border px-4"><ChannelLogo channel={selectedListingChannel} size="sm" /><span className="text-sm font-semibold text-foreground">{selectedListingChannel.label} listing queue</span><span className="ml-auto text-xs text-muted-foreground">{filtered.length} master products available</span></div>}
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-        <div className="relative min-w-0 basis-72 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={workspaceMode === 'master' ? 'Search product, Master or variant SKU...' : `Search ${selectedListingChannel.label} listing or master SKU...`} className="h-10 pl-9 pr-9" />{search ? <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-slate-400 hover:text-slate-700"><X className="size-4" /></button> : null}</div>
+        <div className="relative min-w-0 basis-72 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input ref={catalogSearchRef} aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={workspaceMode === 'master' ? 'Search product, Master or variant SKU...' : `Search ${selectedListingChannel.label} listing or master SKU...`} className="h-10 pl-9 pr-9" />{search ? <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-slate-400 hover:text-slate-700"><X className="size-4" /></button> : null}</div>
         <div className="flex flex-wrap items-center gap-2">
           {workspaceMode === 'master' && (catalogView === 'all' || (catalogView === 'todo' && !showingDrafts)) ? <><label className="sr-only" htmlFor="master-status-filter">Product status</label><select id="master-status-filter" value={masterStatusFilter} onChange={(event) => setMasterStatusFilter(event.target.value as MasterStatusFilter)} className="h-10 min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="all">All statuses</option><option value="published">Active</option><option value="draft">Draft</option><option value="archived">Archived</option></select></> : null}
           {showingDrafts ? <select aria-label="Draft readiness" value={draftReadinessFilter} onChange={event => setDraftReadinessFilter(event.target.value as DraftReadinessFilter)} className="h-10 min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="all">All drafts</option><option value="ready">Ready to publish</option><option value="incomplete">Missing data</option></select> : null}
@@ -636,21 +665,33 @@ export default function Products() {
       {workspaceMode === 'listings' ? <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/40 px-4 py-2"><span className="mr-1 text-xs font-semibold text-slate-500">{selectedListingChannel.label} status</span><button type="button" onClick={() => setLegendFilter('all')} className={cn('min-h-10 rounded-md border px-3 text-xs font-semibold', legendFilter === 'all' ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-transparent text-slate-600')}>All</button>{(['live', 'draft', 'pending', 'error', 'inactive', 'unconfirmed', 'missing'] as ListingIndicator[]).map((item) => <button key={item} type="button" onClick={() => setLegendFilter((current) => current === item ? 'all' : item)} className={cn('inline-flex min-h-10 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors', legendFilter === item ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-white')}><span className={cn('size-2 rounded-full', statusTone[item])} />{statusLabel[item]}</button>)}<span className="ml-auto text-xs tabular-nums text-slate-500">{filtered.length} listings</span></div> : <div className="flex min-h-10 items-center border-b border-slate-200 bg-slate-50/40 px-4 text-xs text-slate-500"><span><strong className="font-semibold text-slate-700">{filtered.length}</strong> master products</span></div>}
       {search || sourceFilter !== 'all' || (showingDrafts && draftReadinessFilter !== 'all') || masterStatusFilter !== 'all' || channelFilter !== 'all' || categoryFilter !== 'all' || stockFilter !== 'all' || syncFilter !== 'all' || variantFilter !== 'all' ? <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/50 px-4 py-2 text-xs"><span className="font-semibold text-slate-500">Active filters</span>{sourceFilter !== 'all' ? <button type="button" aria-label="Remove source filter" onClick={() => setSourceFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-border bg-background px-2 font-semibold text-foreground">{sourceFilter === 'imported' ? 'Imported' : 'Manually created'}<X className="size-3" /></button> : null}{showingDrafts && draftReadinessFilter !== 'all' ? <button type="button" aria-label="Remove readiness filter" onClick={() => setDraftReadinessFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-border bg-background px-2 font-semibold text-foreground">{draftReadinessFilter === 'ready' ? 'Ready to publish' : 'Missing data'}<X className="size-3" /></button> : null}{masterStatusFilter !== 'all' ? <button type="button" onClick={() => setMasterStatusFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 font-semibold text-slate-700">{masterStatusConfig[masterStatusFilter].label}<X className="size-3" /></button> : null}{channelFilter !== 'all' ? <button type="button" onClick={() => setChannelFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 font-semibold text-slate-700">{channels.find((channel) => channel.key === channelFilter)?.label}<X className="size-3" /></button> : null}{categoryFilter !== 'all' ? <button type="button" onClick={() => setCategoryFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 font-semibold text-slate-700">{categoryFilter}<X className="size-3" /></button> : null}{stockFilter !== 'all' ? <button type="button" onClick={() => setStockFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 font-semibold text-slate-700">{stockFilter === 'in-stock' ? 'In stock' : stockFilter === 'low-stock' ? 'Low stock' : 'Out of stock'}<X className="size-3" /></button> : null}{syncFilter !== 'all' ? <button type="button" onClick={() => setSyncFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-indigo-200 bg-white px-2 font-semibold text-indigo-700">{syncFilter === 'errors' ? 'Sync errors' : syncFilter === 'pending' ? 'Pending publication' : 'Shopee missing/error'}<X className="size-3" /></button> : null}{variantFilter !== 'all' ? <button type="button" onClick={() => setVariantFilter('all')} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 font-semibold text-slate-700">{variantFilter === 'with-variants' ? 'With variants' : 'Single products'}<X className="size-3" /></button> : null}<button type="button" onClick={clearCatalogFilters} className="ml-auto min-h-8 font-semibold text-indigo-700">Clear all</button></div> : null}
 
-      <TooltipProvider delayDuration={150}><div className="overflow-x-auto"><table className={cn('w-full text-left', workspaceMode === 'master' ? 'min-w-[1160px]' : 'min-w-[1160px]')}><thead className="border-b border-slate-200 bg-slate-50/60"><tr><th className="sticky left-0 z-10 w-12 bg-slate-50 px-4 py-3"><Checkbox checked={filtered.length > 0 && filtered.every(({ product }) => selectedIds.includes(product.id))} onCheckedChange={() => setSelectedIds(filtered.every(({ product }) => selectedIds.includes(product.id)) ? selectedIds.filter((id) => !filtered.some(({ product }) => product.id === id)) : Array.from(new Set([...selectedIds, ...filtered.map(({ product }) => product.id)])))} aria-label="Select all visible products" /></th>{(workspaceMode === 'master' ? masterHeaders : ['PRODUCT SOURCE', `${selectedListingChannel.label.toUpperCase()} LISTING`, 'READINESS & SYNC', 'CHANNEL STOCK', 'CHANNEL PRICE', 'ACTION']).map((header) => <th key={header} className={cn('px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500', (header === 'ACTIONS' || header === 'ACTION') && 'text-right')}><span className={cn('inline-flex items-center gap-1', (header === 'ACTIONS' || header === 'ACTION') && 'w-full justify-end')}>{header}{header === 'MASTER STATUS' ? <MasterStatusHelp /> : null}{header === 'MASTER STOCK' || header === 'CHANNEL STOCK' ? <Tooltip><TooltipTrigger asChild><button type="button" className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`How ${header.toLowerCase()} is calculated`}><Info className="size-3.5" /></button></TooltipTrigger><TooltipContent className="max-w-64 text-xs">{header === 'MASTER STOCK' ? 'Stock currently available across Prime OS warehouses.' : 'Managed independently by default. Prime OS publishes updates only after inventory sync is configured for this listing.'}</TooltipContent></Tooltip> : null}</span></th>)}</tr></thead>
+      <TooltipProvider delayDuration={150}><div className="overflow-x-auto"><table className={cn('w-full text-left', workspaceMode === 'master' ? 'min-w-[1160px]' : 'min-w-[1160px]')}><thead className="border-b border-slate-200 bg-slate-50/60"><tr><th className="sticky left-0 z-10 w-12 bg-slate-50 px-4 py-3"><Checkbox checked={filtered.length > 0 && filtered.every(({ product }) => selectedIds.includes(product.id))} onCheckedChange={() => setSelectedIds(filtered.every(({ product }) => selectedIds.includes(product.id)) ? selectedIds.filter((id) => !filtered.some(({ product }) => product.id === id)) : Array.from(new Set([...selectedIds, ...filtered.map(({ product }) => product.id)])))} aria-label="Select all visible products" /></th>{(workspaceMode === 'master' ? masterHeaders : ['PRODUCT SOURCE', `${selectedListingChannel.label.toUpperCase()} LISTING`, 'READINESS & SYNC', 'CHANNEL STOCK', 'CHANNEL PRICE', 'ACTION']).map((header) => <th key={header} className={cn('px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500', (header === 'ACTIONS' || header === 'ACTION' || header === 'MASTER STOCK') && 'text-right')}><span className={cn('inline-flex items-center gap-1', (header === 'ACTIONS' || header === 'ACTION' || header === 'MASTER STOCK') && 'w-full justify-end')}>{header}{header === 'MASTER STATUS' ? <MasterStatusHelp /> : null}{header === 'MASTER STOCK' || header === 'CHANNEL STOCK' ? <Tooltip><TooltipTrigger asChild><button type="button" className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`How ${header.toLowerCase()} is calculated`}><Info className="size-3.5" /></button></TooltipTrigger><TooltipContent className="max-w-64 text-xs">{header === 'MASTER STOCK' ? 'Stock currently available across Prime OS warehouses.' : 'Managed independently by default. Prime OS publishes updates only after inventory sync is configured for this listing.'}</TooltipContent></Tooltip> : null}</span></th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{isLoading ? Array.from({ length: 6 }).map((_, index) => <tr key={index}><td className="px-4 py-3"><Skeleton className="size-4" /></td><td className="px-4 py-3"><div className="flex items-center gap-3"><Skeleton className="size-10 rounded-lg" /><div className="space-y-2"><Skeleton className="h-4 w-44" /><Skeleton className="h-3 w-28" /></div></div></td><td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td><td className="px-4 py-3"><Skeleton className="h-4 w-20" /></td><td className="px-4 py-3"><Skeleton className="h-9 w-28" /></td><td className="px-4 py-3"><Skeleton className="h-9 w-52" /></td><td className="px-4 py-3"><Skeleton className="ml-auto h-9 w-20" /></td></tr>) : filtered.map(({ product, matrix }) => {
           const imageMissingFromImport = product.import_result === 'incomplete' && product.import_issues?.includes('Product image is required');
           const image = imageMissingFromImport ? '' : product.images[0] || (product.asin ? getProductImage(product.id, product.asin) : '');
           const variantCount = product.skus.length;
-          return <tr key={product.id} className="group transition-colors hover:bg-slate-50/60">
+          const dataIssue = getProductDataIssue(product);
+          return <tr key={product.id} data-product-id={product.id} className={cn("group transition-colors hover:bg-slate-50/60", recentMasterIds.includes(product.id) && "bg-primary/5")}>
             <td className="sticky left-0 z-[1] bg-white px-4 py-3 group-hover:bg-slate-50"><Checkbox checked={selectedIds.includes(product.id)} onCheckedChange={() => toggleProduct(product.id)} aria-label={`Select ${product.name}`} /></td>
-            <td className="px-4 py-3"><div className="flex items-start gap-3"><div className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50"><PackageX className="size-4 text-slate-400" />{image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" onError={event => { event.currentTarget.style.display = 'none'; }} /> : null}</div><div className="min-w-0"><div className="flex max-w-[360px] items-center gap-2"><Link to={`/products/${product.id}/edit`} state={{ from: `${location.pathname}${location.search}` }} onClick={() => markMatchAsViewed(product)} aria-label={`Open Product Master details for ${product.name}`} className="block min-w-0 truncate rounded-sm text-sm font-semibold text-slate-900 transition-colors hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">{getProductDisplayName(product.name)}</Link>{product.import_result && getImportBadgeLabel(product) ? <button type="button" onClick={() => { if (product.import_result === 'matched') markMatchAsViewed(product); navigate(getProductAttentionHref(product, getProductQuality(product).missing), { state: { from: `${location.pathname}${location.search}` } }); }} className={cn('min-h-7 shrink-0 rounded-md border px-2 text-[10px] font-semibold transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1', importResultConfig[product.import_result].tone)} aria-label={`${getImportBadgeLabel(product)}. ${product.import_result === 'needs_review' ? 'Review imported listing mapping.' : product.import_result === 'incomplete' ? 'Complete missing product data.' : 'Open Product Master details.'}`}>{getImportBadgeLabel(product)}</button> : null}</div><div className="mt-0.5 flex max-w-[420px] flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground"><span title={product.sku_code} className="max-w-full truncate font-mono font-medium">{product.sku_code}</span>{workspaceMode === 'master' && product.has_variants ? <><span aria-hidden="true">·</span><Link to={`/products/${product.id}/edit?section=commerce`} state={{ from: `${location.pathname}${location.search}` }} aria-label={`Manage ${variantCount} ${variantCount === 1 ? 'variant' : 'variants'} for ${product.name}`} className="inline-flex min-h-6 shrink-0 items-center rounded-sm font-medium underline decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">{variantCount} {variantCount === 1 ? 'variant' : 'variants'}</Link></> : null}<span aria-hidden="true">·</span><span title={`Category: ${product.category || 'Not set'}`} className="min-w-0 max-w-full truncate">Category: {product.category || 'Not set'}</span></div><ImportProvenanceBadge product={product} />{!product.import_result && workspaceMode === 'master' ? <DataIssueBadge product={product} onClick={() => navigate(getProductAttentionHref(product, getProductQuality(product).missing), { state: { from: `${location.pathname}${location.search}` } })} /> : null}</div></div></td>
+            <td className="px-4 py-3"><div className="flex items-center gap-3">
+              <div className="relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-muted"><PackageX className="size-4 text-muted-foreground" />{image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" onError={event => { event.currentTarget.style.display = 'none'; }} /> : null}</div>
+              <div className="min-w-0 max-w-[420px]">
+                <Link to={`/products/${product.id}/edit`} state={{ from: `${location.pathname}${location.search}` }} onClick={() => markMatchAsViewed(product)} aria-label={`Open Product Master details for ${product.name}`} className="line-clamp-2 rounded-sm text-sm font-semibold text-foreground transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{getProductDisplayName(product.name)}</Link>
+                <div className="mt-1 flex min-h-5 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                  <span title={product.sku_code} className="max-w-40 shrink-0 truncate font-mono">{product.sku_code}</span>
+                  {workspaceMode === 'master' && product.has_variants ? <><span aria-hidden="true">·</span><Link to={`/products/${product.id}/edit?section=commerce`} state={{ from: `${location.pathname}${location.search}` }} aria-label={`Manage ${variantCount} ${variantCount === 1 ? 'variant' : 'variants'} for ${product.name}`} className="inline-flex min-h-6 shrink-0 items-center rounded-sm underline decoration-muted-foreground/50 underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{variantCount} {variantCount === 1 ? 'variant' : 'variants'}</Link></> : null}
+                  <span aria-hidden="true">·</span><span title={`Category: ${product.category || 'Not set'}`} className="min-w-0 max-w-28 truncate">{product.category || 'No category'}</span>
+                  <ProductSources product={product} />
+                </div>
+              </div>
+            </div></td>
             {workspaceMode === 'master' ? <>
-              {!hiddenMasterColumns.includes('status') ? <td className="px-4 py-3"><span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground"><span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', masterStatusConfig[product.status].dotTone)} />{masterStatusConfig[product.status].label}</span>{product.status === 'published' && product.import_result === 'incomplete' ? <p className="mt-1 text-[10px] leading-4 text-slate-500">Published version is live<br />Working draft is incomplete</p> : null}</td> : null}
+              {!hiddenMasterColumns.includes('status') ? <td className="px-4 py-3"><span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground"><span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', masterStatusConfig[product.status].dotTone)} />{masterStatusConfig[product.status].label}</span>{dataIssue ? <Tooltip><TooltipTrigger asChild><span tabIndex={0} className="mt-1 flex w-fit items-center gap-1 whitespace-nowrap rounded text-xs text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300"><AlertTriangle aria-hidden="true" className="size-3" />{dataIssue.label}</span></TooltipTrigger><TooltipContent className="max-w-72">{dataIssue.detail}{product.status === 'published' ? ' The active Master and existing live listings are unchanged.' : ''}</TooltipContent></Tooltip> : null}</td> : null}
               {!hiddenMasterColumns.includes('base-price') ? <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold tabular-nums text-slate-900">{product.status === 'draft' && product.retail_price === 0 ? <span className="font-medium text-slate-500">Not set</span> : formatLocalizedMoney(locale, product.retail_price, product.price_currency)}</td> : null}
-              {!hiddenMasterColumns.includes('stock') ? <td className="px-4 py-3"><StockStatusCell product={product} matrix={matrix} inventorySyncKeys={inventorySyncKeys} onClick={() => setStockTarget(product)} onChannelIssue={(channel, listingId) => navigate(`/products/${product.id}/channels/${channel}?listing=${encodeURIComponent(listingId)}&section=inventory`)} /></td> : null}
+              {!hiddenMasterColumns.includes('stock') ? <td className="px-4 py-3 text-right"><StockStatusCell product={product} matrix={matrix} inventorySyncKeys={inventorySyncKeys} onClick={() => setStockTarget(product)} onChannelIssue={(channel, listingId) => navigate(`/products/${product.id}/channels/${channel}?listing=${encodeURIComponent(listingId)}&section=inventory`)} /></td> : null}
               {!hiddenMasterColumns.includes('linked-listings') ? <td className="px-4 py-3"><ListingCoverage product={product} matrix={matrix} inventorySyncKeys={inventorySyncKeys} onClick={() => navigate(`/products/${product.id}?tab=channels`)} /></td> : null}
-              {!hiddenMasterColumns.includes('updated') ? <td className="px-4 py-3"><p className="whitespace-nowrap text-sm font-medium text-slate-700">{new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(product.updated_at))}</p></td> : null}
-              <td className="px-4 py-3"><div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="size-10" aria-label={`More actions for ${product.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-60"><DropdownMenuItem onClick={() => navigate(`/products/${product.id}/edit`)}><Pencil className="size-4" />Edit master product</DropdownMenuItem><DropdownMenuItem onClick={() => navigate(`/products/${product.id}/channel-listings/new`)}><Layers3 className="size-4" />Create channel listings</DropdownMenuItem><DropdownMenuItem onClick={() => toast({ title: 'Product duplicated', description: `${product.name} copied as a draft.` })}><Copy className="size-4" />Duplicate master product</DropdownMenuItem><DropdownMenuSeparator />{new URLSearchParams(location.search).get('mode') !== 'viewer' && <ProductLifecycleMenuItems product={product} onAction={lifecycle.requestAction} />}</DropdownMenuContent></DropdownMenu></div></td>
+              {!hiddenMasterColumns.includes('updated') ? <td className="px-4 py-3"><time dateTime={product.updated_at} className="whitespace-nowrap text-xs tabular-nums text-foreground" title={new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'long' }).format(new Date(product.updated_at))}><span className="block">{new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(product.updated_at))}</span><span className="mt-1 block text-muted-foreground">{new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZoneName: 'short' }).format(new Date(product.updated_at))}</span></time>{recentMasterIds.includes(product.id) && <span className="mt-1 block text-xs text-primary">Just updated</span>}</td> : null}
+              <td className="px-4 py-3"><div className="flex items-center justify-end gap-1">{dataIssue && new URLSearchParams(location.search).get('mode') !== 'viewer' ? <Button variant="outline" size="sm" className="h-8 whitespace-nowrap text-xs" aria-label={`${dataIssue.action} for ${product.name}`} onClick={() => navigate(getProductAttentionHref(product, getProductQuality(product).missing), { state: { from: `${location.pathname}${location.search}` } })}>{dataIssue.action}</Button> : null}<DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="size-10" aria-label={`More actions for ${product.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-60"><DropdownMenuItem onClick={() => navigate(`/products/${product.id}/edit`)}><Pencil className="size-4" />Edit master product</DropdownMenuItem><DropdownMenuItem onClick={() => navigate(`/products/${product.id}/channel-listings/new`)}><Layers3 className="size-4" />Create channel listings</DropdownMenuItem><DropdownMenuItem onClick={() => toast({ title: 'Product duplicated', description: `${product.name} copied as a draft.` })}><Copy className="size-4" />Duplicate master product</DropdownMenuItem><DropdownMenuSeparator />{new URLSearchParams(location.search).get('mode') !== 'viewer' && <ProductLifecycleMenuItems product={product} onAction={lifecycle.requestAction} />}</DropdownMenuContent></DropdownMenu></div></td>
             </> : <>
               <td className="px-4 py-3"><div className="flex items-center gap-2"><ChannelLogo channel={selectedListingChannel} /><div><p className="text-sm font-semibold text-slate-900">{matrix[listingChannel] === 'missing' ? 'Listing not created' : `${selectedListingChannel.shortLabel}-${product.sku_code}`}</p><p className="mt-1 text-xs text-slate-500">{matrix[listingChannel] === 'missing' ? `Create from Product Master` : 'Channel-owned content and offer'}</p></div></div></td>
               <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={cn('size-2.5 rounded-full', statusTone[matrix[listingChannel]])} /><span className="text-sm font-semibold text-slate-800">{statusLabel[matrix[listingChannel]]}</span></div><p className="mt-1 pl-[18px] text-xs text-slate-500">{matrix[listingChannel] === 'error' ? 'Action required before retry' : matrix[listingChannel] === 'pending' ? 'Waiting for channel processing' : matrix[listingChannel] === 'live' ? 'Live on the channel; Master sync is separate' : matrix[listingChannel] === 'draft' ? 'Saved locally — not sent' : matrix[listingChannel] === 'inactive' ? 'Not currently live on the channel' : matrix[listingChannel] === 'unconfirmed' ? 'Channel publication has not been confirmed' : 'Ready to configure'}</p></td>
@@ -662,15 +703,36 @@ export default function Products() {
         })}</tbody>
       </table></div></TooltipProvider>
 
-      {!isLoading && filtered.length === 0 ? <div className="grid min-h-56 place-items-center border-t border-slate-100 p-6 text-center"><div><AlertCircle className="mx-auto size-6 text-slate-400" /><p className="mt-3 text-sm font-semibold text-slate-900">No products match this view</p><p className="mt-1 text-xs text-slate-500">Try a different catalog view, search term, or filter.</p><Button variant="outline" size="sm" className="mt-4" onClick={clearCatalogFilters}><CircleDot className="size-3.5" />Clear filters</Button></div></div> : null}
-    </section>
+      {!isLoading && filtered.length === 0 ? <div className="grid min-h-56 place-items-center border-t border-slate-100 p-6 text-center"><div><AlertCircle className="mx-auto size-6 text-slate-400" /><p className="mt-3 text-sm font-semibold text-foreground">{products.length === 0 ? "No Product Masters yet" : "No products match this view"}</p><p className="mt-1 text-xs text-slate-500">{products.length === 0 ? "Use your existing shop listings or create a new product. Nothing is published automatically." : "Try a different catalog view, search term, or filter."}</p><Button variant="outline" size="sm" className="mt-4" onClick={products.length === 0 ? () => setCreateOpen(true) : clearCatalogFilters}><CircleDot className="size-3.5" />{products.length === 0 ? "Create your first product" : "Clear filters"}</Button>{products.length === 0 && <Button variant="ghost" className="mt-4 ml-2" onClick={() => openIntake()}>Use shop listings</Button>}</div></div> : null}
+    </section>}
 
-    {workspaceMode === 'master' && selectedIds.length > 0 ? <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-3xl flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl md:left-[17rem]"><span className="mr-auto px-2 text-sm font-semibold text-slate-800">{selectedProducts.length} selected</span><Button size="sm" onClick={() => runBulkAction('Validate Selected')}><CheckCircle2 className="size-4" />Validate</Button><Button size="sm" variant="outline" onClick={() => runBulkAction('Assign Category')}><Tags className="size-4" />Assign Category</Button><Button size="sm" variant="outline" onClick={() => navigate('/products/channel-listings')}><Layers3 className="size-4" />Create Listings</Button><Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => runBulkAction('Archive')}><Archive className="size-4" />Archive</Button></div> : null}
+    {workspaceMode === 'master' && introMode === 'catalog' && !intakeOpen && selectedIds.length > 0 ? <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-3xl flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl md:left-[17rem]"><span className="mr-auto px-2 text-sm font-semibold text-slate-800">{selectedProducts.length} selected</span><Button size="sm" onClick={() => runBulkAction('Validate Selected')}><CheckCircle2 className="size-4" />Validate</Button><Button size="sm" variant="outline" onClick={() => runBulkAction('Assign Category')}><Tags className="size-4" />Assign Category</Button><Button size="sm" variant="outline" onClick={() => navigate('/products/channel-listings')}><Layers3 className="size-4" />Create Listings</Button><Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => runBulkAction('Archive')}><Archive className="size-4" />Archive</Button></div> : null}
 
-    <Dialog open={Boolean(publishTarget)} onOpenChange={(open) => !open && setPublishTarget(null)}><DialogContent className="w-[calc(100vw-2rem)] max-w-xl overflow-hidden"><DialogHeader><DialogTitle>Publish Product Master?</DialogTitle><DialogDescription>Review the Product Master and what will change before publishing.</DialogDescription></DialogHeader>{publishTarget ? <div className="min-w-0 max-w-full space-y-3"><div className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border bg-muted/20 p-4"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg border bg-background">{publishTarget.images[0] ? <img src={publishTarget.images[0]} alt="" className="size-full object-cover" /> : <PackageX className="size-5 text-muted-foreground" />}</div><div className="min-w-0 flex-1 basis-52"><p className="truncate text-sm font-semibold">{publishTarget.name}</p><p className="mt-1 truncate font-mono text-xs text-muted-foreground">{publishTarget.sku_code}</p></div><div className="flex shrink-0 items-center gap-2 text-xs font-semibold"><Badge variant="outline">Ready</Badge><span className="text-muted-foreground">→</span><Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Active</Badge></div></div><div className="grid min-w-0 grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-4"><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Variants</p><p className="mt-1 text-sm font-semibold tabular-nums">{publishTarget.skus.length || 1}</p></div><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Base price</p><p className="mt-1 truncate text-sm font-semibold tabular-nums">{formatLocalizedMoney(locale, publishTarget.retail_price, publishTarget.price_currency)}</p></div><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Master ATS</p><p className="mt-1 text-sm font-semibold tabular-nums">{getStockSummary(publishTarget).available}</p></div><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Linked listings</p><p className="mt-1 text-sm font-semibold tabular-nums">{publishTarget.channels.length}</p></div></div><div className="flex min-w-0 gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4"><Info className="mt-0.5 size-5 shrink-0 text-sky-700" /><div className="min-w-0"><p className="text-sm font-semibold text-slate-900">Only the Product Master becomes active</p><p className="mt-1 text-xs leading-5 text-slate-600">Linked listings will not be changed. No new channel listings will be created or published.</p></div></div></div> : null}<DialogFooter className="gap-2"><Button variant="ghost" onClick={() => setPublishTarget(null)}>Cancel</Button><Button variant="outline" onClick={() => { if (!publishTarget) return; const productId = publishTarget.id; setPublishTarget(null); navigate(`/products/${productId}/edit`); }}><Pencil className="size-4" />Review &amp; edit</Button><Button onClick={confirmPublishMaster}><Send className="size-4" />Publish master</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(publishTarget)} onOpenChange={(open) => !open && setPublishTarget(null)}><DialogContent className="w-[calc(100vw-2rem)] max-w-xl overflow-hidden"><DialogHeader><DialogTitle>Activate Product Master?</DialogTitle><DialogDescription>Review the Product Master and what will change before publishing.</DialogDescription></DialogHeader>{publishTarget ? <div className="min-w-0 max-w-full space-y-3"><div className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border bg-muted/20 p-4"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg border bg-background">{publishTarget.images[0] ? <img src={publishTarget.images[0]} alt="" className="size-full object-cover" /> : <PackageX className="size-5 text-muted-foreground" />}</div><div className="min-w-0 flex-1 basis-52"><p className="truncate text-sm font-semibold">{publishTarget.name}</p><p className="mt-1 truncate font-mono text-xs text-muted-foreground">{publishTarget.sku_code}</p></div><div className="flex shrink-0 items-center gap-2 text-xs font-semibold"><Badge variant="outline">Ready</Badge><span className="text-muted-foreground">→</span><Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Active</Badge></div></div><div className="grid min-w-0 grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-4"><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Variants</p><p className="mt-1 text-sm font-semibold tabular-nums">{publishTarget.skus.length || 1}</p></div><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Base price</p><p className="mt-1 truncate text-sm font-semibold tabular-nums">{formatLocalizedMoney(locale, publishTarget.retail_price, publishTarget.price_currency)}</p></div><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Master ATS</p><p className="mt-1 text-sm font-semibold tabular-nums">{getStockSummary(publishTarget).available}</p></div><div className="min-w-0 bg-background p-3"><p className="truncate text-[11px] text-muted-foreground">Linked listings</p><p className="mt-1 text-sm font-semibold tabular-nums">{publishTarget.channels.length}</p></div></div><div className="flex min-w-0 gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4"><Info className="mt-0.5 size-5 shrink-0 text-sky-700" /><div className="min-w-0"><p className="text-sm font-semibold text-slate-900">Only the Product Master becomes active</p><p className="mt-1 text-xs leading-5 text-slate-600">Linked listings will not be changed. No new channel listings will be created or published.</p></div></div></div> : null}<DialogFooter className="gap-2"><Button variant="ghost" onClick={() => setPublishTarget(null)}>Cancel</Button><Button variant="outline" onClick={() => { if (!publishTarget) return; const productId = publishTarget.id; setPublishTarget(null); navigate(`/products/${productId}/edit`); }}><Pencil className="size-4" />Review &amp; edit</Button><Button onClick={confirmPublishMaster}><Send className="size-4" />Activate Master</Button></DialogFooter></DialogContent></Dialog>
+    <Sheet open={intakeOpen} onOpenChange={open => { if (open) setIntakeOpen(true); else if (intakeDirty) setDiscardIntake(true); else closeIntake(); }}>
+      <SheetContent className="flex w-full flex-col p-0 sm:max-w-[min(1120px,94vw)] motion-reduce:animate-none motion-reduce:transition-none" onCloseAutoFocus={event => {
+        event.preventDefault();
+        if (intakeReturnRef.current?.isConnected && intakeReturnRef.current !== document.body) intakeReturnRef.current.focus();
+        else catalogSearchRef.current?.focus();
+      }}>
+        <SheetHeader className="shrink-0 border-b px-6 py-5 pr-14 text-left"><div role="group" aria-label="Listing review header" className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2"><div className="min-w-0 flex-1 basis-72 space-y-2"><SheetTitle>{{ queue: 'Review shop listings', choose: 'Find a Product Master', compare: 'Compare product details', create: 'Create one Master', complete: 'Complete Product Master' }[intakeStage]}</SheetTitle><SheetDescription>{intakeStage === 'queue' ? 'Review imported shop listings and connect each to the right Product Master.' : intakeStage === 'choose' ? 'Choose one Master for the selected listings. Review each listing before confirming.' : intakeStage === 'compare' ? 'Same product? Confirm the link. Otherwise, choose another Master or create a new one.' : 'Complete required details here, then confirm to activate. Nothing is published to shops.'}</SheetDescription></div>{intakeStage === 'queue' && <div ref={setIntakeGuideActions} className="shrink-0" />}</div></SheetHeader>
+        <div className={intakeStage === 'queue' ? 'min-h-0 flex-1 overflow-y-auto p-4 sm:p-6' : 'min-h-0 flex-1 overflow-hidden'}>{intakeOpen && <ProductListingIntake stayInQueue guideActionContainer={intakeGuideActions} onDirtyChange={setIntakeDirty} onStageChange={setIntakeStage} onChanged={(ids, created) => { savedInIntake.current = created ? 'created' : 'linked'; setRecentMasterIds(ids); setStockRevision(value => value + 1); }} onOpenMaster={() => closeIntake()} />}</div>
+        {intakeStage === 'queue' && <div className="flex items-center justify-between gap-3 border-t px-6 py-4"><p className="text-sm text-muted-foreground" role="status">{pendingListings.length ? `${pendingListings.length} listing${pendingListings.length === 1 ? '' : 's'} left to review` : 'All listings reviewed'}</p><Button onClick={closeIntake}>Done</Button></div>}
+      </SheetContent>
+    </Sheet>
+    <AlertDialog open={discardIntake} onOpenChange={setDiscardIntake}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard unsaved details?</AlertDialogTitle><AlertDialogDescription>Closing this review discards your unsaved edits. Existing Master data and listing links stay unchanged.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={closeIntake}>Discard &amp; close</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {lifecycle.dialog}
-    <Dialog open={importOpen} onOpenChange={(open) => { setImportOpen(open); if (!open) setManualImportFileName(''); }}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Manual product import</DialogTitle><DialogDescription>Upload product or listing data. PrimeOS will validate each row, match it to existing Product Masters and create drafts only when needed.</DialogDescription></DialogHeader><div className="space-y-4"><label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 text-center transition-colors hover:border-primary hover:bg-primary/10 focus-within:ring-2 focus-within:ring-ring"><input type="file" accept=".csv,.xlsx,.xls,.json" className="sr-only" onChange={(event) => setManualImportFileName(event.target.files?.[0]?.name ?? '')} /><span className="grid size-10 place-items-center rounded-lg bg-background text-primary shadow-sm">{manualImportFileName ? <FileSpreadsheet className="size-5" /> : <Upload className="size-5" />}</span><p className="mt-3 text-sm font-semibold">{manualImportFileName || 'Choose an import file'}</p><p className="mt-1 text-xs text-muted-foreground">{manualImportFileName ? 'File received and ready for validation' : 'CSV, XLSX, XLS or JSON · one listing per row'}</p></label>{!manualImportFileName ? <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setManualImportFileName('product-listings-demo.xlsx')}><FileSpreadsheet className="size-4" />Use demo import file</Button> : null}<div className="rounded-xl border p-4"><p className="text-sm font-semibold">How PrimeOS will process the file</p><div className="mt-3 grid gap-3 sm:grid-cols-3">{[['1', 'Validate data', 'Check required fields and row format.'], ['2', 'Find matches', 'Link only high-confidence matches.'], ['3', 'Return results', 'Create drafts and flag risky cases.']].map(([step, title, detail]) => <div key={step} className="flex gap-2 sm:block"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{step}</span><div><p className="mt-0.5 text-xs font-semibold sm:mt-2">{title}</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">{detail}</p></div></div>)}</div></div>{manualImportFileName ? <div className="grid grid-cols-2 gap-3"><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold tabular-nums">{getCatalogImportItems().filter(item => item.resolution !== 'ignore' && item.status !== 'ignored').length}</p><p className="mt-1 text-xs text-muted-foreground">Rows detected</p></div><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold tabular-nums">{new Set(getCatalogImportItems().filter(item => item.resolution !== 'ignore' && item.status !== 'ignored').map(item => item.storeName)).size}</p><p className="mt-1 text-xs text-muted-foreground">Stores detected</p></div></div> : null}<div className="flex gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-900 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-100"><Info className="mt-0.5 size-5 shrink-0" /><div><p className="text-sm font-semibold">Master data is protected</p><p className="mt-1 text-xs leading-5 opacity-80">Safe matches are linked automatically. Missing data, identity risk and variant or pack conflicts remain visible for user review.</p></div></div></div><DialogFooter><Button variant="outline" onClick={() => { setImportOpen(false); setManualImportFileName(''); }}>Cancel</Button><Button disabled={!manualImportFileName} onClick={processManualImport}><Upload className="size-4" />Process import</Button></DialogFooter></DialogContent></Dialog>
-    <CreateProductDialog open={createOpen} onOpenChange={setCreateOpen} existingSkus={products.map((product) => product.sku_code)} onConfirm={createProductDraft} />
+    <Dialog open={importOpen} onOpenChange={(open) => { setImportOpen(open); if (!open) setManualImportFileName(''); }}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Manual product import</DialogTitle><DialogDescription>Prototype preview: choose a file to explore the sample review queue. File contents are not parsed or uploaded in this demo.</DialogDescription></DialogHeader><div className="space-y-4"><label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 text-center transition-colors hover:border-primary hover:bg-primary/10 focus-within:ring-2 focus-within:ring-ring"><input type="file" accept=".csv,.xlsx,.xls,.json" className="sr-only" onChange={(event) => setManualImportFileName(event.target.files?.[0]?.name ?? '')} /><span className="grid size-10 place-items-center rounded-lg bg-background text-primary shadow-sm">{manualImportFileName ? <FileSpreadsheet className="size-5" /> : <Upload className="size-5" />}</span><p className="mt-3 text-sm font-semibold">{manualImportFileName || 'Choose an import file'}</p><p className="mt-1 text-xs text-muted-foreground">{manualImportFileName ? 'File selected locally · sample review data only' : 'CSV, XLSX, XLS or JSON · one listing per row'}</p></label>{!manualImportFileName ? <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setManualImportFileName('product-listings-demo.xlsx')}><FileSpreadsheet className="size-4" />Use demo import file</Button> : null}<div className="rounded-xl border p-4"><p className="text-sm font-semibold">How PrimeOS will process the file</p><div className="mt-3 grid gap-3 sm:grid-cols-3">{[['1', 'Validate data', 'Check required fields and row format.'], ['2', 'Find matches', 'Suggest matches for your review.'], ['3', 'Return results', 'Choose a Master or create a draft.']].map(([step, title, detail]) => <div key={step} className="flex gap-2 sm:block"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{step}</span><div><p className="mt-0.5 text-xs font-semibold sm:mt-2">{title}</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">{detail}</p></div></div>)}</div></div>{manualImportFileName ? <div className="grid grid-cols-2 gap-3"><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold tabular-nums">{getCatalogImportItems().filter(item => item.resolution !== 'ignore' && item.status !== 'ignored').length}</p><p className="mt-1 text-xs text-muted-foreground">Sample listings</p></div><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold tabular-nums">{new Set(getCatalogImportItems().filter(item => item.resolution !== 'ignore' && item.status !== 'ignored').map(item => item.storeName)).size}</p><p className="mt-1 text-xs text-muted-foreground">Sample stores</p></div></div> : null}<div className="flex gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-900 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-100"><Info className="mt-0.5 size-5 shrink-0" /><div><p className="text-sm font-semibold">Master data is protected</p><p className="mt-1 text-xs leading-5 opacity-80">Review suggestions before linking or creating a Master. Shop content, prices and stock stay unchanged.</p></div></div></div><DialogFooter><Button variant="outline" onClick={() => { setImportOpen(false); setManualImportFileName(''); }}>Cancel</Button><Button disabled={!manualImportFileName} onClick={processManualImport}><Upload className="size-4" />Review sample listings</Button></DialogFooter></DialogContent></Dialog>
+    {connectOpen && <ConnectStoreWizardModal open onOpenChange={setConnectOpen} onConnected={(channel) => {
+      const params = new URLSearchParams(location.search);
+      params.delete('preview');
+      params.set('shop', channel.id);
+      params.set('getting-started', '1');
+      setIntakeOpen(false);
+      channelSetup.retry();
+      navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    }} />}
+    <CreateProductDialog open={createOpen} onOpenChange={setCreateOpen} existingSkus={products.flatMap(product => [product.sku_code, ...product.skus.map(sku => sku.sku_code)])} existingProducts={products} onOpenExisting={openProductDraft} onConfirm={createProductDraft} />
     <ProductStockDrawer product={stockTarget} onClose={() => setStockTarget(null)} onAdjustStock={(product, warehouseId) => setStockAdjustment({ product, warehouse: getWarehouses().find(warehouse => warehouse.id === warehouseId) })} />
     {stockAdjustment?.product && <AdjustWarehouseStockDialog target={stockAdjustment} products={[stockAdjustment.product]} warehouses={getWarehouses()} lockProduct onClose={() => setStockAdjustment(null)} onSaved={() => {
       setStockTarget(getProducts().find(product => product.id === stockAdjustment.product?.id) ?? null);

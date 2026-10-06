@@ -25,6 +25,7 @@ import BusinessSettings from "@/pages/BusinessSettings";
 import PricingRules from "@/pages/PricingRules";
 import InvoiceManagement from "@/pages/InvoiceManagement";
 import PromotionsManagement from "@/pages/PromotionsManagement";
+import PrimeWebWorkspace from "@/features/primeweb/PrimeWebWorkspace";
 import { TouchpointWorkspace } from "@/pages/TouchpointWorkspace";
 import ScheduledTasksPage from "@/pages/ScheduledTasks";
 import FinanceOps from "@/pages/FinanceOps";
@@ -93,11 +94,11 @@ export function PrimeRoutes() {
     <Route path="/overview" element={<PrimeGrowthOSPage />} />
     <Route path="/home" element={<PrimeGrowthOSPage />} />
     <Route path="/admin/dashboard" element={<PrimeGrowthOSPage />} />
-    <Route path="/builder" element={<Navigate to="/builder/theme" replace />} />
-    <Route path="/builder/*" element={<TouchpointWorkspace kind="primeweb" />} />
+    <Route path="/builder" element={<Navigate to="/builder/sites" replace />} />
+    <Route path="/builder/*" element={<PrimeWebWorkspace />} />
     <Route path="/pos" element={<Navigate to="/pos/register" replace />} />
     <Route path="/pos/*" element={<TouchpointWorkspace kind="pos" />} />
-    <Route path="/workspaces/primeweb" element={<Navigate to="/builder/theme" replace />} />
+    <Route path="/workspaces/primeweb" element={<Navigate to="/builder/sites" replace />} />
     <Route path="/workspaces/pos" element={<Navigate to="/pos/register" replace />} />
     <Route path="/client-reports" element={<PrimeClientReportsPage />} />
     <Route path="/prime-ai" element={<PrimeAiWorkspacePage />} />

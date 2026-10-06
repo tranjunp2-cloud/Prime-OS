@@ -57,7 +57,7 @@ describe('brands are immediately available to Product Master', () => {
     saveProductCatalogSettings({ ...settings, brands: settings.brands.map(item => item.id === brand.id ? brand : item) });
     updateProduct(id, { id, brand: brand.name, brandId: brand.id, import_sources: [], channel_overrides: { rakuten: { enabled: true, title: '', description: '', price_markup: 0, listing_sku: 'RKT-BRAND-TEST' } } });
     await mount('distribution');
-    fireEvent.click(screen.getByRole('button', { name: 'Manage listing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue setup' }));
     const drawer = within(screen.getByRole('dialog', { name: 'Rakuten listing' }));
     fireEvent.click(drawer.getByRole('button', { name: /Channel requirements/ }));
     expect(drawer.getByLabelText('Rakuten brand name')).toHaveValue('サイバーレコード');
@@ -70,9 +70,8 @@ describe('brands are immediately available to Product Master', () => {
     cleanup();
     await mount('distribution');
     fireEvent.click(screen.getByRole('button', { name: 'Manage listing' }));
-    const reopened = within(screen.getByRole('dialog', { name: 'Rakuten listing' }));
-    fireEvent.click(reopened.getByRole('button', { name: /Channel requirements/ }));
-    expect(reopened.getByLabelText('Rakuten brand name')).toHaveValue('Listing-only brand name');
+    const reopened = within(screen.getByRole('dialog', { name: 'Manage listing' }));
+    expect(reopened.getByLabelText('Brand')).toHaveValue('Listing-only brand name');
   });
 
   it('creates and selects an Active brand, then allows the publish review without verification', async () => {
@@ -88,8 +87,8 @@ describe('brands are immediately available to Product Master', () => {
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Brand created' }));
     expect(toastMock.mock.calls.some(([toast]) => toast.variant === 'destructive')).toBe(false);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish product', exact: true }));
-    expect(await screen.findByRole('dialog', { name: 'Publish this Product revision?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Activate Master', exact: true }));
+    expect(await screen.findByRole('dialog', { name: 'Activate this Product Master?' })).toBeInTheDocument();
     expect(getProductById(id)).toMatchObject({ brandId: brand.id, brand: brand.name, status: 'draft' });
   });
 
@@ -115,22 +114,23 @@ describe('brands are immediately available to Product Master', () => {
     updateProduct(id, { id, brand: brand.name, brandId: brand.id });
     await mount('distribution');
 
-    expect(screen.getByRole('button', { name: 'Publish product', exact: true })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Link another channel' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Activate Master', exact: true })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create listing' })).toBeEnabled();
     expect(screen.queryByText(/unverified|verify before publishing/i)).not.toBeInTheDocument();
     expect(getProductCatalogSettings().brands[0].mappings).toEqual(brand.mappings);
   });
 
-  it('still blocks publish and channel linking for missing product data', async () => {
+  it('blocks creating listings but allows linking existing listings for incomplete Masters', async () => {
     const brand = getProductCatalogSettings().brands[0];
     updateProduct(id, { id, brand: brand.name, brandId: brand.id, images: [] });
     await mount('distribution');
 
     expect(screen.getByRole('button', { name: 'Complete product', exact: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Link another channel' })).toHaveAttribute('aria-disabled', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Link another channel' }));
-    expect(screen.queryByRole('dialog', { name: 'Link sales channels' })).not.toBeInTheDocument();
-    expect(screen.getAllByText(/Add at least 3 product images/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Create listing' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Link existing listings' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create listing' }));
+    expect(screen.queryByRole('dialog', { name: 'Create channel listings' })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Add at least 1 product image/).length).toBeGreaterThan(0);
   });
 
   it('does not offer inactive brands in the picker', async () => {

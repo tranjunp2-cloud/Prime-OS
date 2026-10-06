@@ -1,4 +1,7 @@
 import { getProducts, type PricePolicy, type Product } from './product-store';
+import { getCatalogImportItems } from './catalog-import-store';
+import { configuredListing } from './product-channel-listings';
+import { resolveListingShopData } from './listing-shop-data';
 
 // Local prototype storage, like Product Master. No marketplace writes happen here.
 export const PRICING_STORAGE_KEY = 'primeos.pricing-rules.v1';
@@ -35,14 +38,16 @@ export function shopPricingId(platform: string, account: string) {
 }
 export function initialListingPricing(product: Product | null | undefined, key: string, account: string): ListingPricing {
   const stored = product?.channel_overrides?.[key as keyof NonNullable<Product['channel_overrides']>];
-  const source = product?.import_sources?.find(item => item.channel === (key === 'webstore' ? 'website' : key));
+  const channel = (key === 'webstore' ? 'website' : key) as Product['channels'][number]['channel'];
+  const listing = product && configuredListing(product.channels, channel, stored?.listing_sku || '');
+  const source = product && listing ? resolveListingShopData(product, listing, getCatalogImportItems({ requireConfirmation: true })) : undefined;
   const defaults: Record<string, string> = { webstore: 'VND', pos: 'VND', shopee: 'VND', lazada: 'MYR', amazon: 'JPY', rakuten: 'JPY', tiktok: 'VND' };
-  const currency = stored?.channel_currency || source?.currency || defaults[key] || product?.price_currency;
-  const price = stored?.channel_price ?? source?.price;
+  const currency = stored?.channel_currency || source?.price?.currency || defaults[key] || product?.price_currency;
+  const price = stored?.channel_price ?? (source?.price && source.price.currency === currency ? source.price.amount : undefined);
   const legacyManual = stored?.listing_mode === 'manual' && stored.price_markup > 0 ? stored.price_markup : undefined;
   const legacyMarkup = stored?.price_markup && product && currency === product.price_currency ? product.retail_price * (1 + stored.price_markup / 100) : undefined;
   const preservedPrice = price ?? legacyManual ?? legacyMarkup;
-  const label = stored?.pricing_shop_label || source?.store || account;
+  const label = stored?.pricing_shop_label || source?.shop || account;
   return {
     pricing_shop_id: stored?.pricing_shop_id || shopPricingId(key, label), pricing_shop_label: label,
     pricing_source: stored?.pricing_source || (preservedPrice != null ? 'manual' : 'shop'),

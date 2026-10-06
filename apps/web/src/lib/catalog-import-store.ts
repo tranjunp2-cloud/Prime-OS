@@ -1,14 +1,22 @@
+import type { ChannelListing, ListingDraftValues, ShopListingSnapshot } from './product-store';
+
 export type ImportMatchStatus = 'matched' | 'suggested' | 'unmatched' | 'conflict' | 'ignored';
 export type ImportResolution = 'link' | 'create' | 'later' | 'ignore';
 
 export interface CatalogImportItem {
   id: string;
-  channel: 'shopee' | 'amazon' | 'lazada';
+  channel: ChannelListing['channel'];
   storeName: string;
   title: string;
   channelSku: string;
   listingId: string;
   image: string;
+  /** Source data only. Missing gallery/content is completed explicitly by the seller. */
+  images?: string[];
+  description?: string;
+  variantItems?: ShopListingSnapshot['variant_items'];
+  shipping?: ListingDraftValues['shipping'];
+  channelSettings?: ListingDraftValues['channel_settings'];
   variants: number;
   channelStock: number;
   channelCategory: string;
@@ -22,6 +30,16 @@ export interface CatalogImportItem {
   confirmed?: boolean;
   /** Brand name as reported by the channel listing. Used for auto-resolve on import. */
   brand?: string;
+  /** Optional identity evidence from the source; never inferred from the title. */
+  modelNumber?: string;
+  mpn?: string;
+  gtin?: string;
+  packQuantity?: number;
+  listingUrl?: string;
+  /** Actual retrieval time supplied by the importer, not the mapping confirmation time. */
+  retrievedAt?: string;
+  /** Existing relationships are reviewed in place, never detached merely by opening the inbox. */
+  existingLinkReview?: { productId: string; key: string; issues: string[]; signature: string };
   /**
    * Shipping dimensions as reported by the channel listing (fill-if-empty on import).
    * Units: cm for length/width/height, grams for weight.
@@ -79,8 +97,11 @@ const defaults: CatalogImportItem[] = [
   { id: 'imp-034', channel: 'amazon', storeName: 'Prime Beauty US', title: 'Artist Precision Paint Brush Set 12 Pieces Exact', channelSku: 'AMZ-BSH-SET-12-EX', listingId: 'B0GBRUSH34', image: '/images/products/B0G432Z33K/1.jpg', variants: 1, channelStock: 29, channelCategory: 'Arts, Crafts & Sewing > Brushes', price: 34, currency: 'USD', status: 'matched', confidence: 100, suggestedProductId: 'prod_003', resolution: 'link', resolvedProductId: 'prod_003', brand: 'Da Vinci' },
 ];
 
-export function getCatalogImportItems(): CatalogImportItem[] {
+export function getCatalogImportItems(options: { requireConfirmation?: boolean } = {}): CatalogImportItem[] {
   const normalize = (item: CatalogImportItem): CatalogImportItem => {
+    // The intake workspace only reads suggestions. Never confirm on page load,
+    // and never replace a user's chosen Master with an older suggestion.
+    if (options.requireConfirmation || item.confirmed) return { ...item };
     const safeCandidate = Boolean(item.suggestedProductId)
       && (item.status === 'matched' || item.status === 'suggested')
       && item.confidence >= AUTO_SYNC_THRESHOLD

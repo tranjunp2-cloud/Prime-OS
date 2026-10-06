@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { getProductAttentionHref, getProductAttentionTarget } from './product-attention-navigation';
 
 describe('catalog attention badge navigation', () => {
-  it.each(['Product identity mismatch', 'Variant structure conflict'])('opens import review for %s', issue => {
+  it.each(['Product identity mismatch', 'Variant structure conflict'])('keeps mapping review out of Master data navigation for %s', issue => {
     expect(getProductAttentionHref({ id: 'import-review', import_result: 'needs_review', import_issues: [issue] }))
-      .toBe('/products/import-review/edit?section=overview&focus=import-review');
+      .toBe('/products/import-review/edit');
   });
 
   it('opens the missing imported image rather than an unrelated missing GTIN', () => {
@@ -33,9 +33,9 @@ describe('catalog attention badge navigation', () => {
       .toBe('/products/import/edit?section=product-data&focus=basic');
   });
 
-  it.each(['ready', 'published', 'matched'] as const)('keeps normal navigation for %s imports', import_result => {
+  it.each(['ready', 'published', 'matched'] as const)('opens missing data for %s imports independently from mapping', import_result => {
     expect(getProductAttentionHref({ id: 'ready', import_result }, ['Product image']))
-      .toBe('/products/ready/edit');
+      .toBe('/products/ready/edit?section=product-data&focus=media');
   });
 
   it('ignores invalid focus parameters and safely encodes product ids', () => {

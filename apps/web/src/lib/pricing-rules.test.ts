@@ -86,7 +86,11 @@ describe('shared shop pricing', () => {
     expect(getProductById('pricing-test')?.price_policies).toHaveLength(1);
   });
   it('preserves imported price and actual shop, never assumes another shop on the platform', () => {
-    const product = { ...seed, channel_overrides: {}, import_sources: [{ channel: 'amazon' as const, store: 'US Store', currency: 'USD', price: 34, brand: '' }] };
+    const product = { ...seed, channels: [{ channel: 'amazon' as const, store_name: 'US Store', external_id: 'listing-us', status: 'active' as const, listing_url: null, last_synced_at: null }], channel_overrides: {}, import_sources: [{ channel: 'amazon' as const, store: 'US Store', currency: 'USD', price: 34, brand: '' }] };
     expect(initialListingPricing(product, 'amazon', 'Japan Store')).toMatchObject({ pricing_shop_id: 'amazon:us store', channel_price: 34, channel_currency: 'USD', pricing_source: 'manual' });
+    const ambiguous = { ...product, channels: [...product.channels, { ...product.channels[0], external_id: 'another-listing' }] };
+    expect(initialListingPricing(ambiguous, 'amazon', 'Japan Store').channel_price).toBeUndefined();
+    const differentCurrency = { ...product, channel_overrides: { amazon: { enabled: true, title: '', description: '', price_markup: 0, channel_currency: 'JPY' } } };
+    expect(initialListingPricing(differentCurrency, 'amazon', 'Japan Store').channel_price).toBeUndefined();
   });
 });

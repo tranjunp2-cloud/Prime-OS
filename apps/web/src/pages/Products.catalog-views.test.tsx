@@ -29,14 +29,14 @@ beforeEach(() => {
   const category = { ...settings.categories[0], id: 'catalog-tab-fixture', name: 'Catalog fixture category', parentId: null, status: 'Active' as const, attributes: [] };
   saveProductCatalogSettings({ ...settings, categories: [...settings.categories, category] });
   const base: Product = { ...getProducts()[0], id: '', name: '', sku_code: '', category: category.name, categoryId: category.id,
-    status: 'draft', has_variants: false, product_type: 'single', images: ['/one.jpg', '/two.jpg', '/three.jpg'],
+    status: 'draft', has_variants: false, product_type: 'single', images: ['/one.jpg'],
     description: 'Complete catalog product description. '.repeat(5), retail_price: 1000, inventory: { wh_crjp: 100 },
     skus: [], variant_options: [], specifications: [], channels: [], channel_overrides: {},
     pkg_length: 10, pkg_width: 10, pkg_height: 10, pkg_weight: 100,
     import_result: undefined, import_source: undefined, import_sources: [], import_issues: [], revisions: [] };
   const listing = { channel: 'shopee' as const, external_id: 'SHO-TAB-FIXTURE', status: 'active' as const, listing_url: null, last_synced_at: null };
   const cases: Record<string, Partial<Product>> = {
-    ready: {}, missing: { images: ['/one.jpg'], inventory: { wh_crjp: 0 } },
+    ready: {}, missing: { images: [], inventory: { wh_crjp: 0 } },
     active: { status: 'published', import_result: 'published' },
     imported: { status: 'published', import_result: 'published', import_source: 'Shopee · Test Store VN', channels: [listing] },
     review: { status: 'review', import_result: 'needs_review', import_issues: ['Confirm mapping'] },
@@ -82,7 +82,7 @@ describe('Seller catalog tabs and scoped filters', () => {
     const position = (key: string) => hrefs.indexOf(`/products/${fixtures[key].id}/edit`);
     expect(position('activeStock')).toBeLessThan(position('activeIssue'));
     expect(position('activeIssue')).toBeLessThan(position('review'));
-    expect(position('review')).toBeLessThan(position('missing'));
+    expect(position('missing')).toBeLessThan(position('review'));
     expect(position('missing')).toBeLessThan(position('ready'));
     expect(within(rowLink('activeIssue')!.closest('tr')!).getByText('Active', { exact: true })).toBeVisible();
     const draftRow = within(rowLink('ready')!.closest('tr')!);
@@ -146,12 +146,12 @@ describe('Seller catalog tabs and scoped filters', () => {
     expect(within(rowLink('active')!.closest('tr')!).queryByRole('button', { name: /^Imported/ })).not.toBeInTheDocument();
   });
 
-  it('Draft filters ready-to-publish and missing fields with no published or review false positives', async () => {
+  it('Draft readiness depends on Master data, not listing mapping review', async () => {
     await mount(); openDrafts();
     expect(screen.getAllByRole('link', { name: /^Open Product Master details for/ })).toHaveLength(3);
     expect(within(rowLink('review')!.closest('tr')!).getByText('Draft', { exact: true })).toBeVisible();
     fireEvent.change(screen.getByLabelText('Draft readiness'), { target: { value: 'ready' } });
-    expect(rowLink('ready')).toBeVisible(); expect(rowLink('missing')).not.toBeInTheDocument(); expect(rowLink('review')).not.toBeInTheDocument();
+    expect(rowLink('ready')).toBeVisible(); expect(rowLink('missing')).not.toBeInTheDocument(); expect(rowLink('review')).toBeVisible();
     fireEvent.change(screen.getByLabelText('Draft readiness'), { target: { value: 'incomplete' } });
     expect(rowLink('missing')).toBeVisible(); expect(rowLink('ready')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Remove readiness filter' }));
@@ -203,8 +203,8 @@ describe('Seller catalog tabs and scoped filters', () => {
     fireEvent.change(screen.getByLabelText('Draft readiness'), { target: { value: 'ready' } });
     fireEvent.click(rowLink('ready')!);
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
-    expect(screen.getByRole('progressbar', { name: '100% of product requirements complete' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Publish product' })).toBeEnabled();
+    expect(screen.queryByRole('heading', { name: /Product readiness/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Activate Master' })).toBeEnabled();
   });
 
   it('refreshes readiness when returning after catalog requirements change', async () => {

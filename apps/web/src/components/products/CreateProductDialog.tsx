@@ -9,6 +9,7 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@
 import { cn } from '@/lib/utils';
 import type { ProductType } from '@/lib/product-store';
 import { getProductCatalogSettings, type CatalogCategory } from '@/lib/product-catalog-settings-store';
+import { suggestMasterSku } from '@/lib/product-onboarding';
 
 export interface CreateProductDraftInput {
   sku: string;
@@ -23,6 +24,8 @@ interface CreateProductDialogProps {
   onOpenChange: (open: boolean) => void;
   existingSkus: string[];
   onConfirm: (input: CreateProductDraftInput) => void;
+  existingProducts?: Array<{ id: string; name: string; sku_code: string }>;
+  onOpenExisting?: (id: string) => void;
 }
 
 function categoryPath(category: CatalogCategory, categories: CatalogCategory[]) {
@@ -40,22 +43,23 @@ function categoryPath(category: CatalogCategory, categories: CatalogCategory[]) 
 }
 
 const productTypes: Array<{ value: ProductType; label: string; description: string; icon: typeof Package }> = [
-  { value: 'single', label: 'Single', description: 'One sellable SKU.', icon: Package },
-  { value: 'variant', label: 'Configurable', description: 'Parent with variant SKUs.', icon: Layers3 },
+  { value: 'single', label: 'Single product', description: 'One version of this product.', icon: Package },
+  { value: 'variant', label: 'With variants', description: 'Different colors, sizes or other options.', icon: Layers3 },
 ];
 
-export function CreateProductDialog({ open, onOpenChange, existingSkus, onConfirm }: CreateProductDialogProps) {
+export function CreateProductDialog({ open, onOpenChange, existingSkus, onConfirm, existingProducts = [], onOpenExisting }: CreateProductDialogProps) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [productType, setProductType] = useState<ProductType>('single');
   const [categoryId, setCategoryId] = useState('');
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [errors, setErrors] = useState<{ sku?: string; name?: string; category?: string }>({});
+  const [errors, setErrors] = useState<{ sku?: string; name?: string; category?: string; save?: string }>({});
   const categories = getProductCatalogSettings().categories;
   const categoryOptions = categories.filter(category => category.status === 'Active')
     .map(category => ({ ...category, path: categoryPath(category, categories) }))
     .sort((a, b) => a.path.localeCompare(b.path));
   const selectedCategory = categoryOptions.find(category => category.id === categoryId);
+  const similarProducts = name.trim().length >= 3 ? existingProducts.filter(product => product.name.toLowerCase().includes(name.trim().toLowerCase())).slice(0, 3) : [];
 
   useEffect(() => {
     if (open) return;
@@ -71,16 +75,18 @@ export function CreateProductDialog({ open, onOpenChange, existingSkus, onConfir
     const category = getProductCatalogSettings().categories.find(item => item.id === categoryId && item.status === 'Active');
     if (categoryId && !category) nextErrors.category = 'This category is no longer available. Choose another or clear it to continue.';
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; }
-    onConfirm({ sku: normalizedSku, name: name.trim(), productType, category: category?.name ?? '', categoryId: category?.id });
+    try {
+      onConfirm({ sku: normalizedSku, name: name.trim(), productType, category: category?.name ?? '', categoryId: category?.id });
+    } catch (reason) {
+      setErrors({ save: reason instanceof Error ? reason.message : 'Could not save this draft. Try again.' });
+    }
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-xl">
-    <DialogHeader className="shrink-0"><DialogTitle>Create Product Master draft</DialogTitle><DialogDescription>Add the product identity and category. Complete the remaining details after creating your draft.</DialogDescription></DialogHeader>
+    <DialogHeader className="shrink-0"><DialogTitle>Create Product Master draft</DialogTitle><DialogDescription>Start with the basics. Your draft is saved before you add images, pricing and other details.</DialogDescription></DialogHeader>
     <div className="min-h-0 space-y-5 overflow-y-auto px-1 py-2 -mx-1">
-      <div className="space-y-2"><Label>Product structure <span className="text-destructive">*</span></Label><div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Product structure">{productTypes.map(option => { const Icon = option.icon; const selected = productType === option.value; return <button key={option.value} type="button" role="radio" aria-checked={selected} onClick={() => setProductType(option.value)} className={cn('relative min-h-24 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/30')}><span className={cn('grid size-8 place-items-center rounded-md', selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}><Icon className="size-4" /></span><span className="mt-2 block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">{option.description}</span>{selected && <Check className="absolute right-3 top-3 size-4 text-primary" />}</button>; })}</div></div>
       <div className="grid gap-4">
-        <div className="space-y-1.5"><Label htmlFor="quick-create-sku">Master SKU <span className="text-destructive">*</span></Label><Input id="quick-create-sku" autoFocus value={sku} onChange={event => { setSku(event.target.value.toUpperCase()); setErrors(current => ({ ...current, sku: undefined })); }} onKeyDown={event => { if (event.key === 'Enter') submit(); }} placeholder="e.g. SKU-0001" className="font-mono uppercase" maxLength={30} aria-invalid={Boolean(errors.sku)} />{errors.sku ? <p role="alert" className="text-xs text-destructive">{errors.sku}</p> : <p className="text-xs text-muted-foreground">Permanent internal identity for this product.</p>}</div>
-        <div className="space-y-1.5"><Label htmlFor="quick-create-name">Product name <span className="text-destructive">*</span></Label><Input id="quick-create-name" value={name} onChange={event => { setName(event.target.value); setErrors(current => ({ ...current, name: undefined })); }} onKeyDown={event => { if (event.key === 'Enter') submit(); }} placeholder="e.g. Classic Leather Sneakers" maxLength={160} aria-invalid={Boolean(errors.name)} />{errors.name ? <p role="alert" className="text-xs text-destructive">{errors.name}</p> : <p className="text-xs text-muted-foreground">Used to identify the draft in Product Master.</p>}</div>
+        <div className="space-y-1.5"><Label htmlFor="quick-create-name">Product name <span className="text-destructive">*</span></Label><Input id="quick-create-name" autoFocus value={name} onChange={event => { setName(event.target.value); setErrors(current => ({ ...current, name: undefined })); }} onKeyDown={event => { if (event.key === 'Enter') submit(); }} placeholder="e.g. Classic Leather Sneakers" maxLength={160} aria-invalid={Boolean(errors.name)} />{errors.name ? <p role="alert" className="text-xs text-destructive">{errors.name}</p> : <p className="text-xs text-muted-foreground">Used to identify the draft in Product Master.</p>}</div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <Label id="quick-create-category-label" htmlFor="quick-create-category">Category <span className="font-normal text-muted-foreground">(optional)</span></Label>
@@ -108,9 +114,13 @@ export function CreateProductDialog({ open, onOpenChange, existingSkus, onConfir
             {errors.category || (categoryOptions.length ? 'Sets the product attributes. You can choose or change it later.' : 'No active categories yet. Add one in Catalog settings and assign it later.')}
           </p>
         </div>
+      <div className="space-y-2"><Label>Product type <span className="text-destructive">*</span></Label><div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Product structure">{productTypes.map(option => { const Icon = option.icon; const selected = productType === option.value; return <button key={option.value} type="button" role="radio" aria-checked={selected} onClick={() => setProductType(option.value)} className={cn('relative min-h-24 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/30')}><span className={cn('grid size-8 place-items-center rounded-md', selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}><Icon className="size-4" /></span><span className="mt-2 block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">{option.description}</span>{selected && <Check className="absolute right-3 top-3 size-4 text-primary" />}</button>; })}</div></div>
+        <div className="space-y-1.5"><div className="flex items-center justify-between"><Label htmlFor="quick-create-sku">Master SKU <span className="text-destructive">*</span></Label><Button type="button" variant="ghost" size="sm" onClick={() => { setSku(suggestMasterSku(existingSkus)); setErrors(current => ({ ...current, sku: undefined })); }}>Generate SKU</Button></div><Input id="quick-create-sku" value={sku} onChange={event => { setSku(event.target.value.toUpperCase()); setErrors(current => ({ ...current, sku: undefined })); }} onKeyDown={event => { if (event.key === 'Enter') submit(); }} placeholder="e.g. SKU-0001" className="font-mono uppercase" maxLength={30} aria-invalid={Boolean(errors.sku)} />{errors.sku ? <p role="alert" className="text-xs text-destructive">{errors.sku}</p> : <p className="text-xs text-muted-foreground">Internal product code, separate from each shop SKU.</p>}</div>
       </div>
-      <p className="text-xs leading-5 text-muted-foreground"><strong className="font-medium text-foreground">Next:</strong> complete product details, pricing and inventory in Product Editor. Link sales channels when ready.</p>
+      <p className="text-xs leading-5 text-muted-foreground"><strong className="font-medium text-foreground">Next:</strong> complete the remaining details. Nothing is published to a shop. You can save and leave at any time.</p>
+      {similarProducts.length > 0 && <div className="rounded-lg border bg-muted/20 p-3"><p className="text-xs font-medium">A similar product may already exist</p>{similarProducts.map(product => <Button key={product.id} variant="link" className="h-auto min-h-10 justify-start whitespace-normal px-0 text-left text-xs" onClick={() => onOpenExisting?.(product.id)} disabled={!onOpenExisting}>{product.name} · {product.sku_code}</Button>)}</div>}
     </div>
+    {errors.save && <p role="alert" className="text-sm text-destructive">{errors.save}</p>}
     <DialogFooter className="shrink-0"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="button" onClick={submit} disabled={!sku.trim() || name.trim().length < 3}>Create draft &amp; continue</Button></DialogFooter>
   </DialogContent></Dialog>;
 }

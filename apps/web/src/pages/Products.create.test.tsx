@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe('Manual Product Master creation', () => {
-  it.each(['Single', 'Configurable'])('persists category and loads its attributes in the %s editor without publishing', async structure => {
+  it.each(['Single product', 'With variants'])('persists category and loads its attributes in the %s editor without publishing', async structure => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Routes>
       <Route path="/products/master-catalog" element={<Products />} />
       <Route path="/products/:id/edit" element={<ProductCreatePage />} />
@@ -44,7 +44,7 @@ describe('Manual Product Master creation', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Create draft & continue' }));
 
     const product = getProducts().find(item => item.sku_code === testSku)!;
-    expect(product).toMatchObject({ category: 'Art Supplies', categoryId: 'art-supplies', status: 'draft', product_type: structure === 'Single' ? 'single' : 'variant', has_variants: structure === 'Configurable', channels: [] });
+    expect(product).toMatchObject({ category: 'Art Supplies', categoryId: 'art-supplies', status: 'draft', product_type: structure === 'Single product' ? 'single' : 'variant', has_variants: structure === 'With variants', channels: [] });
     fireEvent.click(await screen.findByRole('button', { name: /^Product dataIdentity, content and media$/ }));
     expect(document.getElementById('product-category-trigger')).toHaveTextContent('Art Supplies');
     expect(screen.getByText('Office & Creative / Stationery / Art Supplies')).toBeVisible();

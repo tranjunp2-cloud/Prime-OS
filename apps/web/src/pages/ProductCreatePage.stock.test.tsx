@@ -23,7 +23,7 @@ function record(value: string) {
   fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
   fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
 }
-function saveMetadata() { fireEvent.click(screen.getByRole('button', { name: /^(Publish updates|Publish product|Complete product)$/ })); }
+function saveMetadata() { fireEvent.click(screen.getByRole('button', { name: /^(Update Master|Activate Master|Complete product)$/ })); }
 beforeEach(() => {
   clearInventoryStore();
   window.localStorage.removeItem(STOCK_HOLD_STORAGE_KEY);

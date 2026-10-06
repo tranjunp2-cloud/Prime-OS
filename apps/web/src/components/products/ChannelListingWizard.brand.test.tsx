@@ -14,26 +14,28 @@ function Harness({ brand = '', enabled = true }: { brand?: string; enabled?: boo
 
 afterEach(cleanup);
 describe('Rakuten listing brand suggestion', () => {
-  it('prefills an enabled empty draft and allows editing without a fake authorization blocker', () => {
+  it('prefills a selected empty draft and allows editing without a fake authorization blocker', () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 channel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Test shop · Rakuten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 shop' }));
     expect(screen.getByLabelText('Rakuten brand name')).toHaveValue('サイバーレコード');
     fireEvent.change(screen.getByLabelText('Rakuten brand name'), { target: { value: 'Listing-only name' } });
     expect(screen.getByLabelText('Rakuten brand name')).toHaveValue('Listing-only name');
-    expect(screen.getByRole('button', { name: 'Review channel changes' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Review new listings' })).toBeEnabled();
     expect(screen.queryByText(/Approval required|Set in listing/)).not.toBeInTheDocument();
   });
 
   it('does not overwrite an existing listing name', () => {
     render(<Harness brand="Existing listing name" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 channel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Test shop · Rakuten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 shop' }));
     expect(screen.getByLabelText('Rakuten brand name')).toHaveValue('Existing listing name');
   });
 
   it('prefills the name when a new channel is selected', () => {
     render(<Harness enabled={false} />);
-    fireEvent.click(screen.getByRole('button', { name: /^RakutenTest shop/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 channel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Test shop · Rakuten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set up 1 shop' }));
     expect(screen.getByLabelText('Rakuten brand name')).toHaveValue('サイバーレコード');
   });
 });
