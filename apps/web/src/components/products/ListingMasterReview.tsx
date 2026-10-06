@@ -23,6 +23,7 @@ type Props = {
   listings: CatalogImportItem[];
   initialMode: 'existing' | 'new';
   onBack: () => void;
+  backLabel?: string;
   remainingCount?: number;
   onStageChange?: (stage: IntakeStage) => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -44,7 +45,7 @@ const evidenceStyles: Record<EvidenceState, { label: string; className: string; 
   check: { label: 'SKU review needed', className: 'text-amber-700 dark:text-amber-300', Icon: TriangleAlert },
 };
 
-export function ListingMasterReview({ listings, initialMode, onBack, remainingCount, onStageChange, onDirtyChange, onSaved }: Props) {
+export function ListingMasterReview({ listings, initialMode, onBack, backLabel = 'Back to listings', remainingCount, onStageChange, onDirtyChange, onSaved }: Props) {
   // Keep reviewed values stable while the seller is comparing. Saving checks a fresh snapshot.
   const [sources] = useState(() => structuredClone(listings));
   const [mode, setMode] = useState(initialMode);
@@ -94,6 +95,7 @@ export function ListingMasterReview({ listings, initialMode, onBack, remainingCo
     || (item.variants > 1 && !master.has_variants && master.product_type !== 'variant')));
   const unknownStructure = sources.some(item => item.variants === 0);
   const existingLinks = sources.filter(item => item.existingLinkReview);
+  const confirmLabel = existingLinks.length ? existingLinks.every(item => item.existingLinkReview?.productId === master?.id) ? 'Confirm mapping' : 'Move to this Master' : 'Link to this Master';
   const newBlocked = sources.length > 1 && (sources.some(item => item.variants > 1) || (mode === 'new' && draft.productType === 'variant'));
   const reviewedCount = reviewedIds.length;
   const mappingError = master ? variantMappingError([current], master, mappings, verifiedSingles) : '';
@@ -186,7 +188,7 @@ export function ListingMasterReview({ listings, initialMode, onBack, remainingCo
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     <h2 ref={heading} tabIndex={-1} className="sr-only">{title}</h2>
     <div ref={scrollArea} className={`min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${stage === 'choose' ? 'space-y-4' : 'space-y-6'}`}>
-      <Button variant="ghost" className="-ml-3 h-11" onClick={() => dirty ? setDiscardBack(true) : onBack()}><ArrowLeft className="size-4" />Back to listings</Button>
+      <Button variant="ghost" className="-ml-3 h-11" onClick={() => dirty ? setDiscardBack(true) : onBack()}><ArrowLeft className="size-4" />{backLabel}</Button>
       {stage !== 'complete' && existingLinks.length > 0 && <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><p className="font-medium">Review an existing link</p><p>{[...new Set(existingLinks.flatMap(item => item.existingLinkReview!.issues))].join(' · ')}</p><p className="text-muted-foreground">The current link is unchanged until you confirm. Choosing another Master or creating a new Master moves only the selected links; Master stock is not transferred.</p></div>}
 
       {sources.length > 1 && (stage === 'choose' || stage === 'compare') && <SelectedListingsOverview listings={sources} activeIndex={stage === 'compare' ? sourceIndex : undefined} reviewedIds={reviewedIds} onView={stage === 'compare' ? changeSource : undefined} />}
@@ -277,7 +279,7 @@ export function ListingMasterReview({ listings, initialMode, onBack, remainingCo
       {stage !== 'choose' && <div className="flex flex-wrap justify-end gap-2">
         {stage === 'compare' && <><Button variant="outline" className="h-11" onClick={chooseAnother}>Choose another Master</Button><Button variant="outline" className="h-11" disabled={newBlocked} onClick={createNewMaster}><Plus className="size-4" />Create new Master</Button></>}
         {stage === 'complete' && <Button variant="outline" className="h-11" onClick={() => { setCompleting(false); setError(''); }}>Back to review</Button>}
-        <Button className="h-11" disabled={stage === 'complete' ? !completion || Boolean(completionError) || !mediaReady : !canSave} onClick={save}>{stage === 'complete' ? 'Create & activate Master' : stage === 'create' ? 'Continue to details' : sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Review next listing' : 'Link to this Master'}<ArrowRight className="size-4" /></Button>
+        <Button className="h-11" disabled={stage === 'complete' ? !completion || Boolean(completionError) || !mediaReady : !canSave} onClick={save}>{stage === 'complete' ? 'Create & activate Master' : stage === 'create' ? 'Continue to details' : sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Review next listing' : confirmLabel}<ArrowRight className="size-4" /></Button>
       </div>}
     </div>
     <Dialog open={Boolean(zoom)} onOpenChange={open => { if (!open) setZoom(null); }}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Product image</DialogTitle><DialogDescription>{zoom?.name}</DialogDescription></DialogHeader>{zoom && <img src={zoom.src} alt={zoom.name} className="max-h-[65vh] w-full object-contain" />}</DialogContent></Dialog>

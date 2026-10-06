@@ -14,8 +14,9 @@ vi.mock('@/lib/i18n/I18nContext', () => ({ useI18n: () => ({ locale: 'en-US', t:
 
 let id: string;
 let product: Product;
-async function mount() {
-  render(<MemoryRouter initialEntries={[`/products/${id}/edit?section=distribution`]}><Routes><Route path="/products/:id/edit" element={<ProductCreatePage />} /></Routes></MemoryRouter>);
+async function mount(withScrollContainer = false) {
+  const editor = <MemoryRouter initialEntries={[`/products/${id}/edit?section=distribution`]}><Routes><Route path="/products/:id/edit" element={<ProductCreatePage />} /></Routes></MemoryRouter>;
+  render(withScrollContainer ? <main id="main-content">{editor}</main> : editor);
   // Let the editor establish its saved baseline before interacting.
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
 }
@@ -357,28 +358,87 @@ describe('Publishing Product Master without channel listings', () => {
     fireEvent.change(screen.getByLabelText('Sales period'), { target: { value: '7' } });
     expect(JSON.stringify(getProductById(id))).toBe(before);
   });
-  it('moves import provenance into on-demand help and never renders an empty Source banner', async () => {
-    updateProduct(id, { id, import_result: 'incomplete', import_source: undefined });
+  it.each([undefined, 'Lazada · Prime Flagship Store'])('keeps import source %s in Overview without a banner on any workspace', async source => {
+    updateProduct(id, { id, status: 'published', import_result: 'published', import_source: source });
     await mount();
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product editor workspaces' })).getByRole('button', { name: 'Overview' }));
-    expect(screen.queryByText('Imported product data')).not.toBeInTheDocument();
-    expect(screen.getByText('Source: Not recorded')).toBeVisible();
+    const before = JSON.stringify(getProductById(id));
+    const navigation = within(screen.getByRole('navigation', { name: 'Product editor workspaces' }));
+    for (const workspace of ['Product data', 'Pricing & Inventory', 'Channel listings', 'Activity history', 'Overview']) {
+      fireEvent.click(navigation.getByRole('button', { name: workspace }));
+      expect(screen.queryByText('Imported product data')).not.toBeInTheDocument();
+      expect(screen.queryByText('Complete missing master data')).not.toBeInTheDocument();
+      expect(document.getElementById('product-import-review')).toBeNull();
+    }
+    expect(screen.getByText(`Source: ${source ?? 'Not recorded'}`)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Product source' }));
+    expect(within(screen.getByRole('dialog', { name: 'Product source' })).getByText(source ? `Source: ${source}` : 'Source not recorded')).toBeVisible();
+    expect(JSON.stringify(getProductById(id))).toBe(before);
+  });
+  it('uses readiness for incomplete imported data without repeating an import warning', async () => {
+    updateProduct(id, { id, import_result: 'incomplete', import_source: undefined, images: [], image_url: null, import_issues: ['Product image is required'] });
+    await mount();
+    const before = JSON.stringify(getProductById(id));
+    const navigation = within(screen.getByRole('navigation', { name: 'Product editor workspaces' }));
+    for (const workspace of ['Product data', 'Pricing & Inventory', 'Channel listings', 'Overview']) {
+      fireEvent.click(navigation.getByRole('button', { name: workspace }));
+      expect(screen.queryByText('Imported product data')).not.toBeInTheDocument();
+      expect(screen.queryByText('Complete missing master data')).not.toBeInTheDocument();
+      expect(screen.getAllByRole('region', { name: 'Product readiness' })).toHaveLength(1);
+      expect(screen.getByRole('region', { name: 'Product readiness' })).toHaveTextContent('Add at least 1 product image');
+    }
     fireEvent.click(screen.getByRole('button', { name: 'Product source' }));
     expect(within(screen.getByRole('dialog', { name: 'Product source' })).getByText('Source not recorded')).toBeVisible();
+    expect(JSON.stringify(getProductById(id))).toBe(before);
   });
-  it('shows missing requirements once in Overview and lets users open the full checks', async () => {
+  it('keeps Overview readiness in its own sidebar beside both the snapshot and sales, and opens the full checks', async () => {
     updateProduct(id, { id, images: [], image_url: null });
     await mount();
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Product editor workspaces' })).getByRole('button', { name: 'Overview' }));
-    expect(screen.getByText(/Master details need attention/)).toBeVisible();
-    expect(screen.queryByRole('heading', { name: 'Product readiness' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
-    fireEvent.click(screen.getByRole('button', { name: 'Review missing details' }));
+    expect(screen.queryByText(/Master details need attention/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: 'Product readiness' })).toHaveLength(1);
+    const main = screen.getByTestId('product-editor-main');
+    const sidebar = screen.getByTestId('product-editor-readiness');
+    const layout = screen.getByTestId('product-editor-layout');
+    expect(within(sidebar).getByRole('region', { name: 'Product readiness' })).toBeVisible();
+    expect(within(main).getByTestId('product-overview-snapshot')).toBeVisible();
+    expect(within(main).getByRole('region', { name: 'Sales performance' })).toBeVisible();
+    expect(main).not.toContainElement(sidebar);
+    expect(main.parentElement).toBe(layout);
+    expect(sidebar.parentElement).toBe(layout);
+    expect(sidebar).toHaveClass('xl:sticky', 'xl:top-20');
+    expect(layout).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)_300px]');
+    expect(screen.queryByRole('button', { name: 'Review missing details' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View all readiness checks' }));
     const checks = within(screen.getByRole('dialog', { name: 'Complete this product' }));
     expect(checks.getByRole('button', { name: 'Add at least 1 product image' })).toBeVisible();
     fireEvent.click(checks.getByRole('button', { name: 'Add at least 1 product image' }));
     expect(within(screen.getByRole('navigation', { name: 'Product editor workspaces' })).getByRole('button', { name: 'Product data' })).toHaveAttribute('aria-current', 'page');
     expect(getProductById(id)?.status).toBe('draft');
+  });
+  it.each(['draft', 'published'] as const)('uses the same readiness card and direct field shortcut across Overview and editing tabs for %s', async status => {
+    updateProduct(id, { id, status, name: 'X' });
+    await mount();
+    const before = JSON.stringify(getProductById(id));
+    const navigation = within(screen.getByRole('navigation', { name: 'Product editor workspaces' }));
+    const sidebarText = screen.getByRole('region', { name: 'Product readiness' }).textContent;
+    const sidebarClass = screen.getByTestId('product-editor-readiness').className;
+    fireEvent.click(navigation.getByRole('button', { name: 'Overview' }));
+    const readiness = screen.getByRole('region', { name: 'Product readiness' });
+    expect(readiness.textContent).toBe(sidebarText);
+    expect(screen.getByTestId('product-editor-readiness').className).toBe(sidebarClass);
+    expect(readiness).toHaveTextContent('Complete the missing Master details.');
+    expect(readiness).not.toHaveTextContent('activate your Master');
+    expect(within(readiness).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '80');
+    fireEvent.click(within(readiness).getByRole('button', { name: /Add product name and master SKU/ }));
+    expect(navigation.getByRole('button', { name: 'Product data' })).toHaveAttribute('aria-current', 'page');
+    const nameInput = screen.getByDisplayValue('X');
+    await waitFor(() => expect(nameInput).toHaveFocus());
+    fireEvent.change(nameInput, { target: { value: product.name } });
+    fireEvent.click(navigation.getByRole('button', { name: 'Overview' }));
+    expect(screen.queryByRole('region', { name: 'Product readiness' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('product-editor-readiness')).not.toBeInTheDocument();
+    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
+    expect(JSON.stringify(getProductById(id))).toBe(before);
   });
   it('uses the operational metrics as shortcuts without persisting changes', async () => {
     await mount();
@@ -389,6 +449,70 @@ describe('Publishing Product Master without channel listings', () => {
       fireEvent.click(screen.getByRole('button', { name: button }));
       expect(nav.getByRole('button', { name: destination })).toHaveAttribute('aria-current', 'page');
     }
+    expect(JSON.stringify(getProductById(id))).toBe(before);
+  });
+  it.each([true, false])('keeps workspace padding and section gaps identical when readiness is complete: %s', async complete => {
+    if (!complete) updateProduct(id, { id, name: 'X' });
+    await mount();
+    const layoutClass = screen.getByTestId('product-editor-layout').className;
+    const mainClass = screen.getByTestId('product-editor-main').className;
+    const navigation = within(screen.getByRole('navigation', { name: 'Product editor workspaces' }));
+    for (const workspace of ['Overview', 'Product data', 'Pricing & Inventory', 'Channel listings']) {
+      fireEvent.click(navigation.getByRole('button', { name: workspace }));
+      expect(screen.getByTestId('product-editor-layout').className).toBe(layoutClass);
+      expect(screen.getByTestId('product-editor-layout')).toHaveClass('py-6', 'gap-6');
+      expect(screen.getByTestId('product-editor-main').className).toBe(mainClass);
+      expect(screen.getByTestId('product-editor-main')).toHaveClass('gap-5');
+    }
+  });
+  it('resets the actual app scroll container on tab changes without resizing the header', async () => {
+    await mount(true);
+    const scrollContainer = document.getElementById('main-content')!;
+    const scrollTo = vi.fn(({ top }: ScrollToOptions) => { scrollContainer.scrollTop = top ?? 0; });
+    scrollContainer.scrollTo = scrollTo;
+    scrollContainer.scrollTop = 200;
+    fireEvent.scroll(scrollContainer);
+    expect(screen.getByTestId('product-editor-header')).toHaveClass('py-4', 'shadow-sm');
+    fireEvent.click(screen.getByRole('button', { name: 'Overview', exact: true }));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(scrollContainer.scrollTop).toBe(0);
+    expect(screen.getByTestId('product-editor-header')).toHaveClass('py-4');
+    expect(screen.getByTestId('product-editor-header')).not.toHaveClass('py-2', 'shadow-sm');
+  });
+  it.each([1, 3, 9])('uses compact wrapping thumbnails for all %s images and keeps the upload limit', async count => {
+    updateProduct(id, { id, images: Array.from({ length: count }, (_, index) => `/image-${index}.jpg`) });
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Product data', exact: true }));
+    const gallery = screen.getByRole('group', { name: 'Product images', exact: true });
+    expect(gallery).toHaveClass('flex', 'flex-wrap', 'gap-3');
+    const thumbnails = within(gallery).getAllByRole('img');
+    expect(thumbnails).toHaveLength(count);
+    thumbnails.forEach(thumbnail => {
+      expect(thumbnail).toHaveClass('object-contain');
+      expect(thumbnail.parentElement).toHaveClass('size-28', 'sm:size-32', 'shrink-0');
+    });
+    expect(within(gallery).getAllByRole('button', { name: /Remove image/ })).toHaveLength(count);
+    if (count < 9) expect(screen.getByLabelText('Add more product images')).toBeEnabled();
+    else {
+      expect(screen.queryByLabelText('Add more product images')).not.toBeInTheDocument();
+      fireEvent.click(within(gallery).getByRole('button', { name: 'Remove image 9' }));
+      expect(screen.getByLabelText('Add more product images')).toBeEnabled();
+    }
+  });
+  it('keeps image order and accessibility text together when changing the main thumbnail or removing one', async () => {
+    updateProduct(id, { id, images: ['/one.jpg', '/two.jpg', '/three.jpg'], image_alt_texts: ['Front', 'Side', 'Back'] });
+    await mount();
+    const before = JSON.stringify(getProductById(id));
+    fireEvent.click(screen.getByRole('button', { name: 'Product data', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set image 3 as main' }));
+    const gallery = within(screen.getByRole('group', { name: 'Product images', exact: true }));
+    expect(gallery.getAllByRole('img').map(image => image.getAttribute('src'))).toEqual(['/three.jpg', '/one.jpg', '/two.jpg']);
+    expect(screen.getByLabelText('Alt text for image 1')).toHaveValue('Back');
+    expect(screen.getByLabelText('Alt text for image 2')).toHaveValue('Front');
+    fireEvent.click(gallery.getByRole('button', { name: 'Remove image 2' }));
+    expect(gallery.getAllByRole('img').map(image => image.getAttribute('src'))).toEqual(['/three.jpg', '/two.jpg']);
+    expect(screen.getByLabelText('Alt text for image 2')).toHaveValue('Side');
     expect(JSON.stringify(getProductById(id))).toBe(before);
   });
   it('previews all saved images and shows translation progress without changing the Master', async () => {

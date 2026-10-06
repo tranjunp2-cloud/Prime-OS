@@ -622,6 +622,163 @@
       .card, .feature-card, .hero-main, .hero-side { box-shadow: none; break-inside: avoid; }
     }
   </style>
+  <style>
+/* BEGIN DESIGN PLAN STYLES */
+.design-plan { --plan-muted: #475569; max-width: 1480px; margin: 0 auto; font-size: 16px; line-height: 1.6; scroll-margin-top: 150px; }
+html.dark .design-plan { --plan-muted: #cbd5e1; }
+.design-plan * { box-sizing: border-box; }
+.design-plan .eyebrow { margin: 0; color: var(--primary); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.design-plan .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.design-plan .section-head h1 { margin: 8px 0 12px; font-size: clamp(30px, 3.1vw, 46px); line-height: 1.15; letter-spacing: -.035em; }
+.design-plan .section-head p:not(.eyebrow) { max-width: 820px; margin: 0; font-size: 16px; line-height: 1.7; color: var(--plan-muted); }
+.design-plan .tag { display: inline-flex; flex-shrink: 0; align-items: center; width: fit-content; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4; white-space: normal; }
+.design-plan .tag.prototype { background: var(--warning-soft); color: var(--warning); }
+.design-plan .tag.api { background: var(--success-soft); color: var(--success); }
+.design-plan .plan-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin-bottom: 36px; }
+.design-plan .plan-metric { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.design-plan .plan-metric span { display: block; color: var(--plan-muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.design-plan .plan-metric strong { display: block; margin: 10px 0 6px; color: var(--ink); font-size: 28px; line-height: 1.2; letter-spacing: -.03em; }
+.design-plan .plan-metric p { margin: 0; color: var(--plan-muted); font-size: 13px; line-height: 1.6; }
+.design-plan .plan-section { margin-top: 40px; scroll-margin-top: 150px; }
+.design-plan .plan-section-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.design-plan .plan-section-head h2 { margin: 6px 0 8px; font-size: 23px; line-height: 1.3; letter-spacing: -.025em; }
+.design-plan .plan-section-head p:not(.eyebrow) { max-width: 900px; margin: 0; color: var(--plan-muted); font-size: 14px; line-height: 1.65; }
+.design-plan .process-heading { margin: 28px 0 12px; color: var(--ink); font-size: 18px; line-height: 1.4; }
+.design-plan .process-disclosure { margin-top: 28px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.design-plan .process-disclosure > summary { padding: 16px 20px; cursor: pointer; list-style: none; }
+.design-plan .process-disclosure > summary::-webkit-details-marker { display: none; }
+.design-plan .process-disclosure > summary::marker { content: ""; }
+.design-plan .process-disclosure > summary:hover { background: var(--surface-2); }
+.design-plan .process-disclosure > summary:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; }
+.design-plan .process-disclosure > summary h3 { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; color: var(--ink); font-size: 18px; line-height: 1.4; }
+.design-plan .process-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 700; }
+.design-plan .process-toggle svg { width: 16px; height: 16px; flex-shrink: 0; }
+.design-plan .process-disclosure .when-open { display: none; }
+.design-plan .process-disclosure[open] .when-open { display: inline; }
+.design-plan .process-disclosure[open] .when-closed { display: none; }
+.design-plan .process-disclosure[open] .process-toggle svg { transform: rotate(180deg); }
+.design-plan .process-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+.design-plan .process-disclosure > .process-table { border: 0; border-radius: 0; }
+.design-plan .process-disclosure:not([open]) > .process-table { display: none; }
+.design-plan .process-inputs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.design-plan .process-input { padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.design-plan .process-input h4 { margin: 0 0 10px; color: var(--ink); font-size: 15px; line-height: 1.5; }
+.design-plan .process-list { margin: 0; padding-left: 18px; color: var(--ink); font-size: 14px; line-height: 1.65; }
+.design-plan .process-list li + li { margin-top: 6px; }
+.design-plan .process-gate { margin: 14px 0 0; padding: 14px 18px; border-left: 3px solid var(--primary); background: var(--primary-soft); color: var(--ink); font-size: 14px; line-height: 1.65; }
+.design-plan .process-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-size: 14px; line-height: 1.65; }
+.design-plan .process-table th, .design-plan .process-table td { padding: 20px; text-align: left; vertical-align: top; overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
+.design-plan .process-table thead th { background: var(--surface-2); color: var(--plan-muted); font-size: 12px; font-weight: 800; }
+.design-plan .process-table thead th:nth-child(1) { width: 20%; }
+.design-plan .process-table thead th:nth-child(2) { width: 23%; }
+.design-plan .process-table thead th:nth-child(3) { width: 30%; }
+.design-plan .process-table thead th:nth-child(4) { width: 27%; }
+.design-plan .process-table tr > :nth-child(3) { background: var(--primary-soft); }
+.design-plan .process-table thead th:nth-child(3) { color: var(--primary); }
+.design-plan .process-table tbody th { font-weight: 400; }
+.design-plan .process-table tbody tr:last-child > * { border-bottom: 0; }
+.design-plan .process-table h4 { margin: 10px 0; color: var(--ink); font-size: 16px; line-height: 1.5; }
+.design-plan .process-index { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 8px; color: var(--primary); font-size: 12px; font-weight: 800; }
+.design-plan .process-owner { display: block; color: var(--plan-muted); font-size: 12px; line-height: 1.6; }
+.design-plan .process-owner b { color: var(--ink); }
+.design-plan .process-owner.is-design b { color: var(--primary); }
+.design-plan .process-table p { margin: 0; color: var(--ink); }
+.design-plan .process-table .process-review { margin-top: 10px; color: var(--plan-muted); font-size: 13px; }
+.design-plan .roadmap { display: grid; gap: 12px; }
+.design-plan .roadmap-phase { display: grid; grid-template-columns: 96px minmax(180px,.7fr) minmax(0,1.2fr) minmax(180px,.85fr); overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.design-plan .roadmap-phase > div { padding: 18px; border-left: 1px solid var(--line); }
+.design-plan .roadmap-phase > div:first-child { display: flex; align-items: center; padding: 16px; border-left: 0; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 800; }
+.design-plan .roadmap-phase span { display: block; color: var(--plan-muted); font-size: 11px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.design-plan .roadmap-phase strong { display: block; margin-top: 6px; font-size: 14px; line-height: 1.5; }
+.design-plan .roadmap-phase p { margin: 6px 0 0; color: var(--plan-muted); font-size: 13px; line-height: 1.65; }
+.design-plan .contract-table { width: 100%; overflow: hidden; border-collapse: separate; border-spacing: 0; table-layout: fixed; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-size: 13px; }
+.design-plan .contract-table th { padding: 16px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--plan-muted); font-size: 11px; font-weight: 800; line-height: 1.5; text-align: left; text-transform: uppercase; letter-spacing: .04em; }
+.design-plan .contract-table td { padding: 18px 14px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; line-height: 1.7; }
+.design-plan .contract-table tr:last-child td { border-bottom: 0; }
+.design-plan .contract-table strong { display: block; margin-bottom: 6px; font-size: 14px; line-height: 1.5; }
+.design-plan .contract-table span { color: var(--plan-muted); }
+.design-plan .design-backlog-table th:nth-child(1) { width: 8%; }
+.design-plan .design-backlog-table th:nth-child(2) { width: 19%; }
+.design-plan .design-backlog-table th:nth-child(3) { width: 30%; }
+.design-plan .design-backlog-table th:nth-child(4) { width: 30%; }
+.design-plan .design-backlog-table th:nth-child(5) { width: 13%; }
+.design-plan .design-backlog-table td:first-child strong { color: var(--primary); }
+.design-plan .design-backlog-table .estimate { display: inline-block; width: fit-content; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 750; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.design-plan .estimate-days { display: block; margin-top: 8px; color: var(--plan-muted); font-size: 12px; white-space: nowrap; }
+.design-plan .total-estimate { display: grid; grid-template-columns: 18% 41% 41%; min-height: 130px; gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.design-plan .total-estimate > div { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 24px; border-left: 1px solid var(--line); }
+.design-plan .total-estimate > div:first-child { border-left: 0; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.design-plan .total-estimate span { display: block; margin: 0 0 6px; color: var(--plan-muted); font-size: 12px; font-weight: 700; }
+.design-plan .total-estimate strong { display: block; margin: 0 0 8px; color: var(--ink); font-size: 26px; line-height: 1.3; }
+.design-plan .total-estimate p { margin: 0; color: var(--plan-muted); font-size: 13px; line-height: 1.6; }
+.design-plan .settings-plan-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.design-plan .settings-plan-card { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.design-plan .settings-plan-card > span { color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.design-plan .settings-plan-card h3 { margin: 10px 0 8px; font-size: 17px; line-height: 1.4; }
+.design-plan .settings-plan-card > p { margin: 0 0 16px; color: var(--plan-muted); font-size: 13px; line-height: 1.65; }
+.design-plan .settings-plan-card footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--plan-muted); font-size: 12px; line-height: 1.6; }
+.design-plan .compact-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.design-plan .compact-list li { position: relative; padding-left: 13px; color: var(--ink); font-size: 13px; line-height: 1.65; }
+.design-plan .compact-list li::before { content: ""; position: absolute; top: .6em; left: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--warning); }
+.design-plan .dod-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.design-plan .dod-item { display: flex; align-items: flex-start; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 13px; line-height: 1.65; }
+.design-plan .dod-item::before { content: "✓"; display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border-radius: 6px; background: var(--success-soft); color: var(--success); font-size: 13px; font-weight: 800; }
+.design-plan .plan-note { margin-top: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--warning-soft); color: var(--ink); font-size: 13px; line-height: 1.7; }
+.design-plan .plan-note strong { color: var(--warning); }
+.design-plan .plan-footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--plan-muted); font-size: 13px; line-height: 1.7; }
+.design-plan .plan-revision { margin: 12px 0 0; color: var(--plan-muted); font-size: 12px; }
+.plan-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 1120px) {
+  .design-plan .process-table, .design-plan .process-table tbody { display: block; width: 100%; }
+  .design-plan .process-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .design-plan .process-table tbody tr { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-bottom: 1px solid var(--line); }
+  .design-plan .process-table tbody tr:last-child { border-bottom: 0; }
+  .design-plan .process-table tbody th { grid-column: 1 / -1; background: var(--surface-2); }
+  .design-plan .process-table tbody th, .design-plan .process-table td { display: block; padding: 18px; border: 0; }
+  .design-plan .process-table tbody h4 { display: inline; margin: 0 8px; }
+  .design-plan .process-owner { margin-top: 8px; }
+  .design-plan .process-table td::before { content: attr(data-label); display: block; margin-bottom: 10px; color: var(--plan-muted); font-size: 12px; font-weight: 800; }
+  .design-plan .process-table td:nth-child(3)::before { color: var(--primary); }
+  .design-plan .settings-plan-grid, .design-plan .dod-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .design-plan .roadmap-phase { grid-template-columns: 96px minmax(0,1fr); }
+  .design-plan .roadmap-phase > div:nth-child(3), .design-plan .roadmap-phase > div:nth-child(4) { grid-column: 2; border-top: 1px solid var(--line); }
+}
+@media (max-width: 760px) {
+  .design-plan .plan-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .design-plan .section-head, .design-plan .plan-section-head { flex-direction: column; align-items: flex-start; }
+  .design-plan .process-inputs, .design-plan .process-table tbody tr { grid-template-columns: 1fr; }
+  .design-plan .process-list, .design-plan .process-table, .design-plan .process-gate { font-size: 16px; }
+  .design-plan .process-table td + td { border-top: 1px solid var(--line); }
+  .design-plan .contract-table, .design-plan .contract-table tbody, .design-plan .contract-table tr { display: block; width: 100%; }
+  .design-plan .contract-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .design-plan .contract-table tr { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .design-plan .contract-table tr:last-child { border-bottom: 0; }
+  .design-plan .contract-table td { display: block; width: 100%; padding: 8px 0; border: 0; font-size: 14px; }
+  .design-plan .contract-table td::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--plan-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+  .design-plan .total-estimate { grid-template-columns: 1fr; }
+  .design-plan .total-estimate > div { border-left: 0; border-top: 1px solid var(--line); }
+  .design-plan .total-estimate > div:first-child { border-top: 0; }
+}
+@media (max-width: 480px) {
+  .design-plan .process-disclosure > summary { padding: 16px; }
+  .design-plan .process-disclosure > summary h3 { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .design-plan .plan-metric { padding: 16px; }
+  .design-plan .plan-metric strong { font-size: 23px; }
+  .design-plan .settings-plan-grid, .design-plan .dod-grid { grid-template-columns: 1fr; }
+  .design-plan .roadmap-phase { grid-template-columns: 1fr; }
+  .design-plan .roadmap-phase > div, .design-plan .roadmap-phase > div:nth-child(3), .design-plan .roadmap-phase > div:nth-child(4) { grid-column: 1; border-left: 0; }
+  .design-plan .roadmap-phase > div:not(:first-child) { border-top: 1px solid var(--line); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* END DESIGN PLAN STYLES */
+    .plan-file-access { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .plan-file-access strong { display: block; font-size: 14px; }
+    .plan-file-access span { display: block; margin-top: 4px; color: var(--plan-muted); font-size: 12px; }
+    .plan-file-access a { display: inline-flex; align-items: center; min-height: 44px; flex-shrink: 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 700; text-decoration: none; }
+    .plan-file-access a:hover { text-decoration: underline; }
+    .plan-file-access a:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+    @media(max-width: 760px) { .plan-file-access { flex-direction: column; align-items: flex-start; } }
+  </style>
 </head>
 <body>
   <div class="app-shell">
@@ -808,90 +965,89 @@
           </div>
         </section>
 
-        <section id="panel-architecture" class="panel" data-panel="architecture" hidden>
-          <header class="section-head">
-            <div><p class="eyebrow">Next design delivery plan</p><h1>Từ product map đến specification có thể triển khai.</h1><p>Giai đoạn tiếp theo không mở rộng thêm bề mặt UI theo chiều ngang. Design Team sẽ đi sâu từng tính năng, hoàn thiện user flow, decision rule, edge case, trạng thái màn hình và prototype kiểm thử được — trước khi bàn giao cho Engineering.</p></div>
-            <span class="tag prototype">Đề xuất · 8 tuần</span>
-          </header>
-
-          <div class="plan-metrics">
-            <article class="plan-metric"><span>Target journeys đã lập bản đồ</span><strong>10</strong><p>Đủ để trình bày operating model; chưa thay thế feature specification.</p></article>
-            <article class="plan-metric"><span>Design workstream cần đào sâu</span><strong>13</strong><p>Một backlog chung, từ Product Master ở P0 đến ba workspace chuyên biệt ở P3.</p></article>
-            <article class="plan-metric"><span>Dedicated workspaces</span><strong>P3</strong><p>PrimeWeb Studio, POS Workspace và Prime Inbox được triển khai sau operational core.</p></article>
-            <article class="plan-metric"><span>Definition of Done</span><strong>8 gates</strong><p>Mỗi feature chỉ hoàn tất khi đủ state, edge case, prototype và handoff.</p></article>
+        <section id="panel-architecture" class="panel design-plan" data-panel="architecture" hidden>
+          <div class="plan-file-access">
+            <div><strong>Kế hoạch Design đã có file riêng</strong><span>Cập nhật theo timeline tham chiếu ngày 06/10/2026 · 1 designer, 80 ngày làm việc và 16 tuần.</span></div>
+            <a href="Prime-OS-design-plan.html" target="_blank" rel="noopener">Mở file kế hoạch riêng ↗</a>
           </div>
+<!-- BEGIN DESIGN PLAN CONTENT -->
+<header class="section-head">
+  <div><p class="eyebrow">Next design delivery plan</p><h1>Kế hoạch Design Prime OS</h1><p>Giai đoạn tiếp theo không mở rộng thêm bề mặt UI theo chiều ngang. Design Team sẽ đi sâu từng tính năng, hoàn thiện user flow, decision rule, edge case, trạng thái màn hình và prototype kiểm thử được — trước khi bàn giao cho Engineering.</p></div>
+  <span class="tag prototype">Đề xuất · 16 tuần</span>
+</header>
 
-          <section class="plan-section">
-            <div class="plan-section-head"><div><p class="eyebrow">Design operating model</p><h2>Một quy trình chung cho mọi feature</h2><p>Mỗi hạng mục được xử lý từ mục tiêu kinh doanh đến hành vi màn hình, giúp Product, Design và Engineering cùng hiểu một phiên bản sự thật.</p></div></div>
-            <div class="design-process">
-              <article class="process-step"><span class="process-index">01</span><strong>Scope & ownership</strong><p>Xác định persona, mục tiêu, precondition, quyền, dữ liệu sở hữu và điểm bắt đầu/kết thúc.</p></article>
-              <article class="process-step"><span class="process-index">02</span><strong>Flow & decision rules</strong><p>Vẽ happy path, alternate path, điểm quyết định và quy tắc nghiệp vụ theo từng vai trò.</p></article>
-              <article class="process-step"><span class="process-index">03</span><strong>State & edge-case matrix</strong><p>Định nghĩa loading, empty, blocked, partial, error, retry, rollback, offline và permission state.</p></article>
-              <article class="process-step"><span class="process-index">04</span><strong>Prototype & validation</strong><p>Tạo prototype high-fidelity, walkthrough theo scenario và kiểm thử với user đại diện.</p></article>
-              <article class="process-step"><span class="process-index">05</span><strong>Handoff & design QA</strong><p>Bàn giao acceptance criteria, responsive states, analytics events; kiểm tra bản build trước khi đóng.</p></article>
-            </div>
-          </section>
+<div class="plan-metrics" aria-label="Tóm tắt kế hoạch">
+  <article class="plan-metric"><span>Nhân sự thực hiện</span><strong>1 designer</strong><p>Thực hiện tuần tự, không chia nhiều nhóm song song.</p></article>
+  <article class="plan-metric"><span>Phạm vi thiết kế</span><strong>13 hạng mục</strong><p>Product Master ưu tiên đầu tiên; 3 workspace chuyên biệt ở P3.</p></article>
+  <article class="plan-metric"><span>Tổng estimate</span><strong>80 ngày</strong><p>Ngày làm việc, bao gồm prototype luồng chính và bàn giao.</p></article>
+  <article class="plan-metric"><span>Thời gian dự kiến</span><strong>16 tuần</strong><p>5 ngày làm việc mỗi tuần; chưa gán ngày khởi động.</p></article>
+</div>
 
-          <section class="plan-section">
-            <div class="plan-section-head"><div><p class="eyebrow">Proposed delivery sequence</p><h2>Roadmap 8 tuần cho một designer thực hiện toàn bộ scope</h2><p>Một designer xử lý tuần tự theo mức ưu tiên P0 → P3, đồng thời giữ xuyên suốt kiến trúc thông tin, tiêu chuẩn trạng thái và các điểm bàn giao giữa workspace. Mục tiêu là specification đủ rõ để Engineering ước lượng, không phải hoàn thiện mọi màn hình production.</p></div><span class="tag api">1 designer · 40 ngày</span></div>
-            <div class="roadmap">
-              <article class="roadmap-phase"><div>Tuần 1–2</div><div><span>P0 · Operational core</span><strong>Product Master → Order</strong></div><div><span>Deliverables</span><p>Product revision/listing rules; channel impact và recovery; order-payment-fulfillment-return state machine; prototype critical path và handoff contract.</p></div><div><span>Exit gate</span><p>Product và Order có flow, state matrix, permission, acceptance criteria và prototype đủ để review.</p></div></article>
-              <article class="roadmap-phase"><div>Tuần 3–4</div><div><span>P0 → P1 · Foundation</span><strong>Inventory → Onboarding → Settings</strong></div><div><span>Deliverables</span><p>Warehouse ledger và Master Stock; channel-sync opt-in; workspace activation; channel onboarding; Settings IA và permission/impact rules.</p></div><div><span>Exit gate</span><p>Authority boundary của stock và các blocker cấu hình xuyên flow đã được Product/Engineering duyệt.</p></div></article>
-              <article class="roadmap-phase"><div>Tuần 5–6</div><div><span>P1 → P2 · Experience & commercial</span><strong>Live → Customer → Billing → Marketing</strong></div><div><span>Deliverables</span><p>Live Commerce, Customer 360 và conversation handoff; subscription/billing; Marketing campaign lifecycle và reporting. Promotion policy chuyển tiếp sang đầu tuần 7.</p></div><div><span>Exit gate</span><p>Các flow service và commercial có prototype critical path, limit, approval và reporting handoff rõ ràng.</p></div></article>
-              <article class="roadmap-phase"><div>Tuần 7–8</div><div><span>P2 → P3 · Policy & dedicated workspaces</span><strong>Promotion → PrimeWeb → POS → Prime Inbox → Validation</strong></div><div><span>Deliverables</span><p>Promotion policy/redemption prototype; core prototype cho ba workspace chuyên biệt; kiểm thử handoff xuyên workspace; accessibility/responsive; analytics events và đóng gói backlog bàn giao.</p></div><div><span>Exit gate</span><p>Stakeholder sign-off và handoff package của cả 13 workstream sẵn sàng cho Engineering planning.</p></div></article>
-            </div>
-          </section>
+<section class="plan-section" id="design-process">
+  <div class="plan-section-head"><div><p class="eyebrow">Phân công & cách phối hợp</p><h2>Quy Trình</h2><p>Quy trình đề xuất cho từng tính năng. Product chốt bài toán và nghiệp vụ; Design chịu trách nhiệm trải nghiệm và giao diện; Engineering xác nhận kỹ thuật; QA kiểm tra chất lượng. “Chủ trì” là người dẫn dắt bước đó, không có nghĩa làm một mình.</p></div></div>
 
-          <section class="plan-section">
-            <div class="plan-section-head"><div><p class="eyebrow">Unified design backlog</p><h2>13 workstream theo một thứ tự ưu tiên thống nhất</h2><p>Product Master là ưu tiên cao nhất; Order được tách thành đầu mục riêng ngay sau đó. Marketing và Promotions là hai lifecycle độc lập; ba workspace chuyên biệt được gộp vào cùng backlog ở P3.</p></div><span class="tag api">Estimate · 8 tuần</span></div>
-            <table class="contract-table design-backlog-table"><thead><tr><th>Ưu tiên</th><th>Workstream</th><th>Phạm vi thiết kế tiếp theo</th><th>Đầu ra</th><th>Estimate timeline</th></tr></thead><tbody>
-              <tr><td><strong>P0</strong><span>#01 · Flow 02</span></td><td><strong>Product Master revision & channel listings</strong></td><td>Quick-create draft, product structure, Master SKU, readiness, approval/revision, variant/media/pricing, nội dung theo kênh và inventory-sync policy.</td><td>Product/revision state machine, channel listing wizard, impact preview, partial-result recovery, version history và rollback rule.</td><td><span class="estimate">Tuần 1<br>5 ngày</span></td></tr>
-              <tr><td><strong>P0</strong><span>#02 · Flow 03</span></td><td><strong>Order, Payment, Fulfillment & Return</strong></td><td>Order từ channel/manual, validation, confirmation, payment evidence, fulfillment ownership, ATP reservation, multi-package shipping, cancellation, RMA, refund và COD settlement.</td><td>Order state machine; payment, fulfillment và return subflow; permission matrix, exception recovery và service handoff contract.</td><td><span class="estimate">Tuần 2<br>5 ngày</span></td></tr>
-              <tr><td><strong>P0</strong><span>#03 · Flow 10</span></td><td><strong>Warehouse, Master Stock & optional channel sync</strong></td><td>Warehouse Stock mutation, Master Stock roll-up, reservation, transfer, adjustment, cycle count và opt-in inventory policy theo từng channel listing.</td><td>Inventory ledger flow, quantity glossary, authority matrix, channel-sync boundary và exception recovery.</td><td><span class="estimate">Tuần 3<br>4 ngày</span></td></tr>
-              <tr><td><strong>P1</strong><span>#04 · Flow 01</span></td><td><strong>Workspace activation & channel onboarding</strong></td><td>Đăng nhập, business context, tạo/chọn kho, kết nối store, cấp quyền, mapping location, chọn sync services, initial sync và readiness handoff.</td><td>Onboarding state machine, resume/recovery flow, readiness checklist, channel capability matrix và deep link tới blocker.</td><td><span class="estimate">Tuần 3–4<br>3 ngày</span></td></tr>
-              <tr><td><strong>P1</strong><span>#05 · Cross-cutting</span></td><td><strong>Settings & operational configuration</strong></td><td>General & Business, Team & Access, Payments và Shipping & Delivery; cấu hình toàn cục, theo workspace và theo store/branch.</td><td>Settings IA, permission matrix, impact preview, validation và recovery states.</td><td><span class="estimate">Tuần 4–5<br>4 ngày</span></td></tr>
-              <tr><td><strong>P1</strong><span>#06 · Flow 04</span></td><td><strong>Live Commerce</strong></td><td>Session setup, SKU allocation, live monitoring, top-up, end session và release stock.</td><td>War-room prototype, real-time states và recovery playbook.</td><td><span class="estimate">Tuần 5<br>2 ngày</span></td></tr>
-              <tr><td><strong>P1</strong><span>#07 · Flow 05–06</span></td><td><strong>Customer 360 & conversation handoff</strong></td><td>Identity resolution, merge review, consent, ownership, activity timeline và deep link sang Inbox.</td><td>Identity state machine, review queue, handoff and return pattern.</td><td><span class="estimate">Tuần 5–6<br>3 ngày</span></td></tr>
-              <tr><td><strong>P2</strong><span>#08 · Flow 07</span></td><td><strong>Subscription, entitlement & billing</strong></td><td>Plan selection, trial, upgrade/downgrade, limits, invoice, payment recovery và cancellation.</td><td>Billing lifecycle, entitlement messaging và recovery prototype.</td><td><span class="estimate">Tuần 6<br>2 ngày</span></td></tr>
-              <tr><td><strong>P2</strong><span>#09 · Flow 08</span></td><td><strong>Marketing campaign lifecycle</strong></td><td>Audience/source selection, campaign creation, content, approval, channel distribution, demand capture, attribution và performance reporting.</td><td>Campaign wizard, approval/publish states, channel handoff, attribution model và performance dashboard.</td><td><span class="estimate">Tuần 6<br>2 ngày</span></td></tr>
-              <tr><td><strong>P2</strong><span>#10 · Flow 09</span></td><td><strong>Promotion policy & redemption</strong></td><td>Promotion creation, eligibility, discount rule, quota, stacking policy, approval, activation, redemption, refund reversal và outcome reporting.</td><td>Promotion builder, policy explanation, validation states, redemption lifecycle và commercial outcome report.</td><td><span class="estimate">Tuần 7<br>1 ngày</span></td></tr>
-              <tr><td><strong>P3</strong><span>#11 · Workspace</span></td><td><strong>PrimeWeb Studio</strong></td><td>Theme/page/component, Product/Collection binding, responsive preview, domain/SEO, publish, version và rollback.</td><td>Builder IA, interaction model, publish state machine, clickable prototype và component/state inventory.</td><td><span class="estimate">Tuần 7<br>3 ngày</span></td></tr>
-              <tr><td><strong>P3</strong><span>#12 · Workspace</span></td><td><strong>POS Workspace</strong></td><td>Mở ca/thiết bị, scan/search, cart, customer/promotion, split payment, receipt, suspend/resume, return/exchange và close shift.</td><td>Register flow, offline/payment state matrix, hardware recovery prototype và QA scenarios.</td><td><span class="estimate">Tuần 7–8<br>3 ngày</span></td></tr>
-              <tr><td><strong>P3</strong><span>#13 · Workspace</span></td><td><strong>Prime Inbox</strong></td><td>Queue/routing, claim, identify customer, conversation, tra order/SKU/ATP, ticket, draft order, secure checkout, resolve và writeback.</td><td>Queue/conversation interaction model, identity/ownership state machine, assisted-commerce prototype và escalation rules.</td><td><span class="estimate">Tuần 8<br>3 ngày</span></td></tr>
-            </tbody></table>
-            <div class="total-estimate" aria-label="Tổng estimate hoàn thành prototype">
-              <div>Tổng estimate</div>
-              <div><span>Tổng thời gian thiết kế</span><strong>40 ngày làm việc</strong><p>1 designer × 40 ngày để hoàn thành 13 workstream, bao gồm flow, edge cases, prototype critical path và handoff package.</p></div>
-              <div><span>Thời gian hoàn thành dự kiến</span><strong>8 tuần</strong><p>Với 1 designer thực hiện tuần tự 40 ngày làm việc và review trong tối đa 1 ngày.</p></div>
-            </div>
-          </section>
+  <h3 class="process-heading">Trước khi bắt đầu: đầu vào Design cần nhận</h3>
+  <div class="process-inputs">
+    <article class="process-input"><h4>Product / Business cung cấp</h4><ul class="process-list"><li>Ai sử dụng, cần giải quyết việc gì và thế nào là thành công.</li><li>Phạm vi làm / chưa làm, mức ưu tiên và quy tắc nghiệp vụ chính.</li><li>Người chốt yêu cầu và người vận hành để Design trao đổi.</li></ul></article>
+    <article class="process-input"><h4>Engineering cung cấp</h4><ul class="process-list"><li>Dữ liệu, trạng thái hệ thống và quyền truy cập hiện có.</li><li>Khả năng API / tích hợp; giới hạn và các phần chưa hỗ trợ.</li><li>Môi trường xem bản hiện tại, dữ liệu mẫu và người review kỹ thuật.</li></ul></article>
+    <article class="process-input"><h4>QA / Người vận hành cung cấp</h4><ul class="process-list"><li>Tình huống thực tế, lỗi thường gặp và cách đang xử lý.</li><li>Kịch bản quan trọng cần kiểm tra, dữ liệu mẫu thành công / thất bại.</li><li>Người tham gia thử prototype và phản hồi thao tác.</li></ul></article>
+  </div>
+  <p class="process-gate"><strong>Điều kiện bắt đầu:</strong> thống nhất mục tiêu, phạm vi, quy tắc chính và người xác nhận. Nếu thiếu đầu vào, Design ghi rõ câu hỏi / giả định và người cần trả lời; có thể khảo sát trước nhưng chưa chốt thiết kế phần còn phụ thuộc.</p>
 
-          <section class="plan-section">
-            <div class="plan-section-head"><div><p class="eyebrow">Settings as an operating foundation</p><h2>Settings không phải một flow độc lập — mà là điều kiện để các flow chạy đúng</h2><p>Design sẽ không gom bốn mục thành một form dài. Mỗi nhóm có lifecycle cấu hình, validation, quyền và impact riêng; các flow nghiệp vụ sẽ deep-link về đúng cấu hình khi phát hiện blocker.</p></div><span class="tag prototype">Cross-cutting workstream</span></div>
-            <div class="settings-plan-grid">
-              <article class="settings-plan-card"><span>01 · Business foundation</span><h3>General & Business</h3><p>Thông tin pháp nhân, locale, currency, timezone, tax/VAT, invoice identity và chính sách mặc định.</p><ul class="compact-list edge"><li>Đổi currency/timezone khi đã có order</li><li>Thiếu legal/tax data hoặc region không hỗ trợ</li><li>Preview phạm vi ảnh hưởng trước khi lưu</li></ul><footer>Liên kết: Onboarding · Orders · Billing · Analytics</footer></article>
-              <article class="settings-plan-card"><span>02 · Governance</span><h3>Team & Access</h3><p>Mời nhân sự, role template, quyền theo module, workspace, store/branch và audit access.</p><ul class="compact-list edge"><li>Invite hết hạn hoặc email đã tồn tại</li><li>Không cho xoá/hạ quyền admin cuối cùng</li><li>Role thay đổi khi user đang thao tác</li></ul><footer>Liên kết: Toàn bộ workspace · Approval · Audit</footer></article>
-              <article class="settings-plan-card"><span>03 · Money movement</span><h3>Payments</h3><p>Kết nối provider, phương thức thanh toán, settlement account, COD, test/live mode và webhook health.</p><ul class="compact-list edge"><li>Token hết hạn hoặc provider mất kết nối</li><li>Payment timeout, duplicate webhook</li><li>Không trộn test transaction với live data</li></ul><footer>Liên kết: Orders · POS · PrimeWeb · Billing</footer></article>
-              <article class="settings-plan-card"><span>04 · Delivery network</span><h3>Shipping & Delivery</h3><p>Carrier, service level, pickup/return address, fee rule, coverage, COD support và fallback routing.</p><ul class="compact-list edge"><li>Địa chỉ không map được với carrier</li><li>Dịch vụ tạm ngừng hoặc ngoài vùng giao</li><li>Rate lỗi, pickup missed, fallback không khả dụng</li></ul><footer>Liên kết: Warehouse · Orders · Returns · COD</footer></article>
-            </div>
-          </section>
+</section>
 
-          <section class="plan-section">
-            <div class="plan-section-head"><div><p class="eyebrow">Cross-workspace contracts</p><h2>Không tách rời dữ liệu khi tách không gian thao tác</h2><p>Design specification phải chỉ rõ dữ liệu nào được đọc, hành động nào được ghi ngược và user quay lại Main Workspace ở đâu.</p></div></div>
-            <table class="contract-table"><thead><tr><th>Workspace</th><th>Đọc từ Main Workspace</th><th>Ghi ngược về Main Workspace</th><th>Handoff UX cần thiết kế</th></tr></thead><tbody>
-              <tr><td><strong>PrimeWeb Studio</strong><span>Storefront creation</span></td><td>Product revision, listing, price, ATP, promotion, customer policy</td><td>Publish version, domain status, storefront events, checkout attribution</td><td>Workspace switcher, unsaved-change guard, preview link, lỗi publish quay đúng cấu hình</td></tr>
-              <tr><td><strong>POS Workspace</strong><span>In-store checkout</span></td><td>Catalog, store price, promotion, customer, branch ATP, staff permission</td><td>Order, payment evidence, stock movement, receipt, shift reconciliation</td><td>Open register, branch/device context, offline indicator, resume back-office task</td></tr>
-              <tr><td><strong>Prime Inbox</strong><span>Conversation desk</span></td><td>Customer 360, order, SKU, ATP, promotion, conversation source health</td><td>Conversation, identity link, ticket, draft order, attribution, resolution</td><td>Deep link giữ customer/thread context, ownership notice và return-to-record</td></tr>
-            </tbody></table>
-          </section>
+<section class="plan-section" id="design-roadmap">
+  <div class="plan-section-head"><div><p class="eyebrow">Proposed delivery sequence</p><h2>Roadmap 16 tuần cho một designer thực hiện toàn bộ scope</h2><p>Một designer xử lý tuần tự theo mức ưu tiên P0 → P3, đồng thời giữ xuyên suốt kiến trúc thông tin, tiêu chuẩn trạng thái và các điểm bàn giao giữa workspace. Mục tiêu là specification đủ rõ để Engineering ước lượng, không phải hoàn thiện mọi màn hình production. Các mốc tuần có thể giao nhau vì công việc chuyển tiếp giữa tuần, không phải làm song song.</p></div><span class="tag api">1 designer · 80 ngày</span></div>
+  <div class="roadmap">
+    <article class="roadmap-phase"><div>Tuần 1–2</div><div><span>P0 · Ngày 1–10</span><strong>Product Master</strong></div><div><span>Deliverables</span><p>Product structure, draft/revision, readiness, SKU, nội dung và inventory-sync policy theo kênh; prototype critical path và impact preview.</p></div><div><span>Exit gate</span><p>Flow, state matrix và prototype Product Master/listing sẵn sàng review.</p></div></article>
+    <article class="roadmap-phase"><div>Tuần 3–4</div><div><span>P0 · Ngày 11–18</span><strong>Warehouse & Master Stock</strong></div><div><span>Deliverables</span><p>Warehouse ledger, nhập/điều chỉnh/chuyển tồn, Master Stock roll-up, reservation và channel-sync opt-in.</p></div><div><span>Exit gate</span><p>Quyền quản lý tồn, cách tính số lượng và điều kiện đồng bộ theo kênh đã rõ.</p></div></article>
+    <article class="roadmap-phase"><div>Tuần 4–6</div><div><span>P0 · Ngày 19–28</span><strong>Order, Payment, Fulfillment & Return</strong></div><div><span>Deliverables</span><p>Order intake, confirmation, payment evidence, ATP reservation, giao hàng, cancellation, return/refund và COD settlement.</p></div><div><span>Exit gate</span><p>Order state machine, các nhánh payment/fulfillment/return và handoff với Inventory sẵn sàng review.</p></div></article>
+    <article class="roadmap-phase"><div>Tuần 6–9</div><div><span>P1 · Ngày 29–42</span><strong>Onboarding → Settings</strong></div><div><span>Deliverables</span><p>Workspace activation, channel onboarding, resume/recovery; General & Business, Team & Access, Payments và Shipping & Delivery.</p></div><div><span>Exit gate</span><p>Các blocker cấu hình, quyền truy cập và đường dẫn xử lý lỗi xuyên flow đã được duyệt.</p></div></article>
+    <article class="roadmap-phase"><div>Tuần 9–12</div><div><span>P1 → P2 · Ngày 43–60</span><strong>Live → Customer → Billing → Marketing</strong></div><div><span>Deliverables</span><p>Live Commerce, Customer 360 và conversation handoff; subscription/billing; Marketing campaign lifecycle, attribution và reporting.</p></div><div><span>Exit gate</span><p>Các luồng có prototype chính, trạng thái lỗi, giới hạn và điểm bàn giao rõ ràng.</p></div></article>
+    <article class="roadmap-phase"><div>Tuần 13–16</div><div><span>P2 → P3 · Ngày 61–80</span><strong>Promotion → PrimeWeb → POS → Prime Inbox</strong></div><div><span>Deliverables</span><p>Promotion policy/redemption; prototype chính cho ba workspace; kiểm tra handoff, responsive/accessibility và đóng gói bàn giao trong estimate của từng hạng mục.</p></div><div><span>Exit gate</span><p>Prototype và handoff package của 13 hạng mục sẵn sàng để Product/Engineering review.</p></div></article>
+  </div>
+</section>
 
-          <section class="plan-section">
-            <div class="plan-section-head"><div><p class="eyebrow">Definition of Done</p><h2>Một feature chỉ “design complete” khi đủ 8 điều kiện</h2></div></div>
-            <div class="dod-grid"><div class="dod-item">Persona, mục tiêu, precondition và quyền truy cập đã rõ.</div><div class="dod-item">Happy, alternate và failure paths đã được mô tả.</div><div class="dod-item">Loading, empty, error, partial, offline và retry states đầy đủ.</div><div class="dod-item">State transition và hành động hợp lệ theo từng vai trò đã khóa.</div><div class="dod-item">Cross-workspace handoff giữ đúng context và có đường quay lại.</div><div class="dod-item">Responsive, dark mode, i18n và accessibility được kiểm tra.</div><div class="dod-item">Analytics event, audit evidence và success metric được định nghĩa.</div><div class="dod-item">Prototype đã test; acceptance criteria được Product/Engineering duyệt.</div></div>
-            <div class="plan-note"><strong>Capacity & dependency:</strong> Estimate được tính cho 1 designer thực hiện toàn bộ scope theo thứ tự ưu tiên, tổng cộng 40 ngày làm việc tương đương 8 tuần. Timeline giả định Product Owner và Engineering reviewer phản hồi trong 1 ngày làm việc, có SME cho payment, warehouse và channel integration, đồng thời không mở rộng thêm scope. Phạm vi bàn giao là flow, state/edge-case matrix, prototype critical path và backlog ưu tiên; high-fidelity cho toàn bộ màn hình tiếp tục theo từng release.</div>
-          </section>
+<section class="plan-section" id="design-backlog">
+  <div class="plan-section-head"><div><p class="eyebrow">Unified design backlog</p><h2>13 workstream theo một thứ tự ưu tiên thống nhất</h2><p>Thứ tự P0 theo timeline mới: Product Master → Warehouse & Master Stock → Order. Các hạng mục được thực hiện tuần tự bởi một designer. Marketing và Promotions là hai lifecycle độc lập; ba workspace chuyên biệt được gộp vào cùng backlog ở P3.</p></div><span class="tag api">Estimate · 16 tuần</span></div>
+  <table class="contract-table design-backlog-table"><caption class="plan-sr-only">Phạm vi thiết kế, ưu tiên và estimate cho 13 hạng mục</caption><thead><tr><th scope="col">Ưu tiên</th><th scope="col">Workstream</th><th scope="col">Phạm vi thiết kế tiếp theo</th><th scope="col">Đầu ra</th><th scope="col">Estimate timeline</th></tr></thead><tbody>
+    <tr><td data-label="Ưu tiên"><strong>P0</strong><span>#01 · Flow 02</span></td><td data-label="Workstream"><strong>Product Master revision & channel listings</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Quick-create draft, product structure, Master SKU, readiness, approval/revision, variant/media/pricing, nội dung theo kênh và inventory-sync policy.</td><td data-label="Đầu ra">Product/revision state machine, channel listing wizard, impact preview, partial-result recovery, version history và rollback rule.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 1–2<br>10 ngày</span><small class="estimate-days">Ngày 1–10</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P0</strong><span>#03 · Flow 10</span></td><td data-label="Workstream"><strong>Warehouse, Master Stock & optional channel sync</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Warehouse Stock mutation, Master Stock roll-up, reservation, transfer, adjustment, cycle count và opt-in inventory policy theo từng channel listing.</td><td data-label="Đầu ra">Inventory ledger flow, quantity glossary, authority matrix, channel-sync boundary và exception recovery.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 3–4<br>8 ngày</span><small class="estimate-days">Ngày 11–18</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P0</strong><span>#02 · Flow 03</span></td><td data-label="Workstream"><strong>Order, Payment, Fulfillment & Return</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Order từ channel/manual, validation, confirmation, payment evidence, fulfillment ownership, ATP reservation, multi-package shipping, cancellation, RMA, refund và COD settlement.</td><td data-label="Đầu ra">Order state machine; payment, fulfillment và return subflow; permission matrix, exception recovery và service handoff contract.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 4–6<br>10 ngày</span><small class="estimate-days">Ngày 19–28</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P1</strong><span>#04 · Flow 01</span></td><td data-label="Workstream"><strong>Workspace activation & channel onboarding</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Đăng nhập, business context, tạo/chọn kho, kết nối store, cấp quyền, mapping location, chọn sync services, initial sync và readiness handoff.</td><td data-label="Đầu ra">Onboarding state machine, resume/recovery flow, readiness checklist, channel capability matrix và deep link tới blocker.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 6–7<br>6 ngày</span><small class="estimate-days">Ngày 29–34</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P1</strong><span>#05 · Cross-cutting</span></td><td data-label="Workstream"><strong>Settings & operational configuration</strong></td><td data-label="Phạm vi thiết kế tiếp theo">General & Business, Team & Access, Payments và Shipping & Delivery; cấu hình toàn cục, theo workspace và theo store/branch.</td><td data-label="Đầu ra">Settings IA, permission matrix, impact preview, validation và recovery states.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 7–9<br>8 ngày</span><small class="estimate-days">Ngày 35–42</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P1</strong><span>#06 · Flow 04</span></td><td data-label="Workstream"><strong>Live Commerce</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Session setup, SKU allocation, live monitoring, top-up, end session và release stock.</td><td data-label="Đầu ra">War-room prototype, real-time states và recovery playbook.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 9–10<br>4 ngày</span><small class="estimate-days">Ngày 43–46</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P1</strong><span>#07 · Flow 05–06</span></td><td data-label="Workstream"><strong>Customer 360 & conversation handoff</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Identity resolution, merge review, consent, ownership, activity timeline và deep link sang Inbox.</td><td data-label="Đầu ra">Identity state machine, review queue, handoff and return pattern.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 10–11<br>6 ngày</span><small class="estimate-days">Ngày 47–52</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P2</strong><span>#08 · Flow 07</span></td><td data-label="Workstream"><strong>Subscription, entitlement & billing</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Plan selection, trial, upgrade/downgrade, limits, invoice, payment recovery và cancellation.</td><td data-label="Đầu ra">Billing lifecycle, entitlement messaging và recovery prototype.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 11–12<br>4 ngày</span><small class="estimate-days">Ngày 53–56</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P2</strong><span>#09 · Flow 08</span></td><td data-label="Workstream"><strong>Marketing campaign lifecycle</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Audience/source selection, campaign creation, content, approval, channel distribution, demand capture, attribution và performance reporting.</td><td data-label="Đầu ra">Campaign wizard, approval/publish states, channel handoff, attribution model và performance dashboard.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 12<br>4 ngày</span><small class="estimate-days">Ngày 57–60</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P2</strong><span>#10 · Flow 09</span></td><td data-label="Workstream"><strong>Promotion policy & redemption</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Promotion creation, eligibility, discount rule, quota, stacking policy, approval, activation, redemption, refund reversal và outcome reporting.</td><td data-label="Đầu ra">Promotion builder, policy explanation, validation states, redemption lifecycle và commercial outcome report.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 13<br>2 ngày</span><small class="estimate-days">Ngày 61–62</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P3</strong><span>#11 · Workspace</span></td><td data-label="Workstream"><strong>PrimeWeb Studio</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Theme/page/component, Product/Collection binding, responsive preview, domain/SEO, publish, version và rollback.</td><td data-label="Đầu ra">Builder IA, interaction model, publish state machine, clickable prototype và component/state inventory.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 13–14<br>6 ngày</span><small class="estimate-days">Ngày 63–68</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P3</strong><span>#12 · Workspace</span></td><td data-label="Workstream"><strong>POS Workspace</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Mở ca/thiết bị, scan/search, cart, customer/promotion, split payment, receipt, suspend/resume, return/exchange và close shift.</td><td data-label="Đầu ra">Register flow, offline/payment state matrix, hardware recovery prototype và QA scenarios.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 14–15<br>6 ngày</span><small class="estimate-days">Ngày 69–74</small></td></tr>
+    <tr><td data-label="Ưu tiên"><strong>P3</strong><span>#13 · Workspace</span></td><td data-label="Workstream"><strong>Prime Inbox</strong></td><td data-label="Phạm vi thiết kế tiếp theo">Queue/routing, claim, identify customer, conversation, tra order/SKU/ATP, ticket, draft order, secure checkout, resolve và writeback.</td><td data-label="Đầu ra">Queue/conversation interaction model, identity/ownership state machine, assisted-commerce prototype và escalation rules.</td><td data-label="Estimate timeline"><span class="estimate">Tuần 15–16<br>6 ngày</span><small class="estimate-days">Ngày 75–80</small></td></tr>
+  </tbody></table>
+  <div class="total-estimate" aria-label="Tổng estimate hoàn thành prototype">
+    <div>Tổng estimate</div>
+    <div><span>Tổng thời gian thiết kế</span><strong>80 ngày làm việc</strong><p>1 designer × 80 ngày để hoàn thành 13 workstream, bao gồm flow, edge cases, prototype critical path và handoff package.</p></div>
+    <div><span>Thời gian hoàn thành dự kiến</span><strong>16 tuần</strong><p>80 ngày ÷ 5 ngày làm việc/tuần. Review trong tối đa 1 ngày; chưa gồm ngày nghỉ lễ hoặc scope phát sinh.</p></div>
+  </div>
+</section>
 
-          <div class="footer">Đây là kế hoạch thực thi Design được đề xuất, không phải cam kết release của Engineering. Thứ tự ưu tiên: Product Master → Order → Inventory → onboarding và cấu hình → Customer/commercial controls → ba workspace P3 → kiểm thử xuyên hệ thống.</div>
+<!-- Detailed Settings scope: output/docs/prime-os-settings-design-scope.md -->
+
+<section class="plan-section" id="design-contracts">
+  <div class="plan-section-head"><div><p class="eyebrow">Cross-workspace contracts</p><h2>Không tách rời dữ liệu khi tách không gian thao tác</h2><p>Design specification phải chỉ rõ dữ liệu nào được đọc, hành động nào được ghi ngược và user quay lại Main Workspace ở đâu.</p></div></div>
+  <table class="contract-table"><caption class="plan-sr-only">Liên kết dữ liệu giữa ba workspace và Main Workspace</caption><thead><tr><th scope="col">Workspace</th><th scope="col">Đọc từ Main Workspace</th><th scope="col">Ghi ngược về Main Workspace</th><th scope="col">Handoff UX cần thiết kế</th></tr></thead><tbody>
+    <tr><td data-label="Workspace"><strong>PrimeWeb Studio</strong><span>Storefront creation</span></td><td data-label="Đọc từ Main Workspace">Product revision, listing, price, ATP, promotion, customer policy</td><td data-label="Ghi ngược về Main Workspace">Publish version, domain status, storefront events, checkout attribution</td><td data-label="Handoff UX cần thiết kế">Workspace switcher, unsaved-change guard, preview link, lỗi publish quay đúng cấu hình</td></tr>
+    <tr><td data-label="Workspace"><strong>POS Workspace</strong><span>In-store checkout</span></td><td data-label="Đọc từ Main Workspace">Catalog, store price, promotion, customer, branch ATP, staff permission</td><td data-label="Ghi ngược về Main Workspace">Order, payment evidence, stock movement, receipt, shift reconciliation</td><td data-label="Handoff UX cần thiết kế">Open register, branch/device context, offline indicator, resume back-office task</td></tr>
+    <tr><td data-label="Workspace"><strong>Prime Inbox</strong><span>Conversation desk</span></td><td data-label="Đọc từ Main Workspace">Customer 360, order, SKU, ATP, promotion, conversation source health</td><td data-label="Ghi ngược về Main Workspace">Conversation, identity link, ticket, draft order, attribution, resolution</td><td data-label="Handoff UX cần thiết kế">Deep link giữ customer/thread context, ownership notice và return-to-record</td></tr>
+  </tbody></table>
+</section>
+
+  <div class="plan-note"><strong>Capacity & dependency:</strong> Estimate được tính cho 1 designer thực hiện toàn bộ scope theo thứ tự ưu tiên, tổng cộng 80 ngày làm việc tương đương 16 tuần. Timeline giả định Product Owner và Engineering reviewer phản hồi trong 1 ngày làm việc, có SME cho payment, warehouse và channel integration, đồng thời không mở rộng thêm scope. Phạm vi bàn giao là flow, state/edge-case matrix, prototype critical path và backlog ưu tiên; high-fidelity cho toàn bộ màn hình tiếp tục theo từng release.</div>
+
+<div class="plan-footer">Đây là kế hoạch thực thi Design được đề xuất, không phải cam kết release của Engineering. Thứ tự ưu tiên: Product Master → Inventory → Order → onboarding và cấu hình → Customer/commercial controls → ba workspace P3 → kiểm thử xuyên hệ thống.</div>
+<p class="plan-revision">Bản kế hoạch riêng · 06/10/2026. Estimate và thứ tự đã cập nhật theo timeline tham chiếu; tuần được tính lại theo 5 ngày làm việc. Đây không phải báo cáo tiến độ thực tế.</p>
+<!-- END DESIGN PLAN CONTENT -->
         </section>
       </main>
     </div>

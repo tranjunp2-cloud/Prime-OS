@@ -49,7 +49,12 @@ export function pendingShopListings(products = getProducts()) {
     && item.status !== 'ignored' && !item.confirmed && !listingOwner(item, products));
 }
 export function pendingListingReviews(products = getProducts()) {
-  return [...legacyListingReviews(products, getCatalogImportItems({ requireConfirmation: true })), ...pendingShopListings(products)];
+  return pendingShopListings(products);
+}
+
+/** Existing relationships are reviewed in their Master, never in the unmapped inbox. */
+export function pendingMappingReviews(products = getProducts()) {
+  return legacyListingReviews(products, getCatalogImportItems({ requireConfirmation: true }));
 }
 
 const normalizedIdentity = (value: string | undefined) => value?.trim().toUpperCase() || '';

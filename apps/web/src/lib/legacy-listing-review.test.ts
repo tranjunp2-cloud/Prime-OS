@@ -3,7 +3,7 @@ import { readyMasterFields } from '@/test/fixtures/listing-master';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addProduct, commitListingReviewProducts, deleteProduct, getProductById, getProducts, updateProduct, type Product } from './product-store';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from './catalog-import-store';
-import { confirmListingIntake, pendingListingReviews, snapshotListingMatch, snapshotListingSource } from './product-listing-intake';
+import { confirmListingIntake, pendingMappingReviews, snapshotListingMatch, snapshotListingSource } from './product-listing-intake';
 import { legacyListingReviews } from './legacy-listing-review';
 
 let originalIds: Set<string>;
@@ -12,7 +12,7 @@ let source: Product;
 let target: Product;
 let existingSnapshots: Product[];
 const fresh = (id: string) => getProductById(id)!;
-const reviews = () => pendingListingReviews().filter(item => item.existingLinkReview?.productId === source.id);
+const reviews = () => pendingMappingReviews().filter(item => item.existingLinkReview?.productId === source.id);
 beforeEach(() => {
   originalIds = new Set(getProducts().map(product => product.id));
   existingSnapshots = [];
@@ -31,7 +31,7 @@ const confirm = (destination = fresh(source.id)) => {
   const items = reviews();
   return confirmListingIntake(items.map(item => item.id), { productId: destination.id, verifiedSingleListingIds: items.map(item => item.id), reviewed: items.map(item => snapshotListingMatch(item, destination)) });
 };
-describe('Legacy mapping decisions belong to the listing inbox', () => {
+describe('Existing mapping reviews stay with their Product Master', () => {
   it('projects every unresolved link without detaching, auto-confirming or inventing source evidence', () => {
     const before = JSON.stringify(getProducts());
     const item = reviews()[0];
@@ -131,7 +131,7 @@ describe('Legacy mapping decisions belong to the listing inbox', () => {
   it('does not reseed transferred demo links or erase partially reviewed decisions on reload', async () => {
     const demo = fresh('prod_import_test_review_02');
     existingSnapshots.push(structuredClone(demo));
-    const [item] = pendingListingReviews().filter(row => row.existingLinkReview?.productId === demo.id);
+    const [item] = pendingMappingReviews().filter(row => row.existingLinkReview?.productId === demo.id);
     expect(item).toBeDefined();
     confirmListingIntake([item.id], { productId: target.id, verifiedSingleListingIds: [item.id], reviewed: [snapshotListingMatch(item, fresh(target.id))] });
     const remaining = fresh(demo.id).channels;

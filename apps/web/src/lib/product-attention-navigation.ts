@@ -2,7 +2,7 @@ import type { Product } from './product-store';
 import { legacyMappingIssues } from './legacy-listing-review';
 
 const attentionTargets = {
-  'import-review': { section: 'overview', elementId: 'product-import-review' },
+  'import-review': { section: 'distribution', elementId: 'product-section-channels' },
   basic: { section: 'product-data', elementId: 'product-section-basic' },
   identity: { section: 'product-data', elementId: 'product-name' },
   sku: { section: 'product-data', elementId: 'product-master-sku' },

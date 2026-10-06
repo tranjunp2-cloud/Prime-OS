@@ -191,7 +191,8 @@ describe('Product catalog listing inbox', () => {
     expect(cells[1]).not.toHaveTextContent(/review|Incomplete|data issue/i);
     expect(cells[2]).not.toHaveTextContent('decision to review');
     expect(within(cells[7]).queryByRole('button', { name: /Review/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Review & link (3)' })).toBeVisible();
+    // The existing mapping issue is reviewed in its Master, not counted in this inbox.
+    expect(screen.getByRole('button', { name: 'Review & link (2)' })).toBeVisible();
     expect(cells[5]).not.toHaveTextContent(/processing/);
     const warning = within(cells[4]).getByRole('button', { name: /Show affected shops/ });
     expect(warning).not.toHaveClass('border');

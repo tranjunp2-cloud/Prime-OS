@@ -18,6 +18,7 @@ export function AppLayout() {
   const { locale } = useI18n();
   const location = useLocation();
   const isInboxWorkspace = location.pathname.startsWith('/inbox/');
+  const isProductEditor = location.pathname === '/products/new' || /^\/products\/[^/]+\/edit\/?$/.test(location.pathname);
   const shellCopy = useMemo(() => getShellDictionary(locale), [locale]);
   const workspaceTheme = location.pathname.startsWith('/builder')
     ? 'workspace-theme-primeweb'
@@ -103,7 +104,7 @@ export function AppLayout() {
           <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
           <div className="flex h-full min-h-0 flex-col">
             <AppHeader />
-            <main id="main-content" className="scrollbar-visible flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto bg-background">
+            <main id="main-content" className={cn('scrollbar-visible flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto bg-background', isProductEditor && '[scrollbar-gutter:stable]')}>
               <div className="relative min-h-full min-w-0 flex-1">
                 {workspaceSwitching ? (
                   <div className="absolute inset-0 z-20 grid content-start gap-5 bg-background p-6" aria-label="Loading workspace">
