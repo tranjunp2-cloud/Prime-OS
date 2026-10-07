@@ -40,7 +40,8 @@ function MasterIllustration({ pendingCount, sourceChannels }: { pendingCount: nu
   </div>;
 }
 
-export function ProductGettingStarted({ snapshot, pendingCount, sourceChannels = [], preview, onReview, onImport, onCreate, onRetry, onShops, onConnect }: {
+export function ProductGettingStarted({ snapshot, pendingCount, createdCount = 0, sourceChannels = [], preview, onReview, onImport, onCreate, onRetry, onShops, onConnect }: {
+  createdCount?: number;
   snapshot: ChannelSetupSnapshot; pendingCount: number;
   sourceChannels?: Array<{ key: string; label: string }>;
   preview?: ProductOnboardingPreview;
@@ -60,9 +61,9 @@ export function ProductGettingStarted({ snapshot, pendingCount, sourceChannels =
       <MasterIllustration pendingCount={pendingCount} sourceChannels={sourceChannels} />
       <div className="relative min-w-0">
         <p className={styles.recommended}><span aria-hidden="true" className={styles.recommendedDot} />Recommended</p>
-        <h3 id="recommended-product-start" className={`${styles.heroTitle} mt-3 text-xl font-semibold leading-snug tracking-tight sm:text-2xl`}>{pendingCount} shop {pendingCount === 1 ? 'listing' : 'listings'} ready for review</h3>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">Review shop data, then link listings to a Master.</p>
-        <Button className={`${styles.reviewButton} mt-5 min-h-11 px-5`} onClick={onReview}>Review {pendingCount} {pendingCount === 1 ? 'listing' : 'listings'}<ArrowRight aria-hidden="true" className="size-4" /></Button>
+        <h3 id="recommended-product-start" className={`${styles.heroTitle} mt-3 text-xl font-semibold leading-snug tracking-tight sm:text-2xl`}>{createdCount ? 'Continue building your product catalog' : 'Create your first Product Masters'}</h3>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{createdCount ? `${createdCount} Master${createdCount === 1 ? '' : 's'} created in this preview. ${pendingCount} listing${pendingCount === 1 ? '' : 's'} left to review.` : `Start with data from ${pendingCount} imported shop ${pendingCount === 1 ? 'listing' : 'listings'}. Review and create Masters without re-entering it.`}</p>
+        <Button className={`${styles.reviewButton} mt-5 min-h-11 px-5`} onClick={onReview}>Review listings<ArrowRight aria-hidden="true" className="size-4" /></Button>
       </div>
     </section>}
 

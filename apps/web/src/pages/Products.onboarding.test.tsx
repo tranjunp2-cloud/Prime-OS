@@ -29,6 +29,19 @@ afterEach(() => {
 });
 
 describe('First Product Master introduction', () => {
+  it('uses an empty review catalog throughout the no-products preview without changing saved records', () => {
+    records = [{ ...sample }];
+    const before = structuredClone(records);
+    render(<MemoryRouter initialEntries={['/products/master-catalog?preview=first-product']}><Products /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Review listings', exact: true }));
+    expect(screen.queryByRole('columnheader', { name: 'Product Master' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review suggestion' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create Master', exact: true })[0]);
+    expect(screen.getByRole('dialog', { name: 'Create one Master' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Use existing Master' })).not.toBeInTheDocument();
+    expect(records).toEqual(before);
+    expect(localStorage.getItem(completedKey)).toBeNull();
+  });
   it('hides duplicate header shortcuts while keeping working in-place actions', () => {
     render(page());
     expect(screen.getByRole('heading', { name: 'Start your product catalog' })).toBeVisible();

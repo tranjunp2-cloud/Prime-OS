@@ -7,10 +7,12 @@ import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { confirmSuggestedListingLinks, type ListingMatchReview } from '@/lib/product-listing-intake';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
 import type { Product } from '@/lib/product-store';
+import type { ListingIntakeCatalog } from '@/lib/listing-intake-catalog';
 
 export type SuggestedLinkPreview = { listing: CatalogImportItem; master: Product; review: ListingMatchReview };
 
-export function SuggestedListingLinksDialog({ pairs, onClose, onSaved }: {
+export function SuggestedListingLinksDialog({ catalog, pairs, onClose, onSaved }: {
+  catalog?: ListingIntakeCatalog;
   pairs: SuggestedLinkPreview[];
   onClose: () => void;
   onSaved: (result: ReturnType<typeof confirmSuggestedListingLinks>) => void;
@@ -23,7 +25,7 @@ export function SuggestedListingLinksDialog({ pairs, onClose, onSaved }: {
   const confirm = () => {
     if (!acknowledged || !ready || saveLock.current) return;
     saveLock.current = true;
-    try { onSaved(confirmSuggestedListingLinks(pairs.map(pair => pair.review))); }
+    try { onSaved(confirmSuggestedListingLinks(pairs.map(pair => pair.review), catalog)); }
     catch (reason) { saveLock.current = false; setError(reason instanceof Error ? reason.message : 'Could not save links. Return to review and try again.'); setAcknowledged(false); }
   };
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>

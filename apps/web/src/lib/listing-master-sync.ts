@@ -23,7 +23,7 @@ export function masterSyncSourceChanges(previous: MasterSyncPreference, next: Ma
 export function listingMasterSync(listing?: ChannelListing, savedOverride?: ChannelOverride): MasterSyncPreference {
   if (listing?.master_data_sync) {
     const { updated_at: _updatedAt, ...saved } = listing.master_data_sync;
-    const fields = [...new Set((saved.fields ?? []).filter(validField))];
+    const fields = [...new Set((saved.fields ?? []).filter(validField))].filter(field => !listing.review_pending?.sku_mapping_pending || !['price', 'inventory'].includes(field));
     return { ...saved, enabled: saved.enabled && fields.length > 0, fields };
   }
   // Imported links do not inherit another listing's channel-level preferences.
@@ -103,8 +103,13 @@ export function masterSyncPlan(product: Product, listing: ChannelListing, prefer
   const variant = product.product_type === 'variant' || product.has_variants;
   const mappings = listing.variant_mappings ?? [];
   const mappedSkus = mappings.map(mapping => product.skus.find(sku => sku.id === mapping.master_sku_id));
-  const mappingError = variant && (!mappings.length || mappedSkus.some(sku => !sku)
-    || new Set(mappings.map(mapping => mapping.shop_sku)).size !== mappings.length || mappings.some(mapping => !mapping.shop_sku.trim()))
+  const sourceSkus = recorded.variants;
+  const mappingError = listing.review_pending?.sku_mapping_pending || (!variant && (recorded.variantCount ?? 1) > 1)
+    || (variant && (!mappings.length || mappedSkus.some(sku => !sku || sku.status !== 'active')
+    || (recorded.variantCount && mappings.length !== recorded.variantCount)
+    || sourceSkus?.some(sku => !mappings.some(mapping => mapping.shop_sku.trim() === sku.sku.trim()))
+    || new Set(mappings.map(mapping => mapping.master_sku_id)).size !== mappings.length
+    || new Set(mappings.map(mapping => mapping.shop_sku)).size !== mappings.length || mappings.some(mapping => !mapping.shop_sku.trim())))
     ? 'Confirm the listing’s variant-SKU mappings before syncing price or stock.' : undefined;
   const targets = variant ? mappedSkus.flatMap((sku, index) => sku ? [{ label: mappings[index].shop_sku, price: sku.price, stock: sku.stock_by_location ?? {} }] : [])
     : [{ label: listing.shop_sku || product.sku_code, price: product.retail_price, stock: product.inventory }];

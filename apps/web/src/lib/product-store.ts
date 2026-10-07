@@ -104,6 +104,16 @@ export interface ChannelListing {
   /** Fingerprint of the legacy mapping issues explicitly reviewed for this exact listing. */
   identity_review_signature?: string;
   variant_mappings?: Array<{ shop_sku: string; master_sku_id: string }>;
+  /** Saved review work is not a confirmed SKU mapping or permission to sync. */
+  review_pending?: {
+    issues: string[];
+    sku_mapping_pending: boolean;
+    draft_mappings?: Array<{ shop_sku: string; master_sku_id: string }>;
+    master_draft?: Partial<Pick<Product, 'name' | 'description' | 'category' | 'categoryId' | 'images' | 'retail_price' | 'price_currency' | 'specifications' | 'pkg_length' | 'pkg_width' | 'pkg_height' | 'pkg_weight' | 'variant_options' | 'skus' | 'has_variants' | 'product_type' | 'brand' | 'brandId' | 'gtin' | 'mpn' | 'model_number' | 'pack_quantity' | 'field_mappings'>>;
+    master_signature?: string;
+    verified_single?: boolean;
+    saved_at: string;
+  };
   /** Explicit, listing-owned Master data preference. Never a remote sync receipt. */
   master_data_sync?: {
     enabled: boolean;
@@ -127,6 +137,7 @@ export interface ListingDraftValues {
 }
 
 export interface ShopListingSnapshot {
+  mapping_fields?: import('./listing-field-mapping').ImportedMappingField[];
   channel: ChannelListing['channel'];
   store_name: string;
   listing_id: string;
@@ -213,6 +224,8 @@ export interface LocalizedProductContent {
 //     Fields marked [→ dynamic attr] will move to product_family_attributes (driven by familyId).
 //     Fields marked [→ product_identifiers] will move to a shared identifier namespace table.
 export interface Product {
+  /** Reviewed import provenance only; never a recurring or outbound sync rule. */
+  field_mappings?: import('./listing-field-mapping').MasterFieldMappings;
   id: string;
   // Identity — fixed ✅
   name: string;          // [→ dynamic attr, surface: 'basic', isLocalizable: true, isRequired: true]
@@ -796,6 +809,7 @@ function normalizeStoredProduct(product: Product): Product {
     meta_title: typeof product.meta_title === 'string' ? product.meta_title : '',
     meta_description: typeof product.meta_description === 'string' ? product.meta_description : '',
     specifications,
+    field_mappings: product.field_mappings && typeof product.field_mappings === 'object' && !Array.isArray(product.field_mappings) ? structuredClone(product.field_mappings) : undefined,
     inventory_adjustments: Array.isArray(product.inventory_adjustments) ? product.inventory_adjustments : [],
     inventory_transfers: Array.isArray(product.inventory_transfers) ? product.inventory_transfers : [],
     inventory: product.inventory && typeof product.inventory === 'object' && !Array.isArray(product.inventory) ? normalizeDemoStockLocations(product.inventory) : {},

@@ -52,7 +52,7 @@ export function withProductActivity(previous: Product | undefined, next: Product
       ['name', 'Product name'], ['sku_code', 'Master SKU'], ['description', 'Description'], ['brand', 'Brand'], ['category', 'Category'],
       ['images', 'Product images'], ['image_alt_texts', 'Image descriptions'], ['retail_price', 'Base price'], ['price_currency', 'Currency'],
       ['inventory', 'Warehouse stock'], ['skus', 'Variants'], ['specifications', 'Attributes'], ['localized_content', 'Translations'],
-      ['gtin', 'GTIN'], ['mpn', 'MPN'], ['model_number', 'Model'], ['pack_quantity', 'Pack quantity'],
+      ['gtin', 'GTIN'], ['mpn', 'MPN'], ['model_number', 'Model'], ['pack_quantity', 'Pack quantity'], ['field_mappings', 'Import field sources'],
       ['manufacturer', 'Manufacturer'], ['asin', 'ASIN'], ['condition', 'Condition'], ['original_price', 'Original price'],
       ['prod_length', 'Product length'], ['prod_width', 'Product width'], ['prod_height', 'Product height'], ['prod_weight', 'Product weight'],
       ['pkg_length', 'Package length'], ['pkg_width', 'Package width'], ['pkg_height', 'Package height'], ['pkg_weight', 'Package weight'],
@@ -73,9 +73,12 @@ export function withProductActivity(previous: Product | undefined, next: Product
     const key = listing.channel === 'website' ? 'webstore' : listing.channel;
     if (!old) {
       push({ scope: 'listing', kind: 'linked', title: listing.external_id ? 'Listing linked to this Master' : 'Local listing draft added', listing: identity,
-        detail: 'Local relationship recorded. No shop publication or stock transfer was requested.' });
+        detail: listing.review_pending ? `Review unfinished: ${listing.review_pending.issues.join('; ')}. Sync was not turned on.` : 'Local relationship recorded. No shop publication or stock transfer was requested.' });
       continue;
     }
+    if (changed(old.review_pending, listing.review_pending)) push({ scope: 'listing', kind: 'mapping', listing: identity,
+      title: listing.review_pending ? 'Listing review progress saved' : 'Listing review completed',
+      detail: listing.review_pending ? listing.review_pending.issues.join('; ') : 'Pending review cleared. Sync was not turned on.' });
     if (changed(old.variant_mappings, listing.variant_mappings) || old.identity_review_signature !== listing.identity_review_signature) {
       push({ scope: 'listing', kind: 'mapping', title: 'Listing mapping confirmed', listing: identity,
         detail: 'The listing identity or SKU mapping was reviewed. Master activation is a separate action.' });

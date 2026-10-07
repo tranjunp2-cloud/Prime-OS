@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
 import { addProduct, deleteProduct, getProductById, getProducts, updateProduct, type Product } from './product-store';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from './catalog-import-store';
-import { applyMasterCompletion, assertMasterComplete, completionFields, prepareMasterCompletion, type MasterCompletion } from './listing-master-completion';
+import { applyMasterCompletion, assertMasterComplete, completionFields, prepareMasterCompletion, variantMappingError, type MasterCompletion } from './listing-master-completion';
 import { confirmListingIntake, confirmSuggestedListingLinks, pendingShopListings, snapshotListingMatch } from './product-listing-intake';
 import { getStoredMasterReadiness } from './product-master-readiness';
 import { getProductCatalogSettings } from './product-catalog-settings-store';
@@ -31,6 +31,15 @@ afterEach(() => {
 });
 
 describe('Complete and activate a Master in listing review', () => {
+  it('blocks invented source SKUs when the imported variant data is absent or incomplete', () => {
+    const skus = ['Red', 'Blue'].map((variation_name, index) => ({ id: `validation-${index}`, sku_code: `VALID-${index}`, variation_name, status: 'active' as const, weight_g: 0, units_per_carton: 1 }));
+    const variantMaster = { ...master, has_variants: true, product_type: 'variant' as const, skus };
+    const variantSource = { ...source, variants: 2 };
+    const mappings = { [source.id]: skus.map(sku => ({ shop_sku: sku.sku_code, master_sku_id: sku.id })) };
+    expect(variantMappingError([variantSource], variantMaster, mappings)).toMatch(/Listing SKU data is incomplete/);
+    expect(variantMappingError([{ ...variantSource, variantItems: [{ sku: 'SHOP-RED', label: 'Red' }] }], variantMaster, mappings)).toMatch(/Listing SKU data is incomplete/);
+    expect(variantMappingError([{ ...variantSource, variantItems: [{ sku: 'SHOP-RED', label: 'Red' }, { sku: 'SHOP-BLUE', label: 'Blue' }] }], variantMaster, mappings)).toMatch(/exact child SKUs/);
+  });
   it('preserves existing data and cover, merges source galleries and fills only empty content/package fields', () => {
     const gallery = { ...source, image: '/listing.jpg', images: ['/listing.jpg', '/detail.jpg'], description: 'Source description', pkg_length: 25 };
     const candidate = prepareMasterCompletion({ ...master, images: ['/cover.jpg', '/detail.jpg'], pkg_length: 0 }, [gallery]);

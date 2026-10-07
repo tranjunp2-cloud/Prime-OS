@@ -60,11 +60,26 @@ export function groupEvidenceSummary(items: CatalogImportItem[], product: Produc
   };
 }
 
-/** Preselect a known suggestion for review only, never infer a target from ranking. */
+/** Recompute a conservative suggestion after creation. Never match by rank/count alone. */
+function sourceBasedCandidate(item: CatalogImportItem, products: Product[]) {
+  const titleKey = (value: string) => normalized(value).split(/[^\p{L}\p{N}]+/u).filter(Boolean).sort().join(' ');
+  const candidates = products.filter(product => product.status !== 'archived' && !listingMatchEvidence(item, product)
+    .some(row => ['gtin', 'mpn', 'model', 'pack'].includes(row.key) && row.state === 'different') && (
+    (normalized(item.gtin) && normalized(item.gtin) === normalized(product.gtin)) ||
+    product.channels.some(channel => {
+      const source = channel.shop_snapshot;
+      return source && normalized(item.brand) && normalized(item.brand) === normalized(source.brand)
+        && titleKey(item.title) === titleKey(source.title) && item.variants === source.variant_count;
+    })
+  ));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+/** Preselect for review only; every resulting relationship still needs confirmation. */
 export function suggestedMasterForReview(items: CatalogImportItem[], products: Product[]) {
-  const targetId = items[0]?.suggestedProductId;
-  if (!targetId || !items.every(item => item.suggestedProductId === targetId && !item.confirmed && item.status !== 'ignored' && item.resolution !== 'ignore')) return null;
-  return products.find(product => product.id === targetId && product.status !== 'archived') ?? null;
+  if (!items.length || items.some(item => item.confirmed || item.status === 'ignored' || item.resolution === 'ignore')) return null;
+  const candidates = items.map(item => products.find(product => product.id === item.suggestedProductId && product.status !== 'archived') ?? sourceBasedCandidate(item, products));
+  return candidates[0] && candidates.every(product => product?.id === candidates[0]?.id) ? candidates[0] : null;
 }
 
 /** Ranking only: never expose this heuristic as a probability or bypass confirmation. */

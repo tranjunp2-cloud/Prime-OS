@@ -2035,7 +2035,7 @@ export default function ProductCreatePage() {
     const review = listing && mappingReviews.find(item => item.existingLinkReview?.key === legacyReviewKey(listing));
     if (!review || !existingProduct) return null;
     return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-amber-700 dark:text-amber-300">
-      <span className="inline-flex items-center gap-1.5"><CircleAlert className="size-3.5" aria-hidden="true" />Mapping needs review</span>
+      <span className="inline-flex items-center gap-1.5"><CircleAlert className="size-3.5" aria-hidden="true" />{listing?.review_pending?.issues[0] || 'Mapping needs review'}</span>
       {canWrite && <Button type="button" variant="link" size="sm" className="h-8 p-0 text-inherit underline underline-offset-4" aria-label={`Review mapping for ${shop}`} onClick={event => {
         mappingReviewTrigger.current = event.currentTarget;
         setMappingReview(structuredClone({ listing: review, master: existingProduct }));
@@ -3373,7 +3373,7 @@ export default function ProductCreatePage() {
 
               </CardHeader>
               <CardContent>
-                {mappingReviews.length > 0 && <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" /><div><p className="font-medium">{mappingReviews.length} listing mapping{mappingReviews.length === 1 ? ' needs' : 's need'} review</p><p className="text-muted-foreground">Check that the flagged listings belong to this Master. The current mapping stays unchanged until you confirm. Shop data and sync settings are unaffected.{isArchived ? ' Restore this Master to review its mappings.' : ''}</p></div></div>}
+                {mappingReviews.length > 0 && <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" /><div><p className="font-medium">{mappingReviews.length} listing mapping{mappingReviews.length === 1 ? ' needs' : 's need'} review</p><p className="text-muted-foreground">Check that the flagged listings belong to this Master. Shop data is unchanged. Unconfirmed SKU mappings cannot be used for price or stock sync.{isArchived ? ' Restore this Master to review its mappings.' : ''}</p></div></div>}
                 {!isArchived && channelListingCount === 0 && !masterReadyForListings ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3 text-sm"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" /><div className="min-w-0 flex-1"><p className="font-semibold">Complete required Master data before creating or publishing listings</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Next required item: {firstMissingMasterListingCheck?.label ?? 'Complete Product Master data'}.</p><Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0 text-amber-600" onClick={() => firstMissingMasterListingCheck && openCompletionItem(firstMissingMasterListingCheck.id)}>Fix this requirement<ChevronRight className="size-3.5" /></Button></div></div> : null}
                 {canWrite && !storedProduct ? <p className="mb-4 text-xs text-muted-foreground">Save this Master before linking existing listings.</p> : null}
                 {!isArchived && channelListingCount === 0 && masterReadyForListings && (!existingProduct || isDirty) ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-500/25 bg-blue-500/[0.06] p-3 text-sm"><Info className="mt-0.5 size-4 shrink-0 text-blue-500" /><div><p className="font-semibold">Creating a listing saves your Master first</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Linking an existing listing uses the saved Master and keeps your unsaved edits here.</p></div></div> : null}
@@ -3928,7 +3928,8 @@ export default function ProductCreatePage() {
         onClose={() => setMappingReview(null)}
         restoreFocus={() => (mappingReviewTrigger.current?.isConnected ? mappingReviewTrigger.current : document.getElementById('product-section-channels'))?.focus()}
         onSaved={(result, created) => {
-          acknowledgeListingCommit(mappingReview.master.record_version ?? 1);
+          if (!result.masterUpdated) acknowledgeListingCommit(mappingReview.master.record_version ?? 1);
+          else setStaleConflictOpen(true);
           const latest = getProductById(mappingReview.master.id)!;
           // A moved listing must not survive as a phantom setup row or be re-created by a later Master save.
           const removedKeys = OVERRIDE_CHANNELS.map(channel => channel.key).filter(key => mappingReview.master.channels.some(listing => listing.channel === listingChannelByOverride[key]) && !latest.channels.some(listing => listing.channel === listingChannelByOverride[key]) && !latest.channel_overrides?.[key]);
@@ -3943,7 +3944,7 @@ export default function ProductCreatePage() {
             }
           }
           setMappingReview(null);
-          toast({ title: result.productId === latest.id ? 'Mapping confirmed' : created ? 'Listing moved to a new Master' : 'Listing moved to the selected Master', description: result.reviewSaved ? 'Shop data, sync settings and Master stock are unchanged.' : 'Mapping saved, but review history could not be saved. Shop data is unchanged.' });
+          toast({ title: result.deferred ? 'Review progress saved' : result.productId === latest.id ? 'Mapping confirmed' : created ? 'Listing moved to a new Master' : 'Listing moved to the selected Master', description: result.reviewSaved ? result.masterUpdated ? 'Reviewed Master changes saved. Reload the editor to use the latest data. Nothing was published; sync was not turned on.' : result.deferred ? 'Linked with review unfinished. Unconfirmed SKU mappings cannot be used for price or stock sync.' : 'Shop data and Master stock are unchanged. Sync was not turned on.' : 'Mapping saved, but review history could not be saved. Shop data is unchanged.' });
         }}
       />}
       {canWrite && linkExistingMaster && <LinkExistingListingsDialog

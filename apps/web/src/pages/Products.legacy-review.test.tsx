@@ -65,8 +65,8 @@ describe('Existing mapping review is separate from the unmapped listing inbox', 
     openCurrentLink();
     expect(screen.getByRole('dialog', { name: 'Review mapping' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Create new Master' }));
-    expect(screen.getByRole('button', { name: 'Continue to details' })).toBeDisabled();
-    expect(screen.getByText('Shop SKU structure is not recorded. Check the source and choose the correct type.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByText('Check the source SKU structure and confirm the product type before activating.')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Use existing Master' }));
     expect(screen.getByRole('region', { name: 'Find a Product Master' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Back to Channel listings' }));

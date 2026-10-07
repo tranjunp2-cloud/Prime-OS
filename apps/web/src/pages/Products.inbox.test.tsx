@@ -114,12 +114,15 @@ describe('Product catalog listing inbox', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    expect(screen.getByRole('columnheader', { name: 'Product Master' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Link to one Master' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Review selected listings' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create one Master' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Create one Master' }));
-    expect(dialog.getByRole('button', { name: 'Continue to details' })).toBeDisabled();
+    expect(dialog.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     fireEvent.click(dialog.getByRole('checkbox', { name: /I checked/ }));
-    fireEvent.click(dialog.getByRole('button', { name: 'Continue to details' }));
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create & activate Master' }));
+
+    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
     expect(screen.getByRole('dialog', { name: 'Review shop listings' })).toBeVisible();
     expect(screen.getByText('All listings reviewed')).toBeVisible();
     expect(screen.getByRole('button', { name: 'View updated Master' })).toBeVisible();
@@ -148,6 +151,30 @@ describe('Product catalog listing inbox', () => {
     expect(screen.queryByRole('region', { name: 'Shop listings to review' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Review & link|Listings to link|Product Masters/ })).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Catalog status' })).toBeVisible();
+  });
+
+  it('keeps a recovery entry point when all imported listings are linked but reviews are unfinished', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create one Master' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I checked/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft & link' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Save draft & link' }));
+    expect(screen.getByText('0 unlinked · 2 linked reviews unfinished')).toBeVisible();
+    expect(screen.queryByText('All listings reviewed')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Linked listings to finish' })).toHaveTextContent('2 reviews unfinished');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue review (2)' }));
+    const progress = within(screen.getByRole('region', { name: 'Linked listings to finish' }));
+    fireEvent.click(progress.getAllByRole('button', { name: 'Continue review' })[0]);
+    expect(screen.getByRole('region', { name: 'Complete Product Master' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Save progress' })).toBeEnabled();
+    expect(screen.getByTestId('path')).toHaveTextContent('/products/master-catalog');
+    const created = getProducts().filter(product => !originalIds.has(product.id));
+    expect(created).toHaveLength(1);
+    expect(created[0].status).toBe('draft');
+    expect(created[0].channels).toHaveLength(2);
   });
 
   it('links to a seller-selected Master and refreshes the remaining count without navigating', async () => {

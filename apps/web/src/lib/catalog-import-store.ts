@@ -1,4 +1,6 @@
 import type { ChannelListing, ListingDraftValues, ShopListingSnapshot } from './product-store';
+import { withCatalogSkuDemo } from './catalog-import-sku-demo';
+import type { ImportedMappingField } from './listing-field-mapping';
 
 export type ImportMatchStatus = 'matched' | 'suggested' | 'unmatched' | 'conflict' | 'ignored';
 export type ImportResolution = 'link' | 'create' | 'later' | 'ignore';
@@ -14,6 +16,8 @@ export interface CatalogImportItem {
   /** Source data only. Missing gallery/content is completed explicitly by the seller. */
   images?: string[];
   description?: string;
+  /** Original provider fields, when supplied by the importer. */
+  mappingFields?: ImportedMappingField[];
   variantItems?: ShopListingSnapshot['variant_items'];
   shipping?: ListingDraftValues['shipping'];
   channelSettings?: ListingDraftValues['channel_settings'];
@@ -99,6 +103,7 @@ const defaults: CatalogImportItem[] = [
 
 export function getCatalogImportItems(options: { requireConfirmation?: boolean } = {}): CatalogImportItem[] {
   const normalize = (item: CatalogImportItem): CatalogImportItem => {
+    item = withCatalogSkuDemo(item);
     // The intake workspace only reads suggestions. Never confirm on page load,
     // and never replace a user's chosen Master with an older suggestion.
     if (options.requireConfirmation || item.confirmed) return { ...item };

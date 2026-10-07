@@ -1,10 +1,12 @@
-import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from './catalog-import-store';
-import { addProduct, commitListingReviewProducts, getProducts, type Product, type ProductType } from './product-store';
+import { getCatalogImportItems, type CatalogImportItem } from './catalog-import-store';
+import { getProducts, type Product, type ProductType } from './product-store';
+import { savedListingCatalog, type ListingIntakeCatalog } from './listing-intake-catalog';
 import { commitExistingListingReviews, legacyIssueSignature, legacyListingReviews, legacyMappingIssues } from './legacy-listing-review';
-import { listingMatchEvidence } from './listing-match-evidence';
+import { listingMatchEvidence, suggestedMasterForReview } from './listing-match-evidence';
 import { suggestMasterSku } from './product-onboarding';
 import { getProductCatalogSettings } from './product-catalog-settings-store';
 import { snapshotShopListing } from './listing-shop-data';
+import { savedReviewProgress } from './listing-review-progress';
 
 import { applyMasterCompletion, assertMasterComplete, newListingMasterPreview, variantMappingError, type MasterCompletion, type VariantMappings } from './listing-master-completion';
 
@@ -21,7 +23,9 @@ export type CreateListingMasterInput = {
   verifiedSourceStructure?: boolean;
   completion?: Partial<MasterCompletion>;
   variantMappings?: VariantMappings;
+  defer?: boolean;
 };
+export type ExistingListingMasterInput = { productId: string; reviewed?: ListingMatchReview[]; verifiedSingleListingIds?: string[]; variantMappings?: VariantMappings; defer?: boolean; completion?: Partial<MasterCompletion>; activate?: boolean };
 
 export function snapshotListingSource(item: CatalogImportItem): ListingSourceReview {
   return { itemId: item.id, signature: JSON.stringify(item) };
@@ -44,24 +48,27 @@ export function listingOwner(item: CatalogImportItem, products = getProducts()) 
   return products.find(product => product.channels.some(listing => listing.channel === item.channel
     && listing.external_id === item.listingId && (!listing.store_name || listing.store_name === item.storeName)));
 }
-export function pendingShopListings(products = getProducts()) {
-  return getCatalogImportItems({ requireConfirmation: true }).filter(item => item.resolution !== 'ignore'
+export function pendingShopListings(products = getProducts(), items = getCatalogImportItems({ requireConfirmation: true })) {
+  return items.filter(item => item.resolution !== 'ignore'
     && item.status !== 'ignored' && !item.confirmed && !listingOwner(item, products));
 }
-export function pendingListingReviews(products = getProducts()) {
-  return pendingShopListings(products);
+export function pendingListingReviews(products = getProducts(), items = getCatalogImportItems({ requireConfirmation: true })) {
+  return pendingShopListings(products, items);
 }
 
 /** Existing relationships are reviewed in their Master, never in the unmapped inbox. */
-export function pendingMappingReviews(products = getProducts()) {
-  return legacyListingReviews(products, getCatalogImportItems({ requireConfirmation: true }));
+export function pendingMappingReviews(products = getProducts(), items = getCatalogImportItems({ requireConfirmation: true })) {
+  return legacyListingReviews(products, items);
+}
+export function unfinishedListingReviews(products = getProducts(), items = getCatalogImportItems({ requireConfirmation: true })) {
+  return pendingMappingReviews(products, items).filter(item => products.find(product => product.id === item.existingLinkReview?.productId)?.channels.some(link => link.review_pending && link.external_id === item.listingId && (!link.store_name || link.store_name === item.storeName)));
 }
 
 const normalizedIdentity = (value: string | undefined) => value?.trim().toUpperCase() || '';
 
 export function getListingSuggestion(item: CatalogImportItem, products = getProducts()) {
-  const product = products.find(product => product.id === item.suggestedProductId && product.status !== 'archived');
-  const suggested = Boolean(product && (item.status === 'matched' || item.status === 'suggested'));
+  const product = suggestedMasterForReview([item], products) ?? undefined;
+  const suggested = Boolean(product && (product.id !== item.suggestedProductId || item.status === 'matched' || item.status === 'suggested'));
   const identityConflict = product && listingMatchEvidence(item, product).find(row => !['sku', 'brand', 'structure'].includes(row.key) && row.state === 'different');
   let reason = '';
   if (item.existingLinkReview) reason = 'Existing link · verify identity and pack';
@@ -85,9 +92,9 @@ export function snapshotListingMatch(item: CatalogImportItem, product: Product):
 }
 
 /** Confirm relationships atomically, without editing or activating existing Masters. */
-export function confirmSuggestedListingLinks(reviewed: ListingMatchReview[]) {
-  const items = getCatalogImportItems({ requireConfirmation: true });
-  const products = getProducts();
+export function confirmSuggestedListingLinks(reviewed: ListingMatchReview[], catalog: ListingIntakeCatalog = savedListingCatalog) {
+  const items = catalog.listings();
+  const products = catalog.products();
   if (!reviewed.length || new Set(reviewed.map(pair => pair.itemId)).size !== reviewed.length) throw new Error('Select distinct listing pairs to review.');
   const pairs = reviewed.map(pair => {
     const item = items.find(item => item.id === pair.itemId);
@@ -107,24 +114,24 @@ export function confirmSuggestedListingLinks(reviewed: ListingMatchReview[]) {
     next.import_sources!.push({ channel: item.channel, store: item.storeName, listing_id: item.listingId, shop_sku: item.channelSku, brand: item.brand || '', price: item.price, currency: item.currency });
     changes.set(product.id, next);
   });
-  commitListingReviewProducts([...changes.values()]);
+  catalog.commit([...changes.values()]);
   let reviewSaved = true;
   const destinations = new Map(reviewed.map(pair => [pair.itemId, pair.productId]));
-  try { saveCatalogImportItems(items.map(item => destinations.has(item.id) ? { ...item, resolution: 'link', resolvedProductId: destinations.get(item.id), confirmed: true } : item)); }
+  try { catalog.saveListings(items.map(item => destinations.has(item.id) ? { ...item, resolution: 'link', resolvedProductId: destinations.get(item.id), confirmed: true } : item)); }
   catch { reviewSaved = false; }
   return { linkedCount: pairs.length, masterCount: changes.size, productIds: [...changes.keys()], reviewSaved };
 }
 
 /** One explicit local decision. No outbound channel calls or inventory writes. */
-export function confirmListingIntake(ids: string[], target: { productId: string; reviewed?: ListingMatchReview[]; verifiedSingleListingIds?: string[]; variantMappings?: VariantMappings } | CreateListingMasterInput) {
-  const items = getCatalogImportItems({ requireConfirmation: true });
-  const products = getProducts();
+export function confirmListingIntake(ids: string[], target: ExistingListingMasterInput | CreateListingMasterInput, catalog: ListingIntakeCatalog = savedListingCatalog) {
+  const items = catalog.listings();
+  const products = catalog.products();
   const selected = [...items, ...legacyListingReviews(products, items)].filter(item => ids.includes(item.id));
   if (!selected.length || selected.length !== new Set(ids).size) throw new Error('The selection changed. Reload the listings and try again.');
   if (selected.some(item => item.resolution === 'ignore' || item.status === 'ignored')) throw new Error('A selected listing has been excluded. Refresh the list before continuing.');
   const identities = selected.map(item => `${item.channel}:${item.storeName}:${item.listingId}`);
   if (new Set(identities).size !== identities.length) throw new Error('The selection contains the same shop listing more than once. Review it before continuing.');
-  if (selected.some(item => !item.existingLinkReview && (item.confirmed || listingOwner(item)))) throw new Error('A selected listing is already linked. Refresh the list before continuing.');
+  if (selected.some(item => !item.existingLinkReview && (item.confirmed || listingOwner(item, products)))) throw new Error('A selected listing is already linked. Refresh the list before continuing.');
   const existingLinkReview = selected.some(item => item.existingLinkReview);
   if (existingLinkReview && selected.some(item => !item.existingLinkReview)) throw new Error('Review existing links separately from new listings.');
   if (existingLinkReview && (('productId' in target && !target.reviewed) || (!('productId' in target) && !target.reviewedSources))) throw new Error('Review the current listing details before confirming.');
@@ -149,10 +156,9 @@ export function confirmListingIntake(ids: string[], target: { productId: string;
     if (target.name.trim().length < 3 || !sku) throw new Error('Enter a product name and Master SKU.');
     if (products.some(item => item.sku_code.toUpperCase() === sku || item.skus.some(variant => variant.sku_code.toUpperCase() === sku))) throw new Error('This SKU already exists. Choose the existing Master or use another SKU.');
     const productType = target.productType ?? (source.variants > 1 ? 'variant' : 'single');
-    if (selected.some(item => item.variants === 0) && !target.verifiedSourceStructure) throw new Error('Verify the source product structure before creating a Master.');
+    if (!target.defer && selected.some(item => item.variants === 0) && !target.verifiedSourceStructure) throw new Error('Verify the source product structure before creating a Master.');
     if (productType !== 'single' && productType !== 'variant') throw new Error('Choose Single product or With variants.');
     if (source.variants > 1 && productType === 'single') throw new Error('This listing has multiple SKUs. Keep With variants and prepare its SKU details in the Master.');
-    if (selected.length > 1 && (productType === 'variant' || selected.some(item => item.variants > 1))) throw new Error('Import variant listings separately first. Their individual SKU details must be checked before grouping.');
     const settings = getProductCatalogSettings();
     const category = settings.categories.find(item => item.id === target.categoryId && item.status === 'Active');
     if (target.categoryId && !category) throw new Error('This category is no longer available. Choose another category or clear it.');
@@ -164,15 +170,24 @@ export function confirmListingIntake(ids: string[], target: { productId: string;
     product = { ...newListingMasterPreview(source, { ...target, brandId }), id: `prod_intake_${crypto.randomUUID()}`, created_at: now, updated_at: now };
   }
   if (!('productId' in target)) {
-    product = applyMasterCompletion(product, selected, target.completion);
-    assertMasterComplete(product, selected);
-    activateCompletedMaster(product);
+    product = applyMasterCompletion(product, selected.filter(item => item.id === target.sourceId), target.completion, true);
+    if (!target.defer) { assertMasterComplete(product, selected, products); activateCompletedMaster(product); }
+    else { product.status = 'draft'; product.import_activation_paused = true; }
+  } else if (target.completion && !target.defer) {
+    if (!target.reviewed) throw new Error('Review the current Master before changing its details.');
+    product = applyMasterCompletion(product, [], target.completion);
+    assertMasterComplete(product, selected, products);
+    if (target.activate) activateCompletedMaster(product);
   }
-  const mappingError = variantMappingError(selected, product, target.variantMappings, 'productId' in target ? target.verifiedSingleListingIds : target.verifiedSourceStructure ? selected.map(item => item.id) : []);
-  if (mappingError) throw new Error(mappingError);
+  const verified = ('productId' in target ? target.verifiedSingleListingIds : target.verifiedSourceStructure ? selected.map(item => item.id) : []) ?? [];
+  const mappingError = variantMappingError(selected, product, target.variantMappings, verified);
+  if (mappingError && !target.defer) throw new Error(mappingError);
+  const savedDraft = 'productId' in target && target.completion && target.defer ? applyMasterCompletion(product, [], target.completion) : undefined;
+  const progress = target.defer ? Object.fromEntries(selected.map(source => [source.id,
+    savedReviewProgress(source, product, target.variantMappings ?? {}, verified, savedDraft, !('productId' in target) || Boolean(savedDraft))])) : undefined;
   if (existingLinkReview) {
-    commitExistingListingReviews(selected, product, !('productId' in target), target.variantMappings);
-    return { productId: product.id, reviewSaved: true };
+    commitExistingListingReviews(selected, product, !('productId' in target), target.variantMappings, progress, catalog);
+    return { productId: product.id, reviewSaved: true, deferred: Boolean(target.defer), masterUpdated: Boolean('productId' in target && target.completion && !target.defer) };
   }
   const result: Product = {
     ...product,
@@ -180,18 +195,18 @@ export function confirmListingIntake(ids: string[], target: { productId: string;
     record_version: 'productId' in target ? (product.record_version ?? 1) + 1 : 1,
     channels: [...product.channels, ...selected.map(item => ({ channel: item.channel, external_id: item.listingId,
       store_name: item.storeName, shop_sku: item.channelSku, reported_stock: item.channelStock, shop_snapshot: snapshotShopListing(item),
-      status: 'draft' as const, publication_unconfirmed: true, listing_url: item.listingUrl || null, last_synced_at: null, identity_review_signature: legacyIssueSignature(product), variant_mappings: target.variantMappings?.[item.id] }))],
+      status: 'draft' as const, publication_unconfirmed: true, listing_url: item.listingUrl || null, last_synced_at: null, identity_review_signature: legacyIssueSignature(product), variant_mappings: target.defer ? undefined : target.variantMappings?.[item.id], review_pending: progress?.[item.id] }))],
     import_sources: [...(product.import_sources ?? []), ...selected.map(item => ({ channel: item.channel, store: item.storeName, listing_id: item.listingId, shop_sku: item.channelSku, brand: item.brand || '', price: item.price, currency: item.currency }))],
   };
-  if ('productId' in target) commitListingReviewProducts([result]);
-  else addProduct(result, { requirePersistence: true });
+  if ('productId' in target) catalog.commit([result]);
+  else catalog.add(result);
   // The persisted Master relationship is authoritative. If the secondary review
   // receipt cannot be saved, ownership still prevents linking the listing twice.
   let reviewSaved = true;
   try {
-    saveCatalogImportItems(items.map(item => ids.includes(item.id) ? { ...item, resolution: 'link', resolvedProductId: product.id, confirmed: true } : item));
+    catalog.saveListings(items.map(item => ids.includes(item.id) ? { ...item, resolution: 'link', resolvedProductId: product.id, confirmed: true } : item));
   } catch { reviewSaved = false; }
-  return { productId: product.id, reviewSaved };
+  return { productId: product.id, reviewSaved, deferred: Boolean(target.defer), masterUpdated: Boolean('productId' in target && target.completion && !target.defer) };
 }
 
 function activateCompletedMaster(product: Product) {
@@ -203,6 +218,6 @@ function activateCompletedMaster(product: Product) {
   if (!product.import_issues?.length && product.import_result === 'incomplete') product.import_result = undefined;
 }
 
-export function intakeSku() {
-  return suggestMasterSku(getProducts().flatMap(product => [product.sku_code, ...product.skus.map(sku => sku.sku_code)]));
+export function intakeSku(products = getProducts()) {
+  return suggestMasterSku(products.flatMap(product => [product.sku_code, ...product.skus.map(sku => sku.sku_code)]));
 }

@@ -26,11 +26,13 @@ import { CreateProductDialog, type CreateProductDraftInput } from '@/components/
 import { ProductGettingStarted } from '@/components/products/ProductGettingStarted';
 import { ConnectStoreWizardModal } from '@/components/channels/ConnectStoreWizardModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { createEmptyListingCatalog, type ListingIntakeCatalog } from '@/lib/listing-intake-catalog';
+import { withFirstMasterDemoData } from '@/lib/catalog-import-sku-demo';
 import { ProductListingIntake } from '@/components/products/ProductListingIntake';
 import type { IntakeStage } from '@/components/products/ListingMasterReview';
 import { ListingReviewBanner } from '@/components/products/ListingReviewBanner';
 import { useProductChannelSetup } from '@/hooks/use-product-channel-setup';
-import { pendingListingReviews } from '@/lib/product-listing-intake';
+import { pendingListingReviews, unfinishedListingReviews } from '@/lib/product-listing-intake';
 import { legacyMappingIssues } from '@/lib/legacy-listing-review';
 import { productIntroMode, type ProductOnboardingPreview } from '@/lib/product-onboarding';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -310,7 +312,7 @@ export default function Products() {
   }, [intakeOpen, recentMasterIds]);
   const closeIntake = () => {
     setIntakeOpen(false);
-    if (!savedInIntake.current) return;
+    if (!savedInIntake.current || previewCatalog) return;
     clearCatalogFilters();
     setCatalogView(savedInIntake.current === 'created' ? 'active' : 'all');
     setHiddenMasterColumns(columns => columns.filter(column => column !== 'updated'));
@@ -327,6 +329,9 @@ export default function Products() {
   };
   const previewMode: ProductOnboardingPreview | undefined = workspaceMode !== 'master' ? undefined : queryParams.get('preview') === 'no-channels' ? 'no-channels' : queryParams.get('preview') === 'first-product' ? 'no-products' : undefined;
   const previewIntro = Boolean(previewMode);
+  const previewCatalogRef = useRef<ListingIntakeCatalog | null>(null);
+  if (previewMode === 'no-products' && !previewCatalogRef.current) previewCatalogRef.current = createEmptyListingCatalog(pendingListingReviews().map(withFirstMasterDemoData));
+  const previewCatalog = previewMode === 'no-products' ? previewCatalogRef.current! : undefined;
   const [hasCreatedMaster, setHasCreatedMaster] = useState(() => {
     try { return localStorage.getItem('prime-product-intro-completed-v1') === '1'; }
     catch { return false; }
@@ -365,10 +370,12 @@ export default function Products() {
   };
 
   const products = getProducts();
-  const pendingListings = pendingListingReviews(products);
+  const pendingListings = previewCatalog ? pendingListingReviews(previewCatalog.products(), previewCatalog.listings()) : pendingListingReviews(products);
+  const unfinishedListings = previewCatalog ? unfinishedListingReviews(previewCatalog.products(), previewCatalog.listings()) : unfinishedListingReviews(products);
+  const reviewListings = [...pendingListings, ...unfinishedListings];
   const introMode = productIntroMode(products.length, hasCreatedMaster, previewIntro);
   const showingIntro = introMode === 'intro';
-  const showQueueBanner = introMode === 'catalog' && pendingListings.length > 0;
+  const showQueueBanner = introMode === 'catalog' && reviewListings.length > 0;
   const channelSetup = useProductChannelSetup(showingIntro && workspaceMode === 'master' && !previewIntro, queryParams.get('shop'));
   const selectedDemo = previewMode ?? (introMode === 'catalog' ? 'with-data' : channelSetup.snapshot.status === 'loaded' && channelSetup.snapshot.channels.length === 0 ? 'no-channels' : 'no-products');
   useEffect(() => {
@@ -615,8 +622,8 @@ export default function Products() {
     />
 
     {workspaceMode === 'master' && <>
-      {showQueueBanner && <ListingReviewBanner listings={pendingListings} onReview={openIntake} />}
-      {showingIntro && <ProductGettingStarted snapshot={channelSetup.snapshot} preview={previewMode} pendingCount={pendingListings.length} sourceChannels={channels.filter(channel => pendingListings.some(listing => listing.channel === channel.key))} onReview={openIntake} onImport={() => setImportOpen(true)} onCreate={() => setCreateOpen(true)} onRetry={channelSetup.retry} onShops={() => navigate('/sales-channels/connected-channels')} onConnect={() => setConnectOpen(true)} />}
+      {showQueueBanner && <ListingReviewBanner listings={reviewListings} unfinishedCount={unfinishedListings.length} onReview={openIntake} />}
+      {showingIntro && <ProductGettingStarted createdCount={previewCatalog?.products().length ?? 0} snapshot={channelSetup.snapshot} preview={previewMode} pendingCount={reviewListings.length} sourceChannels={channels.filter(channel => reviewListings.some(listing => listing.channel === channel.key))} onReview={openIntake} onImport={() => setImportOpen(true)} onCreate={() => setCreateOpen(true)} onRetry={channelSetup.retry} onShops={() => navigate('/sales-channels/connected-channels')} onConnect={() => setConnectOpen(true)} />}
       {introMode === 'empty' && <section aria-labelledby="empty-products-title" className="rounded-xl border border-border bg-card px-6 py-12 text-center"><h2 id="empty-products-title" className="text-base font-semibold">No Product Masters yet</h2><p className="mt-2 text-sm text-muted-foreground">Use Import products or Create Product Master above to add products.</p>{pendingListings.length > 0 && <Button variant="outline" className="mt-5" onClick={openIntake}>Review shop listings ({pendingListings.length})</Button>}</section>}
 
     </>}
@@ -715,9 +722,9 @@ export default function Products() {
         if (intakeReturnRef.current?.isConnected && intakeReturnRef.current !== document.body) intakeReturnRef.current.focus();
         else catalogSearchRef.current?.focus();
       }}>
-        <SheetHeader className="shrink-0 border-b px-6 py-5 pr-14 text-left"><div role="group" aria-label="Listing review header" className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2"><div className="min-w-0 flex-1 basis-72 space-y-2"><SheetTitle>{{ queue: 'Review shop listings', choose: 'Find a Product Master', compare: 'Compare product details', create: 'Create one Master', complete: 'Complete Product Master' }[intakeStage]}</SheetTitle><SheetDescription>{intakeStage === 'queue' ? 'Review imported shop listings and connect each to the right Product Master.' : intakeStage === 'choose' ? 'Choose one Master for the selected listings. Review each listing before confirming.' : intakeStage === 'compare' ? 'Same product? Confirm the link. Otherwise, choose another Master or create a new one.' : 'Complete required details here, then confirm to activate. Nothing is published to shops.'}</SheetDescription></div>{intakeStage === 'queue' && <div ref={setIntakeGuideActions} className="shrink-0" />}</div></SheetHeader>
-        <div className={intakeStage === 'queue' ? 'min-h-0 flex-1 overflow-y-auto p-4 sm:p-6' : 'min-h-0 flex-1 overflow-hidden'}>{intakeOpen && <ProductListingIntake stayInQueue guideActionContainer={intakeGuideActions} onDirtyChange={setIntakeDirty} onStageChange={setIntakeStage} onChanged={(ids, created) => { savedInIntake.current = created ? 'created' : 'linked'; setRecentMasterIds(ids); setStockRevision(value => value + 1); }} onOpenMaster={() => closeIntake()} />}</div>
-        {intakeStage === 'queue' && <div className="flex items-center justify-between gap-3 border-t px-6 py-4"><p className="text-sm text-muted-foreground" role="status">{pendingListings.length ? `${pendingListings.length} listing${pendingListings.length === 1 ? '' : 's'} left to review` : 'All listings reviewed'}</p><Button onClick={closeIntake}>Done</Button></div>}
+        <SheetHeader className="shrink-0 border-b px-6 py-5 pr-14 text-left"><div role="group" aria-label="Listing review header" className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2"><div className="min-w-0 flex-1 basis-72 space-y-2"><SheetTitle>{{ queue: 'Review shop listings', group: 'Review selected listings', choose: 'Find a Product Master', compare: 'Compare product details', create: 'Create one Master', complete: 'Complete Product Master' }[intakeStage]}</SheetTitle><SheetDescription>{intakeStage === 'queue' ? ((previewCatalog?.products() ?? products).length ? 'Review imported shop listings and connect each to the right Product Master.' : 'Create Product Masters using data already imported from your shops.') : intakeStage === 'group' ? 'Choose whether these listings are separate products or the same product across shops.' : intakeStage === 'choose' ? 'Choose one Master for the selected listings. Review each listing before confirming.' : intakeStage === 'compare' ? 'Same product? Confirm the link. Otherwise, choose another Master or create a new one.' : intakeStage === 'create' ? 'Review the proposed Master data. Edit only what needs to change.' : 'Complete required details here, then confirm to activate. Nothing is published to shops.'}</SheetDescription></div>{intakeStage === 'queue' && <div ref={setIntakeGuideActions} className="shrink-0" />}</div></SheetHeader>
+        <div className={intakeStage === 'queue' ? 'min-h-0 flex-1 overflow-y-auto p-4 sm:p-6' : 'min-h-0 flex-1 overflow-hidden'}>{intakeOpen && <ProductListingIntake catalog={previewCatalog} stayInQueue guideActionContainer={intakeGuideActions} onDirtyChange={setIntakeDirty} onStageChange={setIntakeStage} onChanged={(ids, created) => { savedInIntake.current = created ? 'created' : 'linked'; if (!previewCatalog) setRecentMasterIds(ids); setStockRevision(value => value + 1); }} onOpenMaster={() => closeIntake()} />}</div>
+        {intakeStage === 'queue' && <div className="flex items-center justify-between gap-3 border-t px-6 py-4"><p className="text-sm text-muted-foreground" role="status">{unfinishedListings.length ? `${pendingListings.length} unlinked · ${unfinishedListings.length} linked review${unfinishedListings.length === 1 ? '' : 's'} unfinished` : pendingListings.length ? `${pendingListings.length} listing${pendingListings.length === 1 ? '' : 's'} left to review` : 'All listings reviewed'}</p><Button onClick={closeIntake}>Done</Button></div>}
       </SheetContent>
     </Sheet>
     <AlertDialog open={discardIntake} onOpenChange={setDiscardIntake}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard unsaved details?</AlertDialogTitle><AlertDialogDescription>Closing this review discards your unsaved edits. Existing Master data and listing links stay unchanged.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={closeIntake}>Discard &amp; close</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

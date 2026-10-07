@@ -3,6 +3,7 @@ import type { VariantMappings } from './listing-master-completion';
 import { commitListingReviewProducts, getProducts, type ChannelListing, type Product } from './product-store';
 import { getCatalogImportItems } from './catalog-import-store';
 import { listingImportSource, resolveListingShopData, snapshotShopListing } from './listing-shop-data';
+import type { ListingIntakeCatalog } from './listing-intake-catalog';
 
 export function legacyMappingIssues(product: Pick<Product, 'import_result' | 'import_issues'>) {
   if (product.import_result !== 'needs_review') return [];
@@ -11,8 +12,8 @@ export function legacyMappingIssues(product: Pick<Product, 'import_result' | 'im
 }
 
 /** Commit only after the caller validates the seller's complete, fresh review snapshots. */
-export function commitExistingListingReviews(items: CatalogImportItem[], destination: Product, created: boolean, mappings?: VariantMappings) {
-  const products = getProducts();
+export function commitExistingListingReviews(items: CatalogImportItem[], destination: Product, created: boolean, mappings?: VariantMappings, progress?: Record<string, ChannelListing['review_pending']>, catalog?: ListingIntakeCatalog) {
+  const products = catalog?.products() ?? getProducts();
   const changes = new Map<string, Product>();
   const editable = (product: Product) => {
     if (!changes.has(product.id)) changes.set(product.id, structuredClone(product));
@@ -28,11 +29,16 @@ export function commitExistingListingReviews(items: CatalogImportItem[], destina
     if (matches.length !== 1) throw new Error('This listing identity is missing or duplicated. Check its shop and listing ID before moving it.');
     const link = matches[0];
     if (!link.external_id) throw new Error('This listing has no external ID. Verify its shop identity before continuing.');
-    const imported = listingImportSource(source, link, getCatalogImportItems({ requireConfirmation: true }));
+    const imported = listingImportSource(source, link, catalog?.listings() ?? getCatalogImportItems({ requireConfirmation: true }));
     if (!link.shop_snapshot && imported) link.shop_snapshot = snapshotShopListing(imported);
+    link.review_pending = progress?.[item.id];
+    if (link.review_pending?.sku_mapping_pending && link.master_data_sync?.enabled) {
+      const fields = link.master_data_sync.fields.filter(field => field !== 'price' && field !== 'inventory');
+      link.master_data_sync = { ...link.master_data_sync, fields, enabled: fields.length > 0, updated_at: new Date().toISOString() };
+    }
     if (source.id === target.id) {
-      link.identity_review_signature = legacyIssueSignature(original);
-      if (mappings?.[item.id]) link.variant_mappings = mappings[item.id];
+      if (!progress) link.identity_review_signature = legacyIssueSignature(destination);
+      if (!progress && mappings?.[item.id]) link.variant_mappings = mappings[item.id];
       continue;
     }
     if (target.channels.some(other => other.channel === link.channel && other.external_id === link.external_id
@@ -47,7 +53,7 @@ export function commitExistingListingReviews(items: CatalogImportItem[], destina
       throw new Error('These channel settings belong to multiple listings. Review one shop-specific mapping before moving this link.');
     }
     source.channels = source.channels.filter(other => other !== link);
-    target.channels.push({ ...link, identity_review_signature: legacyIssueSignature(destination), ...(mappings?.[item.id] ? { variant_mappings: mappings[item.id] } : {}) });
+    target.channels.push({ ...link, identity_review_signature: legacyIssueSignature(destination), variant_mappings: progress ? undefined : mappings?.[item.id], master_data_sync: { enabled: false, fields: [], updated_at: new Date().toISOString() } });
     if (override) {
       target.channel_overrides = { ...target.channel_overrides, [overrideKey]: override };
       if (source.channel_overrides) delete source.channel_overrides[overrideKey];
@@ -68,13 +74,14 @@ export function commitExistingListingReviews(items: CatalogImportItem[], destina
   }
   // Existing lifecycle states are unchanged. New destinations arrive already validated and Active.
   if (created) changes.delete(target.id);
-  commitListingReviewProducts([...changes.values()], created ? target : undefined);
+  if (catalog) catalog.commit([...changes.values()], created ? target : undefined);
+  else commitListingReviewProducts([...changes.values()], created ? target : undefined);
 }
 export const legacyReviewKey = (listing: ChannelListing) => JSON.stringify([listing.channel, listing.store_name || '', listing.external_id || '']);
 export const legacyIssueSignature = (product: Product) => JSON.stringify(legacyMappingIssues(product));
 export function unresolvedLegacyLinks(product: Product) {
   const issues = legacyMappingIssues(product);
-  return issues.length ? product.channels.filter(link => link.identity_review_signature !== JSON.stringify(issues)) : [];
+  return product.channels.filter(link => link.review_pending || (issues.length && link.identity_review_signature !== JSON.stringify(issues)));
 }
 
 /** Read-only projection: all persisted relationships, inventory and shop state stay untouched. */
@@ -94,7 +101,14 @@ export function legacyListingReviews(products: Product[], imports: CatalogImport
       listingId: link.external_id || '', storeName: link.store_name || provenance?.store || source?.storeName || 'Shop not recorded',
       title: shopData.title || `Listing ${link.external_id || '(ID not recorded)'}`,
       channelSku: shopData.sku || '',
-      image: shopData.images?.[0] || '', images: shopData.images, description: shopData.description, variants: source?.variants ?? 0,
+      image: shopData.images?.[0] || '', images: shopData.images, description: shopData.description,
+      variants: shopData.variantCount ?? source?.variants ?? 0,
+      variantItems: shopData.variants ?? source?.variantItems,
+      mappingFields: source?.mappingFields ?? link.shop_snapshot?.mapping_fields,
+      shipping: source?.shipping ?? link.shop_snapshot?.shipping,
+      modelNumber: source?.modelNumber ?? link.shop_snapshot?.identifiers?.model,
+      mpn: source?.mpn ?? link.shop_snapshot?.identifiers?.mpn,
+      gtin: source?.gtin ?? link.shop_snapshot?.identifiers?.gtin,
       channelStock: shopData.stock ?? NaN,
       channelCategory: source?.channelCategory || override?.category || '',
       price: shopData.price?.amount ?? NaN,
@@ -104,7 +118,7 @@ export function legacyListingReviews(products: Product[], imports: CatalogImport
       listingUrl: source?.listingUrl || link.listing_url || undefined,
       status: 'conflict' as const, confidence: 0, suggestedProductId: product.id,
       resolution: 'later' as const, confirmed: false, resolvedProductId: undefined,
-      existingLinkReview: { productId: product.id, key, issues: legacyMappingIssues(product), signature: JSON.stringify({ product, source }) },
+      existingLinkReview: { productId: product.id, key, issues: link.review_pending?.issues ?? legacyMappingIssues(product), signature: JSON.stringify({ product, source }) },
     };
   }));
 }

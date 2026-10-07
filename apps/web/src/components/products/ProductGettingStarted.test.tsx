@@ -13,7 +13,7 @@ describe('Getting started guidance', () => {
   it('prioritizes shop review and gives each alternative its own working action', () => {
     const props = callbacks();
     render(<ProductGettingStarted {...props} snapshot={connected} pendingCount={4} />);
-    const review = screen.getByRole('button', { name: 'Review 4 listings' });
+    const review = screen.getByRole('button', { name: 'Review listings' });
     const importButton = screen.getByRole('button', { name: 'Import Excel / CSV' });
     expect(review.compareDocumentPosition(importButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('Recommended')).toBeVisible();
@@ -61,14 +61,15 @@ describe('Getting started guidance', () => {
     expect(screen.queryByRole('button', { name: /^Review/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Recommended/)).not.toBeInTheDocument();
     rerender(<ProductGettingStarted {...props} snapshot={connected} pendingCount={1} />);
-    expect(screen.getByRole('button', { name: 'Review 1 listing' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: '1 shop listing ready for review' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Review listings' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Create your first Product Masters' })).toBeVisible();
+    expect(screen.getByText(/Start with data from 1 imported shop listing\./)).toBeVisible();
   });
   it('shows only the supplied listing sources in the visual, without implying approval or automatic linking', () => {
     const { rerender } = render(<ProductGettingStarted {...callbacks()} snapshot={connected} pendingCount={4} sourceChannels={[{ key: 'shopee', label: 'Shopee' }, { key: 'amazon', label: 'Amazon' }]} />);
     expect(screen.getByRole('img', { name: 'Shopee, Amazon listings to Product Master' })).toBeVisible();
     expect(screen.queryByText(/Lazada/)).not.toBeInTheDocument();
-    expect(screen.getByText('Review shop data, then link listings to a Master.')).toBeVisible();
+    expect(screen.getByText(/Start with data from 4 imported shop listings/)).toBeVisible();
     rerender(<ProductGettingStarted {...callbacks()} snapshot={connected} pendingCount={1} sourceChannels={[{ key: 'lazada', label: 'Lazada' }]} />);
     expect(screen.getByRole('img', { name: 'Lazada listings to Product Master' })).toBeVisible();
     expect(screen.queryByText(/Shopee|Amazon/)).not.toBeInTheDocument();

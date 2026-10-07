@@ -159,7 +159,7 @@ describe('Explicit shop-listing intake', () => {
     saveCatalogImportItems([{ ...items[0], variants: 3 }, items[1]]);
     expect(() => confirmListingIntake(['a'], { productId: target.id })).toThrow(/variant-SKU/);
     expect(() => confirmListingIntake(['a'], { name: 'Variants', sku: 'VARIANT-INTAKE', completion: readyMasterFields(), sourceId: 'a', productType: 'single' })).toThrow(/multiple SKUs/);
-    expect(() => confirmListingIntake(['a', 'b'], { name: 'Variants', sku: 'VARIANT-INTAKE', completion: readyMasterFields(), sourceId: 'a' })).toThrow(/separately/);
+    expect(() => confirmListingIntake(['a', 'b'], { name: 'Variants', sku: 'VARIANT-INTAKE', completion: readyMasterFields(), sourceId: 'a' })).toThrow(/required details/);
     expect(() => confirmListingIntake(['a'], { name: 'Variants', sku: 'VARIANT-INTAKE', completion: readyMasterFields(), sourceId: 'a' })).toThrow(/required details/);
   });
   it('does not mutate products or confirm when required persistence fails', () => {

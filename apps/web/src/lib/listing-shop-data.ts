@@ -27,6 +27,7 @@ export function snapshotShopListing(item: CatalogImportItem, recordedAt = new Da
   return {
     channel: item.channel, store_name: item.storeName, listing_id: item.listingId, shop_sku: item.channelSku,
     title: item.title, description: item.description, brand: item.brand,
+    mapping_fields: item.mappingFields ? structuredClone(item.mappingFields) : undefined,
     images: [...new Set([item.image, ...(item.images ?? [])].filter(image => typeof image === 'string' && Boolean(image.trim())))],
     category: item.channelCategory, price: recordedListingPrice(item.price, item.currency),
     stock: validNumber(item.channelStock) ? item.channelStock : undefined,

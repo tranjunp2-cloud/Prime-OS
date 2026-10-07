@@ -32,6 +32,17 @@ const confirm = (destination = fresh(source.id)) => {
   return confirmListingIntake(items.map(item => item.id), { productId: destination.id, verifiedSingleListingIds: items.map(item => item.id), reviewed: items.map(item => snapshotListingMatch(item, destination)) });
 };
 describe('Existing mapping reviews stay with their Product Master', () => {
+  it('passes saved shop SKU details into review even when the import queue no longer has the listing', () => {
+    const link = source.channels[0];
+    const variants = [{ sku: 'SHOP-RED', label: 'Red' }, { sku: 'SHOP-BLUE', label: 'Blue' }];
+    updateProduct(source.id, { id: source.id, channels: [{ ...link, shop_snapshot: {
+      channel: link.channel, store_name: link.store_name!, listing_id: link.external_id!, shop_sku: 'SHOP-PARENT',
+      title: 'Shop variant listing', images: [], category: '', variant_count: 2, variant_items: variants, recorded_at: '2026-10-01T00:00:00Z',
+    } }] });
+    const before = JSON.stringify(getProducts());
+    expect(reviews()[0]).toMatchObject({ variants: 2, variantItems: variants });
+    expect(JSON.stringify(getProducts())).toBe(before);
+  });
   it('projects every unresolved link without detaching, auto-confirming or inventing source evidence', () => {
     const before = JSON.stringify(getProducts());
     const item = reviews()[0];
