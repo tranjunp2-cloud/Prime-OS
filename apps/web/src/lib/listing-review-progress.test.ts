@@ -51,7 +51,7 @@ describe('Deferred listing review', () => {
     const preference = { enabled: true, fields: ['price' as const], pricing: { currency: 'JPY' } };
     expect(masterSyncPlan(after, after.channels[1], preference).error).toContain('variant-SKU');
     expect(() => saveListingMasterSync(after.id, after.channels[1], preference, masterSyncSnapshot(after))).toThrow(/variant-SKU/);
-    expect(masterSyncPlan(after, after.channels[1], { enabled: true, fields: ['content'] }).error).toBeUndefined();
+    expect(masterSyncPlan(after, after.channels[1], { enabled: true, fields: ['content'] }).error).toContain('Channel requirements not checked');
   });
   it('keeps partial mappings and proposed Master edits separate until explicit confirmation', () => {
     const draft = prepareReviewVariants(master, [source]);

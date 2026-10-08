@@ -57,7 +57,7 @@ describe('Editable field mapping row', () => {
     fireEvent.click(panel.getByRole('radio', { name: /Parcel mass/ }));
     expect(panel.getByText('0.3 kg → 300 g')).toBeVisible();
     fireEvent.click(panel.getByRole('button', { name: 'Use this source' }));
-    expect(screen.getByLabelText('Package weight (g) *')).toHaveValue(300);
+    expect(screen.getByLabelText('Package weight (g)')).toHaveValue(300);
     expect(screen.getByTestId('product')).toHaveTextContent('"unit":"kg"');
   });
   it('requires an explicit allowed value for an enum and restores that reviewed value after manual editing', () => {

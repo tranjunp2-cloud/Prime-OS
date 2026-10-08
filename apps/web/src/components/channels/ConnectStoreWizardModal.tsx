@@ -1,3 +1,4 @@
+import { connectionWarehouseChoices } from '@/lib/shop-warehouse-settings';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,7 +13,7 @@ import { channelIntegrationsApi, type AvailablePlatform, type CatalogStrategy, t
 
 type WizardStep = 'CHANNEL_SELECTION' | 'AUTHORIZATION' | 'WAREHOUSE_MAPPING' | 'CATALOG_STRATEGY';
 const order: WizardStep[] = ['CHANNEL_SELECTION', 'AUTHORIZATION', 'WAREHOUSE_MAPPING', 'CATALOG_STRATEGY'];
-const labels = ['Choose channel', 'Authorize store', 'Map warehouse', 'Catalog sync'];
+const labels = ['Choose channel', 'Authorize store', 'Default warehouse', 'Catalog sync'];
 
 export function ConnectStoreWizardModal({ open, onOpenChange, onConnected }: { open: boolean; onOpenChange: (open: boolean) => void; onConnected: (channel: ConnectedChannelRecord) => void }) {
   const queryClient = useQueryClient();
@@ -38,7 +39,7 @@ export function ConnectStoreWizardModal({ open, onOpenChange, onConnected }: { o
   useEffect(() => {
     if (!open) return;
     Promise.all([channelIntegrationsApi.platforms(), channelIntegrationsApi.warehouses()])
-      .then(([platformResponse, warehouseResponse]) => { setPlatforms(platformResponse.data); setWarehouses(warehouseResponse.data); })
+      .then(([platformResponse, warehouseResponse]) => { setPlatforms(platformResponse.data); setWarehouses(connectionWarehouseChoices(warehouseResponse.data)); })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Unable to load channel setup data.'));
   }, [open]);
 

@@ -6,12 +6,12 @@ import { getCatalogImportItems } from '@/lib/catalog-import-store';
 import { getProducts } from '@/lib/product-store';
 import { createEmptyListingCatalog } from '@/lib/listing-intake-catalog';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
-import { completeListingDetails } from '@/test/fixtures/complete-listing-details';
+import { completeListingDetails, confirmListingSave, editListingSection, applyListingSection } from '@/test/fixtures/complete-listing-details';
 import { ProductListingIntake } from './ProductListingIntake';
 import { ListingMasterReview } from './ListingMasterReview';
 
 afterEach(cleanup);
-const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }));
+const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
 function fixture() {
   const source = { ...getCatalogImportItems({ requireConfirmation: true }).find(item => item.variants === 1)!, id: 'progress-ui-source', listingId: 'progress-ui-listing', channelSku: 'PROGRESS-UI-SOURCE', variants: 1, variantItems: undefined, title: 'Progress UI product', image: '/test-front.jpg', images: [], description: '', confirmed: false, resolution: 'later' as const };
   return { source, catalog: createEmptyListingCatalog([source]) };
@@ -34,7 +34,7 @@ describe('Review progress recovery UI', () => {
     expect(screen.getByRole('region', { name: 'Complete Product Master' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Save & activate Master' })).toBeDisabled();
     completeListingDetails();
-    click('Save & activate Master');
+    confirmListingSave('Save & activate Master');
     expect(catalog.products()).toHaveLength(1);
     expect(catalog.products()[0].status).toBe('published');
     expect(catalog.products()[0].channels).toHaveLength(1);
@@ -89,7 +89,9 @@ describe('Review progress recovery UI', () => {
     expect(back).toHaveClass('h-11');
     expect(screen.queryByRole('button', { name: 'Back to listings' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Review actions' })).queryByRole('button', { name: 'Back to review' })).not.toBeInTheDocument();
+    editListingSection('Product essentials');
     fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Unsaved reviewed name' } });
+    applyListingSection();
     click('Back to review');
     expect(screen.getByRole('region', { name: 'Compare product details' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Compare product details' })).toHaveFocus();
@@ -99,6 +101,7 @@ describe('Review progress recovery UI', () => {
     expect(onSaved).not.toHaveBeenCalled();
     expect(catalog.products()[0]).toMatchObject({ name: master.name, has_variants: false, skus: [], channels: [] });
     click('Set up SKUs & details');
+    editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Unsaved reviewed name');
     expect(screen.getAllByLabelText('Master variant SKU').map(input => (input as HTMLInputElement).value)).toEqual(['BACK-RED', 'BACK-BLUE']);
   });

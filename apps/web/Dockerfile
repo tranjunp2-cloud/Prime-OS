@@ -6,6 +6,7 @@ COPY package.json package-lock.json* ./
 RUN npm install
 
 COPY . .
+COPY --from=order_workflow . /packages/order-workflow
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ARG VITE_PRIME_ADMIN_API_BASE

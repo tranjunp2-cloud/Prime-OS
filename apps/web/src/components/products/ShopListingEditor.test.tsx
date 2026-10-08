@@ -7,7 +7,8 @@ import { getProducts, type ChannelListing } from '@/lib/product-store';
 
 afterEach(cleanup);
 const listing: ChannelListing = { channel: 'amazon', external_id: 'one', store_name: 'Shop A', shop_sku: 'SKU-A', status: 'active', publication_unconfirmed: true, listing_url: null, last_synced_at: null,
-  shop_snapshot: { channel: 'amazon', store_name: 'Shop A', listing_id: 'one', shop_sku: 'SKU-A', title: 'Listing title A', description: 'Shop description', brand: 'Shop brand', category: 'Shop category', images: ['/one.jpg'], price: { amount: 29, currency: 'USD' }, stock: 0, recorded_at: '' } };
+  shop_snapshot: { channel: 'amazon', store_name: 'Shop A', listing_id: 'one', shop_sku: 'SKU-A', title: 'Listing title A', description: 'Shop description', brand: 'Shop brand', category: 'Shop category', images: ['/one.jpg'], price: { amount: 29, currency: 'USD' }, stock: 0, recorded_at: '',
+    requirements: { channel: 'amazon', category: 'Shop category', revision: 'test-v1', origin: 'prototype', fields: [] } } };
 function mount(extra: Partial<ChannelListing> = {}, saveError?: string) {
   const target = { ...listing, ...extra };
   const product = { ...getProducts()[0], name: 'Never prefill me', status: 'draft' as const, images: ['/master.jpg'], channels: [target], channel_overrides: {}, import_sources: [] };
@@ -175,7 +176,8 @@ describe('Existing listing editor', () => {
     fireEvent.change(screen.getByLabelText('Listing title'), { target: { value: 'Unsaved independent title' } });
     chooseSource('Product content', true);
     expect(screen.getByLabelText('Listing title')).toHaveAttribute('readonly');
-    fireEvent.change(screen.getByLabelText('Shop category'), { target: { value: 'Local category' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Channel details' }));
+    fireEvent.change(screen.getByLabelText('Search terms'), { target: { value: 'Local keywords' } });
     fireEvent.click(screen.getByRole('tab', { name: 'Images' }));
     chooseSource('Images', true);
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
@@ -186,7 +188,16 @@ describe('Existing listing editor', () => {
     expect(review.getAllByRole('img').map(image => image.getAttribute('src'))).toEqual(['/one.jpg', '/master.jpg']);
     expect(onSave).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Save listing changes' }));
-    expect(onSave).toHaveBeenCalledWith({ category: 'Local category' }, expect.any(String), expect.objectContaining({ preference: expect.objectContaining({ fields: ['content', 'media'] }), reviewedPlan: expect.any(String) }));
+    expect(onSave).toHaveBeenCalledWith({ channel_settings: { search_terms: 'Local keywords' } }, expect.any(String), expect.objectContaining({ preference: expect.objectContaining({ fields: ['content', 'media'] }), reviewedPlan: expect.any(String) }));
+  });
+  it('requires a new category requirements check before enabling sync after a category edit', () => {
+    const { onSave } = mount();
+    fireEvent.change(screen.getByLabelText('Shop category'), { target: { value: 'Different category' } });
+    chooseSource('Product content', true);
+    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
+    expect(screen.queryByRole('region', { name: 'Review listing changes' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('alert').some(alert => alert.textContent?.includes('Channel requirements not checked'))).toBe(true);
+    expect(onSave).not.toHaveBeenCalled();
   });
   it('exposes pricing and warehouse settings in their groups and blocks incomplete configuration', () => {
     const { onSave } = mount();

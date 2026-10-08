@@ -27,6 +27,7 @@ export function snapshotShopListing(item: CatalogImportItem, recordedAt = new Da
   return {
     channel: item.channel, store_name: item.storeName, listing_id: item.listingId, shop_sku: item.channelSku,
     title: item.title, description: item.description, brand: item.brand,
+    requirements: item.requirements ? structuredClone(item.requirements) : undefined,
     mapping_fields: item.mappingFields ? structuredClone(item.mappingFields) : undefined,
     images: [...new Set([item.image, ...(item.images ?? [])].filter(image => typeof image === 'string' && Boolean(image.trim())))],
     category: item.channelCategory, price: recordedListingPrice(item.price, item.currency),
@@ -48,7 +49,7 @@ function enrichSnapshot(saved: ShopListingSnapshot, source?: CatalogImportItem):
     || source.channelSku !== saved.shop_sku || source.price !== saved.price?.amount || source.currency !== saved.price?.currency
     || source.channelStock !== saved.stock) return saved;
   const incoming = snapshotShopListing(source, saved.recorded_at);
-  const additions = Object.fromEntries((['shipping', 'channel_settings', 'variant_items', 'variant_count', 'listing_url', 'identifiers'] as const)
+  const additions = Object.fromEntries((['shipping', 'channel_settings', 'variant_items', 'variant_count', 'listing_url', 'identifiers', 'requirements'] as const)
     .filter(key => saved[key] === undefined && incoming[key] !== undefined).map(key => [key, incoming[key]]));
   return Object.keys(additions).length ? { ...saved, ...additions } : saved;
 }
@@ -95,6 +96,7 @@ function ownProvenance(product: Product, listing: ChannelListing) {
 }
 
 export interface ListingShopData {
+  requirements?: ShopListingSnapshot['requirements'];
   shop?: string;
   sku?: string;
   title?: string;
@@ -128,6 +130,7 @@ export function resolveListingShopData(product: Product, listing: ChannelListing
     ?? recordedListingPrice(provenance?.price, provenance?.currency);
   const savedPrice = savedListingPrice(override);
   return {
+    requirements: snapshot?.requirements,
     shop: listing.store_name || snapshot?.store_name || provenance?.store,
     sku: listing.shop_sku || snapshot?.shop_sku || override?.listing_sku || provenance?.shop_sku,
     title: snapshot?.title || override?.title,

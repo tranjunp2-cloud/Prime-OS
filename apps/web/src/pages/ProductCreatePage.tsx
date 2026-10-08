@@ -1,4 +1,6 @@
-import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
+import { useConnectedShops } from '@/hooks/use-connected-shops';
+import { listingStockWarehouseId } from '@/lib/warehouse-shop-sources';
+import { Fragment, useState, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Archive, RotateCcw, Info, History, Image, Package, Truck, Layers, Check, Lock,
@@ -32,6 +34,7 @@ import { ProductSalesPerformance } from '@/components/products/ProductSalesPerfo
 import { ProductOverviewSnapshot } from '@/components/products/ProductOverviewSnapshot';
 import { ProductReadinessCard } from '@/components/products/ProductReadinessCard';
 import { ProductChannelListings, type ProductChannelListingRow } from '@/components/products/ProductChannelListings';
+import { ListingRequirementNotice } from '@/components/products/ListingRequirementNotice';
 import { LinkedListingDetails, type LinkedListingDetail } from '@/components/products/LinkedListingDetails';
 import { ShopListingEditor } from '@/components/products/ShopListingEditor';
 import { LinkExistingListingsDialog } from '@/components/products/LinkExistingListingsDialog';
@@ -73,6 +76,9 @@ import { AdjustWarehouseStockDialog } from '@/components/inventory/AdjustWarehou
 import { ManageStockHoldsButton } from '@/components/inventory/ManageStockHoldsDialog';
 import type { StockAdjustmentTarget } from '@/components/inventory/WarehouseStockTable';
 import { canEditWarehouseStock, recordedQuantity } from '@/lib/warehouse-stock-view';
+import { getInventoryPositions, subscribeInventory } from '@/lib/inventory-store';
+import { variantInventoryView } from '@/lib/variant-inventory-view';
+import { VariantInventoryDetails } from '@/components/products/VariantInventoryDetails';
 import { initialListingPricing, quoteListingPrice, pricingNeedsReview, formatPrice } from '@/lib/pricing-rules';
 import { usePricingRevision } from '@/hooks/use-pricing';
 import { getMasterReadinessChecks, hydrateExistingVariants, richTextPlainText, type VariantGroup, type VariantItem } from '@/lib/product-master-readiness';
@@ -102,7 +108,7 @@ function resolveProductWorkspace(value: string | null): ProductWorkspace {
 }
 
 function completionWorkspaceFor(checkId: string): { id: ProductWorkspace; label: string } {
-  if (['identity', 'content', 'category', 'attributes', 'media', 'shipping'].includes(checkId)) return { id: 'product-data', label: 'Product data' };
+  if (['identity', 'sku', 'content', 'category', 'attributes', 'media', 'shipping'].includes(checkId)) return { id: 'product-data', label: 'Product data' };
   if (['price', 'variants'].includes(checkId)) return { id: 'commerce', label: 'Pricing & Inventory' };
   return { id: 'distribution', label: 'Channel listings' };
 }
@@ -1002,23 +1008,25 @@ interface VariantSectionProps {
     skuExists: string;
   };
   warehouses: Array<{ id: string; code: string; label: string }>;
-  listingInventorySources: Array<{ key: string; label: string; warehouseIds: string[]; syncPolicy: string }>;
+  listingInventorySources: Array<{ key: string; label: string; warehouseIds: string[]; syncPolicy: string; skuIds: string[] }>;
   onConfigureInventorySources: () => void;
-  stockControlled: boolean;
+  savedProduct?: Product | null;
+  canWrite: boolean;
+  onAddStockLocation: (item: VariantItem) => void;
+  onAdjustStock: (warehouseId: string, item: VariantItem) => void;
   renderStock: (warehouseId: string, item: VariantItem) => React.ReactNode;
 }
 
 function VariantSection({
   groups, onGroupsChange, items, onItemsChange,
-  parentSku, basePrice, currency, existingSkus, availableAttributes, onAttributeValueAdded, onVariantAttributeAdded, copy, warehouses, listingInventorySources, onConfigureInventorySources, stockControlled, renderStock,
+  parentSku, basePrice, currency, existingSkus, availableAttributes, onAttributeValueAdded, onVariantAttributeAdded, copy, warehouses, listingInventorySources, onConfigureInventorySources, savedProduct, canWrite, onAddStockLocation, onAdjustStock, renderStock,
 }: VariantSectionProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [addGroupName, setAddGroupName] = useState('');
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [bulkPrice, setBulkPrice] = useState('');
-  const [bulkStock, setBulkStock] = useState('');
   const [bulkSku, setBulkSku] = useState('');
-  const [bulkWarehouseId, setBulkWarehouseId] = useState(warehouses[0]?.id ?? '');
+  const inventoryPositions = useSyncExternalStore(subscribeInventory, getInventoryPositions, getInventoryPositions);
   const [stockView, setStockView] = useState<'overview' | 'warehouse'>('overview');
   const [expandedStockRows, setExpandedStockRows] = useState<Set<string>>(new Set());
   const [addingValueFor, setAddingValueFor] = useState<string | null>(null);
@@ -1051,6 +1059,8 @@ function VariantSection({
       };
     });
   }, [basePrice, items, parentSku, variantKeys]);
+  const inventoryViews = new Map(initializedItems.map(item => [item.key, variantInventoryView(savedProduct, item.id, inventoryPositions)]));
+  const visibleWarehouses = [...new Map([...inventoryViews.values()].flatMap(view => view.locations).map(location => [location.id, location])).values()];
 
   useEffect(() => {
     const currentSignature = items.map(item => item.key.replaceAll(' / ', '|')).join('||');
@@ -1070,32 +1080,14 @@ function VariantSection({
       const newItem = {
         ...item,
         price: bulkPrice || item.price,
-        stock: !stockControlled && bulkStock ? bulkStock : item.stock,
         sku_code: bulkSku ? `${bulkSku.trim().toUpperCase()}-${String(index + 1).padStart(3, '0')}` : item.sku_code,
       };
-      // Apply stock only to the warehouse explicitly selected by the user.
-      if (!stockControlled && bulkStock && bulkWarehouseId) {
-        newItem.stock_by_location = { ...item.stock_by_location, [bulkWarehouseId]: bulkStock };
-        newItem.stock = String(Object.values(newItem.stock_by_location).reduce((total, value) => total + (Number(value) || 0), 0));
-      }
       return newItem;
     }));
   }
 
   function updateGroupImage(firstValue: string, imageUrl: string) {
     setItems(initializedItems.map(item => item.key.split(' / ')[0] === firstValue ? { ...item, image_url: imageUrl } : item));
-  }
-
-  function updateLocationStock(key: string, warehouseId: string, value: string) {
-    setItems(initializedItems.map(item => {
-      if (item.key !== key) return item;
-      const stockByLocation = { ...(item.stock_by_location ?? {}), [warehouseId]: value };
-      return {
-        ...item,
-        stock_by_location: stockByLocation,
-        stock: String(Object.values(stockByLocation).reduce((total, current) => total + (Number(current) || 0), 0)),
-      };
-    }));
   }
 
   function toggleStockDetails(key: string) {
@@ -1106,9 +1098,6 @@ function VariantSection({
     });
   }
 
-  function listingLabelsForWarehouse(warehouseId: string) {
-    return listingInventorySources.filter(source => source.warehouseIds.includes(warehouseId)).map(source => source.label);
-  }
 
   function deleteGroup(id: string) {
     onGroupsChange(groups.filter(g => g.id !== id));
@@ -1175,8 +1164,6 @@ function VariantSection({
   const remainingAttributes = availableAttributes.filter(attribute =>
     !groups.some(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase())
   );
-  const mappedListingSources = listingInventorySources.filter(source => source.warehouseIds.length > 0);
-  const unmappedListingSources = listingInventorySources.filter(source => source.warehouseIds.length === 0);
 
   return (
     <div className="space-y-4">
@@ -1244,29 +1231,34 @@ function VariantSection({
               <span className="text-[11px] text-muted-foreground">All generated combinations are included</span>
             </div>
 
-            {unmappedListingSources.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-500/[0.06] px-3 py-2.5"><AlertTriangle className="size-4 shrink-0 text-amber-500" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">{unmappedListingSources.length} {unmappedListingSources.length === 1 ? 'listing needs' : 'listings need'} an inventory source</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{unmappedListingSources.map(source => source.label).join(' · ')}</p></div><Button type="button" variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={onConfigureInventorySources}>Configure sources</Button></div> : null}
-
             {/* Variant Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="border-b bg-muted/40 p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-semibold">Bulk edit all variants</p><p className="mt-0.5 text-[10px] text-muted-foreground">Changes apply to all {totalCombinations} generated variants.</p></div><div className="inline-flex rounded-md border bg-background p-0.5" aria-label="Stock display mode"><button type="button" aria-pressed={stockView === 'overview'} onClick={() => setStockView('overview')} className={cn('h-7 rounded px-2.5 text-[11px] font-medium transition-colors', stockView === 'overview' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>Overview</button><button type="button" aria-pressed={stockView === 'warehouse'} onClick={() => setStockView('warehouse')} className={cn('h-7 rounded px-2.5 text-[11px] font-medium transition-colors', stockView === 'warehouse' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>By warehouse</button></div></div><div className={cn("grid gap-2", stockControlled ? "sm:grid-cols-[1fr_1fr_auto]" : "sm:grid-cols-[1fr_1fr_1fr_1.2fr_auto]")}>
-                <Field label="Price"><Input type="number" value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="No change" className="h-8 text-xs" /></Field>
-                {!stockControlled && <><Field label="Stock at"><select aria-label="Warehouse for bulk stock update" value={bulkWarehouseId} onChange={event => setBulkWarehouseId(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs">{warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.label}</option>)}</select></Field>
-                <Field label="Units"><Input type="number" min="0" value={bulkStock} onChange={event => setBulkStock(event.target.value)} placeholder="No change" className="h-8 text-xs" /></Field></>}
-                <Field label="SKU prefix"><Input value={bulkSku} onChange={event => setBulkSku(event.target.value)} placeholder="e.g. SHIRT" className="h-8 text-xs uppercase" /></Field>
-                <Button type="button" size="sm" className="self-end" disabled={!bulkPrice && (stockControlled || !bulkStock) && !bulkSku.trim()} onClick={applyBulkValues}>Apply</Button>
-              </div>
+            <div className="overflow-hidden rounded-lg border">
+              <div className="border-b bg-muted/40 p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="text-xs font-semibold">Bulk edit all variants</p><p className="mt-0.5 text-[11px] text-muted-foreground">Price and SKU changes apply to all {totalCombinations} variants.</p></div>
+                  <div className="inline-flex rounded-md border bg-background p-0.5" aria-label="Stock display mode">
+                    <button type="button" aria-pressed={stockView === 'overview'} onClick={() => setStockView('overview')} className={cn('min-h-9 rounded px-3 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary', stockView === 'overview' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>Overview</button>
+                    <button type="button" aria-pressed={stockView === 'warehouse'} onClick={() => setStockView('warehouse')} className={cn('min-h-9 rounded px-3 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary', stockView === 'warehouse' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>By warehouse</button>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                  <Field label="Price"><Input type="number" value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="No change" className="h-9 text-xs" /></Field>
+                  <Field label="SKU prefix"><Input value={bulkSku} onChange={event => setBulkSku(event.target.value)} placeholder="e.g. SHIRT" className="h-9 text-xs uppercase" /></Field>
+                  <Button type="button" size="sm" className="self-end" disabled={!bulkPrice && !bulkSku.trim()} onClick={applyBulkValues}>Apply</Button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs" aria-label="Variant pricing matrix">
                   <thead>
-                    <tr className="bg-muted/50 border-b">
-                      {groups.map((group, index) => <th key={group.id} className={cn('min-w-28 p-2 text-left font-medium', index === 0 && 'bg-muted/70')}>{group.name}</th>)}
-                      <th className="text-left p-2 font-medium w-16">Image</th>
-                      <th className="text-left p-2 font-medium w-40">{copy.skuCode}</th>
-                      <th className="text-right p-2 font-medium w-28">{copy.price} ({currency})</th>
-                      {stockView === 'overview' ? <><th className="w-36 p-2 text-right font-medium">Available stock</th><th className="w-48 p-2 text-left font-medium">Listing coverage</th></> : warehouses.map(wh => (
-                        <th key={wh.id} className="min-w-28 p-2 text-right font-medium"><span className="block whitespace-nowrap">{wh.code}</span><span className="block max-w-28 truncate text-[10px] font-normal text-muted-foreground" title={wh.label}>{wh.label}</span></th>
-                      ))}
+                    <tr className="border-b bg-muted/50">
+                      {groups.map(group => <th key={group.id} className="min-w-28 p-3 text-left font-medium">{group.name}</th>)}
+                      <th className="w-16 p-3 text-left font-medium">Image</th>
+                      <th className="w-48 p-3 text-left font-medium">{copy.skuCode}</th>
+                      <th className="w-28 p-3 text-right font-medium">{copy.price} ({currency})</th>
+                      {stockView === 'overview' || !visibleWarehouses.length ? <><th className="w-44 p-3 text-right font-medium">Recorded stock</th><th className="w-40 p-3 text-left font-medium">Mapped listings</th></> : <>
+                        {visibleWarehouses.map(warehouse => <th key={warehouse.id} className="min-w-44 p-3 text-right font-medium"><span className="block">{warehouse.code}</span><span className="block text-[11px] font-normal text-muted-foreground">{warehouse.label}</span></th>)}
+                        <th className="w-28 p-3 text-right font-medium">Inventory</th>
+                      </>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1274,73 +1266,51 @@ function VariantSection({
                       const normalizedSku = item.sku_code.trim().toUpperCase();
                       const skuDup = Boolean(normalizedSku) && ((existingSkus.includes(item.sku_code) && !(item.sku_code.startsWith(parentSku))) || initializedItems.filter(candidate => candidate.sku_code.trim().toUpperCase() === normalizedSku).length > 1);
                       const optionValues = item.key.split(' / ');
-                      const firstValue = optionValues[0];
-                      const firstGroupItems = initializedItems.filter(candidate => candidate.key.split(' / ')[0] === firstValue);
-                      const isFirstInGroup = firstGroupItems[0]?.key === item.key;
-                      const expandedRowsInGroup = stockView === 'overview' ? firstGroupItems.filter(candidate => expandedStockRows.has(candidate.key)).length : 0;
-                      const totalStockForItem = Object.values(item.stock_by_location ?? {}).reduce((total, value) => total + (Number(value) || 0), 0);
-                      const activeWarehouses = warehouses.filter(warehouse => (Number(item.stock_by_location?.[warehouse.id]) || 0) > 0);
-                      const listingCoverage = mappedListingSources;
+                      const view = inventoryViews.get(item.key)!;
+                      const listingCoverage = listingInventorySources.filter(source => view.sku && source.skuIds.includes(view.sku.id));
                       const detailsExpanded = expandedStockRows.has(item.key);
-                      return (<Fragment key={item.key}>
-                        <tr className={cn('border-b', isFirstInGroup && 'border-t-2 border-t-border')}>
-                          {isFirstInGroup ? <td rowSpan={firstGroupItems.length + expandedRowsInGroup} className="border-r bg-muted/20 p-3 text-center align-middle"><strong className="block text-sm text-foreground">{firstValue}</strong><span className="mt-1 block text-[10px] text-muted-foreground">{firstGroupItems.length} {firstGroupItems.length === 1 ? 'variant' : 'variants'}</span></td> : null}
-                          {groups.length > 1 ? <td className="p-3 font-semibold text-foreground">{optionValues[1]}</td> : null}
-                          <td className="p-1.5 align-middle">
+                      const overview = stockView === 'overview' || !visibleWarehouses.length;
+                      const inventoryButton = <button type="button" aria-label={`View inventory for ${item.key}`} aria-expanded={detailsExpanded} onClick={() => toggleStockDetails(item.key)} className="ml-auto flex min-h-11 items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-right transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                        <span><strong className="block tabular-nums">{!view.sku ? 'Not saved' : view.total === null ? 'Not recorded' : `${view.total.toLocaleString()} units${view.incomplete ? ' · Partial' : ''}`}</strong><span className="block text-[11px] text-muted-foreground">{!view.sku ? 'Save variant first' : view.locations.length ? `${view.locations.length} related ${view.locations.length === 1 ? 'location' : 'locations'}` : 'Set up stock'}</span></span>
+                        {detailsExpanded ? <ChevronDown className="size-3.5 text-muted-foreground" /> : <ChevronRight className="size-3.5 text-muted-foreground" />}
+                      </button>;
+                      return <Fragment key={item.key}>
+                        <tr className="border-b">
+                          {groups.map((group, index) => <td key={group.id} className="p-3 font-semibold">{optionValues[index]}</td>)}
+                          <td className="p-2">
                             <label className="grid size-9 cursor-pointer place-items-center overflow-hidden rounded-md border border-dashed bg-muted/30 hover:bg-muted/60" title="Upload variant image">
-                              <input type="file" accept="image/*" className="sr-only" onChange={event => {
+                              <input type="file" accept="image/*" className="sr-only" aria-label={`Image for ${item.key}`} onChange={event => {
                                 const file = event.target.files?.[0];
                                 if (!file) return;
                                 const reader = new FileReader();
-                                reader.onload = () => updateGroupImage(firstValue, String(reader.result ?? ''));
+                                reader.onload = () => updateGroupImage(optionValues[0], String(reader.result ?? ''));
                                 reader.readAsDataURL(file);
                                 event.target.value = '';
                               }} />
                               {item.image_url ? <img src={item.image_url} alt={`${item.key} variant`} className="size-full object-cover" /> : <Upload className="size-3.5 text-muted-foreground" />}
                             </label>
                           </td>
-                          <td className="p-1.5">
-                            <Input
-                              value={item.sku_code}
-                              onChange={e => updateItem(item.key, 'sku_code', e.target.value.toUpperCase())}
-                              className={`h-7 text-xs font-mono ${skuDup ? 'border-destructive' : ''}`}
-                              placeholder={copy.skuCode}
-                            />
-                            {skuDup && <p className="text-[10px] text-destructive mt-0.5">{copy.skuExists}</p>}
-                          </td>
-                          <td className="p-1.5">
-                            <Input
-                              value={item.price}
-                              onChange={e => updateItem(item.key, 'price', e.target.value)}
-                              className="h-7 text-xs text-right font-mono"
-                              placeholder="0"
-                              type="number"
-                            />
-                          </td>
-                          {stockView === 'overview' ? <>
-                            <td className="p-1.5 text-right"><button type="button" aria-expanded={detailsExpanded} onClick={() => toggleStockDetails(item.key)} className="ml-auto flex min-h-8 items-center gap-2 rounded-md border bg-background px-2.5 text-right transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span><strong className="block tabular-nums">{totalStockForItem} units</strong><span className="block text-[10px] text-muted-foreground">{activeWarehouses.length} {activeWarehouses.length === 1 ? 'location' : 'locations'}</span></span>{detailsExpanded ? <ChevronDown className="size-3.5 text-muted-foreground" /> : <ChevronRight className="size-3.5 text-muted-foreground" />}</button></td>
-                            <td className="p-2"><div className="flex max-w-48 flex-wrap gap-1">{listingCoverage.length ? listingCoverage.slice(0, 3).map(source => { const sourceStock = source.warehouseIds.reduce((total, warehouseId) => total + (Number(item.stock_by_location?.[warehouseId]) || 0), 0); const outOfStock = sourceStock === 0; return <span key={source.key} title={`${source.label}: ${sourceStock} units · ${source.syncPolicy} sync`} className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', outOfStock ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground')}>{source.label}{outOfStock ? ' · Out of stock' : ''}</span>; }) : <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">No coverage</span>}{listingCoverage.length > 3 ? <span className="text-[10px] text-muted-foreground">+{listingCoverage.length - 3}</span> : null}</div></td>
-                          </> : warehouses.map(wh => (
-                            <td key={wh.id} className="p-1.5">
-                              {stockControlled ? renderStock(wh.id, item) : <Input
-                                value={item.stock_by_location?.[wh.id] ?? ''}
-                                onChange={e => updateLocationStock(item.key, wh.id, e.target.value)}
-                                aria-label={`${item.key} stock at ${wh.label}`}
-                                className="ml-auto h-7 w-20 text-right font-mono text-xs"
-                                placeholder="0"
-                                type="number"
-                                min="0"
-                              />}
-                              <p className="mt-1 text-right text-[9px] text-muted-foreground">{listingLabelsForWarehouse(wh.id).join(' · ') || 'Not mapped'}</p>
-                            </td>))}
+                          <td className="p-2"><Input value={item.sku_code} aria-label={`SKU code for ${item.key}`} onChange={event => updateItem(item.key, 'sku_code', event.target.value.toUpperCase())} className={cn('h-9 text-xs font-mono', skuDup && 'border-destructive')} placeholder={copy.skuCode} />{skuDup && <p className="mt-0.5 text-[11px] text-destructive">{copy.skuExists}</p>}</td>
+                          <td className="p-2"><Input value={item.price} aria-label={`Price for ${item.key}`} onChange={event => updateItem(item.key, 'price', event.target.value)} className="h-9 text-right font-mono text-xs" placeholder="0" type="number" /></td>
+                          {overview ? <>
+                            <td className="p-2 text-right">{inventoryButton}</td>
+                            <td className="p-3 text-muted-foreground">{listingCoverage.length ? `${listingCoverage.length} mapped ${listingCoverage.length === 1 ? 'listing' : 'listings'}` : 'No confirmed SKU links'}</td>
+                          </> : <>
+                            {visibleWarehouses.map(warehouse => <td key={warehouse.id} className="p-2 text-right">{view.locations.some(location => location.id === warehouse.id) ? renderStock(warehouse.id, item) : <span className="text-muted-foreground">Not recorded</span>}</td>)}
+                            <td className="p-2">{inventoryButton}</td>
+                          </>}
                         </tr>
-                        {stockView === 'overview' && detailsExpanded ? <tr key={`${item.key}-stock-details`} className="border-b bg-muted/15"><td colSpan={groups.length + 4} className="p-3"><div className="rounded-lg border bg-background p-3"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-semibold">Inventory for {item.key}</p><p className="mt-0.5 text-[10px] text-muted-foreground">Update physical stock and see which listings use each source.</p></div><span className="text-xs font-semibold tabular-nums">{totalStockForItem} units available</span></div><div className="grid gap-2 md:grid-cols-2">{warehouses.map(warehouse => { const labels = listingLabelsForWarehouse(warehouse.id); return <div key={warehouse.id} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-semibold" title={warehouse.label}>{warehouse.label}</p><p className="text-[10px] text-muted-foreground">{warehouse.code}</p><div className="mt-1 flex flex-wrap gap-1">{labels.length ? labels.map(label => <span key={label} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">{label}</span>) : <span className="text-[9px] text-muted-foreground">Not used by a listing</span>}</div></div>{stockControlled ? renderStock(warehouse.id, item) : <Input value={item.stock_by_location?.[warehouse.id] ?? ''} onChange={event => updateLocationStock(item.key, warehouse.id, event.target.value)} aria-label={`${item.key} stock at ${warehouse.label}`} className="h-8 text-right font-mono text-xs" placeholder="0" type="number" min="0" />}</div>; })}</div></div></td></tr> : null}
-                      </Fragment>);
+                        {detailsExpanded && <tr className="border-b bg-muted/15"><td colSpan={groups.length + 3 + (overview ? 2 : visibleWarehouses.length + 1)} className="p-3"><VariantInventoryDetails name={item.key} product={savedProduct} view={view} canWrite={canWrite} onAdd={() => onAddStockLocation(item)} onAdjust={warehouseId => onAdjustStock(warehouseId, item)} /></td></tr>}
+                      </Fragment>;
                     })}
                   </tbody>
                 </table>
               </div>
             </div>
+            {listingInventorySources.length > 0 && <section aria-label="Listing stock sources" className="mt-4 rounded-lg border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="text-xs font-semibold">Listing stock sources</h4><p className="mt-1 text-xs text-muted-foreground">Configure which warehouse supplies each shop in Channel listings. This does not move physical stock.</p></div><Button type="button" variant="outline" size="sm" className="min-h-9" onClick={onConfigureInventorySources}>Manage listing sources<ArrowRight className="ml-1 size-3.5" /></Button></div>
+              <details className="mt-3"><summary className="cursor-pointer py-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">View sources for {listingInventorySources.length} {listingInventorySources.length === 1 ? 'listing' : 'listings'}</summary><ul className="divide-y">{listingInventorySources.map(source => <li key={source.key} className="flex flex-wrap justify-between gap-2 py-2 text-xs"><span className="font-medium">{source.label}</span><span className="text-muted-foreground">{source.warehouseIds.length ? source.warehouseIds.map(id => warehouses.find(warehouse => warehouse.id === id)?.label ?? 'Unknown stock location').join(', ') : 'Source not confirmed'} · {source.syncPolicy}</span></li>)}</ul></details>
+            </section>}
           </div>
         )}
     </div>
@@ -1954,6 +1924,7 @@ export default function ProductCreatePage() {
 
   const [packageWeightUnit, setPackageWeightUnit] = useState<'g' | 'kg'>('g');
   usePricingRevision();
+  const warehouseConnections = useConnectedShops();
   const [channelOverrides, setChannelOverrides] = useState<Record<OverrideChannel, ChannelOverrideForm>>(() => {
     const saved = existingProduct?.channel_overrides;
     const syncStatusDemo = existingProduct?.id === 'prod_004';
@@ -2083,18 +2054,19 @@ export default function ProductCreatePage() {
       baselineSnapshotRef.current = JSON.stringify(baseline);
     }
   }
-  const listingInventorySources = useMemo(() => OVERRIDE_CHANNELS.flatMap(channel => {
-    const draft = channelOverrides[channel.key];
-    const listing = configuredListing(existingProduct?.channels ?? [], listingChannelByOverride[channel.key], draft.listing_sku);
-    const preference = listingMasterSync(listing, existingProduct?.channel_overrides?.[channel.key]);
-    if (!draft.enabled || !syncsField(preference, 'inventory') || !preference.inventory?.warehouse_id) return [];
-    return [{
-      key: channel.key,
-      label: channel.label,
-      warehouseIds: [preference.inventory.warehouse_id],
-      syncPolicy: 'Master stock',
-    }];
-  }), [channelOverrides, existingProduct]);
+  const listingInventorySources = useMemo(() => (existingProduct?.channels ?? []).map((listing, index) => {
+    const preference = listingMasterSync(listing, syncListingOverride(existingProduct!, listing));
+    const warehouseId = listingStockWarehouseId(existingProduct!, listing, preference.inventory, warehouseConnections.status === 'ready' ? warehouseConnections.shops : []);
+    const data = resolveListingShopData(existingProduct!, listing, getCatalogImportItems());
+    const pending = Boolean(listing.review_pending?.sku_mapping_pending);
+    return {
+      key: `${listing.channel}:${listing.external_id ?? ''}:${index}`,
+      label: `${data.shop || 'Shop not identified'} · ${listing.channel}`,
+      warehouseIds: warehouseId ? [warehouseId] : [],
+      syncPolicy: pending ? 'SKU mapping needs review' : syncsField(preference, 'inventory') ? 'Master stock selected' : 'Master stock sync off',
+      skuIds: pending ? [] : [...new Set((listing.variant_mappings ?? []).map(mapping => mapping.master_sku_id))],
+    };
+  }), [existingProduct, warehouseConnections.shops, warehouseConnections.status]);
 
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishPercent, setPublishPercent] = useState(0);
@@ -2461,7 +2433,7 @@ export default function ProductCreatePage() {
   function openCompletionItem(checkId: string) {
     const workspace = completionWorkspaceFor(checkId).id;
     const targetByCheck: Record<string, string> = {
-      identity: 'product-name', content: 'product-description', category: 'product-category-trigger', attributes: missingRequiredCategoryAttributes[0] ? `product-attribute-${missingRequiredCategoryAttributes[0].key}` : 'product-attributes-title',
+      identity: 'product-name', sku: 'product-master-sku', content: 'product-description', category: 'product-category-trigger', attributes: missingRequiredCategoryAttributes[0] ? `product-attribute-${missingRequiredCategoryAttributes[0].key}` : 'product-attributes-title',
       shipping: 'product-section-shipping', price: 'product-section-pricing', variants: 'variant-attributes-title',
       media: 'product-media-panel', channels: 'product-section-channels',
     };
@@ -2620,9 +2592,9 @@ export default function ProductCreatePage() {
       .filter(i => i.selected && i.sku_code.trim())
       .map(i => {
         const saved = latestProduct?.skus.find(sku => sku.id === i.id);
-        const locations = saved?.stock_by_location ?? (latestProduct
-          ? saved ? undefined : Object.fromEntries(WAREHOUSES.filter(warehouse => canEditWarehouseStock(warehouse.id)).map(warehouse => [warehouse.id, 0]))
-          : Object.fromEntries(Object.entries(i.stock_by_location).map(([id, value]) => [id, num(value)])));
+        // A new variant has no warehouse membership until an opening count is recorded.
+        // Preserve saved missing counts and explicit zeros without manufacturing balances.
+        const locations = saved ? saved.stock_by_location : {};
         return {
           ...saved,
           id: saved?.id ?? genId('sku'),
@@ -2633,7 +2605,7 @@ export default function ProductCreatePage() {
           status: 'active' as const,
           image_url: i.image_url,
           price: num(i.price),
-          stock: locations ? Object.values(locations).reduce((total, value) => total + value, 0) : saved?.stock,
+          stock: locations && Object.keys(locations).length ? Object.values(locations).reduce((total, value) => total + value, 0) : saved?.stock,
           stock_by_location: locations,
         };
       });
@@ -2687,7 +2659,7 @@ export default function ProductCreatePage() {
       meta_title: form.meta_title.trim(),
       meta_description: form.meta_description.trim(),
       specifications: serializeSpecifications(specifications),
-      inventory: latestProduct?.inventory ?? Object.fromEntries(Object.entries(inventory).map(([k, v]) => [k, num(v)])),
+      inventory: latestProduct?.inventory ?? (form.has_variants ? {} : Object.fromEntries(Object.entries(inventory).map(([k, v]) => [k, num(v)]))),
       has_variants: form.has_variants,
       channels: selectedChannels,
       channel_overrides: Object.fromEntries(Object.entries(channelOverrides).map(([key, value]) => [key, {
@@ -2793,16 +2765,19 @@ export default function ProductCreatePage() {
     if (!latest) return;
     const variant = item ? latest.skus.find(sku => sku.id === item.id) : undefined;
     if (item && !variant) return;
-    setAddingStockLocation(false);
+    const count = variant ? variant.stock_by_location?.[warehouseId] : latest.inventory[warehouseId];
+    setAddingStockLocation(recordedQuantity(count) === null);
     setStockAdjustment({ product: latest, warehouse: getWarehouses().find(warehouse => warehouse.id === warehouseId), sku: variant?.sku_code });
   }
 
-  function openAddStockLocation() {
-    if (!canWrite || !existingProduct || form.has_variants) return;
+  function openAddStockLocation(item?: VariantItem) {
+    if (!canWrite || !existingProduct) return;
     const latest = getProductById(existingProduct.id);
     if (!latest) return;
+    const variant = item ? latest.skus.find(sku => sku.id === item.id) : undefined;
+    if (form.has_variants && !variant) return;
     setAddingStockLocation(true);
-    setStockAdjustment({ product: latest });
+    setStockAdjustment({ product: latest, sku: variant?.sku_code });
   }
 
   function refreshAdjustedStock() {
@@ -2823,7 +2798,7 @@ export default function ProductCreatePage() {
   function renderControlledStock(warehouseId: string, item?: VariantItem) {
     const saved = item ? existingProduct?.skus.find(sku => sku.id === item.id) : undefined;
     const value = item ? saved?.stock_by_location?.[warehouseId] : existingProduct?.inventory[warehouseId];
-    const writable = canEditWarehouseStock(warehouseId);
+    const writable = canEditWarehouseStock(warehouseId) && getWarehouses().some(warehouse => warehouse.id === warehouseId && warehouse.status === 'active');
     const needsSave = Boolean(item && !saved);
     return <div className="flex flex-wrap items-center justify-end gap-2 text-right">
       <span className="text-sm font-semibold tabular-nums">{value === undefined ? 'Not recorded' : `${value.toLocaleString()} units`}</span>
@@ -2841,7 +2816,10 @@ export default function ProductCreatePage() {
       ...recordedLocationIds.filter(id => !stockLocations.some(warehouse => warehouse.id === id)).map(id => ({ id, label: 'Unknown stock location', code: id })),
     ]
     : WAREHOUSES;
-  const availableStockLocations = stockLocations.filter(warehouse => warehouse.status === 'active' && canEditWarehouseStock(warehouse.id) && !recordedLocationIds.includes(warehouse.id));
+  const stockLocationCounts = existingProduct?.has_variants
+    ? existingProduct.skus.find(sku => sku.sku_code === stockAdjustment?.sku)?.stock_by_location ?? {}
+    : existingProduct?.inventory ?? {};
+  const availableStockLocations = stockLocations.filter(warehouse => warehouse.status === 'active' && canEditWarehouseStock(warehouse.id) && recordedQuantity(stockLocationCounts[warehouse.id]) === null);
   const recordedStockTotal = recordedLocationIds.reduce((total, id) => total + existingProduct!.inventory[id], 0);
   const masterSkuLocked = Boolean(existingProduct && (
     existingProduct.status !== 'draft' || existingProduct.channels.length > 0 || totalStock > 0
@@ -3338,7 +3316,7 @@ export default function ProductCreatePage() {
             {/* Product media belongs to the canonical master and is prepared before channel distribution. */}
             {activeSection === 'product-data' ? <Card id="product-media-panel" tabIndex={-1} className="order-20">
               <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-sm"><Image className="size-4 text-primary" />{copy.media}</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">First image is the main image. Used by channel listings.</p></div><Badge variant="outline" className={cn(masterMedia.ready && 'border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300')}>{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · {MIN_MASTER_IMAGES} required · 9 max</Badge></div>
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-sm"><Image className="size-4 text-primary" />{copy.media}</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">First image is the main image. Used by channel listings.</p></div><Badge variant="outline" className={cn(masterMedia.ready && 'border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300')}>{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · optional for activation · 9 max</Badge></div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {images.length === 0 ? <label className="flex min-h-28 cursor-pointer items-center justify-center gap-3 rounded-lg border-2 border-dashed bg-muted/20 px-4 py-5 transition-colors hover:border-primary/40 hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring">
@@ -3394,7 +3372,7 @@ export default function ProductCreatePage() {
                       return {
                         id: 'configured-' + channel.key, channelKey: channel.key, channelLabel: channel.label,
                         shop, sku: data.sku || override.listing_sku || 'Not recorded',
-                        context: <>{listing?.local_draft ? 'Local draft · Not sent to shop' : data.retrievedAt ? 'Shop data retrieved: ' + formatSyncRecord(data.retrievedAt) : null}{listingMappingNotice(listing, shop)}</>,
+                        context: <>{listing?.local_draft ? 'Local draft · Not sent to shop' : data.retrievedAt ? 'Shop data retrieved: ' + formatSyncRecord(data.retrievedAt) : null}{listingMappingNotice(listing, shop)}{listing && existingProduct && <ListingRequirementNotice product={existingProduct} listing={listing} />}</>,
                         price: <ListingShopValue data={data} field="price" />,
                         stock: <ListingShopValue data={data} field="stock" />,
                         status: <ListingMasterSyncControl preference={preference} shop={shop} disabled={!canWrite || !listing} disabledReason={!listing ? 'Save the listing first' : isArchived ? 'Archived Master' : undefined} onOpen={() => listing && openListingSyncSettings(listing, shop, data.sku || override.listing_sku || 'Not recorded', preference)} />,
@@ -3412,7 +3390,7 @@ export default function ProductCreatePage() {
                         id: 'linked-' + JSON.stringify([listing.channel, listing.store_name, listing.external_id, index]),
                         channelKey: channel.key, channelLabel: channel.label, shop, sku,
                         newlyLinked: newLinkedKeys.includes(listingActivityKey(listing)),
-                        context: <>{listing.local_draft ? 'Local draft · Not sent to shop' : data.retrievedAt ? 'Shop data retrieved: ' + formatSyncRecord(data.retrievedAt) : null}{listingMappingNotice(listing, shop)}</>,
+                        context: <>{listing.local_draft ? 'Local draft · Not sent to shop' : data.retrievedAt ? 'Shop data retrieved: ' + formatSyncRecord(data.retrievedAt) : null}{listingMappingNotice(listing, shop)}{listing && existingProduct && <ListingRequirementNotice product={existingProduct} listing={listing} />}</>,
                         price: <ListingShopValue data={data} field="price" />,
                         stock: <ListingShopValue data={data} field="stock" />,
                         status: <ListingMasterSyncControl preference={preference} shop={shop} disabled={!canWrite} disabledReason={isArchived ? 'Archived Master' : undefined} onOpen={() => openListingSyncSettings(listing, shop, sku, preference)} />,
@@ -3647,7 +3625,7 @@ export default function ProductCreatePage() {
                     {missingRequiredCategoryAttributes.length ? <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50">{missingRequiredCategoryAttributes.length} required {missingRequiredCategoryAttributes.length === 1 ? 'field' : 'fields'} missing</Badge> : requiredCategoryAttributes.length ? <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">Required fields complete</Badge> : null}
                   </div>
                   {retainedAttributes.length ? <details className="rounded-lg border bg-muted/10 p-4"><summary className="cursor-pointer text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Saved values outside this category ({retainedAttributes.length})</summary><p className="mt-2 text-xs text-muted-foreground">These values are kept, but are not required by the current category. They are restored if you switch back. Translations are also preserved.</p><dl className="mt-3 space-y-2">{retainedAttributes.map((spec, index) => <div key={`${spec.attributeKey ?? spec.name}-${index}`} className="grid gap-1 text-sm sm:grid-cols-2"><dt className="text-muted-foreground">{spec.name}</dt><dd className="break-words">{spec.value}</dd></div>)}</dl></details> : null}
-                  {!form.category ? <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">Attributes will appear after selecting a category</p><p className="mt-1 text-xs text-muted-foreground">Use the Product category field above to load its required attributes.</p></div> : categoryAttributesForProduct.length ? <div className="divide-y overflow-hidden rounded-lg border">{categoryAttributesForProduct.map(attribute => { const spec = specificationForAttribute(attribute); const managedGroup = form.has_variants ? variantGroups.find(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase()) : undefined; const missingRequired = attribute.required && !spec?.value.trim() && !managedGroup?.values.length; return <div key={attribute.key} className="grid gap-3 p-4 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.3fr)] sm:items-start"><div><div className="flex items-center gap-2"><Label htmlFor={`product-attribute-${attribute.key}`} className="text-sm font-semibold">{attribute.name}</Label>{managedGroup ? <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">Variant attribute</Badge> : attribute.required ? <span className="text-xs font-semibold text-destructive">Required</span> : <span className="text-xs text-muted-foreground">Optional</span>}</div><p className="mt-1 text-xs text-muted-foreground">{attribute.type}</p></div><div className="space-y-1.5" id={`product-attribute-${attribute.key}`}>{managedGroup ? <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2"><div><p className="text-sm font-medium">Managed by variants</p><p className="mt-0.5 text-xs text-muted-foreground">{managedGroup.values.length ? managedGroup.values.join(', ') : 'Add at least one value in Commerce'}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => selectWorkspace('commerce')}>Manage variants<ChevronRight className="size-3.5" /></Button></div> : <><DynamicAttributeValueControl attribute={attribute} value={spec?.value ?? ''} onChange={nextValue => setSpecifications(current => current.map(item => item.attributeKey === attribute.key || (!item.attributeKey && item.name.toLowerCase() === attribute.name.toLowerCase()) ? { ...item, attributeKey: attribute.key, name: attribute.name, value: nextValue } : item))}  />{attribute.isLocalizable && contentLocale !== primaryLocale ? <div className="mt-2 space-y-2 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3"><div className="flex flex-wrap items-center gap-2"><Globe2 className="size-3.5 text-primary" /><span className="text-xs font-semibold">{activeOrgLocales.find(locale => locale.locale === contentLocale)?.nativeLabel ?? contentLocale} translation</span><span className="ml-auto text-[11px] text-muted-foreground">{localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() ? 'Complete' : `Using ${primaryLocaleConfig?.nativeLabel ?? 'primary'} fallback`}</span></div><DynamicAttributeValueControl attribute={attribute} value={localizedContent[contentLocale]?.attributeValues?.[attribute.key] ?? ''} onChange={value => updateLocalizedAttributeValue(attribute.key, value)} />{!localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() && spec?.value.trim() ? <p className="text-[11px] leading-4 text-muted-foreground">Reference: {spec.value}</p> : null}</div> : null}{missingRequired ? <p className={cn('text-xs', hasPublishedRevision ? 'font-medium text-destructive' : 'text-muted-foreground')}>Needed to activate Master. You can save a draft without this value.</p> : attribute.required && attribute.validation ? <p className="text-xs text-muted-foreground">{attribute.validation}</p> : null}</>}</div></div>; })}</div> : <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">No additional attributes required</p><p className="mt-1 text-xs text-muted-foreground">This category does not require extra product information.</p></div>}
+                  {!form.category ? <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">Attributes will appear after selecting a category</p><p className="mt-1 text-xs text-muted-foreground">Use the Product category field above to load its required attributes.</p></div> : categoryAttributesForProduct.length ? <div className="divide-y overflow-hidden rounded-lg border">{categoryAttributesForProduct.map(attribute => { const spec = specificationForAttribute(attribute); const managedGroup = form.has_variants ? variantGroups.find(group => group.name.trim().toLowerCase() === attribute.name.trim().toLowerCase()) : undefined; const missingRequired = attribute.required && !spec?.value.trim() && !managedGroup?.values.length; return <div key={attribute.key} className="grid gap-3 p-4 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.3fr)] sm:items-start"><div><div className="flex items-center gap-2"><Label htmlFor={`product-attribute-${attribute.key}`} className="text-sm font-semibold">{attribute.name}</Label>{managedGroup ? <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">Variant attribute</Badge> : attribute.required ? <span className="text-xs font-semibold text-destructive">Required</span> : <span className="text-xs text-muted-foreground">Optional</span>}</div><p className="mt-1 text-xs text-muted-foreground">{attribute.type}</p></div><div className="space-y-1.5" id={`product-attribute-${attribute.key}`}>{managedGroup ? <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2"><div><p className="text-sm font-medium">Managed by variants</p><p className="mt-0.5 text-xs text-muted-foreground">{managedGroup.values.length ? managedGroup.values.join(', ') : 'Add at least one value in Commerce'}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => selectWorkspace('commerce')}>Manage variants<ChevronRight className="size-3.5" /></Button></div> : <><DynamicAttributeValueControl attribute={attribute} value={spec?.value ?? ''} onChange={nextValue => setSpecifications(current => current.map(item => item.attributeKey === attribute.key || (!item.attributeKey && item.name.toLowerCase() === attribute.name.toLowerCase()) ? { ...item, attributeKey: attribute.key, name: attribute.name, value: nextValue } : item))}  />{attribute.isLocalizable && contentLocale !== primaryLocale ? <div className="mt-2 space-y-2 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3"><div className="flex flex-wrap items-center gap-2"><Globe2 className="size-3.5 text-primary" /><span className="text-xs font-semibold">{activeOrgLocales.find(locale => locale.locale === contentLocale)?.nativeLabel ?? contentLocale} translation</span><span className="ml-auto text-[11px] text-muted-foreground">{localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() ? 'Complete' : `Using ${primaryLocaleConfig?.nativeLabel ?? 'primary'} fallback`}</span></div><DynamicAttributeValueControl attribute={attribute} value={localizedContent[contentLocale]?.attributeValues?.[attribute.key] ?? ''} onChange={value => updateLocalizedAttributeValue(attribute.key, value)} />{!localizedContent[contentLocale]?.attributeValues?.[attribute.key]?.trim() && spec?.value.trim() ? <p className="text-[11px] leading-4 text-muted-foreground">Reference: {spec.value}</p> : null}</div> : null}{missingRequired ? <p className={cn('text-xs', hasPublishedRevision ? 'font-medium text-destructive' : 'text-muted-foreground')}>Not required to activate Master. Each listing’s channel requirements are checked separately.</p> : attribute.required && attribute.validation ? <p className="text-xs text-muted-foreground">{attribute.validation}</p> : null}</>}</div></div>; })}</div> : <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-5 text-center"><p className="text-sm font-medium">No additional attributes required</p><p className="mt-1 text-xs text-muted-foreground">This category does not require extra product information.</p></div>}
 
                   <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div><p className="text-xs font-medium">Attribute setup</p><p className="mt-1 text-xs text-muted-foreground">Changes open in Catalog Setup. Save there to return to this product.</p></div><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm" disabled={!form.category || !canWrite}>Manage attribute setup<ChevronDown className="size-3.5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-80"><DropdownMenuLabel>Manage {form.category || 'category'} attributes</DropdownMenuLabel>{categoryAttributesForProduct.filter(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select').map(attribute => <DropdownMenuItem key={attribute.key} className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ attribute: attribute.key })}><Tags className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Edit {attribute.name} values</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Add or edit selectable values used across products.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem>)}{categoryAttributesForProduct.some(attribute => attribute.type === 'Single select' || attribute.type === 'Multi-select') ? <DropdownMenuSeparator /> : null}<DropdownMenuItem className="min-h-14 items-start gap-3" onSelect={() => openAttributeSetup({ category: selectedCatalogCategory?.id ?? form.category })}><Layers className="mt-0.5 size-4 shrink-0 text-primary" /><span><span className="block font-medium">Manage attributes for {form.category}</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">Assign fields and set which ones are required.</span></span><ChevronRight className="ml-auto mt-0.5 size-3.5 shrink-0 text-muted-foreground" /></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </section>}
@@ -3693,8 +3671,11 @@ export default function ProductCreatePage() {
                       stock: copy.stock,
                       skuExists: copy.skuExists,
                     }}
-                    warehouses={WAREHOUSES}
-                    stockControlled={Boolean(existingProduct)}
+                    warehouses={stockLocations.map(warehouse => ({ id: warehouse.id, label: warehouse.name, code: warehouse.code }))}
+                    savedProduct={existingProduct}
+                    canWrite={canWrite}
+                    onAddStockLocation={openAddStockLocation}
+                    onAdjustStock={openStockAdjustment}
                     renderStock={renderControlledStock}
                     listingInventorySources={listingInventorySources}
                     onConfigureInventorySources={() => selectWorkspace('distribution')}
@@ -3731,7 +3712,7 @@ export default function ProductCreatePage() {
                       <h3 id="inventory-title" className="text-sm font-semibold">Inventory by location</h3>
                       <p className="mt-0.5 text-xs text-muted-foreground">{existingProduct ? 'Locations with recorded stock, including zero. Each change is saved in adjustment history.' : 'Set the initial stock at each warehouse for this SKU.'}</p>
                     </div>
-                    {existingProduct && canWrite && availableStockLocations.length > 0 && <Button type="button" variant="outline" size="sm" className="min-h-9 shrink-0" onClick={openAddStockLocation}><Plus className="size-3.5" />Add stock location</Button>}
+                    {existingProduct && canWrite && availableStockLocations.length > 0 && <Button type="button" variant="outline" size="sm" className="min-h-9 shrink-0" onClick={() => openAddStockLocation()}><Plus className="size-3.5" />Add stock location</Button>}
                   </div>
                   {inventoryLocations.length ? <div className="overflow-hidden rounded-lg border">
                     {inventoryLocations.map((warehouse, idx) => (
@@ -3910,7 +3891,7 @@ export default function ProductCreatePage() {
                   </div>
                   <p className={cn('mt-2 flex items-center gap-1.5 text-[11px]', masterMedia.ready ? 'text-emerald-600' : 'text-muted-foreground')}>
                     {masterMedia.ready ? <CircleCheck className="size-3.5" /> : <Circle className="size-3.5" />}
-                    {masterMedia.ready ? 'Minimum image requirement met' : `Add at least ${MIN_MASTER_IMAGES} product image`}
+                    Images are optional for Master activation. Each listing may have its own image requirements.
                   </p>
                 </div>
                 {images.length > 0 ? <div className="space-y-2 border-t pt-3"><p className="text-xs font-medium">Image alt text</p>{images.map((url, index) => <div key={`${url}:${index}-alt`} className="flex items-center gap-2"><img src={url} alt="" className="size-8 rounded border object-cover" /><Input value={imageAltTexts[index] ?? ''} maxLength={125} onChange={event => setImageAltTexts(current => { const next = [...current]; next[index] = event.target.value; return next; })} placeholder={`Describe image ${index + 1}`} aria-label={`Alt text for image ${index + 1}`} className="h-8 text-xs" /></div>)}</div> : null}
@@ -4061,6 +4042,7 @@ export default function ProductCreatePage() {
         products={[stockAdjustment.product ?? existingProduct]}
         warehouses={addingStockLocation ? availableStockLocations : getWarehouses()}
         lockProduct
+        lockSku={Boolean(stockAdjustment.sku)}
         initializeLocation={addingStockLocation}
         onClose={refreshAdjustedStock}
         onSaved={() => { refreshAdjustedStock(); toast({ title: addingStockLocation ? 'Stock location added' : 'Stock adjustment recorded', description: 'Stock updated. Your other product changes are still here.' }); }}

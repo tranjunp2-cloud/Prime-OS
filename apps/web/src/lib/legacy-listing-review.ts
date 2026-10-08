@@ -12,7 +12,7 @@ export function legacyMappingIssues(product: Pick<Product, 'import_result' | 'im
 }
 
 /** Commit only after the caller validates the seller's complete, fresh review snapshots. */
-export function commitExistingListingReviews(items: CatalogImportItem[], destination: Product, created: boolean, mappings?: VariantMappings, progress?: Record<string, ChannelListing['review_pending']>, catalog?: ListingIntakeCatalog) {
+export function commitExistingListingReviews(items: CatalogImportItem[], destination: Product, created: boolean, mappings?: VariantMappings, progress?: Record<string, ChannelListing['review_pending']>, catalog?: ListingIntakeCatalog, listingDrafts?: Record<string, import('./product-store').ListingDraftValues>) {
   const products = catalog?.products() ?? getProducts();
   const changes = new Map<string, Product>();
   const editable = (product: Product) => {
@@ -32,6 +32,9 @@ export function commitExistingListingReviews(items: CatalogImportItem[], destina
     const imported = listingImportSource(source, link, catalog?.listings() ?? getCatalogImportItems({ requireConfirmation: true }));
     if (!link.shop_snapshot && imported) link.shop_snapshot = snapshotShopListing(imported);
     link.review_pending = progress?.[item.id];
+    const patch = listingDrafts?.[item.id];
+    if (patch) link.local_draft = { values: { ...link.local_draft?.values, ...patch,
+      shipping: { ...link.local_draft?.values.shipping, ...patch.shipping }, channel_settings: { ...link.local_draft?.values.channel_settings, ...patch.channel_settings } }, updated_at: new Date().toISOString() };
     if (link.review_pending?.sku_mapping_pending && link.master_data_sync?.enabled) {
       const fields = link.master_data_sync.fields.filter(field => field !== 'price' && field !== 'inventory');
       link.master_data_sync = { ...link.master_data_sync, fields, enabled: fields.length > 0, updated_at: new Date().toISOString() };
@@ -105,6 +108,7 @@ export function legacyListingReviews(products: Product[], imports: CatalogImport
       variants: shopData.variantCount ?? source?.variants ?? 0,
       variantItems: shopData.variants ?? source?.variantItems,
       mappingFields: source?.mappingFields ?? link.shop_snapshot?.mapping_fields,
+      requirements: shopData.requirements,
       shipping: source?.shipping ?? link.shop_snapshot?.shipping,
       modelNumber: source?.modelNumber ?? link.shop_snapshot?.identifiers?.model,
       mpn: source?.mpn ?? link.shop_snapshot?.identifiers?.mpn,

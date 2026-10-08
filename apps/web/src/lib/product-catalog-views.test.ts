@@ -56,7 +56,7 @@ describe('Catalog lifecycle views', () => {
     expect(isMasterReadyToPublish({ ...product, status: 'archived' })).toBe(false);
     expect(isMasterReadyToPublish({ ...product, import_result: 'needs_review' })).toBe(true);
     expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: ['/one.jpg'] })).toBe(true);
-    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: [] })).toBe(false);
+    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: [] })).toBe(true);
   });
 
   it('does not classify a manually-published Master as imported', () => {
@@ -85,25 +85,26 @@ describe('Shared Master readiness', () => {
     expect(editor.some(check => check.id === 'channels')).toBe(false);
   });
 
-  it('checks image count and visible description text, not stale import flags', () => {
+  it('requires visible description text, with no global image or character-count gate', () => {
     const incomplete = { ...product, import_result: 'ready' as const, images: [], description: '<p title="'.padEnd(150, 'x') + '">Short</p>' };
-    expect(getStoredMasterReadiness(incomplete).checks.filter(check => !check.done).map(check => check.id)).toEqual(['media', 'content']);
+    expect(getStoredMasterReadiness(incomplete).ready).toBe(true);
+    expect(getStoredMasterReadiness({ ...incomplete, description: '<p>&nbsp;</p>' }).missing).toEqual(['Add a product description']);
   });
 
-  it('requires an active category and its actual required attributes', () => {
+  it('does not promote category requirements into Master activation blockers', () => {
     const settings = getProductCatalogSettings();
     const category = settings.categories.find(item => item.id === product.categoryId)!;
     saveProductCatalogSettings({ ...settings, categories: [{ ...category, attributes: [{ key: 'color', required: true }] }] });
-    expect(getStoredMasterReadiness(product).missing).toContain('Complete required attributes: Color');
+    expect(getStoredMasterReadiness(product).ready).toBe(true);
     const complete = { ...product, specifications: [{ attributeKey: 'color', name: 'Color', value: 'Blue' }] };
     expect(getStoredMasterReadiness(complete).ready).toBe(true);
     saveProductCatalogSettings({ ...settings, categories: [{ ...category, status: 'Inactive' }] });
-    expect(getStoredMasterReadiness(complete).missing).toContain('Select an active product category');
+    expect(getStoredMasterReadiness(complete).ready).toBe(true);
   });
 
-  it('checks shipping only for enabled online channels, respecting explicit disabled overrides', () => {
+  it('never makes Master activation depend on a linked channel’s shipping requirements', () => {
     const listing = { channel: 'shopee' as const, external_id: 'SHO-123', status: 'active' as const, listing_url: null, last_synced_at: null };
-    expect(getStoredMasterReadiness({ ...product, channels: [listing] }).missing).toContain('Configure shipping package dimensions and weight');
+    expect(getStoredMasterReadiness({ ...product, channels: [listing] }).ready).toBe(true);
     expect(getStoredMasterReadiness({ ...product, channels: [{ ...listing, channel: 'pos' }] }).ready).toBe(true);
     expect(getStoredMasterReadiness({ ...product, channels: [listing], channel_overrides: { shopee: { enabled: false, title: '', description: '', price_markup: 0 } } }).ready).toBe(true);
   });
@@ -114,6 +115,7 @@ describe('Shared Master readiness', () => {
       skus: [{ id: 'blue', sku_code: 'BLUE-001', variation_name: 'Blue', price: 10, stock_by_location: { wh_crjp: 2 }, weight_g: 10, units_per_carton: 1, status: 'active' }] };
     expect(getStoredMasterReadiness(variant).ready).toBe(true);
     expect(getStoredMasterReadiness({ ...variant, skus: [{ ...variant.skus[0], price: 0 }] }).checks.find(check => check.id === 'price')?.done).toBe(false);
-    expect(getStoredMasterReadiness({ ...variant, variant_options: [{ attributeKey: 'unknown', name: 'Unknown option', values: ['Blue'] }] }).checks.find(check => check.id === 'variants')?.done).toBe(false);
+    expect(getStoredMasterReadiness({ ...variant, variant_options: [{ attributeKey: 'unknown', name: 'Unknown option', values: ['Blue'] }] }).ready).toBe(true);
+    expect(getStoredMasterReadiness({ ...variant, skus: [{ ...variant.skus[0], sku_code: '' }] }).checks.find(check => check.id === 'sku')?.done).toBe(false);
   });
 });

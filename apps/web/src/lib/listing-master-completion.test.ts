@@ -55,7 +55,7 @@ describe('Complete and activate a Master in listing review', () => {
   it('requires complete data only when creating a new Master', () => {
     updateProduct(master.id, { id: master.id, images: ['/same.jpg', '/same.jpg', '/same.jpg'], description: '' });
     const before = JSON.stringify(getProducts());
-    expect(() => confirmListingIntake([source.id], { name: 'New incomplete Master', sku: 'NEW-INCOMPLETE', sourceId: source.id })).toThrow(/1 product image.*description/);
+    expect(() => confirmListingIntake([source.id], { name: 'New incomplete Master', sku: 'NEW-INCOMPLETE', sourceId: source.id })).toThrow(/description/);
     expect(JSON.stringify(getProducts())).toBe(before);
     expect(pendingShopListings()).toHaveLength(1);
     expect(getProductById(master.id)?.status).toBe('draft');

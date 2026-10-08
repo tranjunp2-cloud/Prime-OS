@@ -16,6 +16,8 @@ export interface Warehouse {
   status: WarehouseStatus;
   created_at: string;
   updated_at: string;
+  manager?: string;
+  phone?: string;
 }
 
 const SEED_WAREHOUSES: Warehouse[] = [
@@ -87,6 +89,36 @@ const SEED_WAREHOUSES: Warehouse[] = [
 ];
 
 let _warehouses: Warehouse[] = [...SEED_WAREHOUSES];
+export const WAREHOUSE_STORAGE_KEY = 'primeos-managed-warehouses-v1';
+
+function savedWarehouses(): Warehouse[] {
+  if (typeof window === 'undefined') return [];
+  const raw = window.localStorage.getItem(WAREHOUSE_STORAGE_KEY);
+  if (!raw) return [];
+  const saved: unknown = JSON.parse(raw);
+  if (!Array.isArray(saved) || saved.some(w => !w || typeof w.id !== 'string' || typeof w.name !== 'string' || typeof w.code !== 'string')) throw new Error('Saved warehouses could not be read. Please reload before making changes.');
+  return saved;
+}
+
+/** Demo reseeding must never remove a warehouse the seller created. */
+export function restoreSavedWarehouses(): void {
+  const saved = savedWarehouses();
+  _warehouses = [..._warehouses.filter(w => !saved.some(item => item.id === w.id)), ...saved];
+}
+try { restoreSavedWarehouses(); } catch { /* Mutations surface storage failures without overwriting unreadable data. */ }
+
+export function createManagedWarehouse(input: { name: string; code: string; address: string; country: string; manager?: string; phone?: string }): Warehouse {
+  const saved = savedWarehouses();
+  const name = input.name.trim();
+  const code = input.code.trim().toUpperCase();
+  if (!name || !code || !input.address.trim() || !/^[A-Z]{2}$/.test(input.country)) throw new Error('Enter a name, code, country and address.');
+  if ([..._warehouses, ...saved].some(w => w.code.toUpperCase() === code)) throw new Error('This warehouse code is already in use. Choose another code.');
+  const now = new Date().toISOString();
+  const warehouse: Warehouse = { ...input, name, code, address: input.address.trim(), manager: input.manager?.trim(), phone: input.phone?.trim(), id: genWarehouseId(), type: 'internal', is_virtual: false, status: 'active', capabilities: ['pick_pack'], created_at: now, updated_at: now };
+  if (typeof window !== 'undefined') window.localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify([...saved, warehouse]));
+  _warehouses = [..._warehouses, warehouse];
+  return warehouse;
+}
 
 export function getWarehouses(): Warehouse[] {
   return _warehouses;

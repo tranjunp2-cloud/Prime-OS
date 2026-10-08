@@ -19,11 +19,19 @@ function mount(query = '') {
 }
 async function ready() { await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); }); }
 function record(value: string) {
-  fireEvent.change(screen.getByLabelText('New stock'), { target: { value } });
+  fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value } });
   fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
   fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
 }
 function saveMetadata() { fireEvent.click(screen.getByRole('button', { name: /^(Update Master|Activate Master|Complete product)$/ })); }
+function seedVariants(blue: Record<string, number> = {}, red: Record<string, number> = { wh_rslsg: 7 }) {
+  const sku = { weight_g: 0, units_per_carton: 1, status: 'active' as const, price: 10 };
+  product = { ...product, has_variants: true, product_type: 'variant', variant_options: [{ attributeKey: 'color', name: 'Color', values: ['Blue', 'Red'] }], skus: [
+    { ...sku, id: 'child-blue', sku_code: 'STOCK-DETAIL-BLUE', variation_name: 'Blue', stock_by_location: blue },
+    { ...sku, id: 'child-red', sku_code: 'STOCK-DETAIL-RED', variation_name: 'Red', stock_by_location: red },
+  ] };
+  updateProduct(id, product);
+}
 beforeEach(() => {
   clearInventoryStore();
   window.localStorage.removeItem(STOCK_HOLD_STORAGE_KEY);
@@ -34,6 +42,96 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); deleteProduct(id); clearInventoryStore(); window.localStorage.removeItem(STOCK_HOLD_STORAGE_KEY); vi.restoreAllMocks(); });
 describe('stock adjustments without leaving Product Master', () => {
+  it('shows related locations per variant in a full-width panel and keeps provider stock read-only', async () => {
+    seedVariants({ wh_crjp: 0, wh_fbajp: 2 });
+    mount(); await ready();
+    fireEvent.click(screen.getByRole('button', { name: 'View inventory for Blue' }));
+    const panel = screen.getByRole('region', { name: 'Inventory for Blue' });
+    expect(panel.closest('td')).toHaveAttribute('colspan', '6');
+    expect(screen.getByRole('table', { name: 'Variant pricing matrix' }).querySelector('[rowspan]')).toBeNull();
+    const details = within(panel);
+    expect(details.getByText('CyberRecord Japan HQ')).toBeInTheDocument();
+    expect(details.getByText('0 units')).toBeInTheDocument();
+    expect(details.getByText('Channel-managed stock · read only')).toBeInTheDocument();
+    expect(details.getByText('Fulfillment By Amazon Japan')).toBeInTheDocument();
+    expect(details.queryByText('Reseller Singapore')).not.toBeInTheDocument();
+    expect(details.queryByText('Vietnam 3PL Partner')).not.toBeInTheDocument();
+    expect(details.queryByRole('button', { name: /Adjust stock at Fulfillment/ })).not.toBeInTheDocument();
+    expect(details.getByText('Not verified')).toBeInTheDocument();
+  });
+  it('explicitly adds stock to only the chosen variant and location while retaining unsaved edits', async () => {
+    seedVariants();
+    mount(); await ready();
+    fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Unsaved variant name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'View inventory for Blue' }));
+    const panel = within(screen.getByRole('region', { name: 'Inventory for Blue' }));
+    expect(panel.getByText('No stock recorded yet')).toBeInTheDocument();
+    expect(panel.queryByText('0 units')).not.toBeInTheDocument();
+    fireEvent.click(panel.getByRole('button', { name: 'Add stock location for Blue' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Record opening stock' }));
+    expect(dialog.getByLabelText('Variant SKU')).toBeDisabled();
+    expect(dialog.getByLabelText('Variant SKU')).toHaveValue('STOCK-DETAIL-BLUE');
+    expect(within(dialog.getByLabelText('Warehouse')).getAllByRole('option').map(option => option.textContent)).toEqual(['Select a warehouse', 'CyberRecord Japan HQ', 'Reseller Singapore', 'Vietnam 3PL Partner']);
+    fireEvent.change(dialog.getByLabelText('Warehouse'), { target: { value: 'wh_crjp' } });
+    fireEvent.change(dialog.getByLabelText('Opening stock'), { target: { value: '0' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Save opening stock' }));
+    expect(getProductById(id)?.skus.map(sku => sku.stock_by_location)).toEqual([{ wh_crjp: 0 }, { wh_rslsg: 7 }]);
+    expect(getProductById(id)?.inventory_adjustments?.[0]).toMatchObject({ sku: 'STOCK-DETAIL-BLUE', warehouseId: 'wh_crjp', before: null, after: 0, kind: 'opening' });
+    expect(screen.getByDisplayValue('Unsaved variant name')).toBeInTheDocument();
+    expect(panel.getByText('0 units')).toBeInTheDocument();
+    saveMetadata();
+    expect(getProductById(id)?.skus.map(sku => sku.stock_by_location)).toEqual([{ wh_crjp: 0 }, { wh_rslsg: 7 }]);
+  });
+  it('does not assign warehouses when saving a newly generated variant', async () => {
+    seedVariants({ wh_crjp: 5 });
+    updateProduct(id, { id, skus: [product.skus[0]] });
+    mount(); await ready();
+    expect(screen.getByRole('button', { name: 'View inventory for Red' })).toHaveTextContent('Not saved');
+    fireEvent.click(screen.getByRole('button', { name: 'View inventory for Red' }));
+    const panel = within(screen.getByRole('region', { name: 'Inventory for Red' }));
+    expect(panel.getByText('Save this variant before setting up stock')).toBeInTheDocument();
+    expect(panel.queryByRole('button', { name: /Add stock location/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Price for Red'), { target: { value: '20' } });
+    saveMetadata();
+    const saved = getProductById(id)!;
+    expect(saved.skus).toHaveLength(2);
+    expect(saved.skus[0].stock_by_location).toEqual({ wh_crjp: 5 });
+    expect(saved.skus[1].stock_by_location).toEqual({});
+    expect(saved.skus[1].stock).toBeUndefined();
+    expect(saved.inventory).toEqual(product.inventory);
+    expect(saved.inventory_adjustments).toHaveLength(0);
+  });
+  it('cancels new variant stock without creating a count and hides stock writes from viewers', async () => {
+    seedVariants();
+    mount(); await ready();
+    fireEvent.click(screen.getByRole('button', { name: 'View inventory for Blue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add stock location for Blue' }));
+    fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: 'wh_crjp' } });
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(getProductById(id)?.skus[0].stock_by_location).toEqual({});
+    expect(getProductById(id)?.inventory_adjustments).toHaveLength(0);
+    cleanup(); mount('&mode=viewer'); await ready();
+    fireEvent.click(screen.getByRole('button', { name: 'View inventory for Red' }));
+    const panel = within(screen.getByRole('region', { name: 'Inventory for Red' }));
+    expect(panel.queryByRole('button', { name: /Add stock location|Adjust stock|Manage holds/ })).not.toBeInTheDocument();
+  });
+  it('counts confirmed SKU mappings per listing, not every shop sharing its channel', async () => {
+    seedVariants({ wh_crjp: 5 });
+    const listing = { channel: 'amazon' as const, status: 'active' as const, listing_url: null, last_synced_at: null };
+    updateProduct(id, { id, channels: [
+      { ...listing, store_name: 'Blue shop', external_id: 'blue-listing', variant_mappings: [{ shop_sku: 'SHOP-BLUE', master_sku_id: 'child-blue' }] },
+      { ...listing, store_name: 'Red shop', external_id: 'red-listing', variant_mappings: [{ shop_sku: 'SHOP-RED', master_sku_id: 'child-red' }] },
+      { ...listing, store_name: 'Pending shop', external_id: 'pending-listing', variant_mappings: [{ shop_sku: 'PENDING', master_sku_id: 'child-blue' }], review_pending: { issues: ['Review SKU'], sku_mapping_pending: true, saved_at: '2026-10-08T00:00:00Z' } },
+    ] });
+    mount(); await ready();
+    const matrix = within(screen.getByRole('table', { name: 'Variant pricing matrix' }));
+    expect(matrix.getAllByText('1 mapped listing')).toHaveLength(2);
+    const sources = within(screen.getByRole('region', { name: 'Listing stock sources' }));
+    expect(sources.getByText('Blue shop · amazon')).toBeInTheDocument();
+    expect(sources.getByText('Red shop · amazon')).toBeInTheDocument();
+    expect(sources.getByText(/SKU mapping needs review/)).toBeInTheDocument();
+  });
   it('manages holds without leaving product details or overwriting unsaved product edits', async () => {
     addInventoryPosition({ id: 'detail-hold', product_id: id, sku_id: `${id}_default`, warehouse_id: 'wh_crjp', on_hand: 7, reserved_unpaid: 0, reserved_paid: 1, allocated: 0, safety_stock: 1, campaign_lock: 0, unfulfillable: 0, inbound: 0, outbound: 0, return_pending: 0, version: 1, updated_at: '2026-09-30T00:00:00Z' });
     mount(); await ready();
@@ -77,7 +175,7 @@ describe('stock adjustments without leaving Product Master', () => {
     mount(); await ready();
     fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Unfinished name' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adjust stock at CyberRecord Japan HQ' }));
-    fireEvent.change(screen.getByLabelText('New stock'), { target: { value: '18' } });
+    fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value: '18' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByDisplayValue('Unfinished name')).toBeInTheDocument();
     expect(getProductById(id)?.inventory.wh_crjp).toBe(7);
@@ -128,21 +226,20 @@ describe('stock adjustments without leaving Product Master', () => {
     mount(); await ready();
     fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Still editing this product' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add stock location' }));
-    const dialog = within(screen.getByRole('dialog', { name: 'Record initial stock' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Record opening stock' }));
     expect(within(dialog.getByLabelText('Warehouse')).getAllByRole('option').map(option => option.textContent)).toEqual(['Select a warehouse', 'Vietnam 3PL Partner']);
-    expect(dialog.getByRole('button', { name: 'Save location & stock' })).toBeDisabled();
+    expect(dialog.getByRole('button', { name: 'Save opening stock' })).toBeDisabled();
     fireEvent.change(dialog.getByLabelText('Warehouse'), { target: { value: 'wh_3plvn' } });
-    fireEvent.change(dialog.getByLabelText('Initial stock'), { target: { value: '0' } });
-    fireEvent.change(dialog.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    fireEvent.change(dialog.getByLabelText('Opening stock'), { target: { value: '0' } });
     updateProduct(id, { id, inventory: { ...product.inventory, wh_rslsg: 9 } });
-    fireEvent.click(dialog.getByRole('button', { name: 'Save location & stock' }));
+    fireEvent.click(dialog.getByRole('button', { name: 'Save opening stock' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Adjust stock at Vietnam 3PL Partner' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add stock location' })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue('Still editing this product')).toBeInTheDocument();
     const saved = getProductById(id)!;
     expect(saved.inventory).toEqual({ ...product.inventory, wh_rslsg: 9, wh_3plvn: 0 });
-    expect(saved.inventory_adjustments?.[0]).toMatchObject({ warehouseId: 'wh_3plvn', before: null, after: 0, reason: 'Physical stock count' });
+    expect(saved.inventory_adjustments?.[0]).toMatchObject({ warehouseId: 'wh_3plvn', before: null, after: 0, kind: 'opening', reason: 'Opening stock' });
     expect(saved.channels).toEqual(product.channels);
     expect(saved.channel_overrides).toEqual(product.channel_overrides);
     saveMetadata();
@@ -156,7 +253,7 @@ describe('stock adjustments without leaving Product Master', () => {
     expect(inventory.queryByText('0 units')).not.toBeInTheDocument();
     fireEvent.click(inventory.getByRole('button', { name: 'Add stock location' }));
     fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: 'wh_crjp' } });
-    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(getProductById(id)?.inventory).toEqual({});
     expect(inventory.getByText('No stock recorded yet')).toBeInTheDocument();

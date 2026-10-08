@@ -7,7 +7,9 @@ import { getProducts, type ChannelListing, type Product } from '@/lib/product-st
 import { PRICING_STORAGE_KEY } from '@/lib/pricing-rules';
 
 afterEach(() => { cleanup(); localStorage.removeItem(PRICING_STORAGE_KEY); });
-const listing: ChannelListing = { channel: 'website', external_id: 'sync-ui', shop_sku: 'SHOP', status: 'active', listing_url: null, last_synced_at: null };
+const listing: ChannelListing = { channel: 'website', external_id: 'sync-ui', shop_sku: 'SHOP', status: 'active', listing_url: null, last_synced_at: null,
+  shop_snapshot: { channel: 'website', listing_id: 'sync-ui', shop_sku: 'SHOP', store_name: 'Shop', title: 'Shop title', category: '', images: [], recorded_at: '',
+    requirements: { channel: 'website', category: '', revision: 'test-v1', origin: 'prototype', fields: [] } } };
 function mount(extra: Partial<Product> = {}) {
   const master = { ...getProducts()[0], product_type: 'single' as const, has_variants: false, skus: [], images: ['/one.jpg'], name: 'Master name', brand: 'Master brand', channels: [listing], channel_overrides: {}, import_sources: [], inventory: { wh_crjp: 20 }, retail_price: 1000, price_currency: 'JPY', pkg_length: 10, pkg_width: 10, pkg_height: 10, pkg_weight: 100, ...extra };
   const onSave = vi.fn(), onClose = vi.fn();

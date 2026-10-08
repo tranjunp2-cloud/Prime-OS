@@ -8,6 +8,7 @@ import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import UIRegressionReview from "./pages/UIRegressionReview";
 import Auth from "./pages/Auth";
+import SellerOnboardingDemo from "./pages/SellerOnboardingDemo";
 import { AppLayout } from "./components/layout/AppLayout";
 import { PrimeRoutes } from "./routes/PrimeRoutes";
 
@@ -53,6 +54,7 @@ const App = () => {
               <Router>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/demo/no-data" element={<RequireAuth><SellerOnboardingDemo /></RequireAuth>} />
                   <Route path="/" element={<Navigate to="/overview" replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route

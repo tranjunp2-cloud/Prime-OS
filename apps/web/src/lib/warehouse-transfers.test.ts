@@ -31,16 +31,19 @@ describe('recorded stock transfers', () => {
     expect(() => recordWarehouseTransfer({ ...input, to: 'wh_fbajp', expectedTo: null })).toThrow(/read only/);
     expect(getProducts().find(item => item.id === product.id)?.inventory_transfers).toEqual([]);
   });
-  it('records unknown destination counts honestly and moves only the selected variant', () => {
+  it('requires a destination count for receipt and dispatches only the selected variant', () => {
     updateProduct(product.id, { id: product.id, has_variants: true, skus: [
       { id: 'blue', sku_code: 'BLUE', variation_name: 'Blue', weight_g: 0, units_per_carton: 1, status: 'active', stock_by_location: { wh_crjp: 10 } },
       { id: 'red', sku_code: 'RED', variation_name: 'Red', weight_g: 0, units_per_carton: 1, status: 'active', stock_by_location: { wh_crjp: 5, wh_rslsg: 2 } },
     ] });
-    const record = recordWarehouseTransfer({ ...input, sku: 'BLUE', expectedFrom: 10, expectedTo: null });
+    clearInventoryStore();
+    addInventoryPosition({ id: 'blue-position', product_id: product.id, sku_id: 'blue', warehouse_id: 'wh_crjp', on_hand: 10, reserved_unpaid: 0, reserved_paid: 0, allocated: 0, safety_stock: 0, campaign_lock: 0, unfulfillable: 0, inbound: 0, outbound: 0, return_pending: 0, version: 1, updated_at: new Date().toISOString() });
+    expect(() => recordWarehouseTransfer({ ...input, sku: 'BLUE', expectedFrom: 10, expectedTo: null })).toThrow(/Record the current stock/);
+    const record = recordWarehouseTransfer({ ...input, sku: 'BLUE', expectedFrom: 10, expectedTo: null, mode: 'in_transit' });
     const saved = getProducts().find(item => item.id === product.id)!;
-    expect(record).toMatchObject({ sku: 'BLUE', toBefore: null, toAfter: 4 });
-    expect(saved.skus[0].stock_by_location).toEqual({ wh_crjp: 6, wh_rslsg: 4 });
+    expect(record).toMatchObject({ sku: 'BLUE', toBefore: null, status: 'in_transit' });
+    expect(saved.skus[0].stock_by_location).toEqual({ wh_crjp: 6 });
     expect(saved.skus[1].stock_by_location).toEqual({ wh_crjp: 5, wh_rslsg: 2 });
-    expect(saved.inventory).toEqual({ wh_crjp: 11, wh_rslsg: 6 });
+    expect(saved.inventory).toEqual({ wh_crjp: 11, wh_rslsg: 3 });
   });
 });

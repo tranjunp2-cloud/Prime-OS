@@ -18,10 +18,17 @@ const sketchbookSources: Pick<CatalogImportItem, 'id' | 'channel' | 'listingId' 
 /** Fill only omitted fields on the exact old demo records; preserve all decisions
  * and any explicitly supplied (even incomplete) source data. No storage reset. */
 export function withCatalogSkuDemo(source: CatalogImportItem): CatalogImportItem {
-  if (source.variantItems !== undefined || source.variants !== 3) return source;
   const fixture = sketchbookSources.find(item => item.id === source.id && item.channel === source.channel
     && item.listingId === source.listingId && item.storeName === source.storeName && item.channelSku === source.channelSku);
-  return fixture ? { ...source, variantItems: structuredClone(fixture.variantItems) } : source;
+  if (!fixture) return source;
+  return { ...source,
+    ...(source.variantItems === undefined && source.variants === 3 ? { variantItems: structuredClone(fixture.variantItems) } : {}),
+    // Explicit prototype scenarios, not a claim about live Shopee/Amazon policies.
+    // Real imports must supply their own schema per market, category and revision.
+    requirements: source.requirements ?? { channel: source.channel, category: source.channelCategory, revision: 'prototype-sketchbook-v1', origin: 'prototype', fields:
+      source.channel === 'shopee' ? [{ key: 'channel_settings.attribute_material', label: 'Material', kind: 'text' }]
+        : [{ key: 'images', label: 'Product image', kind: 'images' }] },
+  };
 }
 
 /** Complete the known sketchbook fixture only in the isolated first-use preview. */

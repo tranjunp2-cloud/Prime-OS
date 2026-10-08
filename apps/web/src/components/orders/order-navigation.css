@@ -1,0 +1,12 @@
+.order-navigation { container: order-navigation / inline-size; }
+.order-navigation__tabs { display: none; }
+.order-navigation__select { display: flex; }
+.order-navigation .order-navigation__extra { display: none; }
+@container order-navigation (min-width: 900px) {
+  .order-navigation__tabs { display: flex; }
+  .order-navigation__select { display: none; }
+}
+@container order-navigation (min-width: 1100px) {
+  .order-navigation .order-navigation__extra { display: inline-flex; }
+  .order-navigation .order-navigation__more { display: none; }
+}

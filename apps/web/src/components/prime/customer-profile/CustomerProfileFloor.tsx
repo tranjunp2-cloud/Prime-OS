@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowRight,
   Building2,
   CircleUserRound,
   CopyCheck,
@@ -19,6 +20,7 @@ import {
   Tag,
   Truck,
   UserRoundCheck,
+  UsersRound,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,6 +47,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { SummaryMetricCard } from '@/components/system/SummaryMetricCard';
+import { EmptyState } from '@/components/system/EmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import type { Locale } from '@/lib/i18n/dictionaries';
@@ -484,9 +487,16 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
   const [searchParams, setSearchParams] = useSearchParams();
   const customerParam = searchParams.get('customer');
   const activeSubFloor = resolveSubFloor(searchParams.get('floor'), defaultSubFloor);
+  const isNoDataDemo = searchParams.get('demo') === 'no-data';
   const { toast } = useToast();
-  const [accounts, setAccounts] = useState(normalizedSeedAccounts);
-  const [contacts, setContacts] = useState(seed.contacts);
+  const [populatedAccounts, setPopulatedAccounts] = useState(normalizedSeedAccounts);
+  const [emptyDemoAccounts, setEmptyDemoAccounts] = useState<CustomerAccount[]>([]);
+  const [populatedContacts, setPopulatedContacts] = useState(seed.contacts);
+  const [emptyDemoContacts, setEmptyDemoContacts] = useState<CustomerContact[]>([]);
+  const accounts = isNoDataDemo ? emptyDemoAccounts : populatedAccounts;
+  const setAccounts = isNoDataDemo ? setEmptyDemoAccounts : setPopulatedAccounts;
+  const contacts = isNoDataDemo ? emptyDemoContacts : populatedContacts;
+  const setContacts = isNoDataDemo ? setEmptyDemoContacts : setPopulatedContacts;
   const [tags, setTags] = useState(seed.tags);
   const [selectedAccountId, setSelectedAccountId] = useState(() => resolveAccountIdFromCustomerParam(normalizedSeedAccounts, customerParam));
   const [filters, setFilters] = useState<CustomerAccountFilters>(defaultFilters);
@@ -500,12 +510,20 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
   const requestedAccountId = useMemo(() => resolveAccountIdFromCustomerParam(accounts, customerParam), [accounts, customerParam]);
 
   useEffect(() => {
-    setAccounts((current) => current.map(normalizeCustomerAccount));
+    setPopulatedAccounts((current) => current.map(normalizeCustomerAccount));
   }, []);
 
   useEffect(() => {
-    setAccounts(normalizedSeedAccounts);
+    setPopulatedAccounts(normalizedSeedAccounts);
   }, [normalizedSeedAccounts]);
+
+  useEffect(() => {
+    setFilters(defaultFilters);
+    setAccountDialogMode(null);
+    setProfileDialogOpen(false);
+    setProfileAccountId(null);
+    setContactDialogOpen(false);
+  }, [isNoDataDemo]);
 
   useEffect(() => {
     setTags(seed.tags);
@@ -575,6 +593,7 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
       const nextAccount = buildAccountFromForm(accountForm, accountForm.tags);
       setAccounts((current) => [nextAccount, ...current]);
       setSelectedAccountId(nextAccount.id);
+      if (accounts.length === 0) setActiveSubFloor('account');
       toast({ title: 'Account created in mock CRM floor' });
     }
 
@@ -665,6 +684,30 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
 
   return (
     <div className="space-y-4" data-testid="customer-profile-floor">
+      {accounts.length === 0 ? (
+        <section aria-label="Get started with customers" data-testid="customer-accounts-empty-state">
+          <EmptyState
+            className="min-h-[360px] border-0 bg-transparent shadow-none sm:min-h-[420px]"
+            icon={<UsersRound aria-hidden="true" />}
+            title="No customers yet"
+            description="Create your first customer account or connect a sales channel to get started."
+            action={(
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button className="min-h-11" onClick={openCreateAccount}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Create first account
+                </Button>
+                <Button variant="outline" className="min-h-11" asChild>
+                  <Link to="/sales-channels/connected-channels">
+                    Connect sales channel
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                  </Link>
+                </Button>
+              </div>
+            )}
+          />
+        </section>
+      ) : <>
       <CustomerSubFloorNav
         activeSubFloor={activeSubFloor}
         onChange={setActiveSubFloor}
@@ -710,7 +753,7 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
                 {copy.account.create}
               </Button>
             </div>
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            {accounts.length > 0 ? <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -777,7 +820,7 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
                   </Button>
                 ) : null}
               </div>
-            </div>
+            </div> : null}
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="hidden lg:block">
@@ -892,9 +935,13 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
             </div>
 
             {filteredAccounts.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                {copy.account.noMatch}
-              </div>
+              <EmptyState
+                variant="filtered"
+                icon={<Search aria-hidden="true" />}
+                title="No matching customer accounts"
+                description="Try a different keyword or clear your filters to see all accounts."
+                action={<Button variant="outline" onClick={() => setFilters(defaultFilters)}><RotateCcw className="size-4" aria-hidden="true" />Reset filters</Button>}
+              />
             ) : null}
           </CardContent>
         </Card>
@@ -914,6 +961,8 @@ export function CustomerProfileFloor({ snapshot, defaultSubFloor = 'overview' }:
           copy={copy}
         />
       ) : null}
+
+      </>}
 
       <AccountEditorDialog
         mode={accountDialogMode}

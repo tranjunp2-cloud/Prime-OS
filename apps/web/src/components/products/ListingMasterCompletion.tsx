@@ -14,7 +14,7 @@ import { ListingFieldMappingRow } from './ListingFieldMappingRow';
 import { ListingSkuMappings } from './ListingSkuMappings';
 import { ListingMasterSummary } from './ListingMasterSummary';
 import { ListingReviewHelp } from './ListingReviewHelp';
-import { getMasterMediaReadiness, MIN_MASTER_IMAGES } from '@/lib/product-master-media';
+import { getMasterMediaReadiness } from '@/lib/product-master-media';
 
 type Props = {
   product: Product; sources: CatalogImportItem[]; onChange: (product: Product) => void;
@@ -24,12 +24,13 @@ type Props = {
   baseline?: Product;
   creationSetup?: (product: Product, onChange: (product: Product) => void) => ReactNode;
   onEditingChange?: (editing: boolean, dirty: boolean) => void;
+  readFirst?: boolean;
 };
 
 /** One review surface; collapsed groups preserve drafts and image validation. */
-export function ListingMasterCompletion({ product: proposal, sources, onChange: applyProduct, mappings: proposalMappings, onMappingsChange: applyMappings, onMediaReady, preservedSkuIds, baseline, creationSetup, onEditingChange }: Props) {
+export function ListingMasterCompletion({ product: proposal, sources, onChange: applyProduct, mappings: proposalMappings, onMappingsChange: applyMappings, onMediaReady, preservedSkuIds, baseline, creationSetup, onEditingChange, readFirst }: Props) {
   const prefix = useId();
-  const reviewFirst = Boolean(creationSetup);
+  const reviewFirst = readFirst ?? Boolean(creationSetup);
   const [editor, setEditor] = useState<{ group: string; product: Product; mappings: VariantMappings } | null>(null);
   const product = editor?.product ?? proposal;
   const mappings = editor?.mappings ?? proposalMappings;
@@ -47,14 +48,14 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
   const checks = completionReadiness(product, sources).checks;
   const masterMedia = getMasterMediaReadiness(product.images);
   const [imageStates, setImageStates] = useState<Record<string, boolean>>({});
-  const missing = checks.filter(check => !check.done || (check.id === 'media' && product.images.some(image => imageStates[image] !== true)));
+  const missing = checks.filter(check => !check.done);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ identity: true, variants: !creationSetup, price: true });
   const [uploadError, setUploadError] = useState('');
   const [uploading, setUploading] = useState(false);
   const mediaCallback = useRef(onMediaReady);
   mediaCallback.current = onMediaReady;
   useEffect(() => {
-    mediaCallback.current(!uploading && getMasterMediaReadiness(product.images).ready && product.images.every(image => imageStates[image] === true));
+    mediaCallback.current(!uploading);
   }, [product.images, imageStates, uploading]);
   const settings = getProductCatalogSettings();
   const category = resolveCatalogCategory(product, settings.categories);
@@ -76,7 +77,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
   };
   const setImages = (images: string[]) => {
     update({ images });
-    onMediaReady(!uploading && getMasterMediaReadiness(images).ready && images.every(image => imageStates[image] === true));
+    onMediaReady(!uploading);
   };
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -94,15 +95,15 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
   };
   const skuError = product.has_variants ? variantMappingError(sources, product, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, product, mappings[source.id])]))) : '';
   const groups = [
-    { id: 'identity', title: 'Product essentials', checks: ['identity', 'category'], summary: 'Name, category, brand & product structure' },
-    { id: product.has_variants ? 'variants' : 'price', title: product.has_variants ? 'Variants, pricing & SKU mapping' : 'Pricing', checks: product.has_variants ? ['variants', 'price'] : ['price'], summary: product.has_variants ? `${product.skus.length} Master SKUs · ${sources.length} source listing(s)` : `${product.retail_price || 'No price'} ${product.price_currency}` },
-    { id: 'attributes', title: 'Category attributes', checks: ['attributes'], summary: category?.name || 'Choose a category first' },
-    { id: 'content', title: 'Description & images', checks: ['content', 'media'], summary: `${masterMedia.count} image${masterMedia.count === 1 ? '' : 's'} · description ${checks.find(check => check.id === 'content')?.done ? 'provided' : 'needs details'}` },
-    { id: 'shipping', title: 'Shipping package', checks: ['shipping'], summary: product.pkg_length > 0 && product.pkg_width > 0 && product.pkg_height > 0 && product.pkg_weight > 0 ? `${product.pkg_length} × ${product.pkg_width} × ${product.pkg_height} cm · ${product.pkg_weight} g` : 'Dimensions & weight' },
+    { id: 'identity', title: 'Product essentials', checks: product.has_variants ? ['identity'] : ['identity', 'sku'], summary: 'Name, category, brand & product structure' },
+    { id: product.has_variants ? 'variants' : 'price', title: product.has_variants ? 'Variants, pricing & SKU mapping' : 'Pricing', checks: product.has_variants ? ['sku', 'price'] : ['price'], summary: product.has_variants ? `${product.skus.length} Master SKUs · ${sources.length} source listing(s)` : `${product.retail_price || 'No price'} ${product.price_currency}` },
+    { id: 'attributes', title: 'Category attributes', checks: [], summary: category?.name || 'Choose a category first' },
+    { id: 'content', title: 'Description & images', checks: ['content'], summary: `${masterMedia.count} image${masterMedia.count === 1 ? '' : 's'} · description ${checks.find(check => check.id === 'content')?.done ? 'provided' : 'needs details'}` },
+    { id: 'shipping', title: 'Shipping package', checks: [], summary: product.pkg_length > 0 && product.pkg_width > 0 && product.pkg_height > 0 && product.pkg_weight > 0 ? `${product.pkg_length} × ${product.pkg_width} × ${product.pkg_height} cm · ${product.pkg_weight} g` : 'Dimensions & weight' },
     { id: 'identifiers', title: 'Model, barcode & pack details', checks: [], summary: 'Optional product identifiers' },
   ];
   const issuesFor = (group: typeof groups[number]) => [
-    ...missing.filter(check => group.checks.includes(check.id)).map(check => check.id === 'media' && masterMedia.ready ? product.images.some(image => imageStates[image] === false) ? 'Remove or replace unavailable images before confirming.' : 'Wait for images to load.' : check.label),
+    ...missing.filter(check => group.checks.includes(check.id)).map(check => check.id === 'media' && masterMedia.ready ? product.images.some(image => imageStates[image] === false) ? 'Image unavailable. Master activation is not blocked; review it before syncing images.' : 'Wait for images to load.' : check.label),
     ...(group.id === 'variants' && skuError ? [skuError] : []),
     ...((group.id === 'variants' || group.id === 'price') && !/^[A-Z]{3}$/.test(product.price_currency) ? ['Choose a valid three-letter currency.'] : []),
   ];
@@ -129,7 +130,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
         identity: 'Review the proposed Master identity. Its internal SKU is separate from shop SKUs. In Edit, you can choose a different source field or enter a value manually. Shop categories are not copied into your internal taxonomy automatically.',
         variants: 'Suggestions are not confirmed links. Check each shop SKU against the proposed Master SKU, options and price. Applying edits only updates this proposal. Creating and linking confirms the reviewed mappings; warehouse stock is never copied.',
         price: 'This is the Master base price, in the displayed currency. No currency conversion is performed. Shop prices and warehouse stock remain unchanged.',
-        attributes: 'Required attributes depend on your internal category. Exact source matches may be suggested; you can change the source or the final value in Edit.',
+        attributes: 'These shared attributes enrich the Master but do not block activation. Channel-required attributes are checked separately for each listing. Exact source matches may be suggested; you can change the source or the final value in Edit.',
         content: 'Description and images start from imported listing data. Edit to change the source, upload images or choose a cover. Shop content is unchanged.',
         shipping: 'Package dimensions and weight belong to the Master. Open Edit to see or change the source for each measurement. Supported units are converted explicitly.',
         identifiers: 'Optional identifiers can help identify the product across shops. Missing values do not block activation, but any value you enter must be valid.',
@@ -170,16 +171,17 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
   const mappingRow = (key: string) => <ListingFieldMappingRow key={key} product={product} baseline={baseline} sources={sources} target={MASTER_MAPPING_TARGETS.find(target => target.key === key)!} onChange={onChange} multiline={key === 'description'} />;
   const changes = baseline ? MASTER_MAPPING_TARGETS.filter(target => String(fieldValue(product, target.key)) !== String(fieldValue(baseline, target.key))) : [];
   return <div className={reviewFirst ? 'grid items-start gap-3 md:grid-cols-2' : 'space-y-3'} aria-label="Complete Master details">
-    {!creationSetup && <div><h3 className="break-words text-base font-semibold">{product.name || 'Complete product details'}</h3><p className="mt-1 break-words text-xs text-muted-foreground">Master SKU: <span className="break-all font-mono">{product.sku_code}</span> · {product.status === 'published' ? 'Active' : 'Draft'}</p></div>}
+    {!creationSetup && <div className="md:col-span-2"><h3 className="break-words text-base font-semibold">{product.name || 'Complete product details'}</h3><p className="mt-1 break-words text-xs text-muted-foreground">Master SKU: <span className="break-all font-mono">{product.sku_code}</span> · {product.status === 'published' ? 'Active' : 'Draft'}</p></div>}
     <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 rounded-lg bg-muted/40 px-3 py-1 md:col-span-2">
-      <p role="status" className="flex items-center gap-2 text-xs">{incomplete.length ? <><TriangleAlert className="size-4 text-amber-700 dark:text-amber-300" /><strong>{incomplete.length} sections to complete</strong><span className="text-muted-foreground">before activation</span></> : <><CheckCircle2 className="size-4 text-emerald-600" />Required product details complete</>}</p>
+      <p role="status" className="flex flex-wrap items-center gap-2 text-xs">{incomplete.length ? <><TriangleAlert className="size-4 text-amber-700 dark:text-amber-300" /><strong>{incomplete.length} section{incomplete.length === 1 ? '' : 's'} to complete</strong><span className="text-muted-foreground">{baseline?.status === 'published' ? 'before saving these changes' : 'before activation'}</span></> : <><CheckCircle2 className="size-4 text-emerald-600" />Master core data complete</>}</p>
       <div className="flex flex-wrap gap-2">{incomplete.length > 0 && <Button variant="ghost" disabled={reviewFirst && Boolean(editor)} className="h-11 px-2 text-xs" onClick={() => reveal(incomplete[0].id)}>Review missing details</Button>}{!reviewFirst && <Button variant="ghost" className="h-11 px-2 text-xs" onClick={() => setExpanded(Object.fromEntries(groups.map(group => [group.id, !allExpanded])))}>{allExpanded ? 'Collapse all sections' : 'Expand all sections'}</Button>}</div>
     </div>
     {!reviewFirst && <p className="text-xs text-muted-foreground">Check the source → edit the Master value. These import choices do not change sync settings.</p>}
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs md:col-span-2" aria-label="Master activation requirements">{checks.map(check => <span key={check.id} className={`flex items-center gap-1.5 ${check.done ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'}`}>{check.done ? <CheckCircle2 className="size-3.5" /> : <TriangleAlert className="size-3.5" />}{({ identity: 'Title', sku: 'SKU', content: 'Description', price: 'Price' })[check.id as 'identity']}</span>)}<ListingReviewHelp label="Master activation">Only title, unique SKU(s), description and valid price(s) are required to activate the Master. Channel-specific requirements do not block activation or other listings. SKU mapping confirmation is a separate linking step.</ListingReviewHelp></div>
     {section('identity', <>
       <div className="hidden grid-cols-[minmax(120px,.7fr)_minmax(180px,1fr)_minmax(220px,1.4fr)] gap-4 py-1 text-xs text-muted-foreground md:grid"><span>Master field</span><span>Source field &amp; value · change</span><span>{baseline ? 'Value after saving' : 'Value to create'} · editable</span></div>
       {mappingRow('name')}
-      <ListingFieldMappingRow product={product} baseline={baseline} sources={sources} target={{ ...MASTER_MAPPING_TARGETS.find(target => target.key === 'categoryId')!, options: settings.categories.filter(item => item.status === 'Active').map(item => ({ value: item.id, label: categoryLabel(item.id) })) }} onChange={next => onChange(suggestAttributeFields(next, sources))} />{(!reviewFirst || !settings.categories.some(item => item.status === 'Active')) && <p className="text-xs text-muted-foreground">{settings.categories.some(item => item.status === 'Active') ? 'Choose your internal category. Shop taxonomy is not copied automatically.' : 'No active categories. Add one in Categories & Attributes before activation.'}</p>}
+      <ListingFieldMappingRow product={product} baseline={baseline} sources={sources} target={{ ...MASTER_MAPPING_TARGETS.find(target => target.key === 'categoryId')!, options: settings.categories.filter(item => item.status === 'Active').map(item => ({ value: item.id, label: categoryLabel(item.id) })) }} onChange={next => onChange(suggestAttributeFields(next, sources))} />{(!reviewFirst || !settings.categories.some(item => item.status === 'Active')) && <p className="text-xs text-muted-foreground">{settings.categories.some(item => item.status === 'Active') ? 'Choose your internal category. Shop taxonomy is not copied automatically.' : 'No active categories. You can add one later in Categories & Attributes.'}</p>}
       <ListingFieldMappingRow product={product} baseline={baseline} sources={sources} target={{ ...MASTER_MAPPING_TARGETS.find(target => target.key === 'brandId')!, options: settings.brands.filter(brand => brand.status === 'Active').map(brand => ({ value: brand.id, label: brand.name })) }} onChange={onChange} />
       {creationSetup?.(product, onChange)}
     </>)}
@@ -193,15 +195,15 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
     {!product.has_variants && section('price', <>{mappingRow('retail_price')}<div className="max-w-48 space-y-1"><Label htmlFor={`${prefix}-currency`}>Currency *</Label><Input id={`${prefix}-currency`} className="h-11" maxLength={3} value={product.price_currency} onChange={event => update({ price_currency: event.target.value.toUpperCase() })} /></div>{!reviewFirst && <p className="text-xs text-muted-foreground">No currency conversion. Warehouse stock and shop prices stay unchanged.</p>}</>)}
     {section('attributes', <>{attributes.filter(attribute => attribute.required).map(attribute => {
       if (product.has_variants && product.variant_options?.some(option => option.attributeKey === attribute.key)) return null;
-      return <ListingFieldMappingRow key={attribute.key} product={product} baseline={baseline} sources={sources} target={{ key: `attribute:${attribute.key}`, label: attribute.name, kind: 'text', required: true, multiple: attribute.type === 'Multi-select', options: ['Single select', 'Multi-select'].includes(attribute.type) ? attribute.options.split(',').map(value => ({ value: value.trim(), label: value.trim() })) : undefined }} onChange={onChange} />;
+      return <ListingFieldMappingRow key={attribute.key} product={product} baseline={baseline} sources={sources} target={{ key: `attribute:${attribute.key}`, label: attribute.name, kind: 'text', required: false, multiple: attribute.type === 'Multi-select', options: ['Single select', 'Multi-select'].includes(attribute.type) ? attribute.options.split(',').map(value => ({ value: value.trim(), label: value.trim() })) : undefined }} onChange={onChange} />;
     })}{!attributes.some(attribute => attribute.required) && <p className="text-xs text-muted-foreground">No required category attributes.</p>}</>)}
 
     {section('content', <>
       {mappingRow('description')}
-    <section className="space-y-2 border-t pt-3" aria-label="Product images"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold">Product images <span className="font-normal text-muted-foreground">{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · {MIN_MASTER_IMAGES} required · 9 max</span></h4><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm focus-within:ring-2 focus-within:ring-ring"><ImagePlus className="size-4" />{uploading ? 'Adding images…' : 'Add images'}<input className="sr-only" type="file" aria-label="Upload product images" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} onChange={event => { void upload(event.target.files); event.target.value = ''; }} /></label></div>{!reviewFirst && <p className="text-xs text-muted-foreground">Choose the cover and remove unwanted images. Shop images stay unchanged.</p>}
+    <section className="space-y-2 border-t pt-3" aria-label="Product images"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold">Product images <span className="font-normal text-muted-foreground">{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · optional for activation · 9 max</span></h4><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm focus-within:ring-2 focus-within:ring-ring"><ImagePlus className="size-4" />{uploading ? 'Adding images…' : 'Add images'}<input className="sr-only" type="file" aria-label="Upload product images" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} onChange={event => { void upload(event.target.files); event.target.value = ''; }} /></label></div>{!reviewFirst && <p className="text-xs text-muted-foreground">Choose the cover and remove unwanted images. Shop images stay unchanged.</p>}
       <div className="flex flex-wrap gap-3">{product.images.map((src, index) => <div key={src} className="w-32 min-w-0 space-y-1"><div className="relative aspect-square overflow-hidden rounded-lg border bg-muted/30"><img src={src} alt={`Master image ${index + 1}`} className="size-full object-contain" onLoad={() => imageStatus(src, true)} onError={() => imageStatus(src, false)} />{imageStates[src] === false && <div className="absolute inset-0 grid place-content-center bg-background/95 p-2 text-center text-xs text-destructive">Image unavailable. Remove or replace it.</div>}</div><p className="truncate text-xs text-muted-foreground" title={imageSources.get(src)}>{imageSources.has(src) ? `From ${imageSources.get(src)}` : src.startsWith('data:') ? 'Uploaded image' : 'Existing Master image'}</p><div className="flex gap-1"><Button variant="outline" className="h-11 flex-1 px-2 text-xs" disabled={index === 0} onClick={() => setImages([src, ...product.images.filter(image => image !== src)])}>{index === 0 ? 'Cover' : 'Set cover'}</Button><Button variant="ghost" className="size-11 p-0" aria-label={`Remove image ${index + 1}`} onClick={() => setImages(product.images.filter(image => image !== src))}><Trash2 className="size-4" /></Button></div></div>)}</div>
-      {product.images.some(image => imageStates[image] === false) && <p role="alert" className="text-xs text-destructive">Remove or replace unavailable images before confirming.</p>}
-      {!masterMedia.ready && <p className="text-xs text-amber-700 dark:text-amber-300">Add at least {MIN_MASTER_IMAGES} product image to continue. JPG, PNG or WebP · up to 5 MB each.</p>}{uploadError && <p role="alert" className="text-sm text-destructive">{uploadError}</p>}
+      {product.images.some(image => imageStates[image] === false) && <p role="alert" className="text-xs text-destructive">Image unavailable. Master activation is not blocked; review it before syncing images.</p>}
+      {!masterMedia.ready && <p className="text-xs text-amber-700 dark:text-amber-300">Images are optional for Master activation. Each listing is checked against its own channel requirements.</p>}{uploadError && <p role="alert" className="text-sm text-destructive">{uploadError}</p>}
     </section>
 
     </>)}

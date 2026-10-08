@@ -1,9 +1,12 @@
+import { loadConnectedShops, readConnectedShops } from './shop-warehouse-settings';
+import { listingStockWarehouseId, resolveListingShop } from './warehouse-shop-sources';
 import { getProductById, updateProductLinksAtomically, type ChannelListing, type ChannelOverride, type ListingDraftValues, type Product } from './product-store';
 import { configuredListing } from './product-channel-listings';
 import { getCatalogImportItems } from './catalog-import-store';
 import { resolveListingShopData } from './listing-shop-data';
 import { formatPrice, quoteListingPrice, readPricing } from './pricing-rules';
 import { getWarehouses } from './warehouse-store';
+import { listingSyncReadiness } from './listing-sync-readiness';
 
 export type MasterSyncPreference = Omit<NonNullable<ChannelListing['master_data_sync']>, 'updated_at'>;
 export type MasterSyncField = MasterSyncPreference['fields'][number];
@@ -90,7 +93,7 @@ const whole = (value: unknown): value is number => typeof value === 'number' && 
 
 /** One plan powers validation, review and every legacy-editor readout. Never writes shop values. */
 export function masterSyncPlan(product: Product, listing: ChannelListing, preference: MasterSyncPreference,
-  registry = readPricing(), warehouses = getWarehouses()) {
+  registry = readPricing(), warehouses = getWarehouses(), proposedValues?: ListingDraftValues) {
   const recorded = resolveListingShopData(product, listing, getCatalogImportItems({ requireConfirmation: true }));
   const local = listing.local_draft?.values;
   const data = { ...recorded, ...local, shipping: { ...recorded.shipping, ...local?.shipping } };
@@ -124,16 +127,20 @@ export function masterSyncPlan(product: Product, listing: ChannelListing, prefer
   groups.push({ field: 'price', current: [data.price ? formatPrice(data.price.amount, data.price.currency) : unknown],
     proposed: quotes.map((quote, index) => `${variant ? targets[index].label + ': ' : ''}${quote.error || formatPrice(quote.amount, quote.currency)}`), error: priceError });
   const config = preference.inventory;
-  const warehouse = warehouses.find(warehouse => warehouse.id === config?.warehouse_id && warehouse.status === 'active' && !warehouse.is_virtual && !['fba', 'fbs'].includes(warehouse.type));
-  const quantities = targets.map(target => target.stock[config?.warehouse_id || '']);
+  const connections = readConnectedShops();
+  const warehouseId = listingStockWarehouseId(product, listing, config, connections.shops, getCatalogImportItems({ requireConfirmation: true }));
+  const sourceError = config?.source === 'shop_default' ? connections.status !== 'ready' ? 'Load the shop’s current default warehouse before reviewing stock.' : !warehouseId ? 'Set a default warehouse for the matched shop first.' : undefined : undefined;
+  const warehouse = warehouses.find(warehouse => warehouse.id === warehouseId && warehouse.status === 'active' && !warehouse.is_virtual && !['fba', 'fbs'].includes(warehouse.type));
+  const quantities = targets.map(target => target.stock[warehouseId || '']);
   const stockError = mappingError || (listing.channel === 'amazon' && (override?.fulfillment === 'FBA' || config?.fulfillment === 'FBA') ? 'Amazon FBA manages stock; Master stock sync is unavailable.' : undefined)
     || (listing.channel === 'amazon' && override?.fulfillment !== 'FBM' && config?.fulfillment !== 'FBM' ? 'Confirm Amazon fulfillment before enabling stock sync.' : undefined)
+    || sourceError
     || (!warehouse ? 'Choose an active merchant-managed warehouse.' : undefined)
     || (!whole(config?.safety_buffer) || (config?.allocation_cap != null && !whole(config.allocation_cap)) ? 'Buffer and cap must be whole numbers of zero or more.' : undefined)
     || (quantities.some(quantity => !whole(quantity)) ? 'Record stock for every mapped SKU at this warehouse. Missing stock is not zero.' : undefined);
   const stockRows = targets.map((target, index) => ({ sku: target.label, quantity: stockError ? undefined : Math.min(Math.max(0, quantities[index] - config!.safety_buffer), config?.allocation_cap ?? Infinity) }));
   groups.push({ field: 'inventory', current: [data.stock == null ? unknown : `${data.stock} units`],
-    proposed: [warehouse?.name || 'No warehouse selected', ...stockRows.map(row => `${variant ? row.sku + ': ' : ''}${row.quantity == null ? 'Quantity unavailable' : row.quantity + ' units'}`)], error: stockError });
+    proposed: [(config?.source === 'shop_default' ? 'Shop default · ' : '') + (warehouse?.name || 'No warehouse selected'), ...stockRows.map(row => `${variant ? row.sku + ': ' : ''}${row.quantity == null ? 'Quantity unavailable' : row.quantity + ' units'}`)], error: stockError });
   const shipping = [`${product.pkg_length} × ${product.pkg_width} × ${product.pkg_height} cm · ${product.pkg_weight} g`,
     product.country_of_origin ? `Origin: ${product.country_of_origin}` : '', product.hs_code ? `HS code: ${product.hs_code}` : ''].filter(Boolean);
   const shippingError = ['pos', 'social'].includes(listing.channel) ? 'This channel does not use shipping data.'
@@ -143,6 +150,20 @@ export function masterSyncPlan(product: Product, listing: ChannelListing, prefer
     data.shipping.country ? `Origin: ${data.shipping.country}` : '', data.shipping.hs_code ? `HS code: ${data.shipping.hs_code}` : '', data.shipping.notes || override?.compliance_notes || ''].filter(Boolean);
   groups.push({ field: 'shipping', current: currentShipping.length ? currentShipping : [unknown], proposed: shipping, error: shippingError });
   const selected = preference.enabled ? groups.filter(group => preference.fields.includes(group.field)) : [];
-  const error = masterSyncValidation(product, preference) || selected.find(group => group.error)?.error;
-  return { groups, stockRows, error, signature: JSON.stringify([preference, selected, local, quotes.map(quote => quote.signature), stockRows]) };
+  const readiness = listingSyncReadiness(product, listing, getCatalogImportItems({ requireConfirmation: true }), { ...preference, updated_at: '' }, proposedValues);
+  const requirementError = preference.enabled && readiness.requirements.state !== 'complete'
+    ? `${readiness.requirements.message}. Complete this listing’s requirements before enabling sync.` : undefined;
+  const groupError = selected.find(group => group.error)?.error;
+  for (const group of groups) if (preference.fields.includes(group.field) && requirementError && !group.error) group.error = requirementError;
+  const error = masterSyncValidation(product, preference) || groupError || requirementError;
+  return { groups, stockRows, error, signature: JSON.stringify([preference, selected, local, readiness.requirements, quotes.map(quote => quote.signature), stockRows, syncsField(preference, 'inventory') && config?.source === 'shop_default' ? [connections.status, resolveListingShop(product, listing, connections.shops, getCatalogImportItems({ requireConfirmation: true }))?.id, warehouseId] : undefined]) };
+}
+
+/** Re-read shared settings before saving a reviewed inherited source, including edits from another tab. */
+export async function refreshShopDefaultReview(product: Product, listing: ChannelListing, preference: MasterSyncPreference, reviewedPlan: string, proposedValues?: ListingDraftValues) {
+  if (!syncsField(preference, 'inventory') || preference.inventory?.source !== 'shop_default') return;
+  await loadConnectedShops();
+  const plan = masterSyncPlan(product, listing, preference, undefined, undefined, proposedValues);
+  if (plan.error) throw new Error(plan.error);
+  if (plan.signature !== reviewedPlan) throw new Error('The shop default warehouse changed. Review the updated stock source before saving.');
 }

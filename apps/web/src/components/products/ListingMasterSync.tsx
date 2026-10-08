@@ -1,10 +1,11 @@
+import { useConnectedShops } from '@/hooks/use-connected-shops';
 import { useState } from 'react';
 import { ArrowRight, CircleCheck, Info, SlidersHorizontal, CirclePause, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { MASTER_SYNC_FIELDS, MASTER_SYNC_GROUPS, MASTER_SYNC_VALUE_KEYS, initialMasterSyncPreference, masterSyncPlan, syncsField, type MasterSyncField, type MasterSyncPreference } from '@/lib/listing-master-sync';
+import { MASTER_SYNC_FIELDS, MASTER_SYNC_GROUPS, MASTER_SYNC_VALUE_KEYS, initialMasterSyncPreference, masterSyncPlan, refreshShopDefaultReview, syncsField, type MasterSyncField, type MasterSyncPreference } from '@/lib/listing-master-sync';
 import type { Product, ChannelListing } from '@/lib/product-store';
 import { richTextPlainText } from '@/lib/product-master-readiness';
 import { ListingSyncConfiguration } from './ListingSyncConfiguration';
@@ -30,6 +31,7 @@ export function ListingMasterSyncDialog({ shop, sku, preference, master, listing
   onClose: () => void; onSave: (preference: MasterSyncPreference, reviewedPlan: string) => void; restoreFocus: () => void;
 }) {
   usePricingRevision();
+  useConnectedShops();
   const [draft, setDraft] = useState(() => initialMasterSyncPreference(master, listing, { ...preference, fields: preference.fields.length ? preference.fields : ['content', 'media'] }));
   const [reviewed, setReviewed] = useState<string>();
   const [expanded, setExpanded] = useState<MasterSyncField>();
@@ -44,11 +46,14 @@ export function ListingMasterSyncDialog({ shop, sku, preference, master, listing
     shipping: 'Package size, weight, origin and HS code',
   };
   const change = (patch: Partial<MasterSyncPreference>) => { setDraft(current => ({ ...current, ...patch })); setReviewed(undefined); setError(undefined); };
-  function save() {
+  async function save() {
     if (plan.error || saving) return;
     if (!reviewed || reviewed !== plan.signature) { setError('Values changed. Review the updated settings before saving.'); setReviewed(undefined); return; }
     setSaving(true);
-    try { onSave(draft, reviewed); } catch (error) { setError(error instanceof Error ? error.message : 'Could not save. Please try again.'); setSaving(false); }
+    try {
+      if (syncsField(draft, 'inventory') && draft.inventory?.source === 'shop_default') await refreshShopDefaultReview(master, listing, draft, reviewed);
+      onSave(draft, reviewed);
+    } catch (error) { setError(error instanceof Error ? error.message : 'Could not save. Please try again.'); setSaving(false); }
   }
   return <Dialog open onOpenChange={open => { if (!open && !saving) onClose(); }}>
     <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[760px] motion-reduce:animate-none" onCloseAutoFocus={event => { event.preventDefault(); restoreFocus(); }}>

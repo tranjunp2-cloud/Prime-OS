@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { applyOrderWorkflow } from './order-workflow.js';
+import { workflowActions, completionBlocker } from '../../../packages/order-workflow/rules.js';
 import { demoOrders } from './orders-demo.js';
 
-// Canonical lifecycle from distribution-v2. Warehouse execution remains owned by fulfillment.
+// Generic transitions never bypass the validated fulfillment commands below.
 export const orderTransitions = {
   draft: ['created', 'canceled'], created: ['acknowledged', 'canceled'],
   acknowledged: ['allocated', 'canceled'], allocated: ['fulfillment_in_progress', 'canceled'],
   fulfillment_in_progress: ['partially_shipped', 'shipped', 'canceled'],
-  partially_shipped: ['shipped', 'delivered', 'canceled'], shipped: ['delivered', 'closed', 'canceled'],
+  partially_shipped: ['shipped', 'delivered', 'canceled'], shipped: ['delivered'],
   delivered: ['closed'], canceled: [], closed: [],
 };
 function fail(message, statusCode = 400) { throw Object.assign(new Error(message), { statusCode }); }
@@ -52,7 +54,9 @@ export function validateManualOrder(input) {
   if (input.payment.state === 'Paid' && !input.payment.reference?.trim()) fail('Payment reference is required for a paid order.');
   const handlingType = input.metadata?.handlingType ?? 'self';
   if (!['self', 'marketplace'].includes(handlingType)) fail('Invalid handling type.');
-  return { orderKey: text(input.orderKey, 'Order reference', true), canonicalStatus: input.canonicalStatus, currencyCode, buyerSnapshot: { name: customer, phone, email }, shippingAddressSnapshot, lines, totals: { subtotal, discount, shipping, tax, grandTotal: round(subtotal - discount + shipping + tax) }, payment: { state: input.payment.state, method: input.payment.method, reference: text(input.payment.reference || '', 'Payment reference') }, metadata: { handlingType, store: text(input.metadata?.store || 'Manual', 'Store'), warehouse: text(input.metadata?.warehouse || 'Unassigned', 'Warehouse'), assignee: text(input.metadata?.assignee || 'Unassigned', 'Assignee'), notes: text(input.metadata?.notes || '', 'Notes'), tags: text(input.metadata?.tags || '', 'Tags').split(',').map((t) => t.trim()).filter(Boolean) } };
+  const shippingMode = input.metadata?.shippingMode || 'seller';
+  if (!['seller', 'platform'].includes(shippingMode)) fail('Invalid shipping mode.');
+  return { orderKey: text(input.orderKey, 'Order reference', true), canonicalStatus: input.canonicalStatus, currencyCode, buyerSnapshot: { name: customer, phone, email }, shippingAddressSnapshot, lines, totals: { subtotal, discount, shipping, tax, grandTotal: round(subtotal - discount + shipping + tax) }, payment: { state: input.payment.state, method: input.payment.method, reference: text(input.payment.reference || '', 'Payment reference') }, metadata: { handlingType, shippingMode, store: text(input.metadata?.store || 'Manual', 'Store'), warehouse: text(input.metadata?.warehouse || 'Unassigned', 'Warehouse'), assignee: text(input.metadata?.assignee || 'Unassigned', 'Assignee'), notes: text(input.metadata?.notes || '', 'Notes'), tags: text(input.metadata?.tags || '', 'Tags').split(',').map((t) => t.trim()).filter(Boolean) } };
 }
 const seed = demoOrders;
 export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH || path.resolve('data/orders.json')) {
@@ -92,9 +96,19 @@ export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH |
       const db = read(); const order = db.orders.find((o) => o.id === id);
       if (!order) fail('Order not found.', 404);
       if (order.source === 'demo' && !['assign', 'note'].includes(input.action)) fail('Only owner and internal notes can be edited on sample orders.', 409);
+      const requestId = input.requestId ? text(input.requestId, 'Request ID', true) : null;
+      const { version: ignoredVersion, requestId: ignoredRequestId, ...requestBody } = input;
+      const fingerprint = createHash('sha256').update(JSON.stringify(requestBody)).digest('hex');
+      const receipt = requestId && order.commandReceipts?.find(item => item.id === requestId && item.actor === actor);
+      if (receipt) {
+        if (receipt.fingerprint !== fingerprint) fail('Request ID was already used for another command.', 409);
+        return order;
+      }
       if (input.version !== order.version) fail('Order changed. Refresh before trying again.', 409);
       if (order.hold?.active && ['transition','edit-draft'].includes(input.action)) fail('Release the order hold before processing this order.', 409);
-      if (input.action === 'hold') {
+      if (workflowActions.includes(input.action)) {
+        record(order, applyOrderWorkflow(order, input, actor, db.orders), actor);
+      } else if (input.action === 'hold') {
         if (!['created','acknowledged','allocated','fulfillment_in_progress'].includes(order.canonicalStatus)) fail('Only orders before dispatch can be held.',409);
         if (order.hold?.active) fail('Order is already on hold.',409);
         order.hold={active:true,reason:text(input.reason,'Hold reason',true),at:new Date().toISOString(),actor};
@@ -110,6 +124,8 @@ export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH |
         Object.assign(order, validated);
         record(order, validated.canonicalStatus === 'draft' ? 'Draft updated' : 'Draft submitted', actor);
       } else if (input.action === 'transition') {
+        if (order.source !== 'manual') fail('Lifecycle updates must come from the order source.', 409);
+        if (input.toStatus === 'closed') { const blocker = completionBlocker(order); if (blocker) fail(blocker, 409); }
         if (!orderTransitions[order.canonicalStatus]?.includes(input.toStatus)) fail('This status transition is not allowed.', 409);
         if (!['created', 'acknowledged', 'canceled', 'closed'].includes(input.toStatus)) fail('Use the fulfillment service to allocate or ship this order.', 409);
         if (input.toStatus === 'canceled' && !['draft', 'created', 'acknowledged'].includes(order.canonicalStatus)) fail('Cancel fulfillment and release reservations first.', 409);
@@ -117,7 +133,7 @@ export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH |
         order.transitions.push({ fromStatus: order.canonicalStatus, toStatus: input.toStatus, reason, transitionedAt: new Date().toISOString() });
         order.canonicalStatus = input.toStatus; record(order, `Status → ${input.toStatus}${reason ? `: ${reason}` : ''}`, actor);
       } else if (input.action === 'payment') {
-        if (['canceled', 'closed'].includes(order.canonicalStatus) || order.payment.state === 'Paid') fail('Payment cannot be confirmed in this state.', 409);
+        if (['canceled', 'closed'].includes(order.canonicalStatus) || ['Paid', 'Refunded', 'Partially refunded'].includes(order.payment.state)) fail('Payment cannot be confirmed in this state.', 409);
         order.payment = { ...order.payment, state: 'Paid', reference: text(input.reference, 'Payment evidence/reference', true) }; record(order, 'Payment confirmed with reference', actor);
       } else if (input.action === 'assign') {
         order.metadata.assignee = text(input.assignee, 'Assignee', true); record(order, `Assigned to ${order.metadata.assignee}`, actor);
@@ -132,6 +148,7 @@ export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH |
         const issue = order.exceptions.find((e) => e.id === input.exceptionId); if (!issue) fail('Exception not found.', 404);
         issue.status = 'resolved'; record(order, `Exception resolved: ${issue.summary}`, actor);
       } else { fail('Unsupported order action.'); }
+      if (requestId) order.commandReceipts = [...(order.commandReceipts || []).slice(-99), { id: requestId, actor, fingerprint }];
       order.version += 1; save(db); return order;
     },
   };

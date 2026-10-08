@@ -10,6 +10,23 @@ const warehouses = [{ id: 'wh_crjp', name: 'Japan' }, { id: 'wh_rslsg', name: 'S
 const props = { open: true, onOpenChange: vi.fn(), products: [product], warehouses, onNewAction: vi.fn() };
 afterEach(() => { cleanup(); localStorage.removeItem(STOCK_HOLD_STORAGE_KEY); vi.clearAllMocks(); });
 describe('Stock activity drawer', () => {
+  it('shows distinct receipt, opening and adjustment entries and their filtered balances', () => {
+    const record = product.inventory_adjustments[0];
+    render(<StockActivityDrawer {...props} products={[{ ...product, inventory_adjustments: [
+      { ...record, id: 'opening', kind: 'opening', before: null, after: 7, reason: 'Opening stock' },
+      { ...record, id: 'receipt', kind: 'receipt', before: 7, after: 10, reason: 'Goods received' },
+      { ...record, id: 'correction', kind: 'adjustment', before: 10, after: 5 },
+    ] }]} />);
+    for (const [type, id, balance] of [['opening', 'opening', 'Not recorded → 7'], ['receipt', 'receipt', '7 → 10'], ['adjustment', 'correction', '10 → 5']]) {
+      fireEvent.change(screen.getByLabelText('Activity type'), { target: { value: type } });
+      expect(screen.getAllByRole('button', { name: /^View activity/ })).toHaveLength(1);
+      const row = screen.getByRole('button', { name: `View activity ${id}` }).closest('tr')!;
+      expect(within(row).getByText(balance)).toBeVisible();
+    }
+    fireEvent.keyDown(screen.getByRole('button', { name: 'New action' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Receive stock' }));
+    expect(props.onNewAction).toHaveBeenCalledWith('receipt');
+  });
   it('renders one page, expands details by keyboard and preserves filters across reopening', () => {
     const view = render(<StockActivityDrawer {...props} />);
     expect(screen.getByLabelText('Activity results')).toHaveTextContent('1–25 of 61');
@@ -41,10 +58,10 @@ describe('Stock activity drawer', () => {
     expect(within(row).getByText('New')).toBeInTheDocument();
     expect(within(row).getByText('units held')).toBeInTheDocument();
   });
-  it('offers all three actions in one menu and handles empty and invalid date results', () => {
+  it('offers the stock actions in one menu and handles empty and invalid date results', () => {
     render(<StockActivityDrawer {...props} />);
     fireEvent.keyDown(screen.getByRole('button', { name: 'New action' }), { key: 'Enter' });
-    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    expect(screen.getAllByRole('menuitem')).toHaveLength(4);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Manage holds' }));
     expect(props.onNewAction).toHaveBeenCalledWith('holds');
     fireEvent.change(screen.getByLabelText('Activity warehouse'), { target: { value: 'wh_rslsg' } });

@@ -1,22 +1,29 @@
-import { useId } from 'react';
-import { RefreshCw, TriangleAlert } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { ChevronDown, RefreshCw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Product } from '@/lib/product-store';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
-import type { VariantMappings } from '@/lib/listing-master-completion';
+import { variantMappingError, type VariantMappings } from '@/lib/listing-master-completion';
 import { resolveSourceSkuMappings, sourceSkuDataError, sourceSkuItems, suggestSourceSkuMappings } from '@/lib/listing-sku-mapping';
 
 /** Relationship fields; SKU proposals are reviewed in the adjacent completion form. */
-export function ListingSkuMappings({ product, sources, mappings, onChange, onReload }: {
+export function ListingSkuMappings({ product, sources, mappings, onChange, onReload, compact = false }: {
   product: Product; sources: CatalogImportItem[]; mappings: VariantMappings;
   onChange: (value: VariantMappings) => void;
   onReload?: (sourceId: string) => void;
+  compact?: boolean;
 }) {
   const prefix = useId();
   const skus = product.skus.filter(sku => sku.status === 'active');
-  return <section className="space-y-4 border-t pt-4" aria-label="Map source SKUs">
-    <h3 className="text-sm font-semibold">Map source SKUs</h3>
-    <p className="text-xs leading-5 text-muted-foreground">Shop SKUs are filled from listing data. Review the suggested matches before confirming.</p>
+  const resolved = Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, product, mappings[source.id])]));
+  const issue = variantMappingError(sources, product, resolved);
+  const [expanded, setExpanded] = useState(!compact || Boolean(issue));
+  useEffect(() => { if (issue) setExpanded(true); }, [issue]);
+  const total = sources.reduce((sum, source) => sum + sourceSkuItems(source).length, 0);
+  const chosen = Object.values(resolved).flat().filter(row => skus.some(sku => sku.id === row.master_sku_id)).length;
+  return <section className={compact ? 'overflow-hidden rounded-lg border' : 'space-y-4 border-t pt-4'} aria-label="Map source SKUs">
+    {compact ? <button type="button" aria-expanded={expanded} aria-controls={`${prefix}-mapping-body`} onClick={() => setExpanded(value => !value)} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">SKU mapping</span><span className={`mt-1 block text-xs ${issue ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>{issue ? 'SKU matches need review' : `${chosen}/${total} SKU pairs proposed · Not confirmed`}</span></span><span className="text-xs text-muted-foreground">{expanded ? 'Hide matches' : 'Review matches'}</span><ChevronDown className={`size-4 shrink-0 text-muted-foreground ${expanded ? 'rotate-180' : ''}`} /></button> : <><h3 className="text-sm font-semibold">Map source SKUs</h3><p className="text-xs leading-5 text-muted-foreground">Shop SKUs are filled from listing data. Review the suggested matches before confirming.</p></>}
+    <div id={`${prefix}-mapping-body`} hidden={compact && !expanded} className={compact ? 'space-y-4 border-t p-4' : 'space-y-4'}>
     {!skus.length && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">This Master has no available variant SKUs. Set up SKUs in this review, or save the link and finish later.</p>}
     {sources.map(source => {
       const items = sourceSkuItems(source);
@@ -27,7 +34,7 @@ export function ListingSkuMappings({ product, sources, mappings, onChange, onRel
       return <div key={source.id} className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <p className="font-medium">{source.storeName} · {source.channelSku}</p>
-          <p className="text-muted-foreground">Listing: {source.variants || items.length} SKUs · Master: {skus.length} SKUs{!sourceError && ` · ${selectedCount}/${items.length} matched`}</p>
+          <p className="text-muted-foreground">Listing: {source.variants || items.length} SKUs · Master: {skus.length} SKUs{!sourceError && ` · ${selectedCount}/${items.length} selected`}</p>
         </div>
         {sourceError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
           <div className="min-w-0 flex-1 space-y-1"><p className="flex items-center gap-2 text-sm font-medium"><TriangleAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-300" />Listing SKU data is incomplete</p><p className="text-xs leading-5 text-muted-foreground">{items.length} of {source.variants || 'unknown'} SKUs loaded. {sourceError.includes('duplicate') ? 'Duplicate SKU codes were received. ' : ''}Reload the imported listing data. If details are still missing, sync this listing from its channel first.</p></div>
@@ -53,5 +60,6 @@ export function ListingSkuMappings({ product, sources, mappings, onChange, onRel
         </div>}
       </div>;
     })}
+    </div>
   </section>;
 }

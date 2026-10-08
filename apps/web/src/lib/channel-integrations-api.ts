@@ -56,6 +56,7 @@ export const channelIntegrationsApi = {
   platforms: () => request<{ data: AvailablePlatform[] }>('/api/v1/channels/available-platforms'),
   warehouses: () => request<{ data: ChannelWarehouse[] }>('/api/v1/warehouses'),
   channels: () => request<{ data: ConnectedChannelRecord[] }>('/api/v1/channels'),
+  linkWarehouse: (id: string, warehouse: ChannelWarehouse, expectedWarehouseId: string | null) => request<{ data: ConnectedChannelRecord }>(`/api/v1/channels/${encodeURIComponent(id)}/warehouse`, { method: 'PATCH', body: JSON.stringify({ warehouse, expected_warehouse_id: expectedWarehouseId }) }),
   connect: (payload: ConnectChannelPayload) => request<{ data: ConnectedChannelRecord }>('/api/v1/channels/connect', { method: 'POST', body: JSON.stringify(payload) }),
   syncStatus: (id: string) => request<{ id: string; status: ConnectedChannelRecord['status']; synced_listings: number; sync_progress: number }>(`/api/v1/channels/${encodeURIComponent(id)}/sync-status`),
   authorizationUrl: (platform: string, region: string) => {

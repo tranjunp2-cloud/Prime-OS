@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
-import { editListingSection, applyListingSection, completeListingDetails } from '@/test/fixtures/complete-listing-details';
+import { editListingSection, applyListingSection, completeListingDetails, confirmListingSave } from '@/test/fixtures/complete-listing-details';
 import { ListingMasterReview } from './ListingMasterReview';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
 import { addProduct, deleteProduct, getProductById, getProducts, updateProduct, type Product } from '@/lib/product-store';
@@ -66,7 +66,7 @@ describe('Fast evidence-based Master review', () => {
   });
   it('keeps the selected group and current source when returning from creation to the finder', () => {
     mount(listings, 'new');
-    fireEvent.change(screen.getByLabelText('Use product data from'), { target: { value: listings[1].id } });
+    fireEvent.change(screen.getByLabelText('Starting data from'), { target: { value: listings[1].id } });
     applyListingSection();
     click('Use existing Master');
     expect(screen.getByRole('region', { name: 'Find a Product Master' })).toBeVisible();
@@ -75,7 +75,7 @@ describe('Fast evidence-based Master review', () => {
     expect(screen.getByText('2 listings selected')).toBeVisible();
     expect(screen.queryByLabelText('Listing to review')).not.toBeInTheDocument();
     click('Create new Master');
-    expect(screen.getByLabelText('Use product data from')).toHaveValue(listings[1].id);
+    expect(screen.getByLabelText('Starting data from')).toHaveValue(listings[1].id);
   });
   it('shows both selected listings together and scopes candidate evidence to the whole group', () => {
     const sources = listings.map((item, index) => ({ ...item, suggestedProductId: undefined, channelSku: index ? 'OTHER-SKU' : item.channelSku }));
@@ -106,7 +106,7 @@ describe('Fast evidence-based Master review', () => {
     click(secondName);
     expect(screen.getByRole('button', { name: secondName })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('group', { name: 'Source listing' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Check listing 2 of 2 before linking' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Differences to check' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Shared destination Master' })).toHaveTextContent(target.name);
     expect(screen.getByRole('group', { name: 'Shared destination Master' })).toHaveTextContent('For all 2 listings');
     expect(screen.getByRole('status')).toHaveTextContent('0 of 2 checked · Changes not saved');
@@ -117,7 +117,7 @@ describe('Fast evidence-based Master review', () => {
     expect(screen.getByRole('button', { name: firstName })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('status')).toHaveTextContent('1 of 2 checked · Changes not saved');
     expect(onSaved).not.toHaveBeenCalled();
-    click('Link all 2 listings');
+    confirmListingSave('Link all 2 listings');
     expect(onSaved).toHaveBeenCalledOnce();
     expect(getProductById(target.id)?.status).toBe('draft');
   });
@@ -157,19 +157,143 @@ describe('Fast evidence-based Master review', () => {
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(listings[0].title);
   });
-  it('prioritizes differences and reveals the full evidence table on demand', () => {
+  it('shows all comparison fields and required Master data without an extra review screen', () => {
     const { onSaved } = mount([{ ...listings[0], suggestedProductId: undefined }]);
     expect(screen.getAllByRole('button', { name: /^Compare with/ })[0]).toHaveAccessibleName(`Compare with ${target.name}`);
     expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
     compare();
     expect(screen.getByRole('group', { name: 'Differences to check' })).toHaveTextContent('Brand differs');
-    expect(screen.getByText(/4 fields unverified/)).toBeVisible();
-    expect(screen.getByRole('table', { name: 'Product identity comparison' })).not.toBeVisible();
-    fireEvent.click(screen.getByText('View all 7 comparison fields'));
+    expect(screen.getByText(/4 identity fields unverified/)).toBeVisible();
     expect(screen.getByRole('table', { name: 'Product identity comparison' })).toBeVisible();
+    expect(screen.queryByText('View all 7 comparison fields')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review data for Master' })).not.toBeInTheDocument();
+    for (const name of ['Title', 'Master SKU', 'Description', 'Price']) expect(screen.getByRole('rowheader', { name: `${name} Required` })).toBeVisible();
+    expect(screen.getAllByText('Required', { exact: true })).toHaveLength(4);
     expect(screen.getByText('Title says “12 pieces” · unverified')).toBeVisible();
     expect(screen.getByText('Title says “12-piece” · unverified')).toBeVisible();
     expect(getProductById(target.id)?.channels).toEqual([]);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+  it('edits a Master field directly in the comparison table and saves only after confirmation', () => {
+    updateProduct(target.id, { id: target.id, status: 'published' });
+    const before = structuredClone(getProductById(target.id)!);
+    const sourceBefore = structuredClone(listings[0]);
+    const { onSaved } = mount();
+    click('Edit Master Title');
+    expect(screen.getByRole('region', { name: 'Compare product details' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Link to this Master' })).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Reviewed title' } });
+    click('Apply to review');
+    expect(screen.getByRole('table')).toHaveTextContent('Reviewed title');
+    expect(screen.getByRole('table')).toHaveTextContent(`Current: ${target.name}`);
+    expect(getProductById(target.id)).toEqual(before);
+    expect(onSaved).not.toHaveBeenCalled();
+    click('Save Master changes & link');
+    expect(screen.getByRole('dialog', { name: 'Review before saving' })).toHaveTextContent('Reviewed title');
+    expect(getProductById(target.id)).toEqual(before);
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Review before saving' })).getByRole('button', { name: 'Save Master changes & link' }));
+    const after = getProductById(target.id)!;
+    expect(after.name).toBe('Reviewed title');
+    expect(after.status).toBe('published');
+    expect(after.sku_code).toBe(before.sku_code);
+    expect(after.inventory).toEqual(before.inventory);
+    expect(after.images).toEqual(before.images);
+    expect(after.channels[0].shop_snapshot?.title).toBe(sourceBefore.title);
+    expect(after.channels[0].master_data_sync?.enabled).not.toBe(true);
+    expect(onSaved).toHaveBeenCalledOnce();
+  });
+  it('keeps row drafts isolated, validates required fields, and supports cancelling', () => {
+    const { onSaved } = mount();
+    click('Edit Master Description');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product description/ }), { target: { value: '<p> </p>' } });
+    click('Apply to review');
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a product description');
+    expect(screen.getByRole('button', { name: 'Choose another Master' })).toBeDisabled();
+    click('Cancel edit');
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link to this Master' })).toBeEnabled();
+    expect(getProductById(target.id)?.description).toBe(target.description);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+  it('keeps one shared proposal when switching listings and requires each listing to be reviewed', () => {
+    updateProduct(target.id, { id: target.id, status: 'published' });
+    const { onSaved } = mount(listings);
+    click('Edit Master Title');
+    expect(screen.getByRole('button', { name: `View listing 2: ${listings[1].title} · Shop b` })).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Shared reviewed title' } });
+    click('Apply to review');
+    click('Mark checked & continue');
+    expect(screen.getByRole('status')).toHaveTextContent('1 of 2 checked');
+    expect(screen.getByRole('table')).toHaveTextContent('Shared reviewed title');
+    expect(onSaved).not.toHaveBeenCalled();
+    confirmListingSave('Save Master changes & link');
+    expect(getProductById(target.id)?.name).toBe('Shared reviewed title');
+    expect(getProductById(target.id)?.channels).toHaveLength(2);
+    expect(onSaved).toHaveBeenCalledOnce();
+  });
+  it('saves inline changes as pending progress without overwriting the Master when deferred', () => {
+    const { onSaved } = mount();
+    click('Edit Master Title');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Pending review title' } });
+    click('Apply to review');
+    click('Link now, finish later');
+    click('Link & save progress');
+    expect(getProductById(target.id)?.name).toBe(target.name);
+    expect(getProductById(target.id)?.channels[0].review_pending?.master_draft?.name).toBe('Pending review title');
+    expect(onSaved).toHaveBeenCalledOnce();
+  });
+  it('changes the mapped source in the table and retains its provenance without modifying shop data', () => {
+    const { onSaved } = mount();
+    click('Edit Master Title');
+    click('Change source for Product name');
+    fireEvent.click(screen.getByRole('radio', { name: /Shop a · Listing title/ }));
+    click('Use this source');
+    click('Apply to review');
+    expect(screen.getByRole('table')).toHaveTextContent('Shop a · Listing title · Not saved');
+    expect(getProductById(target.id)?.name).toBe(target.name);
+    confirmListingSave('Save, activate & link');
+    expect(getProductById(target.id)?.name).toBe(listings[0].title);
+    expect(getProductById(target.id)?.field_mappings?.name).toMatchObject({ mode: 'source', source: { listingId: listings[0].listingId, fieldKey: 'title' } });
+    expect(getProductById(target.id)?.channels[0].shop_snapshot?.title).toBe(listings[0].title);
+    expect(onSaved).toHaveBeenCalledOnce();
+  });
+  it('does not copy a price from another currency in the inline source picker', () => {
+    updateProduct(target.id, { id: target.id, price_currency: 'JPY' });
+    mount([{ ...listings[0], price: 20, currency: 'USD' }]);
+    click('Edit Master Price');
+    click('Change source for Base price');
+    fireEvent.click(screen.getByRole('radio', { name: /Shop a · Listing price/ }));
+    expect(screen.getByRole('button', { name: 'Use this source' })).toBeDisabled();
+    expect(screen.getByRole('region', { name: 'Choose source for Base price' })).toHaveTextContent(/currency/i);
+    click('Cancel edit');
+    expect(getProductById(target.id)?.price_currency).toBe('JPY');
+    expect(getProductById(target.id)?.retail_price).toBe(target.retail_price);
+  });
+  it('warns before discarding a shared inline proposal when changing the Master', () => {
+    const { onSaved } = mount();
+    click('Edit Master Title');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Unsaved proposal' } });
+    click('Apply to review');
+    click('Choose another Master');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Discard changes for this Master?');
+    click('Keep reviewing');
+    expect(screen.getByRole('table')).toHaveTextContent('Unsaved proposal');
+    click('Choose another Master');
+    click('Discard & continue');
+    expect(screen.getByRole('region', { name: 'Find a Product Master' })).toBeVisible();
+    expect(getProductById(target.id)?.name).toBe(target.name);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+  it('rejects stale Master data before saving an inline proposal', () => {
+    const { onSaved } = mount();
+    click('Edit Master Title');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Stale proposal' } });
+    click('Apply to review');
+    updateProduct(target.id, { id: target.id, name: 'Newer server title' });
+    confirmListingSave('Save, activate & link');
+    expect(screen.getByRole('alert')).toHaveTextContent('changed during review');
+    expect(getProductById(target.id)?.name).toBe('Newer server title');
+    expect(getProductById(target.id)?.channels).toHaveLength(0);
     expect(onSaved).not.toHaveBeenCalled();
   });
   it('preselects the suggestion, shows conflicts, and saves only the link with one explicit action', () => {
@@ -177,10 +301,10 @@ describe('Fast evidence-based Master review', () => {
     const before = structuredClone(getProductById(target.id)!);
     expect(screen.getByText('Suggested Product Master')).toBeVisible();
     expect(screen.getByRole('group', { name: 'Differences to check' })).toHaveTextContent('Brand differs');
-    const footer = within(screen.getByRole('group', { name: 'Review actions' }));
     for (const name of ['Choose another Master', 'Create new Master', 'Link to this Master']) {
-      expect(footer.getByRole('button', { name })).toHaveClass('h-11');
+      expect(screen.getByRole('button', { name })).toBeVisible();
     }
+    expect(within(screen.getByRole('group', { name: 'Review actions' })).queryByRole('button', { name: 'Choose another Master' })).not.toBeInTheDocument();
     click('Link to this Master'); click('Link to this Master');
     expect(onSaved).toHaveBeenCalledOnce();
     expect(getProductById(target.id)).toMatchObject({ status: before.status, images: before.images, inventory: before.inventory, description: before.description });
@@ -189,7 +313,7 @@ describe('Fast evidence-based Master review', () => {
   });
   it('links without a completion form even when identity fields are unverified', () => {
     const { onSaved } = mount([{ ...listings[0], brand: target.brand }]);
-    expect(screen.getByText(/4 fields unverified/)).toBeVisible();
+    expect(screen.getByText(/4 identity fields unverified/)).toBeVisible();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
     click('Link to this Master');
@@ -233,7 +357,7 @@ describe('Fast evidence-based Master review', () => {
     expect(getProductById(target.id)?.channels).toEqual([]);
     click('Change Master for all'); compare();
     expect(screen.getByRole('status')).toHaveTextContent('0 of 2 checked · Changes not saved');
-    click('Mark checked & continue'); click('Link all 2 listings');
+    click('Mark checked & continue'); confirmListingSave('Link all 2 listings');
     expect(onSaved).toHaveBeenCalledOnce();
     expect(getProductById(target.id)?.channels).toHaveLength(2);
     expect(getProductById(target.id)?.status).toBe('draft');
@@ -256,6 +380,7 @@ describe('Fast evidence-based Master review', () => {
     expect(screen.getByRole('button', { name: 'Link to this Master' })).toBeEnabled();
     expect(screen.getByLabelText('Master SKU for shop SKU 1')).toHaveValue(skus[0].id);
     expect(screen.getByLabelText('Master SKU for shop SKU 2')).toHaveValue(skus[1].id);
+    fireEvent.click(screen.getByRole('button', { name: /SKU mapping.*2\/2.*Review matches/ }));
     expect(screen.getByText('SHOP-RED')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Shop SKU 1' })).not.toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
@@ -270,6 +395,35 @@ describe('Fast evidence-based Master review', () => {
     expect(getProductById(target.id)).toMatchObject({ status: before.status, images: [], description: '', retail_price: 0, skus: before.skus });
     expect(getProductById(target.id)?.channels[0].variant_mappings).toEqual([{ shop_sku: 'SHOP-RED', master_sku_id: skus[0].id }, { shop_sku: 'SHOP-BLUE', master_sku_id: skus[1].id }]);
   });
+  it('edits variant prices in the comparison table while preserving SKU identities, stock and links', () => {
+    const skus = ['Red', 'Blue'].map((variation_name, index) => ({ id: `price-child-${index}`, sku_code: `PRICE-${index}`, variation_name, status: 'active' as const, weight_g: 0, units_per_carton: 1, price: 10 + index, stock_by_location: { wh_crjp: 8 + index } }));
+    updateProduct(target.id, { id: target.id, has_variants: true, product_type: 'variant', skus, status: 'published' });
+    const before = structuredClone(getProductById(target.id)!);
+    const { onSaved } = mount([{ ...listings[0], variants: 2, variantItems: [{ sku: 'SHOP-RED', label: 'Red' }, { sku: 'SHOP-BLUE', label: 'Blue' }] }]);
+    click('Edit Master Variant prices');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'PRICE-0 · Red' }), { target: { value: 25 } });
+    click('Apply to review');
+    expect(screen.getByRole('table')).toHaveTextContent('PRICE-0: 25');
+    expect(getProductById(target.id)?.skus).toEqual(before.skus);
+    confirmListingSave('Save Master changes & link');
+    const after = getProductById(target.id)!;
+    expect(after.skus).toEqual(before.skus.map((sku, index) => index === 0 ? { ...sku, price: 25 } : sku));
+    expect(after.inventory).toEqual(before.inventory);
+    expect(after.channels[0].variant_mappings).toEqual([{ shop_sku: 'SHOP-RED', master_sku_id: skus[0].id }, { shop_sku: 'SHOP-BLUE', master_sku_id: skus[1].id }]);
+    expect(onSaved).toHaveBeenCalledOnce();
+  });
+  it('keeps inline edits when preparing missing variants from the structure row', () => {
+    mount([{ ...listings[0], variants: 2, variantItems: [{ sku: 'SHOP-RED', label: 'Red' }, { sku: 'SHOP-BLUE', label: 'Blue' }] }]);
+    click('Edit Master Title');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Keep reviewed title' } });
+    click('Apply to review');
+    expect(screen.getByRole('button', { name: 'Save, activate & link' })).toBeDisabled();
+    click('Set up SKUs & details');
+    expect(screen.getByRole('region', { name: 'Complete Product Master' })).toHaveTextContent('Keep reviewed title');
+    expect(screen.getByRole('region', { name: 'Complete Product Master' })).toHaveTextContent('SHOP-RED');
+    expect(screen.getByRole('region', { name: 'Complete Product Master' })).toHaveTextContent('SHOP-BLUE');
+    expect(getProductById(target.id)?.has_variants).toBe(false);
+  });
   it('prefills both demo listings, reviews each and links all SKUs without editing Master or shop data', () => {
     const demo = original.filter(item => ['imp-002', 'imp-011'].includes(item.id));
     const master = getProducts().find(product => product.id === 'prod_002')!;
@@ -278,15 +432,17 @@ describe('Fast evidence-based Master review', () => {
     const before = structuredClone(getProductById(target.id)!);
     const { onSaved } = mount(listings);
     expect(screen.getByLabelText('Master SKU for shop SKU 1')).toHaveValue(master.skus[0].id);
+    fireEvent.click(screen.getByRole('button', { name: /SKU mapping.*3\/3.*Review matches/ }));
     expect(screen.getAllByText('Suggested · SKU matches')).toHaveLength(3);
-    expect(screen.getByText('Listing: 3 SKUs · Master: 3 SKUs · 3/3 matched')).toBeVisible();
+    expect(screen.getByText('Listing: 3 SKUs · Master: 3 SKUs · 3/3 selected')).toBeVisible();
     expect(getProductById(target.id)?.channels).toEqual([]);
     click('Mark checked & continue');
     expect(screen.getByLabelText('Master SKU for shop SKU 1')).toHaveValue(master.skus[2].id);
+    fireEvent.click(screen.getByRole('button', { name: /SKU mapping.*3\/3.*Review matches/ }));
     expect(screen.getAllByText('Suggested · Variant matches')).toHaveLength(3);
     expect(screen.getByText('1 of 2 checked · Changes not saved')).toBeVisible();
     expect(onSaved).not.toHaveBeenCalled();
-    click('Link all 2 listings');
+    confirmListingSave('Link all 2 listings');
     expect(onSaved).toHaveBeenCalledOnce();
     const after = getProductById(target.id)!;
     expect(after).toMatchObject({ skus: before.skus, inventory: before.inventory, status: before.status, description: before.description, images: before.images });
@@ -343,7 +499,7 @@ describe('Fast evidence-based Master review', () => {
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(listings[0].title);
     expect(screen.queryByRole('checkbox', { name: /I checked/ })).not.toBeInTheDocument();
 
-    completeListingDetails(); click('Create, activate & link');
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(onSaved).toHaveBeenCalledOnce();
     const product = getProductById(onSaved.mock.calls[0][0].productId)!;
     expect(product.status).toBe('published');

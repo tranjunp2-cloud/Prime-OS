@@ -84,10 +84,8 @@ export function applyMasterCompletion(master: Product, sources: CatalogImportIte
   });
   return product;
 }
-export function completionReadiness(product: Product, sources: CatalogImportItem[]) {
-  // Include intended relationships so shipping validation agrees with the saved Master/editor.
-  const candidate = { ...product, channels: [...product.channels, ...sources.map(source => ({ channel: source.channel, external_id: source.listingId, status: 'draft' as const, listing_url: null, last_synced_at: null }))] };
-  return getStoredMasterReadiness(candidate);
+export function completionReadiness(product: Product, _sources: CatalogImportItem[]) {
+  return getStoredMasterReadiness(product);
 }
 export function assertMasterComplete(product: Product, sources: CatalogImportItem[], products = getProducts()) {
   const fieldError = fieldMappingErrors(product, sources, products.find(other => other.id === product.id))[0];

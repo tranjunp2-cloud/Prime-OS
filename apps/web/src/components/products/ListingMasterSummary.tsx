@@ -38,7 +38,7 @@ export function ListingMasterSummary({ group, product, sources, mappings, imageS
   if (group === 'identity') return <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
     {value('Product name', product.name, 'name', true, 'lg:col-span-2')}
     {value('Master SKU', <span className="break-all font-mono">{product.sku_code || 'Not provided'}</span>)}
-    {value('Master category', category?.name, 'categoryId', true)}
+    {value('Master category', category?.name, 'categoryId')}
     {value('Brand', product.brand, 'brandId')}
     {value('Product type', product.has_variants ? `With variants · ${product.skus.length} Master SKUs` : 'Single product')}
   </dl>;
@@ -58,7 +58,7 @@ export function ListingMasterSummary({ group, product, sources, mappings, imageS
             return <div key={`${item.sku}:${index}`} className="grid gap-x-3 gap-y-1 border-t px-3 py-2.5 first:border-0 sm:grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_100px] sm:items-center">
               <div className="min-w-0"><p className="break-all font-mono text-xs">{item.sku}</p><p className="mt-0.5 break-words text-xs text-muted-foreground">{item.label}</p></div>
               <ArrowRight className="hidden size-3.5 text-muted-foreground sm:block" aria-hidden="true" />
-              <div className="min-w-0"><span className="text-xs text-muted-foreground sm:hidden">Master: </span><span className={`break-all font-mono text-xs ${!sku ? 'text-amber-700 dark:text-amber-300' : ''}`}>{sku?.sku_code || 'No match'}</span><p className="mt-0.5 break-words text-xs text-muted-foreground">{sku?.variation_name}</p><p className="mt-0.5 text-xs text-muted-foreground">{incomplete ? 'Source data incomplete' : sku ? mappings[source.id] ? 'Selected · not linked yet' : 'Suggested · review before creating' : 'Needs matching'}</p></div>
+              <div className="min-w-0"><span className="text-xs text-muted-foreground sm:hidden">Master: </span><span className={`break-all font-mono text-xs ${!sku ? 'text-amber-700 dark:text-amber-300' : ''}`}>{sku?.sku_code || 'No match'}</span><p className="mt-0.5 break-words text-xs text-muted-foreground">{sku?.variation_name}</p><p className="mt-0.5 text-xs text-muted-foreground">{incomplete ? 'Source data incomplete' : sku ? mappings[source.id] ? 'Selected · not linked yet' : 'Suggested · review before saving' : 'Needs matching'}</p></div>
               <p className="text-xs sm:text-right">{sku?.price !== undefined && sku.price > 0 ? `${sku.price.toLocaleString()} ${product.price_currency}` : <span className="text-amber-700 dark:text-amber-300">No price</span>}</p>
             </div>;
           })}
@@ -70,16 +70,16 @@ export function ListingMasterSummary({ group, product, sources, mappings, imageS
   </div>;
   if (group === 'attributes') {
     const attributes = assignedCategoryAttributes(category, settings.attributes).filter(attribute => attribute.required && !product.variant_options?.some(option => product.has_variants && option.attributeKey === attribute.key));
-    return attributes.length ? grid(attributes.map(attribute => value(attribute.name, fieldValue(product, `attribute:${attribute.key}`), `attribute:${attribute.key}`, true)))
-      : <p className="text-xs text-muted-foreground">{category ? 'No additional required attributes.' : 'Choose a Master category to see its required attributes.'}</p>;
+    return attributes.length ? grid(attributes.map(attribute => value(attribute.name, fieldValue(product, `attribute:${attribute.key}`), `attribute:${attribute.key}`)))
+      : <p className="text-xs text-muted-foreground">{category ? 'No shared attributes to complete.' : 'Choose a Master category to add shared attributes.'}</p>;
   }
   if (group === 'content') return <div className="flex flex-col gap-3">
     <div className="min-w-0 flex-1"><p className="line-clamp-3 whitespace-pre-line break-words text-sm leading-6">{product.description || <span className="text-amber-700 dark:text-amber-300">Description not provided</span>}</p>{product.description && <details className="mt-1 text-xs"><summary className="min-h-8 cursor-pointer py-2 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Read full description</summary><p className="whitespace-pre-line break-words py-2 leading-5">{product.description}</p></details>}{provenance('description', 'Description')}</div>
     <div className="shrink-0 sm:max-w-56"><div className="flex flex-wrap gap-2">{product.images.slice(0, 3).map((src, index) => <div key={src} className="relative grid size-14 place-items-center overflow-hidden rounded-md border bg-muted/30">{imageStates[src] === false ? <ImageOff aria-label={`Image ${index + 1} unavailable`} className="size-5 text-muted-foreground" /> : <img src={src} alt="" className="size-full object-contain" />}{index === 0 && <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[10px]">Cover</span>}</div>)}</div><p className="mt-2 text-xs text-muted-foreground">{product.images.length} image{product.images.length === 1 ? '' : 's'}</p></div>
   </div>;
   if (group === 'shipping') return grid(<>
-    {value('Package dimensions', [product.pkg_length, product.pkg_width, product.pkg_height].every(n => n > 0) ? `${product.pkg_length} × ${product.pkg_width} × ${product.pkg_height} cm` : '', undefined, true)}
-    {value('Package weight', product.pkg_weight > 0 ? `${product.pkg_weight} g` : '', 'pkg_weight', true)}
+    {value('Package dimensions', [product.pkg_length, product.pkg_width, product.pkg_height].every(n => n > 0) ? `${product.pkg_length} × ${product.pkg_width} × ${product.pkg_height} cm` : '', undefined)}
+    {value('Package weight', product.pkg_weight > 0 ? `${product.pkg_weight} g` : '', 'pkg_weight')}
   </>);
   if (!product.model_number && !product.gtin && !product.mpn && product.pack_quantity == null) return <p className="text-xs text-muted-foreground">No additional identifiers provided.</p>;
   return grid(<>{value('Model', product.model_number, 'model_number')}{value('Barcode (GTIN)', product.gtin, 'gtin')}{value('Manufacturer part number', product.mpn, 'mpn')}{value('Pack quantity', product.pack_quantity, 'pack_quantity')}</>);

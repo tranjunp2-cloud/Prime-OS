@@ -1,8 +1,9 @@
 import type { Product } from './product-store';
 import { canonicalWarehouseId, holdReasons, type StockHoldChange } from './stock-hold-history';
 
-export type StockActivityType = 'adjustment' | 'transfer' | 'hold' | 'release';
+export type StockActivityType = 'opening' | 'receipt' | 'adjustment' | 'availability' | 'transfer' | 'hold' | 'release';
 export const activityLabels: Record<StockActivityType, string> = {
+  opening: 'Opening stock', receipt: 'Stock received', availability: 'Availability setup',
   adjustment: 'Adjustment', transfer: 'Transfer', hold: 'Hold added', release: 'Hold released',
 };
 export type StockActivity = {
@@ -22,6 +23,8 @@ export type StockActivity = {
   note?: string;
   destinationBefore?: number | null;
   destinationAfter?: number;
+  transferStatus?: 'in_transit' | 'received';
+  receivedAt?: string;
 };
 export type ActivityFilters = { search: string; type: StockActivityType | 'all'; warehouseId: string; period: '30' | '7' | 'today' | 'all' | 'custom'; from: string; to: string };
 export const defaultActivityFilters: ActivityFilters = { search: '', type: 'all', warehouseId: '', period: '30', from: '', to: '' };
@@ -52,14 +55,16 @@ export function createStockActivitySource(products: Product[], holds: StockHoldC
   for (const product of products) {
     const common = { productId: product.id, productName: product.name };
     for (const item of product.inventory_adjustments ?? []) {
-      events.push({ ...common, ...item, key: `adjustment:${item.id}`, type: 'adjustment', quantity: item.before === null ? item.after : item.after - item.before,
+      // Preserve old audit records; classify them without rewriting saved history.
+      const type = item.kind ?? (item.before === null ? 'opening' : item.reason === 'Availability setup' && item.before === item.after ? 'availability' : item.reason === 'Goods received' && item.after > item.before ? 'receipt' : 'adjustment');
+      events.push({ ...common, ...item, key: `adjustment:${item.id}`, type, quantity: item.before === null ? item.after : item.after - item.before,
         warehouseIds: [canonicalWarehouseId(item.warehouseId)], warehouseNames: [location(item.warehouseId)] });
     }
     for (const item of product.inventory_transfers ?? []) {
       events.push({ ...common, id: item.id, key: `transfer:${item.id}`, type: 'transfer', sku: item.sku, createdAt: item.createdAt,
         warehouseIds: [canonicalWarehouseId(item.fromWarehouseId), canonicalWarehouseId(item.toWarehouseId)], warehouseNames: [location(item.fromWarehouseId), location(item.toWarehouseId)],
         quantity: item.quantity, before: item.fromBefore, after: item.fromAfter, destinationBefore: item.toBefore, destinationAfter: item.toAfter,
-        reason: 'Moved between warehouses',
+        reason: item.status === 'in_transit' ? 'Awaiting destination receipt' : 'Moved between warehouses', transferStatus: item.status ?? 'received', receivedAt: item.receivedAt,
       });
     }
   }

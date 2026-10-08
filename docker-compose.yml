@@ -2,6 +2,8 @@ services:
   web:
     build:
       context: ./apps/web
+      additional_contexts:
+        order_workflow: ./packages/order-workflow
       args:
         VITE_SUPABASE_URL: "${VITE_SUPABASE_URL:?Set Supabase project URL for the PrimeOS frontend build}"
         VITE_SUPABASE_PUBLISHABLE_KEY: "${VITE_SUPABASE_PUBLISHABLE_KEY:?Set Supabase anon/publishable key for the PrimeOS frontend build}"
@@ -26,6 +28,8 @@ services:
   api:
     build:
       context: ./apps/api
+      additional_contexts:
+        order_workflow: ./packages/order-workflow
     container_name: prime-os-backend
     environment:
       NODE_ENV: production

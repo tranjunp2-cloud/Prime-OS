@@ -1,3 +1,5 @@
+import { refreshShopDefaultReview } from '@/lib/listing-master-sync';
+import { useConnectedShops } from '@/hooks/use-connected-shops';
 import { Children, cloneElement, isValidElement, useId, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { ExternalLink, ImageOff, LockKeyhole, Plus, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +10,7 @@ import { listingDraftErrors, listingEditSnapshot, listingHasMultipleSkus, listin
 import { listingEditorData } from '@/lib/listing-editor-data';
 import { initialMasterSyncPreference, listingMasterSync, masterSyncPlan, masterSyncSnapshot, masterSyncSourceChanges, MASTER_SYNC_FIELDS, MASTER_SYNC_GROUPS, MASTER_SYNC_VALUE_KEYS, syncListingOverride, syncsField, type MasterSyncField, type MasterSyncPreference } from '@/lib/listing-master-sync';
 import { richTextPlainText } from '@/lib/product-master-readiness';
+import { ListingRequirementNotice } from './ListingRequirementNotice';
 import { usePricingRevision } from '@/hooks/use-pricing';
 import { ListingSyncConfiguration } from './ListingSyncConfiguration';
 import { uploadProductImage, validateImageFile } from '@/lib/product-images';
@@ -64,6 +67,7 @@ function displayValue(value: unknown): string {
 /** Recorded shop values with explicitly labelled, non-persisted fallbacks. No publication side effect. */
 export function ShopListingEditor({ product, listing, channelLabel, shopLabel, onClose, restoreFocus, onSave }: Props) {
   usePricingRevision();
+  useConnectedShops();
   const sourceId = useId();
   const [details] = useState(() => listingEditorData(product, listing));
   const original = details.values;
@@ -74,6 +78,7 @@ export function ShopListingEditor({ product, listing, channelLabel, shopLabel, o
   const [review, setReview] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof ListingDraftValues, string>>>({});
   const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [discard, setDiscard] = useState(false);
@@ -96,8 +101,6 @@ export function ShopListingEditor({ product, listing, channelLabel, shopLabel, o
   const independentGroups = MASTER_SYNC_GROUPS.filter(group => syncsField(initialSync, group) && !follows(group));
   const syncDirty = JSON.stringify(committedPreference) !== JSON.stringify(initialSync);
   const syncChanges = masterSyncSourceChanges(initialSync, committedPreference);
-  const plan = masterSyncPlan(product, listing, committedPreference);
-  const syncError = plan.groups.find(group => follows(group.field) && syncChanges.includes(group.field) && group.error);
   const multiSku = listingHasMultipleSkus(product, listing);
   const fba = listingStockManagedByAmazon(product, listing);
   const allEdits = changedValues(initial, form);
@@ -108,12 +111,14 @@ export function ShopListingEditor({ product, listing, channelLabel, shopLabel, o
   })) as ListingDraftValues;
   const ignoredEditGroups = MASTER_SYNC_GROUPS.filter(group => follows(group) && MASTER_SYNC_VALUE_KEYS[group].some(key => key in allEdits));
   const patch = listingIndependentPatch(original, editedPatch, independentGroups);
+  const plan = masterSyncPlan(product, listing, committedPreference, undefined, undefined, editedPatch);
+  const syncError = plan.groups.find(group => follows(group.field) && syncChanges.includes(group.field) && group.error);
   const dirty = Object.keys(allEdits).length > 0 || syncDirty || Boolean(imageUrl.trim());
   const hasChanges = Object.keys(editedPatch).length > 0 || syncDirty;
   const set = <K extends keyof Form>(key: K, value: Form[K]) => { setForm(current => ({ ...current, [key]: value })); setSaveError(''); };
   const navigate = (next: Tab) => { setTab(next); body.current?.scrollTo?.({ top: 0 }); };
   function leave() {
-    if (uploading) return;
+    if (uploading || saving) return;
     if (dirty) setDiscard(true);
     else onClose();
   }
@@ -181,6 +186,7 @@ export function ShopListingEditor({ product, listing, channelLabel, shopLabel, o
           </div>
         </section>
         <p role="status" className="text-xs leading-5"><span className="text-muted-foreground">Following Master: </span><span className="font-medium">{preference.fields.map(group => groupName[group]).join(', ') || 'None · All groups independent'}</span>{syncDirty && <span className="ml-2 text-muted-foreground">· Unsaved changes</span>}</p>
+        <ListingRequirementNotice product={product} listing={listing} />
       </SheetHeader>
       {!review && <div className="grid shrink-0 grid-cols-5 border-b px-2" role="tablist" aria-label="Listing details">
         {tabs.map(value => <button key={value} role="tab" aria-selected={tab === value} aria-controls="shop-listing-panel" id={`listing-tab-${tabs.indexOf(value)}`} tabIndex={tab === value ? 0 : -1} onClick={() => navigate(value)} onKeyDown={event => {
@@ -271,15 +277,17 @@ export function ShopListingEditor({ product, listing, channelLabel, shopLabel, o
       <div className={`${styles.footer} shrink-0 space-y-3 border-t bg-background px-5 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:space-y-0 sm:px-6`}>
         {discard ? <div role="alert" className="w-full space-y-3"><p className="text-sm font-medium">Discard unsaved listing changes?</p><div className="flex flex-wrap justify-end gap-2"><Button variant="outline" className="min-h-11" onClick={() => setDiscard(false)}>Keep editing</Button><Button variant="destructive" className="min-h-11" onClick={onClose}>Discard changes</Button></div></div> : <>
           <p className="text-xs leading-5 text-muted-foreground">Local draft only. No update is sent to the shop.</p>
-          <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" className="min-h-11" disabled={uploading} onClick={() => review ? setReview(false) : leave()}>{review ? 'Back to edit' : 'Cancel'}</Button><Button className="min-h-11" disabled={uploading || !(hasChanges || (!follows('media') && imageUrl.trim()))} onClick={() => {
+          <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" className="min-h-11" disabled={uploading || saving} onClick={() => review ? setReview(false) : leave()}>{review ? 'Back to edit' : 'Cancel'}</Button><Button className="min-h-11" disabled={uploading || saving || !(hasChanges || (!follows('media') && imageUrl.trim()))} onClick={async () => {
             if (!review) { openReview(); return; }
+            setSaving(true);
             try {
               if (syncDirty) {
                 if (plan.signature !== reviewedPlan) throw new Error('Sync values changed. Go back and review the latest values before saving.');
+                if (follows('inventory') && committedPreference.inventory?.source === 'shop_default') await refreshShopDefaultReview(product, listing, committedPreference, reviewedPlan, editedPatch);
                 onSave(patch, snapshot, { preference: committedPreference, masterSnapshot, reviewedPlan });
               } else onSave(patch, snapshot);
-            } catch (error) { setSaveError(error instanceof Error ? error.message : 'Unable to save. Try again.'); }
-          }}>{review ? 'Save listing changes' : 'Review changes'}</Button></div>
+            } catch (error) { setSaveError(error instanceof Error ? error.message : 'Unable to save. Try again.'); } finally { setSaving(false); }
+          }}>{saving ? 'Saving…' : review ? 'Save listing changes' : 'Review changes'}</Button></div>
         </>}
       </div>
     </SheetContent>

@@ -5,6 +5,8 @@ import { listingMasterSync, masterSyncSnapshot, masterSyncValidation, saveListin
 import { PRICING_STORAGE_KEY, savePricingRule } from './pricing-rules';
 
 const listing: ChannelListing = { channel: 'lazada', external_id: 'listing-a', store_name: 'Shop A', shop_sku: 'SKU-A', status: 'active', listing_url: null, last_synced_at: '2026-10-01T00:00:00Z', reported_stock: 0 };
+listing.shop_snapshot = { channel: 'lazada', store_name: 'Shop A', listing_id: 'listing-a', shop_sku: 'SKU-A', title: '', category: '', images: [], recorded_at: '',
+  requirements: { channel: 'lazada', category: '', revision: 'test-v1', origin: 'prototype', fields: [] } };
 const id = 'master-sync-test';
 function fixture(): Product {
   const product: Product = { ...getProducts()[0], id, status: 'draft', name: 'Saved Master name', images: ['/one.jpg'], import_activation_paused: true,
@@ -145,7 +147,7 @@ describe('Unified five-group sync policy', () => {
   });
   it('excludes external fulfillment and non-existent warehouses', () => {
     const master = ready();
-    const amazon = { ...listing, channel: 'amazon' as const };
+    const amazon = { ...listing, channel: 'amazon' as const, shop_snapshot: { ...listing.shop_snapshot!, channel: 'amazon' as const, requirements: { ...listing.shop_snapshot!.requirements!, channel: 'amazon' as const } } };
     const fba = { ...master, channels: [amazon], channel_overrides: { amazon: { enabled: true, title: '', description: '', price_markup: 0, fulfillment: 'FBA' } } };
     expect(masterSyncPlan(fba, amazon, { ...preference, fields: ['inventory'] }).error).toContain('Amazon FBA');
     expect(masterSyncPlan(fba, amazon, { ...preference, fields: ['inventory'], inventory: { ...preference.inventory!, fulfillment: 'FBM' } }).error).toContain('Amazon FBA');

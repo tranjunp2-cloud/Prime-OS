@@ -1,3 +1,7 @@
+import { useConnectedShops } from '@/hooks/use-connected-shops';
+import { shopWarehouse } from '@/lib/shop-warehouse-settings';
+import { resolveListingShop } from '@/lib/warehouse-shop-sources';
+import { getCatalogImportItems } from '@/lib/catalog-import-store';
 import { Input } from '@/components/ui/input';
 import { getWarehouses } from '@/lib/warehouse-store';
 import { PRICING_CURRENCIES, readPricing } from '@/lib/pricing-rules';
@@ -9,6 +13,9 @@ export function ListingSyncConfiguration({ field, master, listing, draft, onChan
   field: MasterSyncField; master: Product; listing: ChannelListing; draft: MasterSyncPreference;
   onChange: (patch: Partial<MasterSyncPreference>) => void;
 }) {
+  const connections = useConnectedShops();
+  const shop = resolveListingShop(master, listing, connections.shops, getCatalogImportItems({ requireConfirmation: true }));
+  const defaultWarehouse = shopWarehouse(shop?.warehouse ?? null);
   const registry = readPricing();
   const warehouses = getWarehouses().filter(warehouse => warehouse.status === 'active' && !warehouse.is_virtual && !['fba', 'fbs'].includes(warehouse.type));
   const selectClass = 'min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -18,7 +25,8 @@ export function ListingSyncConfiguration({ field, master, listing, draft, onChan
   </div>;
   if (field === 'inventory') return <div className="grid gap-3 sm:grid-cols-2">
     {listing.channel === 'amazon' && <label className="grid gap-1.5 text-sm sm:col-span-2">Amazon fulfillment<select className={selectClass} value={draft.inventory?.fulfillment || ''} onChange={event => onChange({ inventory: { warehouse_id: '', safety_buffer: 0, ...draft.inventory, fulfillment: event.target.value as 'FBA' | 'FBM' || undefined } })}><option value="">Confirm fulfillment</option><option value="FBM">FBM · Merchant fulfilled</option><option value="FBA">FBA · Amazon manages stock</option></select></label>}
-    <label className="grid gap-1.5 text-sm sm:col-span-2">Stock source<select className={selectClass} value={draft.inventory?.warehouse_id || ''} onChange={event => onChange({ inventory: { safety_buffer: 0, ...draft.inventory, warehouse_id: event.target.value } })}><option value="">Choose warehouse</option>{warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select></label>
+    <label className="grid gap-1.5 text-sm sm:col-span-2">Stock source<select className={selectClass} value={draft.inventory?.source === 'shop_default' ? '__shop_default' : draft.inventory?.warehouse_id || ''} onChange={event => onChange({ inventory: { safety_buffer: 0, ...draft.inventory, source: event.target.value === '__shop_default' ? 'shop_default' : undefined, warehouse_id: event.target.value === '__shop_default' ? '' : event.target.value } })}><option value="">Choose stock source</option><option value="__shop_default">Use shop default{connections.status === 'ready' && defaultWarehouse ? ` · ${defaultWarehouse.name}` : ''}</option><optgroup label="Use a warehouse for this listing only">{warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</optgroup></select></label>
+    {draft.inventory?.source === 'shop_default' && <div className="text-xs leading-5 text-muted-foreground sm:col-span-2">{connections.status === 'ready' ? <p>{shop ? defaultWarehouse ? `${shop.store_name} · Follows this shop’s default whenever it changes.` : `${shop.store_name} has no default warehouse. Set it in Sales Channels, or choose a warehouse for this listing here.` : 'This listing’s shop must match a connected shop before its default can be used.'}</p> : <p>{connections.error || 'Loading shop default…'}{connections.status === 'error' && <button type="button" className="ml-2 min-h-11 text-primary underline" onClick={() => { void connections.reload().catch(() => {}); }}>Retry</button>}</p>}</div>}
     <label className="grid gap-1.5 text-sm">Safety buffer<Input className="min-h-11" type="number" min="0" step="1" value={Number.isFinite(draft.inventory?.safety_buffer) ? draft.inventory!.safety_buffer : ''} onChange={event => onChange({ inventory: { warehouse_id: '', ...draft.inventory, safety_buffer: event.target.value === '' ? NaN : Number(event.target.value) } })} /></label>
     <label className="grid gap-1.5 text-sm">Allocation cap (optional)<Input className="min-h-11" type="number" min="0" step="1" placeholder="No cap" value={draft.inventory?.allocation_cap ?? ''} onChange={event => onChange({ inventory: { warehouse_id: '', safety_buffer: 0, ...draft.inventory, allocation_cap: event.target.value === '' ? undefined : Number(event.target.value) } })} /></label>
     <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">Per mapped SKU: max(warehouse stock − buffer, 0), limited by the cap. Warehouse stock is not changed.</p>

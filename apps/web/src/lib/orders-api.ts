@@ -1,6 +1,9 @@
 import { createPrimeAuthHeaders, resolvePrimeBackendBase } from '@/lib/prime/backend-auth';
+import { restoreOrderPrototype, runOrderPrototype } from './order-prototype';
 
 export type CanonicalStatus = 'draft' | 'created' | 'acknowledged' | 'allocated' | 'fulfillment_in_progress' | 'partially_shipped' | 'shipped' | 'delivered' | 'closed' | 'canceled';
+export type ShipmentTrackingStatus = 'created' | 'ready_for_pickup' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivery_failed' | 'delivered' | 'returning' | 'returned';
+export interface ShipmentTrackingEvent { id: string; status: ShipmentTrackingStatus; occurredAt: string; location?: string; description?: string; source: 'carrier' | 'seller' | 'prototype' }
 export interface OrderLine { inventory?: { onHand: number; committed: number; reservedForOrder?: number; checkedAt: string; warehouse: string }; imageUrl?: string; variant?: string; id?: string; sku: string; name: string; quantity: number; unitPrice: number; lineTotal?: number }
 export interface ManualOrderInput {
   orderKey: string; requestKey: string; canonicalStatus: 'draft' | 'created'; currencyCode: string;
@@ -8,13 +11,14 @@ export interface ManualOrderInput {
   shippingAddressSnapshot: { address: string; city: string; country: string; postalCode: string };
   lines: OrderLine[]; totals: { discount: number; shipping: number; tax: number };
   payment: { state: string; method: string; reference: string };
-  metadata: { handlingType?: 'self' | 'marketplace'; store: string; warehouse: string; assignee: string; notes: string; tags: string };
+  metadata: { handlingType?: 'self' | 'marketplace'; shippingMode?: 'seller' | 'platform'; store: string; warehouse: string; assignee: string; notes: string; tags: string };
 }
 export interface OrderRecord extends Omit<ManualOrderInput, 'metadata' | 'canonicalStatus' | 'totals'> {
   id: string; marketplaceOrderId?: string; buyerNote?: string; source: string; version: number; canonicalStatus: CanonicalStatus; orderedAt: string;
   hold?: {active:boolean; reason:string; at:string; actor:string};
   operations?: {
     shipBy?: string; carrier?: string; service?: string;
+    work?: { preparedAt?: string; preparedBy?: string; stockMode?: 'physical-check'; packedAt?: string; packedBy?: string; labelAttachedAt?: string; verifiedItems?: {lineId: string; quantity: number}[] };
     package?: { weightKg: number; lengthCm: number; widthCm: number; heightCm: number };
     printStatus?: { pickList?: string; shippingLabel?: string; packingSlip?: string };
     settlement?: { platformFees: number; sellerShipping: number; adjustments: number; netAmount: number; status: 'estimated' | 'settled' };
@@ -23,7 +27,7 @@ export interface OrderRecord extends Omit<ManualOrderInput, 'metadata' | 'canoni
   totals: { subtotal?: number; discount?: number; shipping?: number; tax?: number; grandTotal: number };
   metadata: Omit<ManualOrderInput['metadata'], 'tags'> & { tags: string[] };
   transitions: { fromStatus: string; toStatus: string; reason: string; transitionedAt: string }[];
-  shipments: { deliveryOutcome?: 'in_transit' | 'failed' | 'returning' | 'returned' | 'delivered'; carrier: string; tracking: string; status: string; labelUrl?: string }[];
+  shipments: { id?: string; source?: string; service?: string; collectionMethod?: 'pickup' | 'dropoff'; collectionAt?: string; pickedUpAt?: string; pickupReference?: string; deliveredAt?: string; deliveryReference?: string; deliveryOutcome?: 'in_transit' | 'failed' | 'returning' | 'returned' | 'delivered'; carrier: string; tracking: string; status: string; labelUrl?: string; trackingEvents?: ShipmentTrackingEvent[] }[];
   returnRequests: { id: string; status: string; reason: string; items: unknown[] }[];
   exceptions: { id: string; summary: string; status: string; at: string }[];
   activity: { id: string; at: string; message: string; actor: string }[];
@@ -35,20 +39,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = await response.json(); if (!response.ok) throw new Error(body.message || 'Order request failed'); return body;
 }
 export const ordersApi = {
-  list: () => request<{ data: OrderRecord[]; canWrite: boolean; currentUserName?: string }>(''),
+  list: async () => {
+    const result = await request<{ data: OrderRecord[]; canWrite: boolean; currentUserName?: string }>('');
+    return {...result, data: result.data.map(restoreOrderPrototype)};
+  },
   create: (input: ManualOrderInput) => request<{ data: OrderRecord }>('', { method: 'POST', body: JSON.stringify(input) }),
-  command: (order: OrderRecord, action: Record<string, unknown>) => request<{ data: OrderRecord }>(`/${encodeURIComponent(order.id)}/actions`, { method: 'POST', body: JSON.stringify({ ...action, version: order.version }) }),
+  command: async (order: OrderRecord, action: Record<string, unknown>): Promise<{data: OrderRecord}> => order.source === 'demo'
+    ? {data: runOrderPrototype(order, action)}
+    : request<{ data: OrderRecord }>(`/${encodeURIComponent(order.id)}/actions`, { method: 'POST', body: JSON.stringify({ ...action, version: order.version }) }),
 };
-export const orderLabels: Record<CanonicalStatus, string> = { draft: 'Draft', created: 'To Confirm', acknowledged: 'Confirmed', allocated: 'Stock Allocated', fulfillment_in_progress: 'Packing', partially_shipped: 'Partially Shipped', shipped: 'In Transit', delivered: 'Delivered', closed: 'Completed', canceled: 'Cancelled' };
+export const orderStageLabels = {
+  confirmation: 'Awaiting confirmation', preparing: 'Preparing', ready: 'Ready to ship',
+  shipping: 'Shipping', delivered: 'Delivered', completed: 'Completed',
+} as const;
+export const orderLabels: Record<CanonicalStatus, string> = { draft: 'Draft', created: orderStageLabels.confirmation, acknowledged: 'Preparing · Confirmed', allocated: 'Preparing · Stock allocated', fulfillment_in_progress: 'Preparing · Packing', partially_shipped: 'Shipping · Partially shipped', shipped: orderStageLabels.shipping, delivered: orderStageLabels.delivered, closed: orderStageLabels.completed, canceled: 'Cancelled' };
+export function isReadyToShip(order: OrderRecord) {
+  return order.canonicalStatus === 'fulfillment_in_progress' && Boolean(order.readyForPickup);
+}
 export function orderDisplayStatus(order: OrderRecord): string {
-  if (order.canonicalStatus === 'created') return 'To Confirm';
-  if (['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus)) return order.canonicalStatus === 'fulfillment_in_progress' && order.readyForPickup ? 'Ready to Ship' : 'Processing';
-  if (['partially_shipped', 'shipped'].includes(order.canonicalStatus)) return 'In Transit';
+  if (order.canonicalStatus === 'created') return orderStageLabels.confirmation;
+  if (['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus)) return isReadyToShip(order) ? orderStageLabels.ready : orderStageLabels.preparing;
+  if (['partially_shipped', 'shipped'].includes(order.canonicalStatus)) return orderStageLabels.shipping;
   return orderLabels[order.canonicalStatus];
 }
 export function orderMoney(amount: number, currency = 'VND') { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); }
 export function orderRow(order: OrderRecord) {
-  return { ...order, date: new Date(order.orderedAt).toLocaleString(), customer: order.buyerSnapshot.name, phone: order.buyerSnapshot.phone, tags: order.metadata.tags, store: order.metadata.store, owner: order.source === 'manual' ? 'Manual order' : 'Example order', warehouse: order.metadata.warehouse, total: orderMoney(order.totals.grandTotal, order.currencyCode), payment: order.payment.state, status: orderDisplayStatus(order), sla: order.sla || 'Not scheduled', slaRisk: order.slaRisk || false, assignee: order.metadata.assignee, reservation: order.reservation || 'Not reserved', carrier: order.shipments[0]?.carrier || 'Not assigned', tracking: order.shipments[0]?.tracking || 'Pending', needsPaymentVerification: !['draft','closed','canceled'].includes(order.canonicalStatus) && order.payment.state === 'Unpaid' && Boolean(order.needsPaymentVerification || order.payment.reference?.trim()), syncError: order.syncError || false, readyForPickup: order.readyForPickup || false, pickupOverdue: order.pickupOverdue || false };
+  return { ...order, date: new Date(order.orderedAt).toLocaleString(), customer: order.buyerSnapshot.name, phone: order.buyerSnapshot.phone, tags: order.metadata.tags, store: order.metadata.store, owner: order.source === 'manual' ? 'Manual order' : 'Example order', warehouse: order.metadata.warehouse, total: orderMoney(order.totals.grandTotal, order.currencyCode), paymentState: order.payment.state, status: orderDisplayStatus(order), sla: order.sla || 'Not scheduled', slaRisk: order.slaRisk || false, assignee: order.metadata.assignee, reservation: order.reservation || 'Not reserved', carrier: order.shipments[0]?.carrier || 'Not assigned', tracking: order.shipments[0]?.tracking || 'Pending', needsPaymentVerification: !['draft','closed','canceled'].includes(order.canonicalStatus) && order.payment.state === 'Unpaid' && Boolean(order.needsPaymentVerification || order.payment.reference?.trim()), syncError: order.syncError || false, readyForPickup: order.readyForPickup || false, pickupOverdue: order.pickupOverdue || false };
 }
 export type OrderRow = ReturnType<typeof orderRow>;
 export function exportOrders(records: OrderRecord[]) {

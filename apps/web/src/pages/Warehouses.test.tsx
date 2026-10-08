@@ -32,8 +32,8 @@ describe('Warehouse & Inventory workspace', () => {
     expect(screen.queryByRole('navigation', { name: 'Warehouse operations' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'My warehouses' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Choose a warehouse' })).toBeInTheDocument();
-    expect(screen.getByText('Advanced warehouse settings').closest('details')).not.toHaveAttribute('open');
-    expect(await screen.findByText('0 shops · 0 channels')).toBeInTheDocument();
+    expect(screen.queryByText('Advanced warehouse settings')).not.toBeInTheDocument();
+    expect(await screen.findByText('0 linked shops · 0 channels')).toBeInTheDocument();
   });
 
   it('shows a simple product stock overview', () => {
@@ -57,8 +57,9 @@ describe('Warehouse & Inventory workspace', () => {
   });
 
   it('returns to filtered activity after a transfer and retains the audit record after remounting', () => {
-    const original = getProducts().find(product => !product.has_variants && product.inventory.wh_crjp > 5)!;
+    const original = getProducts().find(product => !product.has_variants && product.skus.length <= 1 && product.inventory.wh_crjp > 5 && typeof product.inventory.wh_rslsg === 'number')!;
     try {
+      addInventoryPosition({ id: 'source-availability', product_id: original.id, sku_id: original.skus[0]?.id ?? `${original.id}_default`, warehouse_id: 'wh_crjp', on_hand: original.inventory.wh_crjp, reserved_unpaid: 0, reserved_paid: 0, allocated: 0, safety_stock: 0, campaign_lock: 0, unfulfillable: 0, inbound: 0, outbound: 0, return_pending: 0, version: 1, updated_at: new Date().toISOString() });
       renderPage();
       fireEvent.click(screen.getByRole('button', { name: 'Stock activity' }));
       fireEvent.change(screen.getByLabelText('Activity type'), { target: { value: 'transfer' } });
@@ -66,9 +67,10 @@ describe('Warehouse & Inventory workspace', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'Transfer stock' }));
       fireEvent.change(screen.getByLabelText('Source Warehouse'), { target: { value: 'wh_crjp' } });
       fireEvent.change(screen.getByLabelText('Destination Warehouse'), { target: { value: 'wh_rslsg' } });
-      fireEvent.change(screen.getByLabelText('Product or SKU'), { target: { value: original.sku_code } });
+      fireEvent.change(screen.getByLabelText('Product or SKU'), { target: { value: `${original.id}::${original.sku_code}` } });
       fireEvent.change(screen.getByLabelText('Transfer Quantity'), { target: { value: '2' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Create Transfer' }));
+      fireEvent.click(screen.getByRole('radio', { name: /Already received/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Record completed transfer' }));
       expect(screen.getByRole('heading', { name: 'Stock activity' })).toBeInTheDocument();
       expect(screen.getByLabelText('Activity type')).toHaveValue('transfer');
       const saved = getProducts().find(product => product.id === original.id)!;
@@ -82,7 +84,7 @@ describe('Warehouse & Inventory workspace', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Stock activity' }));
       fireEvent.click(screen.getByRole('button', { name: `View activity ${record.id}` }));
       expect(within(screen.getByLabelText(`Details for activity ${record.id}`)).getByText(/Completed/)).toBeVisible();
-    } finally { updateProduct(original.id, original); }
+    } finally { updateProduct(original.id, original); clearInventoryStore(); }
   });
 
   it('creates a hold from activity and returns on cancel without creating another record', () => {
@@ -115,7 +117,7 @@ describe('Warehouse & Inventory workspace', () => {
     const original = getProducts().find(product => !product.has_variants && typeof product.inventory.wh_crjp === 'number')!;
     try {
       renderPage();
-      await screen.findByText('0 shops · 0 channels');
+      await screen.findByText('0 linked shops · 0 channels');
       fireEvent.change(screen.getByLabelText('Warehouse scope'), { target: { value: 'wh_crjp' } });
       const row = screen.getByRole('button', { name: original.name }).closest('tr')!;
       fireEvent.keyDown(within(row).getByRole('button', { name: /^Actions for/ }), { key: 'Enter' });
@@ -123,7 +125,7 @@ describe('Warehouse & Inventory workspace', () => {
       expect(screen.getByRole('heading', { name: 'Adjust stock' })).toBeInTheDocument();
       expect(screen.getByLabelText('Warehouse')).toHaveValue('wh_crjp');
       expect(within(screen.getByRole('dialog')).getByLabelText('Product')).toHaveValue(original.id);
-      fireEvent.change(screen.getByLabelText('New stock'), { target: { value: String(original.inventory.wh_crjp + 3) } });
+      fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value: String(original.inventory.wh_crjp + 3) } });
       fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
       fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -133,14 +135,14 @@ describe('Warehouse & Inventory workspace', () => {
       const recordId = getProducts().find(product => product.id === original.id)!.inventory_adjustments![0].id;
       fireEvent.click(screen.getByRole('button', { name: `View activity ${recordId}` }));
       expect(screen.getByText('Physical stock count')).toBeInTheDocument();
-    } finally { updateProduct(original.id, original); }
+    } finally { updateProduct(original.id, original); clearInventoryStore(); }
   });
 
   it('uses the same absolute-count form from New Adjustment and appends to history', async () => {
     const original = getProducts().find(product => !product.has_variants && typeof product.inventory.wh_crjp === 'number')!;
     try {
       renderPage();
-      await screen.findByText('0 shops · 0 channels');
+      await screen.findByText('0 linked shops · 0 channels');
       fireEvent.click(screen.getByRole('button', { name: 'Stock activity' }));
       fireEvent.keyDown(screen.getByRole('button', { name: 'New action' }), { key: 'Enter' });
       fireEvent.click(screen.getByRole('menuitem', { name: 'Adjust stock' }));
@@ -151,7 +153,7 @@ describe('Warehouse & Inventory workspace', () => {
       expect(screen.getByRole('button', { name: 'Record adjustment' })).toBeDisabled();
       fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: 'wh_crjp' } });
       fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Product'), { target: { value: original.id } });
-      fireEvent.change(screen.getByLabelText('New stock'), { target: { value: String(original.inventory.wh_crjp + 6) } });
+      fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value: String(original.inventory.wh_crjp + 6) } });
       expect(screen.getByRole('button', { name: 'Record adjustment' })).toBeDisabled();
       fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
       fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
@@ -161,30 +163,28 @@ describe('Warehouse & Inventory workspace', () => {
       expect(updated.inventory_adjustments).toHaveLength((original.inventory_adjustments?.length ?? 0) + 1);
       expect(updated.inventory_adjustments?.[0]).toMatchObject({ before: original.inventory.wh_crjp, after: original.inventory.wh_crjp + 6, warehouseId: 'wh_crjp', sku: original.sku_code, reason: 'Physical stock count' });
       expect(screen.getByText(`${original.inventory.wh_crjp} → ${original.inventory.wh_crjp + 6}`)).toBeInTheDocument();
-    } finally { updateProduct(original.id, original); }
+    } finally { updateProduct(original.id, original); clearInventoryStore(); }
   });
 
-  it('records a first count from an unrecorded row through Actions', async () => {
+  it('adds a catalog-only SKU to the warehouse after recording its opening stock', async () => {
     const original = getProducts().find(product => !product.has_variants)!;
     const inventory = { ...original.inventory };
     delete inventory.wh_crjp;
     try {
       updateProduct(original.id, { id: original.id, inventory });
       renderPage();
-      await screen.findByText('0 shops · 0 channels');
+      await screen.findByText('0 linked shops · 0 channels');
       fireEvent.change(screen.getByLabelText('Warehouse scope'), { target: { value: 'wh_crjp' } });
-      const row = screen.getByRole('button', { name: original.name }).closest('tr')!;
-      fireEvent.keyDown(within(row).getByRole('button', { name: /^Actions for/ }), { key: 'Enter' });
-      expect(screen.queryByRole('menuitem', { name: 'Adjust stock' })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Record initial stock' }));
-      expect(screen.getByLabelText('Warehouse')).toHaveValue('wh_crjp');
-      fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '5' } });
-      fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+      expect(screen.queryByRole('button', { name: original.name })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Warehouse details' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Record opening stock' }));
+      fireEvent.change(screen.getByLabelText(`Opening stock for ${original.sku_code}`), { target: { value: '5' } });
+      fireEvent.click(screen.getByRole('checkbox', { name: /I verified these opening counts/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(within(row).getByText('5')).toBeInTheDocument();
+      expect(within(screen.getByRole('button', { name: original.name }).closest('tr')!).getAllByText('5').length).toBeGreaterThan(0);
       expect(getProducts().find(product => product.id === original.id)?.inventory_adjustments?.[0]).toMatchObject({ before: null, after: 5, warehouseId: 'wh_crjp' });
-    } finally { updateProduct(original.id, original); }
+    } finally { updateProduct(original.id, original); clearInventoryStore(); }
   });
 
   it('aligns only numeric adjustment columns to the right', () => {
@@ -212,15 +212,14 @@ describe('Warehouse & Inventory workspace', () => {
         fireEvent.keyDown(actions(), { key: 'Enter' });
         fireEvent.click(screen.getByRole('menuitem', { name }));
       };
-      openAction('Record initial stock');
+      openAction('Record opening stock');
       expect(screen.getByLabelText('Variant SKU')).toHaveValue(sku.sku_code);
       expect(within(screen.getByRole('dialog')).getByLabelText('Product')).toBeDisabled();
-      fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '10' } });
-      fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+      fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '10' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
       expect(getProducts().find(item => item.id === original.id)!.inventory.wh_crjp).toBe(10);
       openAction('Adjust stock');
-      fireEvent.change(screen.getByLabelText('New stock'), { target: { value: '8' } });
+      fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value: '8' } });
       fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
       fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
       openAction('Manage holds');
@@ -236,7 +235,7 @@ describe('Warehouse & Inventory workspace', () => {
       expect(getInventoryPositions()[0]).toMatchObject({ on_hand: 8, safety_stock: 1 });
       expect(within(actions().closest('tr')!).getByRole('button', { name: /Stock breakdown/ })).toHaveTextContent('7');
       openAction('Adjust stock');
-      fireEvent.change(screen.getByLabelText('New stock'), { target: { value: '99' } });
+      fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value: '99' } });
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       const saved = getProducts().find(item => item.id === original.id)!;
       expect(saved.inventory.wh_crjp).toBe(8);
@@ -253,13 +252,13 @@ describe('Warehouse & Inventory workspace', () => {
     addInventoryPosition({ id: 'atp-live-test', product_id: original.id, sku_id: original.skus[0]?.id ?? `${original.id}_default`, warehouse_id: 'wh_crjp', on_hand: count, reserved_unpaid: 2, reserved_paid: 3, allocated: 1, safety_stock: 2, campaign_lock: 0, unfulfillable: 0, inbound: 50, outbound: 0, return_pending: 0, version: 1, updated_at: new Date().toISOString() });
     try {
       renderPage();
-      await screen.findByText('0 shops · 0 channels');
+      await screen.findByText('0 linked shops · 0 channels');
       fireEvent.change(screen.getByLabelText('Warehouse scope'), { target: { value: 'wh_crjp' } });
       const row = screen.getByRole('button', { name: original.name }).closest('tr')!;
       expect(within(row).getByRole('button', { name: /Stock breakdown/ })).toHaveTextContent(String(count - 8));
       fireEvent.keyDown(within(row).getByRole('button', { name: /^Actions for/ }), { key: 'Enter' });
       fireEvent.click(screen.getByRole('menuitem', { name: 'Adjust stock' }));
-      fireEvent.change(screen.getByLabelText('New stock'), { target: { value: String(count + 3) } });
+      fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value: String(count + 3) } });
       expect(screen.getByText(`Available to sell (ATP): ${count - 8} → ${count - 5}`)).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
       fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
@@ -280,9 +279,9 @@ describe('Warehouse & Inventory workspace', () => {
       renderPage('/warehouses');
       fireEvent.click(screen.getByRole('button', { name: 'Stock activity' }));
       const row = screen.getByRole('button', { name: 'View activity test-initial-count' }).closest('tr')!;
-      expect(within(row).getByText('Initial count')).toBeInTheDocument();
+      expect(within(row).getByText('Opening count')).toBeInTheDocument();
       expect(within(row).getByText('Not recorded → 5')).toBeInTheDocument();
       expect(within(row).queryByText('+5')).not.toBeInTheDocument();
-    } finally { updateProduct(original.id, original); }
+    } finally { updateProduct(original.id, original); clearInventoryStore(); }
   });
 });

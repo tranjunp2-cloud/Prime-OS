@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
-import { editListingSection, applyListingSection, completeListingDetails } from '@/test/fixtures/complete-listing-details';
+import { editListingSection, applyListingSection, completeListingDetails, confirmListingSave } from '@/test/fixtures/complete-listing-details';
 import { ListingMasterReview } from './ListingMasterReview';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
 import { deleteProduct, getProductById, getProducts } from '@/lib/product-store';
@@ -41,11 +41,11 @@ function mount(items = sources.slice(0, 1)) {
   editListingSection('Product essentials');
   return onSaved;
 }
-const submit = () => { completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' })); };
+const submit = () => { completeListingDetails(); confirmListingSave('Create, activate & link'); };
 function chooseCategory() {
   editListingSection('Product essentials');
   expect(screen.queryByRole('option', { name: 'Hidden category' })).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Master category *'), { target: { value: 'draft-tools' } });
+  fireEvent.change(screen.getByLabelText('Master category'), { target: { value: 'draft-tools' } });
 }
 
 describe('Draft creation fields from a shop listing', () => {
@@ -80,17 +80,17 @@ describe('Draft creation fields from a shop listing', () => {
     editListingSection('Pricing');
     fireEvent.change(screen.getByLabelText('Base price *'), { target: { value: '90' } });
     applyListingSection();
-    fireEvent.change(screen.getByLabelText('Use product data from'), { target: { value: sources[1].id } });
+    fireEvent.change(screen.getByLabelText('Starting data from'), { target: { value: sources[1].id } });
     expect(screen.getByRole('alertdialog', { name: 'Replace the starting listing data?' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
     expect(screen.getByLabelText('Base price *')).toHaveValue(90);
-    fireEvent.change(screen.getByLabelText('Use product data from'), { target: { value: sources[1].id } });
+    fireEvent.change(screen.getByLabelText('Starting data from'), { target: { value: sources[1].id } });
     fireEvent.click(screen.getByRole('button', { name: 'Replace draft data' }));
     expect(screen.getByRole('group', { name: 'Source listing' })).toHaveTextContent('Shop b');
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(sources[1].title);
     expect(screen.getByRole('textbox', { name: 'Master SKU' })).toHaveValue(sku);
-    expect(screen.getByLabelText('Master category *')).toHaveValue('draft-tools');
+    expect(screen.getByLabelText('Master category')).toHaveValue('draft-tools');
     expect(screen.getByRole('combobox', { name: 'Brand' })).toHaveValue('');
     expect(screen.getByLabelText('Base price *')).toHaveValue(2500);
     expect(screen.getByLabelText('Currency *')).toHaveValue('JPY');
@@ -116,14 +116,14 @@ describe('Draft creation fields from a shop listing', () => {
     saveProductCatalogSettings({ ...settings, categories: [] });
     fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Edited while catalog unavailable' } });
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
-    expect(screen.getByLabelText('Master category *')).toBeVisible();
+    expect(screen.getByLabelText('Master category')).toBeVisible();
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Edited while catalog unavailable');
     saveProductCatalogSettings(settings);
     fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Refreshed source product' } });
     chooseCategory();
     completeListingDetails();
     saveCatalogImportItems([{ ...sources[0], price: 900 }]);
-    fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    confirmListingSave('Create, activate & link');
     expect(screen.getByRole('alert')).toHaveTextContent(/Source listing data changed/);
     expect(onSaved).not.toHaveBeenCalled();
     expect(getProducts()).toHaveLength(ids.size);

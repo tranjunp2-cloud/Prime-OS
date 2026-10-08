@@ -4,6 +4,15 @@
 
 import { restoreStockHolds } from './stock-hold-history';
 
+export type OrderHoldReference = {
+  orderId: string;
+  orderNumber: string;
+  lineId: string;
+  quantity: number;
+  state: 'reserved_unpaid' | 'reserved_paid' | 'allocated';
+  source: string;
+};
+
 export interface InventoryPosition {
   id: string;
   sku_id: string;
@@ -21,6 +30,8 @@ export interface InventoryPosition {
   campaign_lock: number;
   version: number;
   updated_at: string;
+  /** Evidence for the counters, not an additional quantity to deduct. Missing means unverified. */
+  order_holds?: OrderHoldReference[];
 }
 
 export interface ATPComponents {

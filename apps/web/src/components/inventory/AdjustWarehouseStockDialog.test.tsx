@@ -10,22 +10,55 @@ const simple: store.Product = { ...base, has_variants: false, inventory: { wh_cr
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function setup(product = simple, location = warehouse, initializeLocation = false) {
   vi.spyOn(store, 'getProducts').mockReturnValue([product]);
-  const update = vi.spyOn(store, 'updateProduct').mockImplementation(() => {});
+  const update = vi.spyOn(store, 'commitWarehouseProducts').mockImplementation(() => {});
   const saved = vi.fn();
   render(<AdjustWarehouseStockDialog target={{ product, warehouse: location }} products={[product]} warehouses={[location]} onClose={vi.fn()} onSaved={saved} initializeLocation={initializeLocation} />);
   return { update, saved };
 }
 function fill(value: string) {
-  fireEvent.change(screen.getByLabelText('New stock'), { target: { value } });
+  fireEvent.change(screen.getByLabelText('Actual stock count'), { target: { value } });
   fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
 }
 describe('stock adjustments', () => {
+  it('adds received units and saves a receipt, with only receipt reasons', () => {
+    vi.spyOn(store, 'getProducts').mockReturnValue([simple]);
+    const update = vi.spyOn(store, 'commitWarehouseProducts').mockImplementation(() => {});
+    render(<AdjustWarehouseStockDialog target={{ product: simple, warehouse, mode: 'receive' }} products={[simple]} warehouses={[warehouse]} onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.queryByLabelText('Adjustment reason')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Physical stock count' })).not.toBeInTheDocument();
+    for (const value of ['0', '-1', '1.5']) {
+      fireEvent.change(screen.getByLabelText('Quantity received'), { target: { value } });
+      expect(screen.getByRole('button', { name: 'Receive stock', exact: true })).toBeDisabled();
+    }
+    fireEvent.change(screen.getByLabelText('Quantity received'), { target: { value: '3' } });
+    expect(screen.getByText('7 + 3 received = 10 units')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Receive stock', exact: true }));
+    expect(update).toHaveBeenCalledWith([expect.objectContaining({ inventory: { wh_crjp: 10 }, inventory_adjustments: [expect.objectContaining({ kind: 'receipt', before: 7, after: 10, reason: 'Goods received' })] })]);
+  });
+  it('does not offer receipt reasons in a count correction', () => {
+    setup();
+    expect(screen.queryByRole('option', { name: 'Goods received' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Returned items' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Actual stock count')).toBeVisible();
+  });
+  it('switches an unrecorded receipt to opening stock without assuming a zero balance', () => {
+    const product = { ...simple, inventory: {} };
+    vi.spyOn(store, 'getProducts').mockReturnValue([product]);
+    const update = vi.spyOn(store, 'commitWarehouseProducts').mockImplementation(() => {});
+    render(<AdjustWarehouseStockDialog target={{ product, warehouse, mode: 'receive' }} products={[product]} warehouses={[warehouse]} onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByLabelText('Quantity received')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Record opening stock' }));
+    expect(screen.queryByLabelText('Quantity received')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
+    expect(update.mock.calls[0][0][0].inventory_adjustments?.[0]).toMatchObject({ kind: 'opening', before: null, after: 3, reason: 'Opening stock' });
+  });
   it('sets an absolute count and saves the reason with before/after', () => {
     const { update, saved } = setup();
     fill('10');
     expect(screen.getByText('7 → 10 units · Increase by 3')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
-    expect(update).toHaveBeenCalledWith(simple.id, expect.objectContaining({ inventory: { wh_crjp: 10 }, inventory_adjustments: [expect.objectContaining({ before: 7, after: 10, reason: 'Physical stock count' })] }), { requirePersistence: true });
+    expect(update).toHaveBeenCalledWith([expect.objectContaining({ inventory: { wh_crjp: 10 }, inventory_adjustments: [expect.objectContaining({ before: 7, after: 10, reason: 'Physical stock count' })] })]);
     expect(saved).toHaveBeenCalledOnce();
   });
   it('blocks negative, fractional and unchanged counts but allows zero', () => {
@@ -38,34 +71,34 @@ describe('stock adjustments', () => {
   it('requires a child SKU and only changes that SKU', () => {
     const product = { ...simple, has_variants: true, skus: [{ ...base.skus[0], id: 'a', sku_code: 'A', variation_name: 'Blue', stock_by_location: { wh_crjp: 5 } }, { ...base.skus[0], id: 'b', sku_code: 'B', variation_name: 'Red', stock_by_location: { wh_crjp: 2 } }] };
     const { update } = setup(product);
-    expect(screen.getByLabelText('New stock')).toBeDisabled();
+    expect(screen.getByLabelText('Actual stock count')).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Variant SKU'), { target: { value: 'A' } });
     fill('8');
     fireEvent.click(screen.getByRole('button', { name: 'Record adjustment' }));
-    expect(update.mock.calls[0][1].skus?.map(sku => sku.stock_by_location?.wh_crjp)).toEqual([8, 2]);
-    expect(update.mock.calls[0][1].inventory).toEqual({ wh_crjp: 10 });
-    expect(update.mock.calls[0][1].inventory_adjustments?.[0]).toMatchObject({ sku: 'A', before: 5, after: 8 });
+    expect(update.mock.calls[0][0][0].skus?.map(sku => sku.stock_by_location?.wh_crjp)).toEqual([8, 2]);
+    expect(update.mock.calls[0][0][0].inventory).toEqual({ wh_crjp: 10 });
+    expect(update.mock.calls[0][0][0].inventory_adjustments?.[0]).toMatchObject({ sku: 'A', before: 5, after: 8 });
   });
   it('clears the count and reason when the selected warehouse or product changes', () => {
     const product = { ...simple, inventory: { wh_crjp: 7, wh_rslsg: 3 } };
     const second = { ...simple, id: 'second', sku_code: 'SECOND', name: 'Second product', inventory: { wh_crjp: 2, wh_rslsg: 1 } };
-    const update = vi.spyOn(store, 'updateProduct').mockImplementation(() => {});
+    const update = vi.spyOn(store, 'commitWarehouseProducts').mockImplementation(() => {});
     render(<AdjustWarehouseStockDialog target={{ product, warehouse }} products={[product, second]} warehouses={[warehouse, { id: 'wh_rslsg', name: 'Singapore' }]} onClose={vi.fn()} onSaved={vi.fn()} />);
     fill('10');
     fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: 'wh_rslsg' } });
-    expect(screen.getByLabelText('New stock')).toHaveValue(null);
+    expect(screen.getByLabelText('Actual stock count')).toHaveValue(null);
     expect(screen.getByLabelText('Adjustment reason')).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Record adjustment' })).toBeDisabled();
     fill('5');
     fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'second' } });
-    expect(screen.getByLabelText('New stock')).toHaveValue(null);
+    expect(screen.getByLabelText('Actual stock count')).toHaveValue(null);
     expect(screen.getByRole('button', { name: 'Record adjustment' })).toBeDisabled();
     expect(update).not.toHaveBeenCalled();
   });
   it('preserves a preselected child SKU and cancels without changing stock', () => {
     const product = { ...simple, has_variants: true, skus: [{ ...base.skus[0], id: 'a', sku_code: 'A', variation_name: 'Blue', stock_by_location: { wh_crjp: 5 } }] };
     const close = vi.fn();
-    const update = vi.spyOn(store, 'updateProduct').mockImplementation(() => {});
+    const update = vi.spyOn(store, 'commitWarehouseProducts').mockImplementation(() => {});
     render(<AdjustWarehouseStockDialog target={{ product, warehouse, sku: 'A' }} products={[product]} warehouses={[warehouse]} onClose={close} onSaved={vi.fn()} />);
     expect(screen.getByLabelText('Variant SKU')).toHaveValue('A');
     fill('8');
@@ -82,71 +115,66 @@ describe('stock adjustments', () => {
     expect(update).not.toHaveBeenCalled();
     cleanup();
     setup(simple, { id: 'wh_fbajp', name: 'Amazon' });
-    expect(screen.getByLabelText('New stock')).toBeDisabled();
+    expect(screen.getByLabelText('Actual stock count')).toBeDisabled();
     cleanup();
     setup({ ...simple, inventory: {} });
     expect(screen.getByRole('alert')).toHaveTextContent('No stock is recorded');
     expect(screen.getByRole('button', { name: 'Record adjustment' })).toBeDisabled();
   });
-  it('requires a valid first count and a reason, and saves unknown-to-zero accurately', () => {
+  it('records a valid opening count with its own audit type, including confirmed zero', () => {
     const { update } = setup({ ...simple, inventory: {} }, warehouse, true);
-    const save = screen.getByRole('button', { name: 'Save location & stock' });
+    const save = screen.getByRole('button', { name: 'Save opening stock' });
     expect(save).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '0' } });
-    expect(save).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    expect(screen.queryByLabelText('Adjustment reason')).not.toBeInTheDocument();
     for (const value of ['', '-1', '0.5']) {
-      fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value } });
+      fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value } });
       expect(save).toBeDisabled();
     }
-    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '0' } });
-    expect(screen.getByText('Not recorded → 0 units · Initial count')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '0' } });
+    expect(screen.getByText('Not recorded → 0 units · Opening count')).toBeInTheDocument();
     fireEvent.click(save);
-    expect(update).toHaveBeenCalledWith(simple.id, expect.objectContaining({ inventory: { wh_crjp: 0 }, inventory_adjustments: [expect.objectContaining({ before: null, after: 0 })] }), { requirePersistence: true });
+    expect(update).toHaveBeenCalledWith([expect.objectContaining({ inventory: { wh_crjp: 0 }, inventory_adjustments: [expect.objectContaining({ before: null, after: 0, kind: 'opening', reason: 'Opening stock' })] })]);
   });
   it('does not overwrite a location recorded while the add form was open', () => {
     const { update } = setup({ ...simple, inventory: {} }, warehouse, true);
-    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '4' } });
-    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '4' } });
     vi.mocked(store.getProducts).mockReturnValue([{ ...simple, inventory: { wh_crjp: 0 } }]);
-    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Stock changed');
     expect(update).not.toHaveBeenCalled();
   });
   it('does not initialize external or already recorded locations', () => {
     setup({ ...simple, inventory: {} }, { id: 'wh_fbajp', name: 'Amazon' }, true);
-    expect(screen.getByLabelText('Initial stock')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save location & stock' })).toBeDisabled();
+    expect(screen.getByLabelText('Opening stock')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save opening stock' })).toBeDisabled();
     cleanup();
     setup({ ...simple, inventory: { wh_crjp: 0 } }, warehouse, true);
     expect(screen.getByRole('alert')).toHaveTextContent('Stock is already recorded');
-    expect(screen.getByRole('button', { name: 'Save location & stock' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save opening stock' })).toBeDisabled();
   });
   it('records the chosen variant only and keeps its initial audit balance unknown', () => {
     const product = { ...simple, has_variants: true, skus: [{ ...base.skus[0], id: 'a', sku_code: 'A', stock_by_location: {} }, { ...base.skus[0], id: 'b', sku_code: 'B', stock_by_location: { wh_crjp: 3 } }] };
     const { update, saved } = setup(product, warehouse, true);
-    expect(screen.getByLabelText('Initial stock')).toBeDisabled();
+    expect(screen.getByLabelText('Opening stock')).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Variant SKU'), { target: { value: 'A' } });
-    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '8' } });
-    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
-    expect(update.mock.calls[0][1].skus?.map(sku => sku.stock_by_location?.wh_crjp)).toEqual([8, 3]);
-    expect(update.mock.calls[0][1].inventory.wh_crjp).toBe(11);
-    expect(update.mock.calls[0][1].inventory_adjustments?.[0]).toMatchObject({ sku: 'A', before: null, after: 8 });
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
+    expect(update.mock.calls[0][0][0].skus?.map(sku => sku.stock_by_location?.wh_crjp)).toEqual([8, 3]);
+    expect(update.mock.calls[0][0][0].inventory.wh_crjp).toBe(11);
+    expect(update.mock.calls[0][0][0].inventory_adjustments?.[0]).toMatchObject({ sku: 'A', before: null, after: 8 });
     expect(saved).toHaveBeenCalledOnce();
   });
   it('switches from adjustment to initial stock inside the same dialog and reports save failures', () => {
     const { update, saved } = setup({ ...simple, inventory: {} });
-    fireEvent.click(screen.getByRole('button', { name: 'Record initial stock' }));
-    expect(screen.getByRole('heading', { name: 'Record initial stock' })).toBeVisible();
-    fireEvent.change(screen.getByLabelText('Initial stock'), { target: { value: '5' } });
-    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Physical stock count' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record opening stock' }));
+    expect(screen.getByRole('heading', { name: 'Record opening stock' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '5' } });
     update.mockImplementation(() => { throw new Error('Storage is full'); });
-    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Storage is full');
     expect(saved).not.toHaveBeenCalled();
     update.mockImplementation(() => {});
-    fireEvent.click(screen.getByRole('button', { name: 'Save location & stock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
     expect(saved).toHaveBeenCalledOnce();
   });
 });

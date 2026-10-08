@@ -24,10 +24,10 @@ export const MASTER_MAPPING_TARGETS: MappingTarget[] = [
   { key: 'mpn', label: 'Manufacturer part number', sourceKey: 'mpn', kind: 'text' },
   { key: 'gtin', label: 'Barcode (GTIN)', sourceKey: 'gtin', kind: 'text' },
   { key: 'pack_quantity', label: 'Pack quantity', sourceKey: 'packQuantity', kind: 'number' },
-  { key: 'categoryId', label: 'Master category', sourceKey: 'channelCategory', kind: 'text', required: true },
+  { key: 'categoryId', label: 'Master category', sourceKey: 'channelCategory', kind: 'text' },
   { key: 'retail_price', label: 'Base price', sourceKey: 'price', kind: 'money', required: true },
-  ...(['length', 'width', 'height'] as const).map(dimension => ({ key: `pkg_${dimension}`, label: `Package ${dimension} (cm)`, sourceKey: `pkg_${dimension}`, kind: 'length' as const, unit: 'cm', required: true })),
-  { key: 'pkg_weight', label: 'Package weight (g)', sourceKey: 'pkg_weight', kind: 'weight', unit: 'g', required: true },
+  ...(['length', 'width', 'height'] as const).map(dimension => ({ key: `pkg_${dimension}`, label: `Package ${dimension} (cm)`, sourceKey: `pkg_${dimension}`, kind: 'length' as const, unit: 'cm' })),
+  { key: 'pkg_weight', label: 'Package weight (g)', sourceKey: 'pkg_weight', kind: 'weight', unit: 'g' },
 ];
 
 export function importedFieldCandidates(sources: CatalogImportItem[]): FieldCandidate[] {

@@ -1,4 +1,5 @@
 import { normalizeDemoStockLocations } from './demo-warehouse-locations';
+import type { InventoryPosition } from './inventory-store';
 import { getProductCatalogSettings, resolveCatalogCategory } from './product-catalog-settings-store';
 import type { ListingPricing } from './pricing-rules';
 import { repairDraftListingDemo } from './draft-listing-demo';
@@ -7,6 +8,7 @@ import { completeActiveProductDemo } from './active-product-demo';
 import { withProductActivity, type ProductActivity } from './product-activity';
 import { getCatalogImportItems } from './catalog-import-store';
 import { recoverListingShopSnapshots } from './listing-shop-data';
+import { completeWarehouseListingDemo } from './warehouse-listing-demo';
 // Shared product store — singleton in-memory for local mockup
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
@@ -24,6 +26,8 @@ export type StockTransferRecord = {
   toBefore: number | null;
   toAfter: number;
   createdAt: string;
+  status?: 'in_transit' | 'received';
+  receivedAt?: string;
 };
 
 export interface Sku {
@@ -119,7 +123,7 @@ export interface ChannelListing {
     enabled: boolean;
     fields: Array<'content' | 'media' | 'price' | 'inventory' | 'shipping'>;
     pricing?: { currency: string; rule_id?: string };
-    inventory?: { warehouse_id: string; safety_buffer: number; allocation_cap?: number; fulfillment?: 'FBA' | 'FBM' };
+    inventory?: { source?: 'shop_default' | 'warehouse'; warehouse_id: string; safety_buffer: number; allocation_cap?: number; fulfillment?: 'FBA' | 'FBM' };
     updated_at: string;
   };
 }
@@ -137,6 +141,7 @@ export interface ListingDraftValues {
 }
 
 export interface ShopListingSnapshot {
+  requirements?: import('./listing-requirements').ListingRequirements;
   mapping_fields?: import('./listing-field-mapping').ImportedMappingField[];
   channel: ChannelListing['channel'];
   store_name: string;
@@ -281,8 +286,10 @@ export interface Product {
   specifications?: Array<{ attributeKey?: string; name: string; value: string }>;
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
 
-  inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number | null; after: number; reason: string; createdAt: string }>;
+  inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number | null; after: number; reason: string; createdAt: string; kind?: 'opening' | 'receipt' | 'adjustment' | 'availability' }>;
   inventory_transfers?: StockTransferRecord[];
+  /** Explicitly verified balances; stored with the count and audit event in one write. */
+  warehouse_positions?: InventoryPosition[];
   inventory: Record<string, number>;
   has_variants: boolean;
   // Channels (marketplace listings)
@@ -747,7 +754,8 @@ const ADDITIONAL_IMPORT_TEST_PRODUCTS: Product[] = [
 const DEFAULT_PRODUCTS = [...ADDITIONAL_IMPORT_TEST_PRODUCTS, ...IMPORTED_DEMO_PRODUCTS.map(product => ({ ...product, import_result: 'incomplete' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: ['Product image is required'] })), ...IMPORT_REVIEW_DEMO_PRODUCTS, ...SEED_PRODUCTS, ...CATEGORY_DEMO_PRODUCTS]
   .map(product => product.id === 'prod_001' ? { ...product, channels: [...product.channels, { channel: 'shopee' as const, external_id: 'SHP-9012281', status: 'active' as const, listing_url: null, last_synced_at: '2026-09-28T08:38:00Z' }], import_result: 'matched' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: [], updated_at: '2026-09-28T08:38:00Z' } : product)
   .map(withDemoLocales)
-  .map(product => completeActiveProductDemo(product));
+  .map(product => completeActiveProductDemo(product))
+  .map(completeWarehouseListingDemo);
 
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
@@ -812,6 +820,7 @@ function normalizeStoredProduct(product: Product): Product {
     field_mappings: product.field_mappings && typeof product.field_mappings === 'object' && !Array.isArray(product.field_mappings) ? structuredClone(product.field_mappings) : undefined,
     inventory_adjustments: Array.isArray(product.inventory_adjustments) ? product.inventory_adjustments : [],
     inventory_transfers: Array.isArray(product.inventory_transfers) ? product.inventory_transfers : [],
+    warehouse_positions: Array.isArray(product.warehouse_positions) ? structuredClone(product.warehouse_positions) : [],
     inventory: product.inventory && typeof product.inventory === 'object' && !Array.isArray(product.inventory) ? normalizeDemoStockLocations(product.inventory) : {},
     has_variants: Boolean(product.has_variants),
     channels: Array.isArray(product.channels) ? product.channels : [],
@@ -935,19 +944,20 @@ function loadStoredProducts(): Product[] {
             ...withLocalizedContent,
             import_result: withLocalizedContent.import_result ?? defaultImport.import_result,
             import_source: withLocalizedContent.import_source ?? defaultImport.import_source,
-            import_sources: defaultImport.import_sources,
+            import_sources: withLocalizedContent.import_sources ?? defaultImport.import_sources,
             import_issues: withLocalizedContent.import_result === 'needs_review' && (defaultImport.id === 'prod_import_review_demo' || defaultImport.id === 'prod_import_test_review_02')
               ? defaultImport.import_issues
               : withLocalizedContent.import_result ? withLocalizedContent.import_issues : defaultImport.import_issues,
-            updated_at: defaultImport.updated_at,
-            channels: defaultImport.channels,
-            channel_overrides: defaultImport.channel_overrides,
+            // Saved listing identities and source choices survive fixture updates.
+            channels: withLocalizedContent.channels,
+            channel_overrides: withLocalizedContent.channel_overrides ?? defaultImport.channel_overrides,
             ...(defaultImport.import_result === 'incomplete' && defaultImport.import_issues?.includes('Product image is required')
               ? { images: [], image_alt_texts: [], asin: '' }
               : {}),
           }
         : withLocalizedContent;
-      const withOperationalDemoStock = withImportDemo.id === 'prod_import_test_review_02'
+      const hasRecordedStockOperation = Boolean(withImportDemo.inventory_adjustments?.length || withImportDemo.inventory_transfers?.length || withImportDemo.warehouse_positions?.length);
+      const withOperationalDemoStock = hasRecordedStockOperation ? withImportDemo : withImportDemo.id === 'prod_import_test_review_02'
         ? { ...withImportDemo, inventory: { wh_crjp: 7, wh_rslsg: 3, wh_fbsmy: 2, wh_fbajp: 0 } }
         : withImportDemo.id === 'prod_import_review_demo' || withImportDemo.id === 'prod_003'
           ? { ...withImportDemo, inventory: { wh_crjp: 40, wh_rslsg: 20, wh_fbsmy: 12, wh_fbajp: 0 } }
@@ -1016,7 +1026,30 @@ function completeStoredActiveDemo(products: Product[]): Product[] {
   }
 }
 
-const loadedProducts = loadStoredProducts();
+function completeStoredWarehouseListings(products: Product[]): Product[] {
+  if (typeof window === 'undefined') return products.map(completeWarehouseListingDemo);
+  const key = 'primeos-warehouse-listing-identity-v1';
+  if (window.localStorage.getItem(key) === '1') return products;
+  const completed = products.map(completeWarehouseListingDemo);
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PRODUCT_STORAGE_KEY) ?? 'null') as Product[] | null;
+    if (stored) {
+      const changed = completed.filter((product, index) => product !== products[index]);
+      if (changed.length) {
+        window.localStorage.setItem('primeos-warehouse-listing-before-completion-v1', JSON.stringify(stored.filter(product => changed.some(item => item.id === product.id))));
+        // Persist only listing changes, not other normalization from reading the catalog.
+        window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(stored.map(product => {
+          const next = changed.find(item => item.id === product.id);
+          return next ? { ...product, channels: next.channels } : product;
+        })));
+      }
+    }
+    window.localStorage.setItem(key, '1');
+    return completed;
+  } catch { return products; }
+}
+
+const loadedProducts = completeStoredWarehouseListings(loadStoredProducts());
 const activatedProducts = loadedProducts.map(activateValidatedImport);
 let _products: Product[] = completeStoredActiveDemo(activatedProducts);
 let categoryReferencesPersisted = false;
@@ -1052,6 +1085,19 @@ export function updateProduct(id: string, p: Partial<Product> & { id: string }, 
   if (options?.requirePersistence && typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
   if (!options?.requirePersistence) persistProducts();
+}
+
+/** Save one inventory operation, including multiple SKU counts, atomically. */
+export function commitWarehouseProducts(updates: Product[]): void {
+  const byId = new Map(updates.map(product => [product.id, product]));
+  if (byId.size !== updates.length || updates.some(product => !_products.some(current => current.id === product.id))) throw new Error('Products changed. Reload and review the selected products.');
+  const now = new Date().toISOString();
+  const next = _products.map(current => {
+    const update = byId.get(current.id);
+    return update ? { ...current, inventory: update.inventory, skus: update.skus, warehouse_positions: update.warehouse_positions, inventory_adjustments: update.inventory_adjustments, inventory_transfers: update.inventory_transfers, updated_at: now } : current;
+  });
+  if (typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
+  _products = next;
 }
 
 /** Commit several listing relationships in one write, before exposing any live-state change. */

@@ -7,6 +7,7 @@ import type { Product } from '@/lib/product-store';
 import { ListingReviewHelp } from './ListingReviewHelp';
 
 type Props = {
+  disabled?: boolean;
   listings: CatalogImportItem[];
   activeIndex: number;
   reviewedIds: string[];
@@ -28,7 +29,7 @@ function ListingThumbnail({ listing }: { listing: CatalogImportItem }) {
 }
 
 /** Review navigation and the shared destination, not a preview of already-saved links. */
-export function ListingMappingContext({ listings, activeIndex, reviewedIds, master, masterImage, onView, onChangeMaster, onCreateMaster }: Props) {
+export function ListingMappingContext({ listings, activeIndex, reviewedIds, master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
   const headingId = useId();
   const listId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -71,7 +72,7 @@ export function ListingMappingContext({ listings, activeIndex, reviewedIds, mast
             return <li key={listing.id}>
               <button ref={active ? activeRow : undefined} type="button" aria-label={`View listing ${index + 1}: ${listing.title} · ${listing.storeName}`} aria-pressed={active}
                 className={`flex w-full min-w-0 items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${active ? 'border-primary bg-primary/5' : 'border-transparent'}`}
-                onClick={() => onView(index)}>
+                disabled={disabled} onClick={() => onView(index)}>
                 <ListingThumbnail listing={listing} />
                 <span className="min-w-0 flex-1 space-y-1">
                   <span className="block break-words text-sm font-medium leading-5">{listing.title}</span>
@@ -107,10 +108,10 @@ export function ListingMappingContext({ listings, activeIndex, reviewedIds, mast
             </div>
           </div>
           <div className="flex items-center gap-1 border-t pt-3">
-            <Button variant="outline" className="h-11" onClick={onChangeMaster}>Change Master for all</Button>
+            <Button variant="outline" className="h-11" disabled={disabled} onClick={onChangeMaster}>Change Master for all</Button>
             <ListingReviewHelp label="Changing the shared Master">The new Master applies to all {listings.length} selected listings. You will check them again; previous check marks and SKU mapping choices are cleared. No saved links change until you confirm.</ListingReviewHelp>
           </div>
-          <Button variant="ghost" className="-ml-3 h-11 text-xs text-muted-foreground" onClick={onCreateMaster}><Plus className="size-3.5" />Create a new Master for all</Button>
+          <Button variant="ghost" className="-ml-3 h-11 text-xs text-muted-foreground" disabled={disabled} onClick={onCreateMaster}><Plus className="size-3.5" />Create a new Master for all</Button>
         </div>
       </div>
     </div>

@@ -5,9 +5,9 @@
 // Fulfillment: fulfillment-store.ts schema (FulfillmentJob)
 // etc.
 
-import { getProducts, isDemoProduct } from './product-store';
-import { addWarehouse, clearWarehouseStore } from './warehouse-store';
-import { addInventoryPosition, clearInventoryStore } from './inventory-store';
+import { getProducts, getResolvedProductSkuById, isDemoProduct } from './product-store';
+import { addWarehouse, clearWarehouseStore, restoreSavedWarehouses } from './warehouse-store';
+import { addInventoryPosition, clearInventoryStore, getInventoryPositions, updatePosition } from './inventory-store';
 import {
   addFulfillmentException,
   addFulfillmentJob,
@@ -26,10 +26,17 @@ import {
   getOrderEvents,
   getOrderItems,
   getOrders,
+  getAllOrderItems,
+  updateOrder,
 } from './order-store';
 import { createCrmItem, clearCrmQueue } from './crm-queue-store';
 import { createBooking, clearBookingStore } from './booking-store';
-import { createReservation, clearReservationStore } from './reservation-store';
+import { clearReservationStore, createReservation, confirmReservation, allocateReservation, type ReservationSource } from './reservation-store';
+import { channelIntegrationsApi, type ConnectedChannelRecord } from './channel-integrations-api';
+import { resolveProductShopSources, shopsAtWarehouse } from './warehouse-shop-sources';
+import { getCatalogImportItems } from './catalog-import-store';
+import { orderHoldCounters, orderHoldsForPosition, orderHoldState } from './warehouse-order-holds';
+import { canEditWarehouseStock } from './warehouse-stock-view';
 import type { FulfillmentJob } from './fulfillment-store';
 import type { Listing } from './listing-store';
 import type { Order } from './oms-types';
@@ -89,6 +96,23 @@ interface SeedSkuRef {
 
 // SKU reference used for generating order lines
 const SKU_REFS: SeedSkuRef[] = [];
+const seededPositionIds = new Set<string>();
+let demoShops: ConnectedChannelRecord[] = [];
+
+function sourceFor(sku: SeedSkuRef, warehouseId: string | null, channel?: Channel) {
+  const product = getProducts().find(item => item.id === sku.productId)!;
+  const sources = resolveProductShopSources(product, demoShops, getCatalogImportItems({ requireConfirmation: true }));
+  const confirmed = warehouseId ? shopsAtWarehouse(sources, warehouseId, product.has_variants ? sku.skuId : undefined).shops : [];
+  const group = confirmed.find(item => ['amazon', 'rakuten', 'shopee'].includes(item.shop.platform) && (!channel || item.shop.platform === channel));
+  if (!group) return undefined;
+  return { channel: group.shop.platform as Channel, label: `${group.shop.name} · ${group.shop.store_name}`,
+    shop_id: group.shop.id, store_name: group.shop.store_name, listing_id: group.listings[0].listing.external_id,
+    stock_source_warehouse_id: group.listings[0].warehouseId };
+}
+
+function freshPositions(sku: SeedSkuRef) {
+  return getInventoryPositions().filter(position => seededPositionIds.has(position.id) && position.product_id === sku.productId && position.sku_id === sku.skuId && position.on_hand > 0 && canEditWarehouseStock(position.warehouse_id));
+}
 
 const HERO_SCENARIOS = [
   {
@@ -170,13 +194,11 @@ const HERO_SCENARIOS = [
     flowType: null,
     fulfillmentStatus: null,
     carrierCode: 'manual',
-    story: 'Pre-launch tailoring set order captured from the website waitlist.',
+    story: 'Manual preorder entered by the seller for a tailoring set customer.',
   },
 ] as const;
 
 // ─── Warehouses ────────────────────────────────────────────────────────────────
-
-const WAREHOUSE_IDS = ['wh_crjp', 'wh_rslsg', 'wh_fbsmy', 'wh_3plvn', 'wh_fbajp'];
 
 function seedWarehouses() {
   [
@@ -185,7 +207,6 @@ function seedWarehouses() {
     { id: 'wh_fbsmy', code: 'FBS-MY', name: 'Fulfillment By Shopee MY', country: 'MY', type: 'fbs' as const,      capabilities: ['pick_pack', 'same_day'],                         status: 'active' as const, address: 'Kuala Lumpur, Malaysia',            is_virtual: false },
     { id: 'wh_3plvn', code: '3PL-VN', name: 'Vietnam 3PL Partner',     country: 'VN', type: '3pl' as const,      capabilities: ['pick_pack'],                                   status: 'active' as const, address: 'Ho Chi Minh City, Vietnam',        is_virtual: false },
     { id: 'wh_fbajp', code: 'FBA-JP', name: 'Fulfillment By Amazon JP',  country: 'JP', type: 'fba' as const,      capabilities: ['prime', 'cross_border'],                       status: 'active' as const, address: null,                               is_virtual: false },
-    { id: 'wh_rakjp', code: 'RAK-JP', name: 'Rakuten Virtual Warehouse', country: 'JP', type: 'virtual' as const,   capabilities: ['marketplace_fulfillment'],                      status: 'active' as const, address: null,                               is_virtual: true  },
   ].forEach(w => addWarehouse(w));
 }
 
@@ -209,7 +230,7 @@ function seedProducts() {
         skuId: sku.id,
         productId: product.id,
         familyCode: product.sku_code,
-        skuCode: sku.sku_code,
+        skuCode: product.has_variants ? sku.sku_code : product.sku_code,
         name: product.has_variants ? `${product.name} — ${sku.variation_name}` : product.name,
         productName: product.name,
         unitPrice: product.retail_price,
@@ -249,22 +270,9 @@ function pickStatusLifecycle(idx: number): { status: OrderStatus; lifecycle: Lif
   return { status: 'completed', lifecycle: 'delivered' };
 }
 
-function pickChannel(): Channel {
-  const r = Math.random();
-  if (r < 0.35) return 'amazon';
-  if (r < 0.65) return 'rakuten';
-  if (r < 0.95) return 'shopee';
-  return 'manual';
-}
-
 function orderIdForIdx(idx: number): string {
   const suffixes = ['JP', 'JP', 'JP', 'VN', 'SG', 'MY', 'KR', 'CN', 'TW', 'JP'];
   return `PRIME-${suffixes[idx % suffixes.length]}-${String(idx + 1).padStart(4, '0')}`;
-}
-
-// Deterministic SKU pick from seed
-function pickSku(idx: number, lineIdx: number): typeof SKU_REFS[0] {
-  return SKU_REFS[Math.floor(((idx * 17 + lineIdx * 7 + 3) % SKU_REFS.length))];
 }
 
 function findSkuRefByProductCode(productCode: string, hint?: string): SeedSkuRef {
@@ -275,7 +283,7 @@ function findSkuRefByProductCode(productCode: string, hint?: string): SeedSkuRef
 
   if (!hint) return candidates[0];
 
-  return candidates.find((sku) => (
+  return candidates.find(sku => sku.skuCode.toLowerCase().endsWith(`-${hint.toLowerCase()}`)) ?? candidates.find((sku) => (
     sku.skuCode.toLowerCase().includes(hint.toLowerCase()) ||
     sku.name.toLowerCase().includes(hint.toLowerCase())
   )) ?? candidates[0];
@@ -357,7 +365,14 @@ function seedOrderEvents(orderId: string, lifecycle: LifecycleStage, createdAt: 
 function seedHeroOrders() {
   HERO_SCENARIOS.forEach((scenario, index) => {
     const customer = CUSTOMERS[scenario.customerIndex % CUSTOMERS.length];
-    const sku = findSkuRefByProductCode(scenario.productCode, scenario.skuHint);
+    const sku = findSkuRefByProductCode(scenario.productCode, 'skuHint' in scenario ? scenario.skuHint : undefined);
+    const source = sourceFor(sku, scenario.warehouseId, scenario.channel);
+    const historical = ['shipping', 'completed'].includes(scenario.status);
+    const channel = scenario.channel;
+    const unresolvedSource = !historical && channel !== 'manual' && !source;
+    const status = unresolvedSource ? 'pending' : scenario.status;
+    const lifecycle = unresolvedSource ? 'validated' : scenario.lifecycle;
+    const warehouseId = unresolvedSource ? null : scenario.warehouseId;
     const createdAt = hoursAgo(scenario.createdHoursAgo);
     const shippingAmt = ['shipping', 'completed', 'ready_to_ship'].includes(scenario.status) ? 800 : 0;
     const subtotal = sku.unitPrice * scenario.quantity;
@@ -367,11 +382,11 @@ function seedHeroOrders() {
       : null;
 
     const order: Order = {
-      id: genId('ord'),
+      id: stableSeedId('demo_order', scenario.orderNumber),
       user_id: 'user_demo',
       order_id: scenario.orderNumber,
-      channel: scenario.channel,
-      channel_order_ref: `${scenario.channel.toUpperCase().slice(0, 3)}-HERO-${String(1001 + index)}`,
+      channel,
+      channel_order_ref: channel === 'manual' ? null : `${channel.toUpperCase().slice(0, 3)}-HERO-${String(1001 + index)}`,
       customer_name: customer.name,
       customer_email: customer.email,
       customer_phone: `+81-80-${String(3100 + index).padStart(4, '0')}-${String(5100 + index).padStart(4, '0')}`,
@@ -391,29 +406,29 @@ function seedHeroOrders() {
       shipping_amount: shippingAmt,
       discount_amount: 0,
       total_amount: total,
-      status: scenario.status,
-      lifecycle_stage: scenario.lifecycle,
-      risk_flags: scenario.fulfillmentStatus === 'exception' ? ['SLA_AT_RISK', 'MANUAL_REVIEW'] : [],
-      allocated_warehouse_id: scenario.warehouseId,
-      allocation_policy_snapshot: null,
+      status,
+      lifecycle_stage: lifecycle,
+      risk_flags: unresolvedSource ? ['SHOP_SOURCE_UNCONFIRMED'] : scenario.fulfillmentStatus === 'exception' ? ['SLA_AT_RISK', 'MANUAL_REVIEW'] : [],
+      allocated_warehouse_id: warehouseId,
+      allocation_policy_snapshot: { ...source, stock_source_label: channel === 'manual' ? 'Manual order' : source?.label ?? `${channel} · ${historical ? 'Historical order' : 'Shop source unconfirmed'}` },
       sla_target_days: scenario.fulfillmentStatus === 'exception' ? 2 : 3,
       order_date: createdAt,
       created_at: createdAt,
       updated_at: createdAt,
-      warehouse_id: scenario.warehouseId,
+      warehouse_id: warehouseId,
     };
 
     addOrder(order);
     addOrderItem({
-      id: genId('item'),
-      order_id: order.id,
+      id: stableSeedId('demo_line', scenario.orderNumber),
+      order_id: order.id, product_id: sku.productId, sku_id: sku.skuId,
       sku: sku.skuCode,
       product_name: sku.productName,
       quantity: scenario.quantity,
       price_per_unit: sku.unitPrice,
       created_at: createdAt,
     });
-    seedOrderEvents(order.id, scenario.lifecycle, createdAt, scenario.story);
+    seedOrderEvents(order.id, lifecycle, createdAt, unresolvedSource ? 'Confirm the listing shop and warehouse source before reserving stock.' : scenario.story);
   });
 }
 
@@ -421,22 +436,30 @@ function seedHeroOrders() {
 
 function seedOrders() {
   clearOrders();
+  const candidates = SKU_REFS.flatMap(sku => {
+    if (getResolvedProductSkuById(sku.skuId)?.product.id !== sku.productId) return [];
+    return freshPositions(sku).flatMap(position => {
+      const source = sourceFor(sku, position.warehouse_id);
+      return source ? [{ sku, position, source }] : [];
+    });
+  });
 
-  for (let i = 0; i < 281; i++) {
-    const orderId = genId('ord');
+  for (let i = 0; i < 281 && candidates.length; i++) {
+    const orderId = stableSeedId('demo_order', orderIdForIdx(i));
     const { status, lifecycle } = pickStatusLifecycle(i);
     const customer = CUSTOMERS[i % CUSTOMERS.length];
-    const channel = pickChannel();
+    const candidate = candidates[i % candidates.length];
+    const selectedSku = candidate.sku;
     const daysBack = (i * 3 + 7) % 60;
     const createdAt = daysAgo(daysBack);
 
-    const lineCount = (i % 3) + 1;
+    const lineCount = 1;
     let subtotal = 0;
     const lines: { sku: typeof SKU_REFS[0]; qty: number; unitPrice: number }[] = [];
     for (let li = 0; li < lineCount; li++) {
-      const sku = pickSku(i, li);
+      const sku = selectedSku;
       const unitPrice = 1980 + (li * 1000) + ((i * 137 + li * 31) % 3000);
-      const qty = (li % 3) + 1;
+      const qty = Math.min((i % 3) + 1, candidate.position.on_hand);
       subtotal += unitPrice * qty;
       lines.push({ sku, qty, unitPrice });
     }
@@ -446,14 +469,16 @@ function seedOrders() {
     const total = subtotal + shippingAmt - discount;
 
     const hasWarehouse = ['ready_to_ship', 'shipping', 'completed'].includes(status);
-    const warehouseId = hasWarehouse ? WAREHOUSE_IDS[i % WAREHOUSE_IDS.length] : null;
+    const warehouseId = hasWarehouse ? candidate.position.warehouse_id : null;
+    const source = candidate.source;
+    const channel = source.channel;
 
     const isAtRisk = status === 'pending' && i % 17 === 0;
     const riskFlags = isAtRisk ? ['HIGH_VALUE', 'SLA_AT_RISK'] : [];
 
     const order: Order = {
       id: orderId, user_id: 'user_demo',
-      order_id: orderIdForIdx(i), channel, channel_order_ref: `${channel.toUpperCase().slice(0, 3)}-${20260000 + i}`,
+      order_id: orderIdForIdx(i), channel, channel_order_ref: channel === 'manual' ? null : `${channel.toUpperCase().slice(0, 3)}-${20260000 + i}`,
       customer_name: customer.name, customer_email: customer.email,
       customer_phone: i % 2 === 0 ? `+81-90-${String(1000 + i).padStart(4, '0')}-${String(5000 + i).padStart(4, '0')}` : null,
       shipping_address: `${customer.address}, ${customer.city}, ${customer.prefecture} ${customer.postal}, ${customer.country}`,
@@ -462,7 +487,7 @@ function seedOrders() {
       ship_to: { name: customer.name, address1: customer.address, city: customer.city, prefecture: customer.prefecture, postal_code: customer.postal, country: customer.country },
       currency: 'JPY', subtotal_amount: subtotal, shipping_amount: shippingAmt, discount_amount: discount, total_amount: total,
       status, lifecycle_stage: lifecycle, risk_flags: riskFlags,
-      allocated_warehouse_id: warehouseId, allocation_policy_snapshot: null,
+      allocated_warehouse_id: warehouseId, allocation_policy_snapshot: { ...source, stock_source_label: source.label },
       sla_target_days: 3, order_date: createdAt, created_at: createdAt, updated_at: createdAt, warehouse_id: warehouseId,
     };
     addOrder(order);
@@ -470,8 +495,8 @@ function seedOrders() {
     // Order items
     for (const line of lines) {
       addOrderItem({
-        id: genId('item'), order_id: orderId, sku: line.sku.skuCode, product_name: line.sku.name,
-        quantity: line.qty, price_per_unit: line.unitPrice, created_at: createdAt,
+        id: stableSeedId('demo_line', `${orderId}-${line.sku.productId}-${line.sku.skuId}`), order_id: orderId, sku: line.sku.skuCode, product_name: line.sku.name,
+        quantity: line.qty, price_per_unit: line.unitPrice, created_at: createdAt, product_id: line.sku.productId, sku_id: line.sku.skuId,
       });
     }
   }
@@ -515,38 +540,81 @@ function seedInventory() {
         // A variant position must use its own recorded count, never a share of the parent total.
         if (product.has_variants && typeof variantCount !== 'number') return;
         const onHand = product.has_variants ? variantCount! : perSkuOnHand[skuIndex] ?? 0;
-        const reservedUnpaid = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.10 : 0.04)));
-        const reservedPaid = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.08 : 0.04)));
-        const allocated = Math.min(onHand, Math.floor(onHand * (skuIndex === 0 ? 0.05 : 0.02)));
-        const safetyStock = Math.max(1, Math.floor(onHand * 0.05));
-        const inbound = warehouseId === 'wh_fbajp'
-          ? Math.floor(onHand * 0.12)
-          : Math.floor(onHand * (warehouseIndex === 0 ? 0.06 : 0.03));
-        const isReturnHeavySku = sku.familyCode === 'CR-BSH-SET-12';
-        const isDamagedSku = sku.familyCode === 'CR-ART-MYTH-10';
-        const returnPending = isReturnHeavySku ? Math.min(2, Math.floor(onHand * 0.03)) : Math.floor(onHand * 0.01);
-        const unfulfillable = isDamagedSku ? Math.min(3, Math.floor(onHand * 0.02)) : Math.floor(onHand * 0.01);
-
+        const verified = product.warehouse_positions?.find(position => position.warehouse_id === warehouseId && position.sku_id === sku.skuId);
+        if (verified) { addInventoryPosition(verified); return; }
+        // An audited count with no verified position has unknown holds. Demo
+        // percentages must never turn that unknown balance into sellable stock.
+        const auditedSku = product.has_variants ? sku.skuCode : product.sku_code;
+        if (product.inventory_adjustments?.some(change => change.warehouseId === warehouseId && change.sku === auditedSku)
+          || product.inventory_transfers?.some(change => change.sku === auditedSku && (change.fromWarehouseId === warehouseId || change.toWarehouseId === warehouseId))) return;
+        const id = stableSeedId('demo_inventory', `${product.id}-${sku.skuId}-${warehouseId}`);
+        seededPositionIds.add(id);
         addInventoryPosition({
-          id: genId('inv'),
+          id,
           sku_id: sku.skuId,
           product_id: sku.productId,
           warehouse_id: warehouseId,
           on_hand: onHand,
-          reserved_unpaid: reservedUnpaid,
-          reserved_paid: reservedPaid,
-          allocated,
-          inbound,
+          reserved_unpaid: 0,
+          reserved_paid: 0,
+          allocated: 0,
+          inbound: 0,
+          order_holds: [],
           outbound: 0,
-          unfulfillable,
-          return_pending: returnPending,
-          safety_stock: safetyStock,
+          unfulfillable: 0,
+          return_pending: 0,
+          safety_stock: 0,
           campaign_lock: 0,
           version: 1,
           updated_at: daysAgo((warehouseIndex + skuIndex) % 6),
         });
       });
     });
+  }
+}
+
+/** Allocate each active demo order atomically, using only untouched demo balances. */
+function reconcileDemoOrderHolds() {
+  const positions = getInventoryPositions().filter(position => seededPositionIds.has(position.id));
+  const remaining = new Map(positions.map(position => [position.id, Math.max(0, position.on_hand - position.safety_stock - position.campaign_lock - position.unfulfillable)]));
+  for (const order of [...getOrders()].sort((a, b) => a.order_id.localeCompare(b.order_id))) {
+    if (!orderHoldState(order)) continue;
+    const lines = getOrderItems(order.id);
+    const quantities = new Map<string, number>();
+    for (const line of lines) {
+      const position = positions.find(item => item.product_id === line.product_id && item.sku_id === line.sku_id && item.warehouse_id === order.allocated_warehouse_id);
+      if (position) quantities.set(position.id, (quantities.get(position.id) ?? 0) + line.quantity);
+    }
+    const matched = lines.every(line => positions.some(item => item.product_id === line.product_id && item.sku_id === line.sku_id && item.warehouse_id === order.allocated_warehouse_id));
+    if (!lines.length || !matched || [...quantities].some(([id, quantity]) => quantity > remaining.get(id)!)) {
+      updateOrder(order.id, { status: 'pending', lifecycle_stage: 'validated', allocated_warehouse_id: null, warehouse_id: null, risk_flags: [...order.risk_flags, 'STOCK_NOT_RESERVED'] });
+      addOrderEvent({ id: stableSeedId('demo_stock_shortage', order.id), order_id: order.id, event_type: 'reservation_failed', message: 'Stock has not been reserved. Review the available warehouse balance.', actor_type: 'system', actor_id: null, payload: null, created_at: new Date().toISOString() });
+      continue;
+    }
+    for (const [id, quantity] of quantities) remaining.set(id, remaining.get(id)! - quantity);
+  }
+  refreshDemoOrderHolds();
+}
+
+function refreshDemoOrderHolds() {
+  for (const position of getInventoryPositions().filter(item => seededPositionIds.has(item.id))) {
+    const holds = orderHoldsForPosition(position, getOrders(), getAllOrderItems());
+    updatePosition(position.id, { ...orderHoldCounters(holds), order_holds: holds });
+  }
+}
+
+function seedOrderReservationLedger() {
+  for (const position of getInventoryPositions()) {
+    const expected = orderHoldsForPosition(position, getOrders(), getAllOrderItems());
+    for (const hold of position.order_holds ?? []) {
+      if (!expected.some(item => item.lineId === hold.lineId && item.quantity === hold.quantity && item.state === hold.state)) continue;
+      const order = getOrders().find(item => item.id === hold.orderId)!;
+      const record = createReservation({ order_ref: hold.orderNumber, sku_id: position.sku_id, warehouse_id: position.warehouse_id,
+        product_id: position.product_id, order_item_id: hold.lineId, qty: hold.quantity,
+        source: order.channel.toUpperCase() as ReservationSource, idempotency_key: `demo_hold:${hold.lineId}` });
+      if (record && hold.state !== 'reserved_unpaid') confirmReservation(record.id);
+      if (record && hold.state === 'allocated') allocateReservation(record.id);
+    }
   }
 }
 
@@ -575,7 +643,7 @@ function seedFulfillmentJobs() {
     {
       flowType: 'marketplace_observer',
       fulfillmentType: 'Marketplace Observer',
-      warehouseId: 'wh_rakjp',
+      warehouseId: 'wh_fbsmy',
       partnerId: null,
       carrierCode: 'manual',
     },
@@ -611,7 +679,7 @@ function seedFulfillmentJobs() {
   }: {
     order: Order;
     status: typeof statuses[number];
-    flow: typeof flowBlueprints[number];
+    flow: Omit<typeof flowBlueprints[number], 'warehouseId'> & { warehouseId: string };
     createdAt: string;
     pickedAt: string | null;
     packedAt: string | null;
@@ -672,7 +740,7 @@ function seedFulfillmentJobs() {
     } as FulfillmentJob);
 
     getOrderItems(order.id).forEach((line) => {
-      const sku = SKU_REFS.find((candidate) => candidate.skuCode === line.sku);
+      const sku = SKU_REFS.find(candidate => candidate.productId === line.product_id && candidate.skuId === line.sku_id);
       if (!sku) return;
 
       addFulfillmentJobItem({
@@ -741,10 +809,12 @@ function seedFulfillmentJobs() {
     ['ready_to_ship', 'shipping', 'completed'].includes(order.status)
   ));
 
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < Math.min(18, backgroundOrders.length); i++) {
     const order = backgroundOrders[i % backgroundOrders.length];
-    const status = statuses[i % statuses.length];
-    const flow = flowBlueprints[i % flowBlueprints.length];
+    const status = order.status === 'completed' ? 'done' : order.status === 'shipping' ? 'shipped' : 'pending';
+    const warehouseId = order.allocated_warehouse_id ?? order.warehouse_id!;
+    const blueprint = warehouseId === 'wh_fbajp' ? flowBlueprints[3] : warehouseId === 'wh_fbsmy' ? flowBlueprints[2] : warehouseId === 'wh_3plvn' ? flowBlueprints[1] : flowBlueprints[0];
+    const flow = { ...blueprint, warehouseId };
     const createdAt = daysAgo((i * 2) % 12);
     const pickedAt = ['picking', 'packed', 'shipped', 'done', 'exception'].includes(status) ? daysAgo(Math.max(0, ((i * 2) % 12) - 1)) : null;
     const packedAt = ['packed', 'shipped', 'done'].includes(status) ? daysAgo(Math.max(0, ((i * 2) % 12) - 2)) : null;
@@ -772,9 +842,9 @@ function seedFulfillmentJobs() {
     if (!scenario.fulfillmentStatus || !scenario.flowType) return;
 
     const order = orders.find((candidate) => candidate.order_id === scenario.orderNumber);
-    if (!order) return;
+    if (!order || !order.allocated_warehouse_id || order.status === 'pending') return;
 
-    const flow = flowBlueprintByType[scenario.flowType];
+    const flow = { ...flowBlueprintByType[scenario.flowType], warehouseId: order.allocated_warehouse_id };
     const createdAt = hoursAgo(scenario.createdHoursAgo);
     const pickedAt = ['picking', 'packed', 'shipped', 'done', 'exception'].includes(scenario.fulfillmentStatus) ? hoursAgo(Math.max(scenario.createdHoursAgo - 1, 1)) : null;
     const packedAt = ['packed', 'shipped', 'done', 'exception'].includes(scenario.fulfillmentStatus) ? hoursAgo(Math.max(scenario.createdHoursAgo - 2, 1)) : null;
@@ -959,45 +1029,24 @@ function seedCrmQueue() {
     startTime: new Date(Date.now() + 86400_000).toISOString(),
   });
 
-  // Seed some livestream reservations
-  createReservation({
-    order_ref: 'TIKTOK-LIVE-001',
-    sku_id: 'sku_cr_ntb_blk_a5',
-    warehouse_id: 'wh_crjp',
-    qty: 2,
-    source: 'LIVESTREAM_TIKTOK',
-    idempotency_key: 'seed_tiktok_001',
-    ttl_minutes: 30,
-  });
-  createReservation({
-    order_ref: 'FB-LIVE-002',
-    sku_id: 'sku_cr_skb_mdn_a5',
-    warehouse_id: 'wh_3plvn',
-    qty: 1,
-    source: 'LIVESTREAM_FB',
-    idempotency_key: 'seed_fb_001',
-    ttl_minutes: 10,
-  });
-  createReservation({
-    order_ref: 'LAZADA-ORDER-003',
-    sku_id: 'sku_cr_bsh_set_12',
-    warehouse_id: 'wh_fbsmy',
-    qty: 1,
-    source: 'LAZADA',
-    idempotency_key: 'seed_lazada_001',
-    ttl_minutes: 30,
-  });
+
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
 
 let _seeded = false;
+let seeding: Promise<{ success: boolean }> | null = null;
 
-export async function seedDemoData(_userId?: string): Promise<{ success: boolean }> {
-  if (_seeded) return { success: true };
-  _seeded = true;
+export function seedDemoData(_userId?: string, shops?: ConnectedChannelRecord[]): Promise<{ success: boolean }> {
+  if (_seeded) return Promise.resolve({ success: true });
+  if (seeding) return seeding;
+  seeding = runSeedDemoData(shops);
+  return seeding;
+}
 
+async function runSeedDemoData(shops?: ConnectedChannelRecord[]): Promise<{ success: boolean }> {
   try {
+    demoShops = shops ?? await channelIntegrationsApi.channels().then(result => result.data).catch(() => []);
     clearWarehouseStore();
     clearOrders();
     clearInventoryStore();
@@ -1008,17 +1057,26 @@ export async function seedDemoData(_userId?: string): Promise<{ success: boolean
     clearReservationStore();
     clearBookingStore();
 
+    seededPositionIds.clear();
     seedProducts();
     seedWarehouses();
-    seedOrders();
+    restoreSavedWarehouses();
     seedInventory();
+    seedOrders();
+    reconcileDemoOrderHolds();
+    for (const product of getProducts()) for (const snapshot of product.warehouse_positions ?? []) {
+      if (!getInventoryPositions().some(position => position.product_id === snapshot.product_id && position.sku_id === snapshot.sku_id && position.warehouse_id === snapshot.warehouse_id)) addInventoryPosition(snapshot);
+    }
     seedFulfillmentJobs();
+    refreshDemoOrderHolds();
+    seedOrderReservationLedger();
     seedReturns();
     seedListings();
     seedCrmQueue();
+    _seeded = true;
     return { success: true };
   } catch (e) {
     console.error('[seedDemoData]', e);
     return { success: false };
-  }
+  } finally { seeding = null; }
 }

@@ -104,6 +104,7 @@ import {
   listAvailablePlatforms,
   listChannelWarehouses,
   listConnectedChannels,
+  updateChannelWarehouse,
 } from './channel-integrations.js';
 import {
   createLiveSession,
@@ -1481,6 +1482,16 @@ app.post('/api/v1/channels/connect', (request, response, next) => {
   try {
     response.status(201).json({ data: connectChannel(request.body || {}) });
   } catch (error) {
+    if (error.statusCode) return response.status(error.statusCode).json({ message: error.message });
+    next(error);
+  }
+});
+
+app.patch('/api/v1/channels/:id/warehouse', (request, response, next) => {
+  const session = buildSession(request.primeAccount);
+  if (!session.canWrite) return response.status(403).json({ message: 'You do not have permission to change shop connections.' });
+  try { response.json({ data: updateChannelWarehouse(request.params.id, request.body || {}) }); }
+  catch (error) {
     if (error.statusCode) return response.status(error.statusCode).json({ message: error.message });
     next(error);
   }

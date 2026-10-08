@@ -2,7 +2,7 @@
 // Implements: TTL-based holding, idempotency, state transitions
 // Based on deep-research-livestreamPrimeOS.md recommendations
 
-export type ReservationSource = 'LIVESTREAM_TIKTOK' | 'LIVESTREAM_FB' | 'LAZADA' | 'SHOPEE' | 'CHECKOUT' | 'MANUAL';
+export type ReservationSource = 'LIVESTREAM_TIKTOK' | 'LIVESTREAM_FB' | 'LAZADA' | 'SHOPEE' | 'AMAZON' | 'RAKUTEN' | 'CHECKOUT' | 'MANUAL';
 export type ReservationState = 'RESERVED_UNPAID' | 'RESERVED_PAID' | 'ALLOCATED' | 'RELEASED_TIMEOUT' | 'RELEASED_CANCEL';
 
 export interface Reservation {
@@ -17,6 +17,8 @@ export interface Reservation {
   idempotency_key: string;
   created_at: string;
   released_at?: string;
+  product_id?: string;
+  order_item_id?: string;
 }
 
 const TTL_BY_SOURCE: Record<ReservationSource, number> = {
@@ -24,6 +26,8 @@ const TTL_BY_SOURCE: Record<ReservationSource, number> = {
   LIVESTREAM_FB: 10,
   LAZADA: 30,
   SHOPEE: 20,
+  AMAZON: 20,
+  RAKUTEN: 20,
   CHECKOUT: 15,
   MANUAL: 20,
 };
@@ -50,8 +54,7 @@ export function getReservationsBySku(skuId: string): Reservation[] {
 export function getActiveReservations(): Reservation[] {
   const now = new Date().toISOString();
   return _reservations.filter(r =>
-    (r.state === 'RESERVED_UNPAID' || r.state === 'RESERVED_PAID' || r.state === 'ALLOCATED')
-    && r.expires_at > now
+    r.state === 'RESERVED_PAID' || r.state === 'ALLOCATED' || (r.state === 'RESERVED_UNPAID' && r.expires_at > now)
   );
 }
 
@@ -88,6 +91,8 @@ export function createReservation(params: {
   source: ReservationSource;
   idempotency_key: string;
   ttl_minutes?: number;
+  product_id?: string;
+  order_item_id?: string;
 }): Reservation | null {
   if (isIdempotent(params.idempotency_key)) {
     const existing = _reservations.find(r => r.idempotency_key === params.idempotency_key);
@@ -108,6 +113,8 @@ export function createReservation(params: {
     source: params.source,
     idempotency_key: params.idempotency_key,
     created_at: new Date().toISOString(),
+    product_id: params.product_id,
+    order_item_id: params.order_item_id,
   };
 
   _reservations = [..._reservations, reservation];

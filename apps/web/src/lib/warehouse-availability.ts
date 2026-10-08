@@ -1,8 +1,10 @@
-import { getInventoryPositions, updatePosition, type InventoryPosition } from './inventory-store';
+import { getInventoryPositions, updatePosition, type InventoryPosition, type OrderHoldReference } from './inventory-store';
 import type { Product } from './product-store';
 import { DEMO_WAREHOUSE_ALIASES } from './demo-warehouse-locations';
 import { getWarehouseById } from './warehouse-store';
 import { recordedQuantity, type StockValue } from './warehouse-stock-view';
+import { warehouseProductPresence } from './warehouse-product-scope';
+import { orderHoldCounters } from './warehouse-order-holds';
 
 export type AvailabilityState = 'ready' | 'missing' | 'invalid' | 'mismatch' | 'external' | 'unrecorded';
 export type AvailabilityItem = {
@@ -22,6 +24,8 @@ export type AvailabilityItem = {
   atp: number | null;
   state: AvailabilityState;
   updatedAt: string | null;
+  orderHolds?: OrderHoldReference[];
+  orderSourcesVerified?: boolean;
 };
 export type AvailabilitySummary = {
   onHand: StockValue;
@@ -51,7 +55,7 @@ export function availabilityAt(product: Product, warehouseIds: string[], positio
     : [{ code: product.sku_code, name: '', ids: product.skus.length ? product.skus.map(sku => sku.id) : [`${product.id}_default`, product.id, product.sku_code], inventory: product.inventory }];
   const items: AvailabilityItem[] = [];
   for (const warehouseId of warehouseIds) {
-    const assigned = skus.some(sku => recordedQuantity(sku.inventory[warehouseId]) !== null || positions.some(position => position.product_id === product.id && normalizeWarehouse(position.warehouse_id) === warehouseId && sku.ids.includes(position.sku_id)));
+    const assigned = warehouseProductPresence(product, warehouseId, positions, skuCode).related;
     if (warehouseIds.length > 1 && !assigned) continue;
     for (const sku of skus) {
       const matched = positions.filter(position => position.product_id === product.id && normalizeWarehouse(position.warehouse_id) === warehouseId && sku.ids.includes(position.sku_id));
@@ -70,7 +74,16 @@ export function availabilityAt(product: Product, warehouseIds: string[], positio
         else {
           const sum = (field: typeof fields[number]) => matched.reduce((total, position) => total + position[field], 0);
           Object.assign(item, { unpaid: sum('reserved_unpaid'), paid: sum('reserved_paid'), allocated: sum('allocated'), safety: sum('safety_stock'), campaign: sum('campaign_lock'), damaged: sum('unfulfillable'), incoming: sum('inbound'), state: 'ready' });
+          item.incoming = (item.incoming ?? 0) + (product.inventory_transfers ?? []).filter(record => record.status === 'in_transit' && normalizeWarehouse(record.toWarehouseId) === warehouseId && record.sku === sku.code).reduce((sum, record) => sum + record.quantity, 0);
           item.held = item.unpaid! + item.paid! + item.allocated!;
+          const references = matched.flatMap(position => position.order_holds ?? []);
+          const evidence = orderHoldCounters(references);
+          const verified = matched.every(position => Array.isArray(position.order_holds))
+            && references.every(hold => Number.isSafeInteger(hold.quantity) && hold.quantity > 0 && ['reserved_unpaid', 'reserved_paid', 'allocated'].includes(hold.state) && Boolean(hold.orderId && hold.orderNumber && hold.lineId && hold.source))
+            && new Set(references.map(hold => hold.lineId)).size === references.length
+            && evidence.reserved_unpaid === item.unpaid && evidence.reserved_paid === item.paid && evidence.allocated === item.allocated;
+          item.orderHolds = verified ? references : [];
+          item.orderSourcesVerified = verified;
           item.unavailable = item.safety! + item.campaign! + item.damaged!;
           item.atp = Math.max(0, onHand - item.held - item.unavailable);
           const times = matched.map(position => position.updated_at).filter(value => Number.isFinite(Date.parse(value))).sort();

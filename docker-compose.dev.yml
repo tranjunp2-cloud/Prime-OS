@@ -15,6 +15,7 @@ services:
       - "127.0.0.1:8280:8280"
     volumes:
       - ./apps/api:/app
+      - ./packages/order-workflow:/packages/order-workflow:ro
       - prime_api_dependencies:/app/node_modules
     restart: unless-stopped
 
@@ -32,6 +33,7 @@ services:
       - "127.0.0.1:5188:5188"
     volumes:
       - ./apps/web:/app
+      - ./packages/order-workflow:/packages/order-workflow:ro
       - prime_web_node_modules:/app/node_modules
     restart: unless-stopped
 

@@ -93,6 +93,8 @@ export interface OrderItem {
   quantity: number;
   price_per_unit: number;
   created_at: string;
+  product_id?: string;
+  sku_id?: string;
 }
 
 export interface OrderEvent {

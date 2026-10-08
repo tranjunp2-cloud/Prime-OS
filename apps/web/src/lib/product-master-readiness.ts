@@ -1,7 +1,6 @@
 import type { Product } from './product-store';
-import { getAttributesForCategory, getProductCatalogSettings, resolveCatalogCategory, type ProductCatalogSettings } from './product-catalog-settings-store';
-import { assignedCategoryAttributes, missingCategoryAttributes, type Specification } from './category-schema';
-import { getMasterMediaReadiness, MIN_MASTER_IMAGES } from './product-master-media';
+import { getAttributesForCategory, getProductCatalogSettings, type ProductCatalogSettings } from './product-catalog-settings-store';
+import type { Specification } from './category-schema';
 
 export interface VariantGroup { id: string; name: string; values: string[] }
 export interface VariantItem {
@@ -94,67 +93,26 @@ export interface MasterReadinessInput {
 }
 export interface MasterReadinessCheck { id: string; label: string; done: boolean }
 
-/** One checklist for live editor input and saved products in the catalog. */
-export function getMasterReadinessChecks(input: MasterReadinessInput, settings: ProductCatalogSettings = getProductCatalogSettings()): MasterReadinessCheck[] {
-  const category = resolveCatalogCategory(input, settings.categories);
-  const attributes = assignedCategoryAttributes(category, settings.attributes);
-  const options = input.variantGroups.map(group => ({
-    attributeKey: attributes.find(attribute => attribute.name.toLowerCase() === group.name.toLowerCase())?.key ?? '',
-    name: group.name, values: group.values,
-  }));
-  const missingAttributes = missingCategoryAttributes(attributes, { specifications: input.specifications, has_variants: input.has_variants, variant_options: options });
+/** Activation is a Master-only decision. Channel/category requirements belong to each listing. */
+export function getMasterReadinessChecks(input: MasterReadinessInput, _settings?: ProductCatalogSettings): MasterReadinessCheck[] {
   const selected = input.variantItems.filter(item => item.selected);
-  const generated = input.has_variants && selected.length > 0;
   const positive = (value: NumericInput) => Number.isFinite(Number(value)) && Number(value) > 0;
-  const variantPricingReady = generated && selected.every(item => item.sku_code.trim() && positive(item.price));
-  const selectable = settings.attributes.filter(attribute => attribute.status === 'Active'
-    && ['Single select', 'Multi-select'].includes(attribute.type) && attribute.options.trim());
-  const invalidGroups = input.variantGroups.filter(group => !selectable.some(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase()));
-  const validValues = input.variantGroups.every(group => {
-    const attribute = selectable.find(attribute => attribute.name.trim().toLowerCase() === group.name.trim().toLowerCase());
-    const allowed = attribute?.options.split(',').map(value => value.trim().toLowerCase()) ?? [];
-    const values = group.values.map(value => value.trim().toLowerCase());
-    return values.length > 0 && new Set(values).size === values.length && values.every(value => allowed.includes(value));
-  });
-  const validCombinations = selected.every(item => {
-    const parts = item.key.split('/').map(part => part.trim().toLowerCase());
-    return parts.length === input.variantGroups.length && parts.every((part, index) => input.variantGroups[index].values.some(value => value.trim().toLowerCase() === part));
-  }) && new Set(selected.map(item => item.key.trim().toLowerCase())).size === selected.length;
-  const checks: MasterReadinessCheck[] = [
-    { id: 'identity', label: 'Add product name and master SKU', done: input.name.trim().length >= 3 && Boolean(input.sku_code.trim()) },
-    { id: 'media', label: `Add at least ${MIN_MASTER_IMAGES} product image`, done: getMasterMediaReadiness(input.images).ready },
-    { id: 'content', label: 'Write a detailed description (100+ characters)', done: richTextPlainText(input.description).length >= 100 },
-    { id: 'category', label: 'Select an active product category', done: category?.status === 'Active' },
+  const codes = [input.sku_code, ...(input.has_variants ? selected.map(item => item.sku_code) : [])].map(code => code.trim().toUpperCase());
+  return [
+    { id: 'identity', label: 'Add a product title', done: Boolean(input.name.trim()) },
+    { id: 'sku', label: input.has_variants ? 'Complete unique Master and variant SKUs' : 'Add a Master SKU',
+      done: codes.every(Boolean) && new Set(codes).size === codes.length && (!input.has_variants || selected.length > 0) },
+    { id: 'content', label: 'Add a product description', done: Boolean(richTextPlainText(input.description)) },
     { id: 'price', label: input.has_variants ? 'Configure variant prices' : 'Configure base price',
-      done: input.has_variants ? variantPricingReady : positive(input.retail_price) },
+      done: input.has_variants ? selected.length > 0 && selected.every(item => positive(item.price)) : positive(input.retail_price) },
   ];
-  if (attributes.some(attribute => attribute.required)) checks.push({
-    id: 'attributes', label: missingAttributes.length ? `Complete required attributes: ${missingAttributes.map(attribute => attribute.name).join(', ')}` : 'Complete required category attributes',
-    done: missingAttributes.length === 0,
-  });
-  if (input.shippingPackageRequired) checks.push({
-    id: 'shipping', label: 'Configure shipping package dimensions and weight',
-    done: [input.pkg_length, input.pkg_width, input.pkg_height, input.pkg_weight].every(positive),
-  });
-  if (input.has_variants) checks.push({
-    id: 'variants',
-    label: invalidGroups.length > 0 ? `Replace ${invalidGroups.length} invalid variant option ${invalidGroups.length === 1 ? 'type' : 'types'}`
-      : input.variantGroups.length === 0 ? 'Add at least one valid variant option'
-        : !validValues ? 'Select valid values for every variant option' : 'Complete unique SKUs and option values for all selected variants',
-    done: input.variantGroups.length > 0 && invalidGroups.length === 0 && input.variantGroups.every(group => group.values.length > 0)
-      && validValues && validCombinations && generated && selected.every(item => Boolean(item.sku_code.trim())),
-  });
-  return checks;
 }
 
 export function getStoredMasterReadiness(product: Product, settings: ProductCatalogSettings = getProductCatalogSettings()) {
   const variants = hydrateExistingVariants(product);
-  const onlineChannels = ['webstore', 'shopee', 'lazada', 'tiktok', 'amazon', 'rakuten'] as const;
-  const shippingPackageRequired = onlineChannels.some(key => product.channel_overrides?.[key]?.enabled
-    ?? product.channels.some(listing => listing.channel === (key === 'webstore' ? 'website' : key)));
   const checks = getMasterReadinessChecks({
     ...product, variantGroups: variants.groups, variantItems: variants.items,
-    specifications: product.specifications ?? [], shippingPackageRequired,
+    specifications: product.specifications ?? [], shippingPackageRequired: false,
   }, settings);
   const missing = checks.filter(check => !check.done).map(check => check.label);
   return { checks, missing, score: Math.round((checks.length - missing.length) / checks.length * 100), ready: missing.length === 0 };

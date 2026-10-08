@@ -1,5 +1,6 @@
 import { Bot } from 'lucide-react';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { DemoModeTabs } from './DemoModeTabs';
 
 export function AppHeader() {
   return (
@@ -7,7 +8,7 @@ export function AppHeader() {
       <div className="flex min-w-0 items-center gap-2">
         <WorkspaceSwitcher />
       </div>
-      <div className="flex items-center gap-2"><button
+      <div className="flex items-center gap-2"><DemoModeTabs /><button
         type="button"
         onClick={() => window.dispatchEvent(new CustomEvent('prime-ai:open'))}
         className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:ring-offset-zinc-950 sm:px-4"

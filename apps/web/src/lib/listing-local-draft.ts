@@ -133,7 +133,7 @@ export function saveListingLocalDraft(productId: string, target: ChannelListing,
   if (transaction) {
     const followingChanges = masterSyncSourceChanges(preference, nextPreference!).filter(group => syncsField(nextPreference!, group));
     if (followingChanges.length && masterSyncSnapshot(product) !== transaction.masterSnapshot) throw new Error('Master data changed. Reopen the listing and review the latest values.');
-    const plan = masterSyncPlan(product, listing, nextPreference!);
+    const plan = masterSyncPlan(product, listing, nextPreference!, undefined, undefined, patch);
     // Unrelated legacy setup must not prevent turning a group off.
     const syncError = plan.groups.find(group => followingChanges.includes(group.field) && group.error)?.error;
     if (syncError) throw new Error(syncError);

@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
-import { editListingSection, applyListingSection, completeListingDetails } from '@/test/fixtures/complete-listing-details';
+import { editListingSection, applyListingSection, completeListingDetails, confirmListingSave, chooseListingGroup } from '@/test/fixtures/complete-listing-details';
 import { ProductListingIntake } from './ProductListingIntake';
 import { createEmptyListingCatalog } from '@/lib/listing-intake-catalog';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
@@ -31,6 +31,75 @@ afterEach(() => {
   saveCatalogImportItems(original);
 });
 describe('Listing review drawer', () => {
+  it('requires confirmation before skipping applied edits, without creating a Master', () => {
+    const catalog = createEmptyListingCatalog(getCatalogImportItems({ requireConfirmation: true }));
+    const onChanged = vi.fn();
+    render(<ProductListingIntake catalog={catalog} onChanged={onChanged} onOpenMaster={vi.fn()} stayInQueue />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review selected listings' }));
+    editListingSection('Product essentials');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Unfinished proposal' } });
+    applyListingSection();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }));
+    expect(screen.getByRole('alertdialog', { name: 'Skip without saving these edits?' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep reviewing' }));
+    expect(screen.getByText('Unfinished proposal', { selector: 'dd' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard edits & skip' }));
+    expect(screen.getByText('Reviewing listing 2 of 2')).toBeVisible();
+    expect(catalog.products()).toEqual([]);
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+  it('reviews a mixed selection against each listing’s own Master and reports both saved links', () => {
+    const sources = getCatalogImportItems({ requireConfirmation: true });
+    const catalog = createEmptyListingCatalog(sources);
+    const masters = sources.map((_, index) => ({ ...getProducts()[0], ...readyMasterFields(), id: `separate-${index}`, name: `Separate Master ${index}`, sku_code: `SEPARATE-${index}`, brand: 'Master brand', has_variants: false, product_type: 'single' as const, skus: [], channels: [], status: 'draft' as const }));
+    masters.forEach(master => catalog.add(master));
+    catalog.saveListings(sources.map((source, index) => ({ ...source, brand: 'Different shop brand', suggestedProductId: masters[index].id })));
+    render(<ProductListingIntake catalog={catalog} onChanged={vi.fn()} onOpenMaster={vi.fn()} stayInQueue />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review selected listings' }));
+    screen.getAllByText('Separate Master 0').forEach(element => expect(element).toBeVisible());
+    expect(screen.queryByText('Separate Master 1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Link to this Master' }));
+    expect(screen.getByText('Reviewing listing 2 of 2')).toBeVisible();
+    expect(screen.getAllByText('Separate Master 1')[0]).toBeVisible();
+    expect(catalog.products()[0].channels).toHaveLength(1);
+    expect(catalog.products()[1].channels).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Link to this Master' }));
+    expect(screen.getByRole('region', { name: 'Saved review result' })).toHaveTextContent('2 listings linked to 2 Masters');
+    expect(catalog.products().every(master => master.channels.length === 1 && master.status === 'draft')).toBe(true);
+  });
+  it('skips an unmatched listing without saving and retains both selected rows on return', () => {
+    const before = structuredClone(getProducts());
+    const onChanged = vi.fn();
+    render(<ProductListingIntake onChanged={onChanged} onOpenMaster={vi.fn()} stayInQueue />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review selected listings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }));
+    expect(screen.getByText('Reviewing listing 2 of 2')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to listings' }));
+    expect(screen.getByText('2 selected')).toBeVisible();
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(getProducts()).toEqual(before);
+  });
+  it('confirms only the eligible subset and retains unresolved selection', () => {
+    const sources = getCatalogImportItems({ requireConfirmation: true });
+    const catalog = createEmptyListingCatalog(sources);
+    const master = { ...getProducts()[0], ...readyMasterFields(), id: 'quick-subset', name: 'Quick subset Master', sku_code: 'QUICK-SUBSET', brand: 'Exact brand', has_variants: false, product_type: 'single' as const, skus: [], channels: [], status: 'draft' as const };
+    catalog.add(master);
+    catalog.saveListings([{ ...sources[0], channelSku: master.sku_code, brand: master.brand, status: 'suggested', suggestedProductId: master.id, confidence: 99 }, sources[1]]);
+    render(<ProductListingIntake catalog={catalog} onChanged={vi.fn()} onOpenMaster={vi.fn()} stayInQueue />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quick review 1 suggestions first' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Review suggested links' }));
+    expect(dialog.getByRole('list', { name: 'Listing to Master pairs' }).children).toHaveLength(1);
+    fireEvent.click(dialog.getByRole('checkbox', { name: /I reviewed every/ }));
+    fireEvent.click(dialog.getByRole('button', { name: 'Confirm links' }));
+    expect(catalog.products()[0].channels).toHaveLength(1);
+    expect(screen.getByText('1 selected')).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Select listing UI-b from Shop 1' })).toBeChecked();
+  });
   it('shows creation instead of nonexistent suggestions in an isolated no-Masters catalog', () => {
     const catalog = createEmptyListingCatalog(getCatalogImportItems({ requireConfirmation: true }));
     const before = structuredClone(getProducts());
@@ -43,7 +112,7 @@ describe('Listing review drawer', () => {
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Same product demo');
     expect(screen.queryByRole('button', { name: 'Use existing Master' })).not.toBeInTheDocument();
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(catalog.products()).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Review suggestion' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Review suggestion' }));
@@ -53,7 +122,7 @@ describe('Listing review drawer', () => {
     expect(getProducts()).toEqual(before);
     expect(screen.queryByRole('button', { name: 'View updated Master' })).not.toBeInTheDocument();
   });
-  it('requires an explicit grouping choice and reviews different products sequentially', () => {
+  it('defaults to separate reviews and preserves creation intent after the first Master', () => {
     const sources = getCatalogImportItems({ requireConfirmation: true }).map((source, index) => ({ ...source, title: `Different product ${index}` }));
     const catalog = createEmptyListingCatalog(sources);
     const onChanged = vi.fn();
@@ -62,18 +131,17 @@ describe('Listing review drawer', () => {
     expect(screen.queryByRole('button', { name: 'Link to one Master' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create one Master' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Review selected listings' }));
-    expect(screen.getByRole('radio', { name: /Review separately/ })).toBeChecked();
+    expect(screen.getByText('Reviewing listing 1 of 2')).toBeVisible();
     expect(catalog.products()).toEqual([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Review first listing' }));
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Different product 0');
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(catalog.products()).toHaveLength(1);
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Different product 1');
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(catalog.products()).toHaveLength(2);
     expect(catalog.products().every(product => product.channels.length === 1)).toBe(true);
     expect(onChanged).toHaveBeenCalledTimes(2);
@@ -83,9 +151,7 @@ describe('Listing review drawer', () => {
     const catalog = createEmptyListingCatalog(fixtures);
     render(<ProductListingIntake catalog={catalog} onChanged={vi.fn()} onOpenMaster={vi.fn()} stayInQueue />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Review selected listings' }));
-    fireEvent.click(screen.getByRole('radio', { name: /Same product, one Master/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Review one product' }));
+    chooseListingGroup('Create one Master');
     editListingSection('Product essentials');
     expect(screen.getByRole('radio', { name: 'With variants' })).toBeChecked();
     fireEvent.click(screen.getByRole('checkbox', { name: /I checked/ }));
@@ -93,7 +159,7 @@ describe('Listing review drawer', () => {
     editListingSection('Variants, pricing & SKU mapping');
     expect(screen.getAllByLabelText('Master variant SKU')).toHaveLength(3);
     expect(screen.getAllByRole('combobox', { name: /Master SKU for shop SKU/ })).toHaveLength(6);
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(catalog.products()).toHaveLength(1);
     expect(catalog.products()[0].skus).toHaveLength(3);
     expect(catalog.products()[0].channels).toHaveLength(2);
@@ -111,7 +177,8 @@ describe('Listing review drawer', () => {
     expect(screen.getByRole('list', { name: 'Listing review steps' })).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Search shop listings' })).toHaveValue('Shop 0');
     expect(screen.getByRole('checkbox', { name: 'Select listing UI-a from Shop 0' })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Master' }));
+    expect(screen.getByRole('button', { name: 'Choose Master' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Review selected listings' }));
     expect(screen.queryByRole('region', { name: 'Listing review guide' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Back to listings' }));
     expect(screen.getByRole('button', { name: 'How this works' })).toHaveAttribute('aria-expanded', 'false');
@@ -132,7 +199,7 @@ describe('Listing review drawer', () => {
     expect(screen.getByRole('heading', { name: '2 listings to review' })).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Search shop listings' })).toHaveValue('Shop 0');
     expect(screen.getAllByRole('button', { name: 'Review suggestion' })).toHaveLength(1);
-    expect(screen.getByRole('checkbox', { name: 'Select listing UI-BACK from Shop 0' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select listing UI-BACK from Shop 0' })).not.toBeChecked();
     expect(screen.queryByRole('region', { name: 'Compare product details' })).not.toBeInTheDocument();
     expect(onStageChange).toHaveBeenLastCalledWith('queue');
     expect(onChanged).not.toHaveBeenCalled();
@@ -150,20 +217,19 @@ describe('Listing review drawer', () => {
     expect(getProducts().length).toBe(ids.size);
     expect(getCatalogImportItems({ requireConfirmation: true }).some(item => item.confirmed)).toBe(false);
   });
-  it('keeps direct link and create actions when Masters exist without an onboarding grouping step', () => {
+  it('keeps explicit grouping in a secondary menu while review separately remains primary', () => {
     const beforeProducts = structuredClone(getProducts());
     const beforeListings = structuredClone(getCatalogImportItems({ requireConfirmation: true }));
     const onChanged = vi.fn();
     render(<ProductListingIntake onChanged={onChanged} onOpenMaster={vi.fn()} stayInQueue />);
     expect(screen.getByRole('columnheader', { name: 'Product Master' })).toBeVisible();
     expect(screen.getAllByRole('button', { name: 'Choose Master' })).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: 'Create Master', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create Master' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select listing UI-a from Shop 0' }));
-    expect(screen.getByRole('button', { name: 'Link to one Master' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Create one Master' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Review selected listings' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Group as one product' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Review selected listings' })).toBeEnabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select listing UI-b from Shop 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Link to one Master' }));
+    chooseListingGroup('Link to one Master');
     expect(screen.getByRole('region', { name: 'Find a Product Master' })).toBeVisible();
     expect(screen.queryByRole('radio', { name: /Review separately/ })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Selected listings 2' })).toHaveTextContent('UI-a');
@@ -171,7 +237,7 @@ describe('Listing review drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to listings' }));
     expect(screen.getByRole('checkbox', { name: 'Select listing UI-a from Shop 0' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Select listing UI-b from Shop 1' })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Create one Master' }));
+    chooseListingGroup('Create one Master');
     expect(screen.getByRole('region', { name: 'Create one Master' })).toBeVisible();
     expect(screen.queryByRole('radio', { name: /Same product, one Master/ })).not.toBeInTheDocument();
     expect(onChanged).not.toHaveBeenCalled();
@@ -183,12 +249,12 @@ describe('Listing review drawer', () => {
     const onChanged = vi.fn();
     render(<ProductListingIntake onChanged={onChanged} onOpenMaster={onOpenMaster} />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create one Master' }));
+    chooseListingGroup('Create one Master');
     const dialog = within(screen.getByRole('region', { name: 'Create one Master' }));
     expect(dialog.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     fireEvent.click(dialog.getByRole('checkbox', { name: /I checked/ }));
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(onChanged).toHaveBeenCalledOnce();
     expect(onOpenMaster).not.toHaveBeenCalled();
     const product = getProductById(onChanged.mock.calls[0][0][0])!;
@@ -231,7 +297,7 @@ describe('Listing review drawer', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Choose Master' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Create new Master' }));
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(onOpenMaster).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: '1 listing to review' })).toBeVisible();
     const product = getProducts().find(item => !ids.has(item.id))!;
@@ -248,7 +314,7 @@ describe('Listing review drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to listings' }));
     expect(screen.getByRole('heading', { name: '2 listings to review' })).toBeVisible();
     expect(screen.queryByRole('group', { name: 'Source listing' })).not.toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Select listing UI-a from Shop 0' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select listing UI-a from Shop 0' })).not.toBeChecked();
     expect(onChanged).not.toHaveBeenCalled();
     expect(getCatalogImportItems({ requireConfirmation: true }).every(item => !item.confirmed)).toBe(true);
   });
@@ -258,21 +324,21 @@ describe('Listing review drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Choose Master' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create new Master' }));
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(screen.getByText('No listings match your search')).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Search shop listings' })).toHaveValue('Shop 0');
     expect(screen.getByRole('heading', { name: '1 listing to review' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(screen.getByText('Shop 1')).toBeVisible();
   });
-  it('shows one complete queue and exposes suggested confirmation only for an eligible selection', () => {
+  it('filters the queue without losing selected listings and offers the eligible subset', () => {
     const master = { ...getProducts()[0], ...readyMasterFields(), id: 'ui-batch-a', name: 'Master Alpha', sku_code: 'UI-ALPHA', brand: 'Test Brand', has_variants: false, product_type: 'single', skus: [], channels: [], status: 'draft', import_result: undefined } as Product;
     addProduct(master);
     const items = getCatalogImportItems({ requireConfirmation: true });
     saveCatalogImportItems([{ ...items[0], channelSku: master.sku_code, brand: master.brand, status: 'suggested', suggestedProductId: master.id, confidence: 99 }, items[1]]);
     render(<ProductListingIntake onChanged={vi.fn()} onOpenMaster={vi.fn()} stayInQueue />);
     expect(screen.getByRole('heading', { name: '2 listings to review' })).toBeVisible();
-    expect(screen.queryByRole('group', { name: 'Listing review filters' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Listing review filters' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /All listings|Suggested matches|Needs checking|Select eligible suggestions/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/eligible for bulk confirmation/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Choose Master' })).toBeVisible();
@@ -282,13 +348,15 @@ describe('Listing review drawer', () => {
     expect(screen.queryByRole('group', { name: 'Selected listing actions' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
     expect(screen.queryByRole('button', { name: /Review suggested links/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Link to one Master' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Create one Master' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Review selected listings' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Group as one product' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Review selected listings' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Quick review 1 suggestions first' })).toBeEnabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select listing UI-b from Shop 1' }));
+    expect(screen.getByRole('checkbox', { name: 'Select visible shop listings' })).toHaveAttribute('aria-checked', 'mixed');
     expect(screen.getByRole('button', { name: 'Review suggested links (1)' })).toBeEnabled();
     fireEvent.change(screen.getByRole('textbox', { name: 'Search shop listings' }), { target: { value: 'missing' } });
-    expect(screen.queryByRole('group', { name: 'Selected listing actions' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Selected listing actions' })).toBeVisible();
+    expect(screen.getByText('1 outside this view')).toBeVisible();
     expect(screen.getByRole('heading', { name: '2 listings to review' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(screen.getAllByRole('button', { name: /^(Choose Master|Review suggestion)$/ })).toHaveLength(2);
@@ -305,6 +373,7 @@ describe('Listing review drawer', () => {
     expect(screen.queryByText(/eligible for bulk confirmation/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
     expect(screen.queryByRole('button', { name: /Review suggested links/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Review suggestion' })[0]);
     expect(screen.getByRole('region', { name: 'Compare product details' })).toBeVisible();
     expect(screen.getByText('Suggested Product Master')).toBeVisible();

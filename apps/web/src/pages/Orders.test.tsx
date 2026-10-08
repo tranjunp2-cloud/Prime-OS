@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import Orders from './Orders';
@@ -9,8 +9,36 @@ import { ordersApi, type OrderRecord } from '@/lib/orders-api';
 vi.mock('@/lib/orders-api', async (load) => ({ ...await load<typeof import('@/lib/orders-api')>(), ordersApi: { list: vi.fn(), create: vi.fn(), command: vi.fn() } }));
 const order: OrderRecord = { id: 'order-test', orderKey: 'MAN-TEST', requestKey: 'req-1', version: 1, source: 'manual', canonicalStatus: 'created', orderedAt: '2026-09-10T10:00:00Z', currencyCode: 'VND', buyerSnapshot: { name: 'Lan', phone: '0900123456', email: '' }, shippingAddressSnapshot: { address: '123 Le Loi', city: 'HCM', country: 'VN', postalCode: '' }, lines: [{ sku: 'SKU-A', name: 'Product A', quantity: 2, unitPrice: 50000, lineTotal: 100000 }], totals: { subtotal: 100000, grandTotal: 100000 }, payment: { state: 'Unpaid', method: 'COD', reference: '' }, metadata: { store: 'Manual', warehouse: 'HCM', assignee: 'Unassigned', notes: '', tags: [] }, transitions: [], shipments: [], returnRequests: [], exceptions: [], activity: [] };
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
-function mount() { return render(<MemoryRouter><Orders /></MemoryRouter>); }
+function mount(url = '/orders') { return render(<MemoryRouter initialEntries={[url]}><Orders /></MemoryRouter>); }
 describe('Orders workspace', () => {
+  it('sorts by the real ship-by deadline before orders with no deadline', async () => {
+    const later = { ...order, id: 'later', orderKey: 'LATER', operations: { shipBy: '2026-10-10T12:00:00Z' } };
+    const urgent = { ...order, id: 'urgent', orderKey: 'URGENT', operations: { shipBy: '2026-10-08T12:00:00Z' } };
+    vi.mocked(ordersApi.list).mockResolvedValue({ data: [order, later, urgent], canWrite: true });
+    mount();
+    await screen.findByRole('button', { name: 'URGENT' });
+    const rows = within(screen.getByRole('table', { name: 'Orders' })).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('URGENT');
+    expect(rows[2]).toHaveTextContent('LATER');
+    expect(rows[3]).toHaveTextContent('MAN-TEST');
+  });
+  it('retains the processing queue after confirming an order leaves the selected filter', async () => {
+    const second = { ...order, id: 'second', orderKey: 'MAN-SECOND' };
+    vi.mocked(ordersApi.list).mockResolvedValue({ data: [order, second], canWrite: true });
+    vi.mocked(ordersApi.command).mockResolvedValue({ data: { ...order, version: 2, canonicalStatus: 'acknowledged' } });
+    mount('/orders?status=pending');
+    await screen.findByRole('button', { name: 'MAN-TEST' });
+    fireEvent.click(screen.getByRole('button', { name: 'MAN-TEST' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Order' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirm Order' })).getByRole('button', { name: 'Confirm Order' }));
+    await screen.findByRole('button', { name: 'Prepare order' });
+    expect(screen.getByText('Order 1 of 2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next order' }));
+    expect(screen.getByRole('heading', { name: 'MAN-SECOND' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    expect(screen.queryByRole('button', { name: 'MAN-TEST' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'MAN-SECOND' })).toBeInTheDocument();
+  });
   it('does not report empty results or urgent issues while loading or when the endpoint is missing', async () => {
     let rejectRequest!: (error: Error) => void;
     vi.mocked(ordersApi.list).mockReturnValue(new Promise((_, reject) => { rejectRequest = reject; }));
@@ -49,30 +77,62 @@ describe('Orders workspace', () => {
     vi.mocked(ordersApi.list).mockResolvedValue({data:[order,returned,delivered],canWrite:true}); mount();
     await screen.findByRole('button',{name:'MAN-TEST'});
     expect(screen.getByText('Return · closed')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:/^Completed/}));
+    fireEvent.click(screen.getByRole('button',{name:/^Delivered/}));
     expect(screen.getByRole('button',{name:'DELIVERED-TEST'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'RETURN-TEST'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Filters',exact:true}));
     fireEvent.change(screen.getByLabelText('Exact order status'),{target:{value:'closed'}});
     expect(screen.getByRole('button',{name:'RETURN-TEST'})).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Payment status'),{target:{value:'Paid'}});
     expect(screen.queryByRole('button',{name:'RETURN-TEST'})).not.toBeInTheDocument();
     expect(screen.getByLabelText('Exact order status').querySelectorAll('option')).toHaveLength(11);
   });
-  it('counts affected orders once and excludes routine unpaid orders from attention', async () => {
+  it('offers one review filter, counts affected orders once, and excludes routine unpaid orders', async () => {
     const routine={...order,payment:{...order.payment,method:'Bank transfer'}};
     const flagged={...order,id:'flagged',orderKey:'FLAGGED',syncError:true,pickupOverdue:true,needsPaymentVerification:true};
     const overdue={...order,id:'overdue',orderKey:'OVERDUE',sla:'Breached by 30m'};
     vi.mocked(ordersApi.list).mockResolvedValue({data:[routine,flagged,overdue],canWrite:true});mount();
-    const attention=await screen.findByRole('button',{name:'Needs attention (2)'});
+    const review=await screen.findByRole('button',{name:'Needs review 2'});
     expect(screen.queryByLabelText('Order summary')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Urgent actions')).not.toBeInTheDocument();
-    fireEvent.click(attention);
+    expect(screen.queryByRole('button',{name:/Needs attention/})).not.toBeInTheDocument();
+    fireEvent.click(review);
     expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
     expect(screen.getByRole('button',{name:'FLAGGED'})).toBeInTheDocument();
     expect(screen.getByRole('button',{name:'OVERDUE'})).toBeInTheDocument();
-    expect(attention).toHaveAttribute('aria-pressed','true');
-    fireEvent.click(attention);
+    expect(review).toHaveAttribute('aria-pressed','true');
+    expect(screen.queryByRole('button',{name:'Remove Needs review filter'})).not.toBeInTheDocument();
+    const stageFilters=within(screen.getByRole('group',{name:'Order stage filters'}));
+    expect(stageFilters.getByRole('button',{name:'All 3'})).toBeInTheDocument();
+    fireEvent.click(stageFilters.getByRole('button',{name:'All 3'}));
     expect(screen.getByRole('button',{name:'MAN-TEST'})).toBeInTheDocument();
+  });
+  it('keeps review accessible across lifecycle stages and scopes it to the selected shop', async () => {
+    const allocation={...order,id:'allocation',orderKey:'ALLOCATION',canonicalStatus:'allocated' as const,reservation:'Allocation failed'};
+    const sync={...order,id:'sync',orderKey:'SYNC',canonicalStatus:'allocated' as const,syncError:true,metadata:{...order.metadata,store:'Shopee'}};
+    const routine={...order,id:'routine',orderKey:'ROUTINE',canonicalStatus:'allocated' as const};
+    const failed={...order,id:'failed',orderKey:'FAILED',canonicalStatus:'shipped' as const,shipments:[{carrier:'GHN',tracking:'TRACK-1',status:'Failed',deliveryOutcome:'failed' as const}]};
+    vi.mocked(ordersApi.list).mockResolvedValue({data:[allocation,sync,routine,failed],canWrite:true});
+    mount('/orders?status=ready&orderStage=review');
+    await screen.findByRole('button',{name:'ALLOCATION'});
+    expect(screen.getByRole('button',{name:'SYNC'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'ROUTINE'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Needs review 2'})).toHaveAttribute('aria-pressed','true');
+    expect(screen.getAllByText('Allocation failed').length).toBeGreaterThan(0);
+    expect(screen.getByText('Channel sync failed')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filter by shop'),{target:{value:'Manual'}});
+    expect(screen.queryByRole('button',{name:'SYNC'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Needs review 1'})).toHaveAttribute('aria-pressed','true');
+    fireEvent.click(screen.getByRole('button',{name:'ALLOCATION'}));
+    fireEvent.click(screen.getByRole('button',{name:'Close'}));
+    expect(screen.getByRole('button',{name:'Needs review 1'})).toHaveAttribute('aria-pressed','true');
+    fireEvent.click(screen.getByRole('button',{name:'Shipping 1',hidden:true}));
+    fireEvent.click(screen.getByRole('button',{name:'Needs review 1'}));
+    expect(screen.getByRole('button',{name:'FAILED'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'ALLOCATION'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:/Needs attention/})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
+    expect(screen.getByRole('button',{name:'Needs review 1'})).toHaveAttribute('aria-pressed','false');
   });
   it('creates an order, updates the list, and displays the saved detail', async () => {
     vi.mocked(ordersApi.list).mockResolvedValue({ data: [], canWrite: true });
@@ -100,4 +160,77 @@ describe('Orders workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await screen.findByRole('button', { name: 'MAN-TEST' }); expect(screen.getByRole('button', { name: 'Create order' })).toBeDisabled();
   });
+  it('keeps counts and rows scoped to the same shop, warehouse, payment and date filters, excluding drafts', async () => {
+    const second = {...order, id:'second', orderKey:'SECOND', orderedAt:'2026-09-11T10:00:00Z', canonicalStatus:'delivered' as const, metadata:{...order.metadata,store:'Shopee',warehouse:'HN'}};
+    const completed = {...order, id:'completed', orderKey:'CLOSED', canonicalStatus:'closed' as const, payment:{...order.payment,state:'Paid'}};
+    const draft = {...order, id:'draft', orderKey:'DRAFT', canonicalStatus:'draft' as const};
+    vi.mocked(ordersApi.list).mockResolvedValue({data:[order,second,completed,draft],canWrite:true}); mount();
+    await screen.findByRole('button',{name:'MAN-TEST'});
+    const nav=within(screen.getByRole('navigation',{name:'Order lifecycle',hidden:true}));
+    expect(nav.getByRole('button',{name:'All 3',hidden:true})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'DRAFT'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Drafts (1)'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'On hold (0)'})).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filter by shop'),{target:{value:'Manual'}});
+    expect(nav.getByRole('button',{name:'All 2',hidden:true})).toBeInTheDocument();
+    expect(nav.getByRole('button',{name:'Delivered 0',hidden:true})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Filters',exact:true}));
+    fireEvent.change(screen.getByLabelText('Warehouse / Branch'),{target:{value:'HCM'}});
+    fireEvent.change(screen.getByLabelText('Payment status'),{target:{value:'Paid'}});
+    expect(nav.getByRole('button',{name:'All 1',hidden:true})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'CLOSED'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Remove Warehouse: HCM filter'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
+    expect(nav.getByRole('button',{name:'All 3',hidden:true})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('From date'),{target:{value:'2026-09-10'}});
+    fireEvent.change(screen.getByLabelText('To date'),{target:{value:'2026-09-10'}});
+    expect(nav.getByRole('button',{name:'All 2',hidden:true})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'SECOND'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
+    fireEvent.click(screen.getByRole('button',{name:'Drafts (1)'}));
+    expect(screen.getByRole('button',{name:'DRAFT'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
+  });
+  it('separates delivered from completed and keeps rejected returns in the current stage',async()=>{
+    const delivered={...order,id:'delivered',orderKey:'DELIVERED',canonicalStatus:'delivered' as const,returnRequests:[{id:'r',status:'rejected',reason:'Test',items:[]}]};
+    const completed={...order,id:'completed',orderKey:'COMPLETED',canonicalStatus:'closed' as const};
+    vi.mocked(ordersApi.list).mockResolvedValue({data:[delivered,completed],canWrite:true});mount();
+    await screen.findByRole('button',{name:'DELIVERED'});
+    fireEvent.click(screen.getByRole('button',{name:'Delivered 1',hidden:true}));
+    expect(screen.getByRole('button',{name:'DELIVERED'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'COMPLETED'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Completed 1',hidden:true}));
+    expect(screen.getByRole('button',{name:'COMPLETED'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'DELIVERED'})).not.toBeInTheDocument();
+  });
+  it('exposes preparation stages and keeps a selected stage when opening and closing details',async()=>{
+    const preparing={...order,id:'preparing',orderKey:'PREPARING',canonicalStatus:'allocated' as const,readyForPickup:true};
+    const ready={...order,id:'ready',orderKey:'READY',canonicalStatus:'fulfillment_in_progress' as const,readyForPickup:true};
+    vi.mocked(ordersApi.list).mockResolvedValue({data:[preparing,ready],canWrite:true});mount('/orders?status=ready&orderStage=pickup');
+    await screen.findByRole('button',{name:'READY'});
+    expect(screen.queryByRole('button',{name:'PREPARING'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Ready to ship 1'})).toHaveAttribute('aria-pressed','true');
+    fireEvent.click(screen.getByRole('button',{name:'READY'}));
+    expect(within(screen.getByRole('region',{name:'Current order step'})).getByRole('heading',{name:'Ready to ship'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Close',exact:true}));
+    expect(screen.queryByRole('button',{name:'PREPARING'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Preparing 1'}));
+    expect(screen.getByRole('button',{name:'PREPARING'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'READY'})).not.toBeInTheDocument();
+  });
+  it('filters refund-only records and payment review from the original payment object',async()=>{
+    const refunded={...order,id:'refund',orderKey:'REFUND',canonicalStatus:'closed' as const,payment:{...order.payment,state:'Refunded'}};
+    const review={...order,id:'payment-review',orderKey:'PAYMENT-REVIEW',payment:{...order.payment,method:'Bank transfer',reference:'TRANSFER-1'}};
+    vi.mocked(ordersApi.list).mockResolvedValue({data:[order,refunded,review],canWrite:true});mount();
+    await screen.findByRole('button',{name:'MAN-TEST'});
+    expect(screen.getByRole('button',{name:'Needs review 1'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Returns & refunds 1',hidden:true}));
+    expect(screen.getByRole('button',{name:'REFUND'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Awaiting confirmation 2',hidden:true}));
+    fireEvent.click(screen.getByRole('button',{name:'Awaiting payment 1'}));
+    expect(screen.getByRole('button',{name:'PAYMENT-REVIEW'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
+  });
+
 });

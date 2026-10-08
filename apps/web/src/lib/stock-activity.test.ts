@@ -15,6 +15,21 @@ const holds: StockHoldChange[] = [
 ];
 const source = createStockActivitySource([product], holds, warehouses);
 describe('stock activity source', () => {
+  it('filters opening counts, receipts and corrections independently, including legacy records', () => {
+    const record = product.inventory_adjustments[0];
+    const records = [
+      { ...record, id: 'opening', before: null, after: 7, kind: 'opening' as const, reason: 'Opening stock' },
+      { ...record, id: 'receipt', before: 7, after: 10, kind: 'receipt' as const, reason: 'Goods received' },
+      { ...record, id: 'correction', before: 10, after: 5, kind: 'adjustment' as const },
+      { ...record, id: 'legacy-receipt', before: 5, after: 8, reason: 'Goods received' },
+      { ...record, id: 'legacy-opening', before: null, after: 4 },
+    ];
+    const history = createStockActivitySource([{ ...product, inventory_adjustments: records, inventory_transfers: [] }], [], warehouses);
+    expect(history.query({ ...defaultActivityFilters, type: 'opening' }, 1, null, now).items.map(item => item.id).sort()).toEqual(['legacy-opening', 'opening']);
+    expect(history.query({ ...defaultActivityFilters, type: 'receipt' }, 1, null, now).items.map(item => item.id).sort()).toEqual(['legacy-receipt', 'receipt']);
+    expect(history.query({ ...defaultActivityFilters, type: 'adjustment' }, 1, null, now).items).toEqual([expect.objectContaining({ id: 'correction', quantity: -5, before: 10, after: 5 })]);
+    expect(records[3]).not.toHaveProperty('kind');
+  });
   it('merges saved records newest first and excludes older activity by default', () => {
     const result = source.query(defaultActivityFilters, 1, null, now);
     expect(result.items.map(item => item.id)).toEqual(['released-1', 'held-1', 'move-1', 'adjust-new']);

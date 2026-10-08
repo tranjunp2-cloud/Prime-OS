@@ -42,18 +42,33 @@ function readStore() { ensureStore(); return JSON.parse(fs.readFileSync(STORE_PA
 function writeStore(store) { ensureStore(); const temp = `${STORE_PATH}.tmp`; fs.writeFileSync(temp, JSON.stringify(store, null, 2)); fs.renameSync(temp, STORE_PATH); }
 
 export function listAvailablePlatforms() { return platforms.map((platform) => ({ ...platform, icon_url: `/platform-icons/${platform.id}.svg` })); }
-export function listChannelWarehouses() { return warehouses; }
+export function listChannelWarehouses() { return [...new Map([...warehouses, ...readStore().channels.map(item => item.warehouse_snapshot).filter(Boolean)].map(item => [item.id, item])).values()]; }
 export function listConnectedChannels() { return readStore().channels.map(enrichChannel); }
 export function getChannelPlatform(platformId) { return platforms.find((platform) => platform.id === platformId) || null; }
-function enrichChannel(channel) { return { ...channel, warehouse: warehouses.find((item) => item.id === channel.physical_warehouse_id) || null }; }
+function enrichChannel(channel) { return { ...channel, warehouse: channel.warehouse_snapshot?.id === channel.physical_warehouse_id ? channel.warehouse_snapshot : warehouses.find((item) => item.id === channel.physical_warehouse_id) || null }; }
+
+export function updateChannelWarehouse(id, input) {
+  const store = readStore();
+  const channel = store.channels.find(item => item.id === id);
+  if (!channel) throw Object.assign(new Error('Connected shop not found.'), { statusCode: 404 });
+  const warehouse = input.warehouse;
+  if (!warehouse || ['id', 'name', 'code', 'city'].some(key => typeof warehouse[key] !== 'string') || !warehouse.id.trim() || !warehouse.name.trim() || !warehouse.code.trim()) throw Object.assign(new Error('Choose a valid warehouse.'), { statusCode: 400 });
+  if ((channel.physical_warehouse_id ?? null) !== (input.expected_warehouse_id ?? null)) throw Object.assign(new Error('This shop was linked elsewhere while you were editing. Reload its current connection.'), { statusCode: 409 });
+  channel.physical_warehouse_id = warehouse.id;
+  channel.warehouse_snapshot = { id: warehouse.id, name: warehouse.name.trim(), code: warehouse.code.trim(), city: warehouse.city.trim() };
+  // Changing the source is configuration, never evidence that marketplace stock was published.
+  writeStore(store);
+  return enrichChannel(channel);
+}
 
 export function connectChannel(input) {
   const platform = getChannelPlatform(input.platform);
   if (!platform) throw Object.assign(new Error('Unsupported channel platform.'), { statusCode: 400 });
   if (!input.store_name || !input.auth_code || !input.physical_warehouse_id) throw Object.assign(new Error('Store name, authorization, and warehouse mapping are required.'), { statusCode: 400 });
-  if (!warehouses.some((warehouse) => warehouse.id === input.physical_warehouse_id)) throw Object.assign(new Error('Physical warehouse not found.'), { statusCode: 400 });
+  if (!listChannelWarehouses().some((warehouse) => warehouse.id === input.physical_warehouse_id)) throw Object.assign(new Error('Physical warehouse not found.'), { statusCode: 400 });
   const store = readStore();
   const channel = { id: `channel_${randomUUID()}`, platform: platform.id, name: platform.name, store_name: String(input.store_name).trim(), region: input.region || 'VN', type: platform.category === 'Marketplaces' ? 'Marketplace' : platform.category, status: 'INITIAL_SYNCING', synced_listings: 0, sync_progress: 8, physical_warehouse_id: input.physical_warehouse_id, sync_services: { price: input.sync_services?.price !== false, stock: input.sync_services?.stock !== false, orders: input.sync_services?.orders !== false }, is_default_pickup: Boolean(input.is_default_pickup), is_default_return: Boolean(input.is_default_return), catalog_strategy: input.catalog_strategy || 'AUTO_MATCH_SKU', errors: 0, last_sync_at: new Date().toISOString(), poll_count: 0 };
+  channel.warehouse_snapshot = listChannelWarehouses().find(item => item.id === input.physical_warehouse_id);
   store.channels.unshift(channel); writeStore(store); return enrichChannel(channel);
 }
 

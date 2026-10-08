@@ -14,11 +14,35 @@ const products = [{ ...getProducts()[0], id: 'shirt', name: 'Shirt', has_variant
 const setup = () => render(<MemoryRouter><MyWarehouses warehouses={warehouses} products={products} /></MemoryRouter>);
 
 describe('My warehouses overview', () => {
+  it('places opening counts in warehouse setup instead of an Add products action', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [] });
+    const onAddStock = vi.fn();
+    render(<MemoryRouter><MyWarehouses warehouses={[{ id: 'wh_crjp', name: 'Japan HQ' }]} products={[{ ...products[0], inventory: { wh_crjp: 7 } }]} warehouseId="wh_crjp" onAddStock={onAddStock} /></MemoryRouter>);
+    await screen.findByText('0 linked shops · 0 channels');
+    expect(screen.queryByRole('button', { name: 'Add products' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Record opening stock' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Warehouse details' }));
+    expect(screen.getByRole('heading', { name: 'Stock setup' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Record opening stock' }));
+    expect(onAddStock).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh_crjp' }));
+  });
+  it('shows incoming-only stock instead of empty setup and keeps sidebar and table counts consistent', async () => {
+    vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [] });
+    const pending = { ...products[0], inventory: {}, skus: [], inventory_transfers: [{ id: 'pending', sku: products[0].sku_code, fromWarehouseId: 'wh_rslsg', toWarehouseId: 'wh_crjp', quantity: 3, fromBefore: 3, fromAfter: 0, toBefore: null, toAfter: 3, createdAt: '2026-10-08T00:00:00Z', status: 'in_transit' as const }] };
+    const catalog = { ...pending, id: 'catalog', name: 'Catalog only', inventory_transfers: [] };
+    render(<MemoryRouter><MyWarehouses warehouses={[{ id: 'wh_crjp', name: 'Japan HQ' }]} products={[pending, catalog]} positions={[]} warehouseId="wh_crjp" onAddStock={vi.fn()} /></MemoryRouter>);
+    await screen.findByText('0 linked shops · 0 channels');
+    expect(screen.queryByText('Set up opening stock')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Catalog only' })).not.toBeInTheDocument();
+    expect(screen.getByText('Incoming stock · Count not recorded')).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /^Product/ })).toHaveTextContent('1 product');
+    expect(within(screen.getByRole('region', { name: 'Choose a warehouse' })).getByRole('button', { name: /Japan HQ/ })).toHaveTextContent('1 product · — units');
+  });
   afterEach(() => { cleanup(); vi.resetAllMocks(); });
   it('counts shops separately from platforms and keeps warehouse cards and stock filters in sync', async () => {
     vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [1, 2].map(id => ({ id: String(id), platform: 'shopee', name: 'Shopee', store_name: `Shop ${id}`, region: 'VN', type: 'Marketplace', status: 'CONNECTED', synced_listings: 1, sync_progress: 100, warehouse: { ...warehouses[0], code: 'N', city: 'North' }, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '' })) });
     setup();
-    expect(await screen.findByText('2 shops · 1 channel')).toBeInTheDocument();
+    expect(await screen.findByText('2 linked shops · 1 channel')).toBeInTheDocument();
     const cards = within(screen.getByRole('region', { name: 'Choose a warehouse' }));
     expect(cards.getByRole('button', { name: /All warehouses/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('columnheader', { name: /^Stock/ })).toBeInTheDocument();
@@ -39,7 +63,7 @@ describe('My warehouses overview', () => {
   it('opens the clicked warehouse details without changing the product table or filters', async () => {
     vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: warehouses.map((warehouse, index) => ({ id: String(index), platform: 'shopee', name: 'Shopee', store_name: `Shop ${warehouse.name}`, region: 'VN', type: 'Marketplace', status: 'CONNECTED', synced_listings: 1, sync_progress: 100, warehouse: { ...warehouse, code: warehouse.id, city: warehouse.name }, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '' })) });
     setup();
-    await screen.findByText('2 shops · 1 channel');
+    await screen.findByText('2 linked shops · 1 channel');
     fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'shir' } });
     fireEvent.change(screen.getByLabelText('Stock status'), { target: { value: 'available' } });
     fireEvent.change(screen.getByLabelText('Sort products'), { target: { value: 'low' } });
@@ -68,17 +92,17 @@ describe('My warehouses overview', () => {
   it('keeps legacy channel demo locations within the five demo warehouses', async () => {
     vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [{ id: 'demo-shop', platform: 'lazada', name: 'Lazada', store_name: 'Demo shop', region: 'VN', type: 'Marketplace', status: 'CONNECTED', synced_listings: 1, sync_progress: 100, warehouse: { id: 'wh_hn_01', name: 'Hanoi Hub', code: 'HN', city: 'Hanoi' }, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '' }] });
     render(<MemoryRouter><MyWarehouses warehouses={getWarehouses()} products={getProducts()} /></MemoryRouter>);
-    expect(await screen.findByText('1 shop · 1 channel')).toBeInTheDocument();
+    expect(await screen.findByText('1 linked shop · 1 channel')).toBeInTheDocument();
     const list = within(screen.getByRole('region', { name: 'Choose a warehouse' }));
     expect(list.getAllByRole('button')).toHaveLength(6);
     expect(list.queryByRole('button', { name: /Hanoi Hub|Unidentified warehouse/ })).not.toBeInTheDocument();
     fireEvent.click(list.getByRole('button', { name: /Vietnam 3PL Partner/ }));
-    expect(screen.getByText('1 shop · 1 channel')).toBeInTheDocument();
+    expect(screen.getByText('1 linked shop · 1 channel')).toBeInTheDocument();
   });
   it('keeps overview accessible when searching locations and supports mobile scope changes', async () => {
     vi.mocked(channelIntegrationsApi.channels).mockResolvedValue({ data: [] });
     setup();
-    await screen.findByText('0 shops · 0 channels');
+    await screen.findByText('0 linked shops · 0 channels');
     const list = within(screen.getByRole('region', { name: 'Choose a warehouse' }));
     fireEvent.change(screen.getByLabelText('Find a warehouse'), { target: { value: 'No match' } });
     expect(list.getByRole('button', { name: /All warehouses/ })).toBeInTheDocument();
@@ -94,7 +118,7 @@ describe('My warehouses overview', () => {
     vi.mocked(channelIntegrationsApi.channels).mockRejectedValue(new Error('offline'));
     setup();
     expect(await screen.findByText('Shop links unavailable. Stock is still available.')).toBeInTheDocument();
-    expect(screen.queryByText('0 shops · 0 channels')).not.toBeInTheDocument();
+    expect(screen.queryByText('0 linked shops · 0 channels')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry shop links' })).toBeInTheDocument();
     expect(within(screen.getByRole('table').querySelector('tbody')!).getByText('10')).toBeInTheDocument();
   });

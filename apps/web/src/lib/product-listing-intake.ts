@@ -1,5 +1,7 @@
 import { getCatalogImportItems, type CatalogImportItem } from './catalog-import-store';
-import { getProducts, type Product, type ProductType } from './product-store';
+import { getProducts, type Product, type ProductType, type ListingDraftValues } from './product-store';
+import { listingDraftErrors, LISTING_DRAFT_FIELDS, mergeListingValues } from './listing-local-draft';
+import { previewListing } from './listing-sync-readiness';
 import { savedListingCatalog, type ListingIntakeCatalog } from './listing-intake-catalog';
 import { commitExistingListingReviews, legacyIssueSignature, legacyListingReviews, legacyMappingIssues } from './legacy-listing-review';
 import { listingMatchEvidence, suggestedMasterForReview } from './listing-match-evidence';
@@ -24,8 +26,9 @@ export type CreateListingMasterInput = {
   completion?: Partial<MasterCompletion>;
   variantMappings?: VariantMappings;
   defer?: boolean;
+  listingDrafts?: Record<string, ListingDraftValues>;
 };
-export type ExistingListingMasterInput = { productId: string; reviewed?: ListingMatchReview[]; verifiedSingleListingIds?: string[]; variantMappings?: VariantMappings; defer?: boolean; completion?: Partial<MasterCompletion>; activate?: boolean };
+export type ExistingListingMasterInput = { productId: string; reviewed?: ListingMatchReview[]; verifiedSingleListingIds?: string[]; variantMappings?: VariantMappings; defer?: boolean; completion?: Partial<MasterCompletion>; activate?: boolean; listingDrafts?: Record<string, ListingDraftValues> };
 
 export function snapshotListingSource(item: CatalogImportItem): ListingSourceReview {
   return { itemId: item.id, signature: JSON.stringify(item) };
@@ -153,7 +156,7 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
       throw new Error('Source listing data changed during review. Return to listings and review the latest data before creating a Master.');
     }
     const sku = target.sku.trim().toUpperCase();
-    if (target.name.trim().length < 3 || !sku) throw new Error('Enter a product name and Master SKU.');
+    if (!target.name.trim() || !sku) throw new Error('Enter a product name and Master SKU.');
     if (products.some(item => item.sku_code.toUpperCase() === sku || item.skus.some(variant => variant.sku_code.toUpperCase() === sku))) throw new Error('This SKU already exists. Choose the existing Master or use another SKU.');
     const productType = target.productType ?? (source.variants > 1 ? 'variant' : 'single');
     if (!target.defer && selected.some(item => item.variants === 0) && !target.verifiedSourceStructure) throw new Error('Verify the source product structure before creating a Master.');
@@ -183,10 +186,18 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
   const mappingError = variantMappingError(selected, product, target.variantMappings, verified);
   if (mappingError && !target.defer) throw new Error(mappingError);
   const savedDraft = 'productId' in target && target.completion && target.defer ? applyMasterCompletion(product, [], target.completion) : undefined;
+  // Listing-owned details are local drafts, never Master fields or provider snapshots.
+  for (const source of selected) {
+    const patch = target.listingDrafts?.[source.id];
+    if (!patch) continue;
+    if (Object.keys(patch).some(key => !Object.prototype.hasOwnProperty.call(LISTING_DRAFT_FIELDS, key))) throw new Error('Only supported listing fields can be edited.');
+    const error = Object.values(listingDraftErrors(product, previewListing(source, product, target.variantMappings?.[source.id]), patch))[0];
+    if (error) throw new Error(error);
+  }
   const progress = target.defer ? Object.fromEntries(selected.map(source => [source.id,
     savedReviewProgress(source, product, target.variantMappings ?? {}, verified, savedDraft, !('productId' in target) || Boolean(savedDraft))])) : undefined;
   if (existingLinkReview) {
-    commitExistingListingReviews(selected, product, !('productId' in target), target.variantMappings, progress, catalog);
+    commitExistingListingReviews(selected, product, !('productId' in target), target.variantMappings, progress, catalog, target.listingDrafts);
     return { productId: product.id, reviewSaved: true, deferred: Boolean(target.defer), masterUpdated: Boolean('productId' in target && target.completion && !target.defer) };
   }
   const result: Product = {
@@ -195,6 +206,7 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
     record_version: 'productId' in target ? (product.record_version ?? 1) + 1 : 1,
     channels: [...product.channels, ...selected.map(item => ({ channel: item.channel, external_id: item.listingId,
       store_name: item.storeName, shop_sku: item.channelSku, reported_stock: item.channelStock, shop_snapshot: snapshotShopListing(item),
+      ...(target.listingDrafts?.[item.id] ? { local_draft: { values: mergeListingValues({}, target.listingDrafts[item.id]), updated_at: new Date().toISOString() } } : {}),
       status: 'draft' as const, publication_unconfirmed: true, listing_url: item.listingUrl || null, last_synced_at: null, identity_review_signature: legacyIssueSignature(product), variant_mappings: target.defer ? undefined : target.variantMappings?.[item.id], review_pending: progress?.[item.id] }))],
     import_sources: [...(product.import_sources ?? []), ...selected.map(item => ({ channel: item.channel, store: item.storeName, listing_id: item.listingId, shop_sku: item.channelSku, brand: item.brand || '', price: item.price, currency: item.currency }))],
   };

@@ -22,6 +22,8 @@ const SOURCE_LABELS: Record<string, string> = {
   LIVESTREAM_FB: 'Facebook Live',
   LAZADA: 'Lazada',
   SHOPEE: 'Shopee',
+  AMAZON: 'Amazon',
+  RAKUTEN: 'Rakuten',
   CHECKOUT: 'Checkout',
   MANUAL: 'Manual',
 };

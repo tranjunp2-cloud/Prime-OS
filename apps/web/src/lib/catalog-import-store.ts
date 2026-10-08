@@ -21,6 +21,7 @@ export interface CatalogImportItem {
   variantItems?: ShopListingSnapshot['variant_items'];
   shipping?: ListingDraftValues['shipping'];
   channelSettings?: ListingDraftValues['channel_settings'];
+  requirements?: import('./listing-requirements').ListingRequirements;
   variants: number;
   channelStock: number;
   channelCategory: string;

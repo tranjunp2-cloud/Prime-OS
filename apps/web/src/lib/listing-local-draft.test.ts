@@ -9,6 +9,7 @@ const id = 'listing-local-draft-test';
 const listing: ChannelListing = { channel: 'lazada', external_id: 'listing-a', store_name: 'Shop A', shop_sku: 'SKU-A', status: 'active', publication_unconfirmed: true, listing_url: null, last_synced_at: '2026-10-01T00:00:00Z', reported_stock: 0,
   shop_snapshot: { channel: 'lazada', store_name: 'Shop A', listing_id: 'listing-a', shop_sku: 'SKU-A', title: 'Shop title', brand: 'Shop brand', category: 'Shop category', images: ['/one.jpg'], price: { amount: 29, currency: 'USD' }, stock: 0, recorded_at: '2026-10-01T00:00:00Z' } };
 function fixture(extra: Partial<Product> = {}) {
+  listing.shop_snapshot!.requirements = { channel: 'lazada', category: 'Shop category', revision: 'test-v1', origin: 'prototype', fields: [] };
   addProduct({ ...getProducts()[0], id, status: 'draft', import_activation_paused: true, name: '', images: [], inventory: {}, import_sources: [],
     channels: [listing, { ...listing, external_id: 'listing-b', shop_sku: 'SKU-B' }, { ...listing, store_name: 'Shop B' }],
     channel_overrides: { lazada: { enabled: true, title: 'Unrelated configured listing', description: '', price_markup: 0, channel_price: 999, channel_currency: 'JPY' } }, ...extra });
@@ -70,10 +71,41 @@ describe('Listing-owned local edits', () => {
       expect(getProductById(id)).toBe(before);
     }
     const preference: MasterSyncPreference = { enabled: true, fields: ['price'], pricing: { currency: 'USD' } };
-    saveListingLocalDraft(id, target, { category: 'New category' }, snapshot, { preference, masterSnapshot: masterSyncSnapshot(before), reviewedPlan: masterSyncPlan(before, target, preference).signature });
+    saveListingLocalDraft(id, target, { brand: 'New brand' }, snapshot, { preference, masterSnapshot: masterSyncSnapshot(before), reviewedPlan: masterSyncPlan(before, target, preference).signature });
     expect(getProductById(id)!.channels[0].master_data_sync?.pricing).toEqual({ currency: 'USD' });
-    expect(getProductById(id)!.channels[0].local_draft?.values).toEqual({ category: 'New category' });
+    expect(getProductById(id)!.channels[0].local_draft?.values).toEqual({ brand: 'New brand' });
     expect(getProductById(id)!.retail_price).toBe(42);
+  });
+  it('does not enable sync using the old requirements when category changes in the same save', () => {
+    const before = fixture({ name: 'Master name', product_type: 'single', has_variants: false });
+    const target = before.channels[0];
+    const preference: MasterSyncPreference = { enabled: true, fields: ['content'] };
+    expect(() => saveListingLocalDraft(id, target, { category: 'Different category' }, listingEditSnapshot(before, target), {
+      preference, masterSnapshot: masterSyncSnapshot(before), reviewedPlan: masterSyncPlan(before, target, preference).signature,
+    })).toThrow('Channel requirements not checked');
+    expect(getProductById(id)).toBe(before);
+  });
+  it('validates completed listing fields when enabling sync in the same save', () => {
+    fixture({ name: 'Master name', product_type: 'single', has_variants: false });
+    updateProduct(id, { id, channels: [{ ...listing, shop_snapshot: { ...listing.shop_snapshot!, requirements: {
+      channel: 'lazada', category: 'Shop category', revision: 'test-material-v1', origin: 'prototype',
+      fields: [{ key: 'channel_settings.attribute_material', label: 'Material', kind: 'text' }],
+    } } }] });
+    const before = getProductById(id)!, target = before.channels[0];
+    const preference: MasterSyncPreference = { enabled: true, fields: ['content'] };
+    const patch = { channel_settings: { attribute_material: 'Paper' } };
+    expect(masterSyncPlan(before, target, preference).error).toContain('Material');
+    const reviewed = masterSyncPlan(before, target, preference, undefined, undefined, patch);
+    expect(reviewed.error).toBeFalsy();
+    saveListingLocalDraft(id, target, patch, listingEditSnapshot(before, target), {
+      preference, masterSnapshot: masterSyncSnapshot(before), reviewedPlan: reviewed.signature,
+    });
+    const after = getProductById(id)!;
+    expect(after.channels[0].local_draft?.values).toEqual(patch);
+    expect(after.channels[0].master_data_sync).toMatchObject(preference);
+    expect(after.channels[0].shop_snapshot).toEqual(target.shop_snapshot);
+    expect(after.specifications).toEqual(before.specifications);
+    expect(after.name).toBe(before.name);
   });
   it('allows detaching a group without fixing unrelated incomplete legacy sync setup', () => {
     const before = fixture({ channels: [{ ...listing, master_data_sync: { enabled: true, fields: ['content', 'media'], updated_at: '' } }] });
