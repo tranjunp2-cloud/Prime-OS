@@ -1,3 +1,5 @@
+import { OverviewDemoMode, OverviewNoData } from '@/components/shared/OverviewDemoMode';
+import { isNoDataOverview } from '@/components/seller-onboarding/demo-state';
 import Orders from '@/pages/Orders';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -455,7 +457,7 @@ function ModuleHeader({
   snapshot: GrowthOsSnapshot;
 }) {
   return (
-    <WorkspacePageHeader title={module.title} description={module.subtitle} icon={module.icon} />
+    <WorkspacePageHeader title={module.title} description={module.subtitle} icon={module.icon} actions={module.id === 'overview' ? <OverviewDemoMode /> : undefined} />
   );
 }
 
@@ -5298,11 +5300,22 @@ export function PrimeGrowthOSPage() {
   const queryClient = useQueryClient();
   const activeModuleId = normalizeModuleId(searchParams.get('module'));
   const activeModule = moduleMap.get(activeModuleId) || primeModules[0];
+  const isNoDataDemo = activeModuleId === 'overview' && isNoDataOverview(searchParams);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['growth-os'],
     queryFn: fetchGrowthOsSnapshot,
+    enabled: !isNoDataDemo,
     staleTime: 60_000,
   });
+
+  if (isNoDataDemo) {
+    return <div className="prime-stage h-full overflow-y-auto overflow-x-hidden text-foreground">
+      <div className="flex min-h-full w-full min-w-0 flex-col gap-5 px-4 pb-24 pt-4 sm:px-6 lg:px-7 xl:pr-20">
+        <WorkspacePageHeader title={activeModule.title} description={activeModule.subtitle} icon={activeModule.icon} actions={<OverviewDemoMode />} />
+        <OverviewNoData />
+      </div>
+    </div>;
+  }
 
   if (error && !data) {
     return (

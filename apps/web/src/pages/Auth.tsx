@@ -10,6 +10,7 @@ import { Loader2, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { seedDemoData } from '@/lib/demo-data-seeder';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { getAuthDictionary } from '@/lib/i18n/shell-dictionaries';
+import { defaultHomePath } from '@/components/seller-onboarding/demo-state';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ export default function Auth() {
 
   // Redirect if already logged in
   if (user) {
-    return <Navigate to="/overview" replace />;
+    return <Navigate to={defaultHomePath()} replace />;
   }
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -52,7 +53,7 @@ export default function Auth() {
           title: authCopy.welcomeTitle,
           description: authCopy.workspaceLoaded,
         });
-        navigate('/overview', { replace: true });
+        navigate(defaultHomePath(), { replace: true });
       } else {
         throw new Error(authCopy.loadWorkspaceFailed);
       }

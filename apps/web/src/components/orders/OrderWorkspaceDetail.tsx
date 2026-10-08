@@ -1,5 +1,6 @@
 import { OrderShipmentJourney } from './OrderShipmentJourney';
 import { OrderProcessingDialog } from './OrderProcessingDialog';
+import { confirmationBlocker } from '@/lib/order-bulk';
 import { orderNextAction, paymentAllowsPreparation, type ProcessingAction } from '@/lib/order-processing';
 import { completionBlocker } from '@/lib/order-processing';
 import { prototypePreparation } from '@/lib/order-preparation';
@@ -61,6 +62,13 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   const [success, setSuccess] = useState('');
   const flow = getOrderDetailFlow(order);
   const permissions = getOrderDetailPermissions(order, canWrite);
+  const hasPackingSlip = order.lines.length > 0;
+  const showPackingSlipInHeader = hasPackingSlip && order.metadata.handlingType === 'self'
+    && ['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus);
+  const packingSlipMenuLabel = ['partially_shipped', 'shipped', 'delivered', 'closed'].includes(order.canonicalStatus)
+    ? 'Reprint packing slip' : 'Print packing slip';
+  const packingSlipDisabled = pending || Boolean(order.hold?.active);
+  const packingSlipDisabledReason = order.hold?.active ? 'Release the hold before printing packing slips.' : undefined;
   const openExceptions = order.exceptions.filter((issue) => issue.status === 'open');
   const history = getOrderActivity(order);
   // Read-only real orders still show the next step without enabling it.
@@ -78,7 +86,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
     : order.source === 'demo' && nextWork?.key === 'delivery' ? 'Follow Shipment journey and simulate the next carrier update.'
     : marketplaceStep ? marketplaceStep.action === 'marketplace-ready' ? 'The marketplace warehouse prepares this order. Simulate its ready-to-ship update.' : 'The marketplace arranges handover. Simulate the carrier pickup update.'
     : nextWork ? processingHints[nextWork.key] : flow.description;
-  const actionBlocker = processingNotice || marketplaceStep?.blocker || (!primary && nextWork?.blocker) || (order.canonicalStatus === 'delivered' && !actionPermissions.close && completionBlocker(order)) || '';
+  const actionBlocker = processingNotice || (order.canonicalStatus === 'created' && !primary && confirmationBlocker(order, canWrite)) || marketplaceStep?.blocker || (!primary && nextWork?.blocker) || (order.canonicalStatus === 'delivered' && !actionPermissions.close && completionBlocker(order)) || '';
   const begin = (next: Action, initial = '') => { setAction(next); setValue(initial || (order.source === 'demo' && next === 'payment' ? `DEMO-PAYMENT-${order.orderKey}` : '')); setError(''); setSuccess(''); };
   async function run(payload: Record<string, unknown>) {
     if (pending) return;
@@ -111,8 +119,9 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
             {hasActiveReturn(order) && <StatusPill tone="attention">Return in progress</StatusPill>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {order.lines.length > 0 && <Button variant="outline" disabled={pending || Boolean(order.hold?.active)} title={order.hold?.active ? 'Release the hold before printing packing slips.' : undefined} onClick={print}><Printer className="size-4" />Print packing slip</Button>}
+            {showPackingSlipInHeader && <Button variant="outline" disabled={packingSlipDisabled} title={packingSlipDisabledReason} onClick={print}><Printer aria-hidden="true" className="size-4" />Print packing slip</Button>}
               {(permissions.editable || order.lines.length > 0) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" disabled={pending}>More<ChevronDown className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{permissions.editable && !order.hold?.active && ['created','acknowledged','allocated','fulfillment_in_progress'].includes(order.canonicalStatus) && <DropdownMenuItem onSelect={()=>begin('hold')}>Hold Order</DropdownMenuItem>}<DropdownMenuItem onSelect={() => setTab('activity')}>View audit log</DropdownMenuItem>
+                {hasPackingSlip && !showPackingSlipInHeader && <DropdownMenuItem disabled={packingSlipDisabled} title={packingSlipDisabledReason} onSelect={print}><Printer aria-hidden="true" className="mr-2 size-4" />{packingSlipMenuLabel}</DropdownMenuItem>}
                 {permissions.editable && <><DropdownMenuItem onSelect={() => begin('assign', order.metadata.assignee)}>Assign owner</DropdownMenuItem><DropdownMenuItem onSelect={() => begin('note', order.metadata.notes)}>Edit notes</DropdownMenuItem><DropdownMenuItem onSelect={() => begin('exception')}>Record exception</DropdownMenuItem></>}
                 {permissions.warehouse && <DropdownMenuItem onSelect={() => begin('warehouse', order.metadata.warehouse)}>Change preferred warehouse</DropdownMenuItem>}
                 {permissions.cancel && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => begin('cancel')}>Cancel order</DropdownMenuItem></>}

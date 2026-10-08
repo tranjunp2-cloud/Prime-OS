@@ -1,4 +1,4 @@
-import { completionBlocker, paymentAllowsPreparation, workflowActions, workflowBlocker, type WorkflowAction } from '../../../../packages/order-workflow/rules.js';
+import { completionBlocker, confirmationBlocker, paymentAllowsPreparation, workflowActions, workflowBlocker, type WorkflowAction } from '../../../../packages/order-workflow/rules.js';
 import type { CanonicalStatus, OrderRecord, ShipmentTrackingStatus } from './orders-api';
 import { prototypeTrackingOptions, shipmentTrackingLabels } from './order-shipment-history';
 import { preparationPackageError, preparationPaymentKind, prototypePreparation } from './order-preparation';
@@ -83,6 +83,7 @@ function applyPrototypeCommand(order: OrderRecord, input: Record<string, unknown
       const allowed: Partial<Record<CanonicalStatus, CanonicalStatus[]>> = {draft: ['created', 'canceled'], created: ['acknowledged', 'canceled'], acknowledged: ['canceled'], delivered: ['closed']};
       if (current.hold?.active || !allowed[current.canonicalStatus]?.includes(to)) throw new Error('This step is not available at the current order stage.');
       if (to === 'closed') { const blocker = completionBlocker(workflowOrder); if (blocker) throw new Error(blocker); }
+      if (to === 'acknowledged') { const blocker = confirmationBlocker(workflowOrder); if (blocker) throw new Error(blocker); }
       if (to === 'canceled') required(input.reason, 'Cancellation reason');
       transition(to);
       message = `Prototype status updated to ${to}`;

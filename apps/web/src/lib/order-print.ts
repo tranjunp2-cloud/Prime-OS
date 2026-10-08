@@ -1,8 +1,8 @@
 import type { OrderRecord } from './orders-api';
 
-export function printPackingSlips(orders: OrderRecord[]) {
+export function printPackingSlips(orders: OrderRecord[], target?: Window) {
   if (orders.some(order=>order.hold?.active)) throw new Error('Release held orders before printing packing slips.');
-  const popup = window.open('', '_blank'); if (!popup) throw new Error('Allow pop-ups to print packing slips.');
+  const popup = target || window.open('', '_blank'); if (!popup) throw new Error('Allow pop-ups to print packing slips.');
   popup.document.title = 'Packing slips';
   for (const order of orders) {
     const section = popup.document.createElement('section'); section.style.breakAfter = 'page';

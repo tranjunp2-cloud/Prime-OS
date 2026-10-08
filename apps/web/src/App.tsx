@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import SellerOnboardingDemo from "./pages/SellerOnboardingDemo";
 import { AppLayout } from "./components/layout/AppLayout";
 import { PrimeRoutes } from "./routes/PrimeRoutes";
+import { defaultHomePath } from "./components/seller-onboarding/demo-state";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,7 +56,7 @@ const App = () => {
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/demo/no-data" element={<RequireAuth><SellerOnboardingDemo /></RequireAuth>} />
-                  <Route path="/" element={<Navigate to="/overview" replace />} />
+                  <Route path="/" element={<Navigate to={defaultHomePath()} replace />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route
                     element={

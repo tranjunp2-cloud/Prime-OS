@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ChevronDown, ChevronRight, HelpCircle, Plus, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -67,7 +67,7 @@ export function StockActivityDrawer({ open, onOpenChange, products, warehouses, 
         <div className="flex items-start justify-between gap-3 pr-7">
           <SheetHeader className="min-w-0 text-left"><SheetTitle className="text-base sm:text-xl">Stock activity</SheetTitle><SheetDescription className="sr-only sm:not-sr-only">Opening stock, receipts, adjustments, transfers and holds.</SheetDescription></SheetHeader>
           <div className="flex shrink-0 items-center gap-1">
-            <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="size-8 sm:size-10" aria-label="About stock activity"><HelpCircle className="size-4" /></Button></PopoverTrigger><PopoverContent align="end" className="space-y-2 text-xs leading-5">
+            <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="size-8 sm:size-10" aria-label="About stock activity"><Info aria-hidden="true" className="size-4" /></Button></PopoverTrigger><PopoverContent align="end" className="space-y-2 text-xs leading-5">
               <p>Opening stock records the first count. Receive stock adds arriving units. Adjust stock corrects the count after checking the actual quantity. Each operation is recorded separately.</p>
               <p>Manage holds changes availability without changing physical stock.</p>
               <p>In-transit stock leaves the source first. Confirm receipt to add it at the destination. Already received transfers update both counts immediately.</p>

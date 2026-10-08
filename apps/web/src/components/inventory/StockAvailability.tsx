@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { HelpCircle } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -15,7 +15,7 @@ export function InventoryAmount({ value, highlight = false }: { value: StockValu
 }
 
 export function StockGuide({ iconOnly = false }: { iconOnly?: boolean }) {
-  return <Popover><PopoverTrigger asChild><Button variant="ghost" size={iconOnly ? 'icon' : 'sm'} aria-label="Stock guide" title="Stock guide" className={cn('gap-1.5 text-xs', iconOnly && 'size-9 shrink-0')}><HelpCircle className="size-4" />{!iconOnly && 'Stock guide'}</Button></PopoverTrigger>
+  return <Popover><PopoverTrigger asChild><Button variant="ghost" size={iconOnly ? 'icon' : 'sm'} aria-label="Stock guide" title="Stock guide" className={cn('gap-1.5 text-xs', iconOnly && 'size-9 shrink-0')}><Info aria-hidden="true" className="size-4" />{!iconOnly && 'Stock guide'}</Button></PopoverTrigger>
     <PopoverContent align="end" className="w-80 space-y-3 text-sm">
       <p className="font-semibold">What can I sell now?</p>
       <dl className="space-y-2 text-xs leading-5">

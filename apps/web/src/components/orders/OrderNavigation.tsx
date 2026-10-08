@@ -22,7 +22,7 @@ export function OrderNavigation({ items, value, loaded, onChange }: {
     </nav>
     <label className="order-navigation__select items-center gap-3 text-sm font-medium">Order status
       <select aria-label="Order status view" value={value} onChange={event => onChange(event.target.value as OrderQueue)} className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-        {value === 'draft' && <option value="draft">Drafts</option>}
+        {value === 'draft' && <option value="draft">Draft orders</option>}
         {items.map(item => <option key={item.key} value={item.key}>{item.label} ({loaded ? item.count : '—'})</option>)}
       </select>
     </label>

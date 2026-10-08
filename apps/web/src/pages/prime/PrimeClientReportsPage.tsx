@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { OverviewDemoMode, OverviewNoData } from '@/components/shared/OverviewDemoMode';
+import { isNoDataOverview } from '@/components/seller-onboarding/demo-state';
 import { BarChart3, Box, CalendarDays, ChevronDown, CircleDollarSign, Download, Info, PackageCheck, Search, ShoppingBag, Truck, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,6 +104,7 @@ function TrendChart({ metric }: { metric: MetricKey }) {
 }
 
 export function PrimeClientReportsPage() {
+  const [searchParams] = useSearchParams();
   const [activeMetric, setActiveMetric] = useState<MetricKey>('revenue');
   const [aggregation, setAggregation] = useState('Daily');
   const [dimension, setDimension] = useState<DimensionKey>('store');
@@ -108,8 +112,15 @@ export function PrimeClientReportsPage() {
   const table = tableConfigs[dimension];
   const filteredRows = useMemo(() => table.rows.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase())), [query, table.rows]);
 
+  if (isNoDataOverview(searchParams)) {
+    return <div className="space-y-6 p-4 pb-28 md:p-6">
+      <WorkspacePageHeader title="Unified Analytics Hub" description="Revenue, commerce, product, fulfillment, and customer performance in one operating view." icon={BarChart3} actions={<OverviewDemoMode />} />
+      <OverviewNoData analytics />
+    </div>;
+  }
+
   return <div className="space-y-6 p-4 pb-28 md:p-6">
-    <WorkspacePageHeader title="Unified Analytics Hub" description="Revenue, commerce, product, fulfillment, and customer performance in one operating view." icon={BarChart3} />
+    <WorkspacePageHeader title="Unified Analytics Hub" description="Revenue, commerce, product, fulfillment, and customer performance in one operating view." icon={BarChart3} actions={<OverviewDemoMode />} />
 
     <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-end" aria-label="Analytics filters">
       <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600"><span>Date range</span><button type="button" className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"><CalendarDays className="size-4 text-slate-400" />Aug 1, 2026 — Aug 31, 2026<ChevronDown className="ml-auto size-4 text-slate-400" /></button></label>

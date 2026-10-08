@@ -24,7 +24,7 @@ const order: OrderRecord = {
   transitions: [], activity: [], exceptions: [], returnRequests: [],
 };
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); });
-afterEach(() => { cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Seller order processing', () => {
   it('shows known details as summaries and only reveals prefilled fields when editing', () => {
@@ -160,8 +160,8 @@ describe('Batch processing', () => {
     vi.mocked(ordersApi.list).mockResolvedValue({ data: [first, second], canWrite: true });
     vi.mocked(ordersApi.command).mockResolvedValueOnce({ data: { ...first, canonicalStatus: 'acknowledged' } })
       .mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValueOnce({ data: { ...second, canonicalStatus: 'acknowledged' } });
-    render(<OrderBatchDialog orders={[first, second]} onClose={vi.fn()} onUpdated={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Process 2 eligible orders' }));
+    render(<OrderBatchDialog canWrite={true} orders={[first, second]} onClose={vi.fn()} onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm 2 orders' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 succeeded · 1 failed'));
     fireEvent.click(screen.getByRole('button', { name: 'Retry 1 failed orders' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('2 succeeded · 0 failed'));
@@ -172,16 +172,98 @@ describe('Batch processing', () => {
 
   it('rechecks holds before writing and requires one carrier per pickup batch', async () => {
     vi.mocked(ordersApi.list).mockResolvedValue({ data: [{ ...first, hold: { active: true, reason: 'Changed', at: first.orderedAt, actor: 'CS' } }], canWrite: true });
-    const { unmount } = render(<OrderBatchDialog orders={[first]} onClose={vi.fn()} onUpdated={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Process 1 eligible orders' }));
-    expect(await screen.findByText('Release the hold first.')).toBeInTheDocument();
+    const { unmount } = render(<OrderBatchDialog canWrite={true} orders={[first]} onClose={vi.fn()} onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm 1 orders' }));
+    expect(await screen.findByText('Release the order hold before confirming.')).toBeInTheDocument();
     expect(ordersApi.command).not.toHaveBeenCalled();
     unmount();
     const packed = { ...order, readyForPickup: true, operations: { work: { ...order.operations!.work!, packedAt: order.orderedAt } } };
-    render(<OrderBatchDialog orders={[packed, { ...packed, id: 'other-carrier', shipments: [{ carrier: 'SPX', tracking: 'SPX-1', status: 'Awaiting pickup' }] }]} onClose={vi.fn()} onUpdated={vi.fn()} />);
+    render(<OrderBatchDialog canWrite={true} orders={[packed, { ...packed, id: 'other-carrier', shipments: [{ carrier: 'SPX', tracking: 'SPX-1', status: 'Awaiting pickup' }] }]} onClose={vi.fn()} onUpdated={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Process 0 eligible orders' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Pickup carrier'), { target: { value: 'GHN' } });
-    expect(screen.getByText('1 eligible · 1 need attention')).toBeInTheDocument();
+    expect(screen.getByText('1 eligible · 1 will be skipped')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Process 1 eligible orders' })).toBeDisabled();
   });
+  it('allows local prototypes without write access while skipping real orders', async () => {
+    const demo = {...first, id: 'demo', orderKey: 'DEMO', source: 'demo'};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [first, demo], canWrite: false});
+    vi.mocked(ordersApi.command).mockResolvedValue({data: {...demo, canonicalStatus: 'acknowledged'}});
+    render(<OrderBatchDialog canWrite={false} orders={[first, demo]} onClose={vi.fn()} onUpdated={vi.fn()}/>);
+    fireEvent.click(screen.getByRole('button', {name: 'Confirm 1 orders'}));
+    await screen.findByText('1 succeeded · 0 failed · 1 skipped');
+    expect(ordersApi.command).toHaveBeenCalledOnce();
+    expect(vi.mocked(ordersApi.command).mock.calls[0][0].id).toBe('demo');
+  });
+
+  it('prints only confirmed orders still eligible after revalidation and never confirms again to retry printing', async () => {
+    const confirmed = {...first, canonicalStatus: 'acknowledged' as const};
+    const other = {...second, canonicalStatus: 'acknowledged' as const};
+    vi.mocked(ordersApi.list).mockResolvedValueOnce({data: [first, second], canWrite: true})
+      .mockResolvedValue({data: [confirmed, {...other, hold: {active: true, reason: 'Changed', at: first.orderedAt, actor: 'CS'}}], canWrite: true});
+    vi.mocked(ordersApi.command).mockResolvedValueOnce({data: confirmed}).mockResolvedValueOnce({data: other});
+    const print = vi.fn();
+    const document = window.document.implementation.createHTMLDocument();
+    vi.spyOn(window, 'open').mockReturnValue({document, print, focus: vi.fn(), close: vi.fn()} as unknown as Window);
+    render(<OrderBatchDialog canWrite orders={[first, second]} onClose={vi.fn()} onUpdated={vi.fn()}/>);
+    fireEvent.click(screen.getByRole('button', {name: 'Confirm 2 orders'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Print packing slips (2)'}));
+    await waitFor(() => expect(print).toHaveBeenCalledOnce());
+    expect(document.body.textContent).toContain('MAN-FIRST');
+    expect(document.body.textContent).not.toContain('MAN-SECOND');
+    expect(await screen.findByText(/1 packing slips sent to the print dialog · 1 skipped/)).toHaveTextContent('MAN-SECOND: Release the order hold');
+    expect(ordersApi.command).toHaveBeenCalledTimes(2);
+    vi.mocked(window.open).mockReturnValue(null);
+    fireEvent.click(screen.getByRole('button', {name: 'Print packing slips (2)'}));
+    expect(screen.getByRole('alert')).toHaveTextContent('Allow pop-ups');
+    expect(ordersApi.command).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not print waiting, marketplace or held orders in the packing queue', async () => {
+    const held = {...order, id: 'held', hold: {active: true, reason: 'Review', actor: 'CS', at: order.orderedAt}};
+    const marketplace = {...order, id: 'marketplace', metadata: {...order.metadata, handlingType: 'marketplace' as const}};
+    const data = [order, {...first, id: 'waiting'}, held, marketplace];
+    vi.mocked(ordersApi.list).mockResolvedValue({data, canWrite: false});
+    const print = vi.fn();
+    const document = window.document.implementation.createHTMLDocument();
+    vi.spyOn(window, 'open').mockReturnValue({document, print, focus: vi.fn(), close: vi.fn()} as unknown as Window);
+    render(<OrderBatchDialog canWrite={false} initialAction="print" orders={data} onClose={vi.fn()} onUpdated={vi.fn()}/>);
+    fireEvent.click(screen.getByRole('button', {name: 'Print 1 packing slips'}));
+    await screen.findByText('1 sent to print dialog · 0 failed · 3 skipped');
+    expect(print).toHaveBeenCalledOnce();
+    expect(document.querySelectorAll('section')).toHaveLength(1);
+    expect(ordersApi.command).not.toHaveBeenCalled();
+  });
+
+  it('preserves print exclusions on retry and never adds newly eligible or synced orders', async () => {
+    const other = {...order, id: 'second', orderKey: 'MAN-SECOND'};
+    const waiting = {...first, id: 'waiting', orderKey: 'WAITING'};
+    const newOrder = {...order, id: 'new', orderKey: 'NEW-SYNC'};
+    // The waiting order becomes printable after opening the review; it was never selected.
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [order, other, {...waiting, canonicalStatus: 'acknowledged'}, newOrder], canWrite: false});
+    const print = vi.fn();
+    const documents: Document[] = [];
+    vi.spyOn(window, 'open').mockImplementation(() => {
+      const document = window.document.implementation.createHTMLDocument(); documents.push(document);
+      return {document, print, focus: vi.fn(), close: vi.fn()} as unknown as Window;
+    });
+    render(<OrderBatchDialog canWrite={false} initialAction="print" orders={[order, other, waiting]} onClose={vi.fn()} onUpdated={vi.fn()}/>);
+    expect(screen.getByRole('checkbox', {name: 'Include WAITING'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Select all eligible orders in this batch'}));
+    expect(screen.getByRole('button', {name: 'Print 0 packing slips'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Select all eligible orders in this batch'}));
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Include MAN-SECOND'}));
+    expect(screen.getByRole('checkbox', {name: 'Select all eligible orders in this batch'})).toHaveAttribute('data-state', 'indeterminate');
+    expect(window.open).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: 'Print 1 packing slips'}));
+    await screen.findByText('1 sent to print dialog · 0 failed · 1 skipped');
+    fireEvent.click(screen.getByRole('button', {name: 'Open print dialog again'}));
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(2));
+    for (const document of documents) {
+      expect(document.querySelectorAll('section')).toHaveLength(1);
+      expect(document.body.textContent).toContain('MAN-FIRST');
+      for (const excluded of ['MAN-SECOND', 'WAITING', 'NEW-SYNC']) expect(document.body.textContent).not.toContain(excluded);
+    }
+    expect(ordersApi.command).not.toHaveBeenCalled();
+  });
+
 });

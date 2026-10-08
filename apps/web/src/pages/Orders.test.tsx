@@ -169,7 +169,7 @@ describe('Orders workspace', () => {
     const nav=within(screen.getByRole('navigation',{name:'Order lifecycle',hidden:true}));
     expect(nav.getByRole('button',{name:'All 3',hidden:true})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'DRAFT'})).not.toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Drafts (1)'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Draft orders (1)'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'On hold (0)'})).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Filter by shop'),{target:{value:'Manual'}});
     expect(nav.getByRole('button',{name:'All 2',hidden:true})).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe('Orders workspace', () => {
     expect(nav.getByRole('button',{name:'All 2',hidden:true})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'SECOND'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
-    fireEvent.click(screen.getByRole('button',{name:'Drafts (1)'}));
+    fireEvent.click(screen.getByRole('button',{name:'Draft orders (1)'}));
     expect(screen.getByRole('button',{name:'DRAFT'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
   });
@@ -231,6 +231,86 @@ describe('Orders workspace', () => {
     fireEvent.click(screen.getByRole('button',{name:'Awaiting payment 1'}));
     expect(screen.getByRole('button',{name:'PAYMENT-REVIEW'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
+  });
+
+  it('synchronizes toolbar stages with tabs and filters actionable demo, COD and prepaid orders', async () => {
+    const preparing = {...order, id: 'preparing', orderKey: 'PREPARING', canonicalStatus: 'acknowledged' as const, metadata: {...order.metadata, handlingType: 'self' as const}};
+    const ready = {...preparing, id: 'ready', orderKey: 'READY', canonicalStatus: 'fulfillment_in_progress' as const, readyForPickup: true};
+    const demo = {...order, id: 'demo', orderKey: 'DEMO', source: 'demo'};
+    const prepaid = {...order, id: 'prepaid', orderKey: 'PREPAID', payment: {...order.payment, method: 'Card'}};
+    const held = {...order, id: 'held', orderKey: 'HELD', hold: {active: true, reason: 'Review', at: order.orderedAt, actor: 'CS'}};
+    const channel = {...order, id: 'channel', orderKey: 'CHANNEL', source: 'channel'};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [order, preparing, ready, demo, prepaid, held, channel], canWrite: true});
+    mount(); await screen.findByRole('button', {name: 'MAN-TEST'});
+    fireEvent.change(screen.getByRole('combobox', {name: 'Order status', exact: true}), {target: {value: 'pickup'}});
+    expect(screen.getByRole('button', {name: 'Ready to ship 1'})).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', {name: 'READY', exact: true})).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'PREPARING', exact: true})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Awaiting confirmation 5', hidden: true}));
+    expect(screen.getByRole('combobox', {name: 'Order status', exact: true})).toHaveValue('pending');
+    fireEvent.change(screen.getByLabelText('Available actions'), {target: {value: 'confirm'}});
+    expect(screen.getByRole('button', {name: 'DEMO', exact: true})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'PREPAID', exact: true})).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'HELD', exact: true})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'CHANNEL', exact: true})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Select orders on this page'}));
+    expect(screen.getByRole('button', {name: 'Confirm orders (3)'})).toBeEnabled();
+  });
+
+  it('selects only the visible page until all matching orders are explicitly selected', async () => {
+    const data = Array.from({length: 25}, (_, index) => ({...order, id: `order-${index}`, orderKey: `ORDER-${index}`}));
+    vi.mocked(ordersApi.list).mockResolvedValue({data, canWrite: true});
+    mount(); await screen.findByRole('button', {name: 'ORDER-0', exact: true});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Select orders on this page'}));
+    expect(screen.getByRole('button', {name: 'Confirm orders (20)'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Select all 25 matching orders'}));
+    expect(screen.getByRole('button', {name: 'Confirm orders (25)'})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search orders'), {target: {value: 'ORDER-24'}});
+    expect(screen.queryByRole('button', {name: /Confirm orders \(/})).not.toBeInTheDocument();
+  });
+
+  it('reviews all filtered pages without selecting the table and freezes the confirmed batch', async () => {
+    const matching = Array.from({length: 25}, (_, index) => ({...order, id: `match-${index}`, orderKey: `MATCH-${index}`}));
+    const otherShop = {...order, id: 'other-shop', orderKey: 'MATCH-SHOP', metadata: {...order.metadata, store: 'Other shop'}};
+    const otherStatus = {...order, id: 'other-status', orderKey: 'MATCH-STATUS', canonicalStatus: 'acknowledged' as const};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [...matching, otherShop, otherStatus, order], canWrite: true});
+    vi.mocked(ordersApi.command).mockImplementation(async record => ({data: {...record, canonicalStatus: 'acknowledged'}}));
+    mount(); await screen.findByRole('button', {name: 'MATCH-0', exact: true});
+    fireEvent.change(screen.getByLabelText('Filter by shop'), {target: {value: 'Manual'}});
+    fireEvent.change(screen.getByRole('combobox', {name: 'Order status', exact: true}), {target: {value: 'pending'}});
+    fireEvent.change(screen.getByLabelText('Search orders'), {target: {value: 'MATCH'}});
+    fireEvent.change(screen.getByLabelText('Available actions'), {target: {value: 'confirm'}});
+    expect(screen.getByRole('checkbox', {name: 'Select orders on this page'})).not.toBeChecked();
+    expect(screen.queryByLabelText('Bulk order actions')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('table', {name: 'Orders'})).getAllByRole('row')).toHaveLength(21);
+    expect(ordersApi.command).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: 'Review & confirm 25 orders'}));
+    const dialog = within(screen.getByRole('dialog', {name: 'Confirm orders'}));
+    expect(dialog.getByText(/25 matching orders across all pages/)).toBeInTheDocument();
+    expect(dialog.getByRole('checkbox', {name: 'Include MATCH-24'})).toBeChecked();
+    fireEvent.click(dialog.getByRole('checkbox', {name: 'Include MATCH-24'}));
+    expect(ordersApi.command).not.toHaveBeenCalled();
+    const newOrder = {...order, id: 'new', orderKey: 'MATCH-NEW'};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [...matching, newOrder, otherShop], canWrite: true});
+    fireEvent.click(dialog.getByRole('button', {name: 'Confirm 24 orders'}));
+    await waitFor(() => expect(dialog.getByLabelText('Batch results')).toHaveTextContent('24 succeeded'));
+    expect(vi.mocked(ordersApi.command).mock.calls.map(([record]) => record.id)).toEqual(matching.slice(0, 24).map(record => record.id));
+  });
+
+  it('offers print review without table selection or writes, and handles no matching orders', async () => {
+    const printable = {...order, canonicalStatus: 'acknowledged' as const, metadata: {...order.metadata, handlingType: 'self' as const}};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [printable], canWrite: false});
+    mount(); await screen.findByRole('button', {name: 'MAN-TEST'});
+    fireEvent.change(screen.getByLabelText('Available actions'), {target: {value: 'print'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Print all 1 orders'}));
+    const dialog = within(screen.getByRole('dialog', {name: 'Print packing slips'}));
+    expect(dialog.getByRole('checkbox', {name: 'Include MAN-TEST'})).toBeChecked();
+    expect(ordersApi.list).toHaveBeenCalledOnce();
+    expect(ordersApi.command).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole('button', {name: 'Cancel'}));
+    expect(screen.getByRole('checkbox', {name: 'Select orders on this page'})).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText('Search orders'), {target: {value: 'no match'}});
+    expect(screen.getByRole('button', {name: 'Print all 0 orders'})).toBeDisabled();
   });
 
 });

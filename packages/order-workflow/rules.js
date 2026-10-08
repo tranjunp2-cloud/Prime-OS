@@ -13,6 +13,28 @@ export function activeReturn(order) {
 export function paymentAllowsPreparation(order) {
   return order.payment.state === 'Paid' || (order.payment.state === 'Unpaid' && order.payment.method === 'COD');
 }
+export function confirmationBlocker(order) {
+  if (order.source !== 'manual') return 'Confirm this order in Seller Center until channel actions are connected.';
+  if (order.canonicalStatus !== 'created') return 'This order is not awaiting confirmation.';
+  if (order.hold?.active) return 'Release the order hold before confirming.';
+  if (!order.lines.length) return 'Add order items before confirming.';
+  if (activeReturn(order)) return 'Resolve the active return before confirming.';
+  if (order.exceptions.some(item => item.status === 'open')) return 'Resolve the open issues before confirming.';
+  if (order.syncError) return 'Resolve the channel sync error before confirming.';
+  if (order.reservation === 'Allocation failed') return 'Review the stock allocation failure before confirming.';
+  if (order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) return 'Review the payment evidence before confirming.';
+  return null;
+}
+// Eligibility for the packing queue. Historical reprints remain a separate action.
+export function packingSlipBlocker(order) {
+  if (order.metadata.handlingType !== 'self') return 'Packing slips in this queue are for seller-fulfilled orders.';
+  if (!['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus)) return 'Confirm the order first, or use Reprint for a dispatched order.';
+  if (!order.lines.length) return 'This order has no items to print.';
+  if (order.hold?.active) return 'Release the order hold before printing.';
+  if (activeReturn(order) || order.shipments.some(item => ['returning', 'returned'].includes(item.deliveryOutcome))) return 'Resolve the return before preparing packing slips.';
+  if (order.exceptions.some(item => item.status === 'open')) return 'Resolve the open issues before printing for packing.';
+  return null;
+}
 export function completionBlocker(order) {
   if (order.source !== 'manual') return 'Completion is managed by the order source.';
   if (order.hold?.active) return 'Release the order hold first.';

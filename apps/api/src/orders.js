@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { applyOrderWorkflow } from './order-workflow.js';
-import { workflowActions, completionBlocker } from '../../../packages/order-workflow/rules.js';
+import { workflowActions, completionBlocker, confirmationBlocker } from '../../../packages/order-workflow/rules.js';
 import { demoOrders } from './orders-demo.js';
 
 // Generic transitions never bypass the validated fulfillment commands below.
@@ -125,6 +125,7 @@ export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH |
         record(order, validated.canonicalStatus === 'draft' ? 'Draft updated' : 'Draft submitted', actor);
       } else if (input.action === 'transition') {
         if (order.source !== 'manual') fail('Lifecycle updates must come from the order source.', 409);
+        if (input.toStatus === 'acknowledged') { const blocker = confirmationBlocker(order); if (blocker) fail(blocker, 409); }
         if (input.toStatus === 'closed') { const blocker = completionBlocker(order); if (blocker) fail(blocker, 409); }
         if (!orderTransitions[order.canonicalStatus]?.includes(input.toStatus)) fail('This status transition is not allowed.', 409);
         if (!['created', 'acknowledged', 'canceled', 'closed'].includes(input.toStatus)) fail('Use the fulfillment service to allocate or ship this order.', 409);

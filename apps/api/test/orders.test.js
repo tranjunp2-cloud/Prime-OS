@@ -89,3 +89,28 @@ test('holds block processing and require a reason before resuming',()=>{
   assert.equal(store.command(order.id,{action:'transition',toStatus:'acknowledged',version:released.version},'Admin').canonicalStatus,'acknowledged');
  } finally {rmSync(dir,{recursive:true,force:true});}
 });
+
+test('confirmation eligibility is enforced by the API without requiring prepaid payment or inventory reservation', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'prime-confirm-'));
+  try {
+    const file = path.join(dir, 'orders.json');
+    const store = createOrderStore(file);
+    const created = store.create(input(), 'operator');
+    for (const [patch, reason] of [
+      [{exceptions: [{id: 'issue', status: 'open', summary: 'Invalid address'}]}, /open issues/],
+      [{returnRequests: [{id: 'return', status: 'requested'}]}, /active return/],
+      [{reservation: 'Allocation failed'}, /allocation failure/],
+      [{syncError: true}, /sync error/],
+      [{payment: {state: 'Unpaid', method: 'Bank transfer', reference: 'Needs review'}}, /payment evidence/],
+    ]) {
+      writeFileSync(file, JSON.stringify({orders: [{...created, ...patch}]}));
+      assert.throws(() => store.command(created.id, {action: 'transition', toStatus: 'acknowledged', version: 1}, 'operator'), reason);
+      assert.equal(store.list().find(order => order.id === created.id).canonicalStatus, 'created');
+    }
+    writeFileSync(file, JSON.stringify({orders: [{...created, payment: {state: 'Unpaid', method: 'Card', reference: ''}}]}));
+    const confirmed = store.command(created.id, {action: 'transition', toStatus: 'acknowledged', version: 1}, 'operator');
+    assert.equal(confirmed.canonicalStatus, 'acknowledged');
+    assert.equal(confirmed.payment.state, 'Unpaid');
+    assert.notEqual(confirmed.reservation, 'Reserved');
+  } finally { rmSync(dir, {recursive: true, force: true}); }
+});
