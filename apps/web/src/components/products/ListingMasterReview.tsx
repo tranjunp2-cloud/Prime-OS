@@ -15,6 +15,7 @@ import { resolveSourceSkuMappings, sourceSkuDataError } from '@/lib/listing-sku-
 import { pendingReviewFor, prepareReviewVariants, resolvedReviewMappings } from '@/lib/listing-review-progress';
 import { evidenceSummary, groupEvidenceSummary, listingMatchEvidence, packTitleHint, rankMasterCandidates, safeListingUrl, suggestedMasterForReview, type EvidenceState } from '@/lib/listing-match-evidence';
 import { SelectedListingsOverview } from './SelectedListingsOverview';
+import { ListingMappingContext } from './ListingMappingContext';
 
 import { ListingMasterCompletion } from './ListingMasterCompletion';
 import { ListingSkuMappings } from './ListingSkuMappings';
@@ -106,6 +107,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const saveLock = useRef(false);
   const stage: IntakeStage = mode === 'new' ? 'create' : completing ? 'complete' : master ? 'compare' : 'choose';
   const editingDetails = stage === 'create' || stage === 'complete';
+  const groupedComparison = stage === 'compare' && sources.length > 1;
   const reviewProduct = mode === 'new' ? newProduct : completion;
   const draft = { name: newProduct.name, sku: newProduct.sku_code, productType: newProduct.product_type, categoryId: newProduct.categoryId, brandId: newProduct.brandId, copySourcePrice: false };
   const isSuggestedMaster = Boolean(master && suggestedMasterForReview(sources, catalog.products())?.id === master.id);
@@ -126,11 +128,13 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const unknownStructure = sources.some(item => item.variants === 0);
   const existingLinks = sources.filter(item => item.existingLinkReview);
   const alreadyLinkedHere = existingLinks.length === sources.length && existingLinks.every(item => item.existingLinkReview?.productId === master?.id);
-  const deferLabel = mode === 'new' ? 'Save draft & link' : alreadyLinkedHere ? 'Save progress' : 'Link now, finish later';
+  const deferLabel = mode === 'new' ? 'Save draft & link' : alreadyLinkedHere ? 'Save progress' : groupedComparison ? 'Link all & finish later' : 'Link now, finish later';
   const completeLabel = mode === 'new' ? 'Create, activate & link' : master?.status === 'published'
     ? alreadyLinkedHere ? 'Save Master changes' : 'Save Master changes & link'
     : alreadyLinkedHere ? 'Save & activate Master' : 'Save, activate & link';
-  const confirmLabel = existingLinks.length ? existingLinks.every(item => item.existingLinkReview?.productId === master?.id) ? 'Confirm mapping' : 'Move to this Master' : 'Link to this Master';
+  const confirmLabel = groupedComparison
+    ? existingLinks.length ? alreadyLinkedHere ? `Confirm all ${sources.length} links` : `Confirm Master for all ${sources.length} listings` : `Link all ${sources.length} listings`
+    : existingLinks.length ? existingLinks.every(item => item.existingLinkReview?.productId === master?.id) ? 'Confirm mapping' : 'Move to this Master' : 'Link to this Master';
   const reviewedCount = reviewedIds.length;
   const resolvedMappings = mode === 'existing' && master
     ? Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, master, mappings[source.id])])) : mappings;
@@ -260,14 +264,19 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
 
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     <h2 ref={heading} tabIndex={-1} className="sr-only">{title}</h2>
-    <div ref={scrollArea} className={`min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${stage === 'choose' || stage === 'create' ? 'space-y-3' : 'space-y-6'}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="-ml-3 h-11" onClick={() => dirty || groupDirty ? setDiscardBack(true) : onBack()}><ArrowLeft className="size-4" />{backLabel}</Button>{stage === 'create' && catalog.products().some(product => product.status !== 'archived') && <Button variant="outline" className="h-11" disabled={groupEditing} onClick={useExistingMaster}><ArrowLeft className="size-4" />Use existing Master</Button>}</div>
+    <div ref={scrollArea} className={`min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${stage === 'choose' || stage === 'create' ? 'space-y-3' : groupedComparison ? 'space-y-4' : 'space-y-6'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="-ml-3 h-11" onClick={() => {
+        if (stage === 'complete') { setCompleting(false); setError(''); }
+        else if (dirty || groupDirty) setDiscardBack(true);
+        else onBack();
+      }}><ArrowLeft className="size-4" />{stage === 'complete' ? 'Back to review' : backLabel}</Button>{stage === 'create' && catalog.products().some(product => product.status !== 'archived') && <Button variant="outline" className="h-11" disabled={groupEditing} onClick={useExistingMaster}><ArrowLeft className="size-4" />Use existing Master</Button>}</div>
       {pending && <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p className="font-medium">Linked · review unfinished</p><p className="mt-1 text-xs text-muted-foreground">{pending.issues.join(' · ')}. Confirming does not turn on sync.</p>{pending.master_draft && !savedDraftCurrent && <p className="mt-2 text-xs">The Master changed since this draft was saved. Review the current values; the older draft will not overwrite them automatically.</p>}</div>}
       {stage !== 'complete' && existingLinks.length > 0 && <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><p className="font-medium">Review an existing link</p><p>{[...new Set(existingLinks.flatMap(item => item.existingLinkReview!.issues))].join(' · ')}</p><p className="text-muted-foreground">The current link is unchanged until you confirm. Choosing another Master or creating a new Master moves only the selected links; Master stock is not transferred.</p></div>}
 
-      {sources.length > 1 && (stage === 'choose' || stage === 'compare') && <SelectedListingsOverview listings={sources} activeIndex={stage === 'compare' ? sourceIndex : undefined} reviewedIds={reviewedIds} onView={stage === 'compare' ? changeSource : undefined} />}
+      {sources.length > 1 && stage === 'choose' && <SelectedListingsOverview listings={sources} />}
+      {groupedComparison && master && <ListingMappingContext listings={sources} activeIndex={sourceIndex} reviewedIds={reviewedIds} master={master} masterImage={<Photo src={master.images[0]} name={master.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={chooseAnother} onCreateMaster={createNewMaster} />}
 
-      {current && stage !== 'complete' && !(stage === 'choose' && sources.length > 1) && <div className={master && mode === 'existing' ? 'grid gap-5 sm:grid-cols-2' : ''}>
+      {current && stage !== 'complete' && !groupedComparison && !(stage === 'choose' && sources.length > 1) && <div className={master && mode === 'existing' ? 'grid gap-5 sm:grid-cols-2' : ''}>
         <div role="group" aria-label="Source listing" className={`min-w-0 rounded-xl border bg-muted/20 ${stage !== 'compare' ? 'p-3' : 'p-4'}`}>{stage === 'compare' && <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Source listing</p>}{sourceCard(current)}</div>
         {master && mode === 'existing' && <div className="min-w-0 rounded-xl border border-primary/40 bg-primary/5 p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs"><p className="font-medium uppercase tracking-wide text-muted-foreground">{current.existingLinkReview?.productId === master.id ? 'Current Product Master' : isSuggestedMaster ? 'Suggested Product Master' : 'Selected Product Master'}</p><span className="text-muted-foreground">{current.existingLinkReview?.productId === master.id ? 'Existing link · review required' : 'Not confirmed'}</span></div><div className="flex items-start gap-4"><Photo src={master.images[0]} name={master.name} onZoom={openImage} small /><div className="min-w-0 space-y-1.5"><p className="break-words text-sm font-semibold leading-5">{master.name}</p><p className="break-words font-mono text-xs text-muted-foreground">{master.sku_code}</p><p className="text-xs text-muted-foreground">{master.brand || 'Brand not provided'}</p><p className="text-xs text-muted-foreground">{master.category || 'No category'} · Master {master.status === 'published' ? 'Active' : 'Draft'}</p></div></div></div>}
       </div>}
@@ -305,7 +314,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
 
       {stage === 'compare' && master && <>
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold">Check before linking</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{groupedComparison ? `Check listing ${sourceIndex + 1} of ${sources.length} before linking` : 'Check before linking'}</h3>{groupedComparison && safeListingUrl(current.listingUrl) && <a href={safeListingUrl(current.listingUrl)!} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">View shop listing<ExternalLink className="size-3.5" /></a>}</div>
           {current.variants === 0 && <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm leading-6"><Checkbox className="mt-1 shrink-0" checked={verifiedSingles.includes(current.id)} onCheckedChange={checked => { setVerifiedSingles(ids => checked === true ? [...ids, current.id] : ids.filter(id => id !== current.id)); setReviewedIds([]); }} /><span>Source structure is not recorded. I checked the shop listing: its product, pack quantity and SKU structure match this Master. I will map any variant SKUs below.</span></label>}
           {differences.length > 0 && <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4" role="group" aria-label="Differences to check">
             {differences.map(row => <div key={row.key} className="flex items-start gap-2.5 text-sm"><TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" /><div className="min-w-0"><p className="font-medium text-amber-700 dark:text-amber-300">{row.label} differs</p><p className="mt-1 break-words text-muted-foreground">Listing: <span className="text-foreground">{row.listing}</span><span className="mx-2">·</span>Master: <span className="text-foreground">{row.master}</span></p>{row.note && <p className="mt-1 text-xs text-muted-foreground">{row.note}</p>}</div></div>)}
@@ -358,12 +367,11 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {groupEditing && <p role="status" className="col-span-full text-xs text-muted-foreground">Apply or cancel your section edits before saving this Master.</p>}
       {editingDetails && !groupEditing && (confirmationError || completionError || !mediaReady) && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300" role="status">{confirmationError || (completionError.startsWith('Complete required details before activating:') ? 'Complete the highlighted sections to activate, or save a draft.' : completionError) || 'Wait for images to load, or replace any unavailable images.'}</p>}
       {error && <p role="alert" className="col-span-full rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><Info className="mt-0.5 size-3.5 shrink-0" />{mode === 'new' ? `Only Master data and links are saved. Nothing is published; sync stays off.` : completing ? 'Save the reviewed Master changes and links. Activation does not publish or turn on sync.' : 'Link only. Master status, details and images stay unchanged. Nothing is published; stock and sync are unchanged.'}</p><span role="status">{stage === 'compare' && sources.length > 1 ? `${reviewedCount} of ${sources.length} listings reviewed` : remainingCount !== undefined ? `${remainingCount} listing${remainingCount === 1 ? '' : 's'} left to review` : `${sources.length} listing${sources.length === 1 ? '' : 's'} selected`}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><Info className="mt-0.5 size-3.5 shrink-0" />{mode === 'new' ? `Only Master data and links are saved. Nothing is published; sync stays off.` : completing ? 'Save the reviewed Master changes and links. Activation does not publish or turn on sync.' : 'Link only. Master status, details and images stay unchanged. Nothing is published; stock and sync are unchanged.'}</p><span role="status">{groupedComparison ? `${reviewedCount} of ${sources.length} checked · Changes not saved` : remainingCount !== undefined ? `${remainingCount} listing${remainingCount === 1 ? '' : 's'} left to review` : `${sources.length} listing${sources.length === 1 ? '' : 's'} selected`}</span></div>
       {stage !== 'choose' && <div className="flex flex-wrap justify-end gap-2">
-        {stage === 'compare' && <><Button variant="outline" className="h-11" onClick={chooseAnother}>Choose another Master</Button><Button variant="outline" className="h-11" onClick={createNewMaster}><Plus className="size-4" />Create new Master</Button></>}
-        {stage === 'complete' && <Button variant="outline" className="h-11" onClick={() => { setCompleting(false); setError(''); }}>Back to review</Button>}
+        {stage === 'compare' && !groupedComparison && <><Button variant="outline" className="h-11" onClick={chooseAnother}>Choose another Master</Button><Button variant="outline" className="h-11" onClick={createNewMaster}><Plus className="size-4" />Create new Master</Button></>}
         <Button variant="outline" className="h-11" disabled={!canDefer || groupEditing} onClick={() => setDeferOpen(true)}>{deferLabel}</Button>
-        <Button className="h-11" disabled={groupEditing || (editingDetails ? !reviewProduct || Boolean(confirmationError || completionError) || !mediaReady || (mode === 'new' && !canSave) : !canSave)} onClick={save}>{editingDetails ? completeLabel : sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Review next listing' : confirmLabel}<ArrowRight className="size-4" /></Button>
+        <Button className="h-11" disabled={groupEditing || (editingDetails ? !reviewProduct || Boolean(confirmationError || completionError) || !mediaReady || (mode === 'new' && !canSave) : !canSave)} onClick={save}>{editingDetails ? completeLabel : sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Mark checked & continue' : confirmLabel}<ArrowRight className="size-4" /></Button>
       </div>}
     </div>
     <AlertDialog open={Boolean(replacementSourceId)} onOpenChange={open => { if (!open) setReplacementSourceId(''); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Replace the starting listing data?</AlertDialogTitle><AlertDialogDescription>This replaces your field edits, image choices and SKU mappings with data from the selected listing. Your internal category and Master SKU are kept. To change just one field, use Change source in the mapping table instead.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={() => changeDraftSource(replacementSourceId)}>Replace draft data</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
