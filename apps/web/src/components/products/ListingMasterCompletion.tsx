@@ -19,6 +19,7 @@ import { getMasterMediaReadiness } from '@/lib/product-master-media';
 type Props = {
   product: Product; sources: CatalogImportItem[]; onChange: (product: Product) => void;
   mappings: VariantMappings; onMappingsChange: (mappings: VariantMappings) => void;
+  verifiedSingles?: string[];
   onMediaReady: (ready: boolean) => void;
   preservedSkuIds?: string[];
   baseline?: Product;
@@ -28,7 +29,7 @@ type Props = {
 };
 
 /** One review surface; collapsed groups preserve drafts and image validation. */
-export function ListingMasterCompletion({ product: proposal, sources, onChange: applyProduct, mappings: proposalMappings, onMappingsChange: applyMappings, onMediaReady, preservedSkuIds, baseline, creationSetup, onEditingChange, readFirst }: Props) {
+export function ListingMasterCompletion({ product: proposal, sources, onChange: applyProduct, mappings: proposalMappings, onMappingsChange: applyMappings, verifiedSingles = [], onMediaReady, preservedSkuIds, baseline, creationSetup, onEditingChange, readFirst }: Props) {
   const prefix = useId();
   const reviewFirst = readFirst ?? Boolean(creationSetup);
   const [editor, setEditor] = useState<{ group: string; product: Product; mappings: VariantMappings } | null>(null);
@@ -93,7 +94,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
     } catch (error) { setUploadError(error instanceof Error ? error.message : 'Could not add images. Try again.'); }
     finally { setUploading(false); }
   };
-  const skuError = product.has_variants ? variantMappingError(sources, product, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, product, mappings[source.id])]))) : '';
+  const skuError = product.has_variants ? variantMappingError(sources, product, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, product, mappings[source.id])])), verifiedSingles) : '';
   const groups = [
     { id: 'identity', title: 'Product essentials', checks: product.has_variants ? ['identity'] : ['identity', 'sku'], summary: 'Name, category, brand & product structure' },
     { id: product.has_variants ? 'variants' : 'price', title: product.has_variants ? 'Variants, pricing & SKU mapping' : 'Pricing', checks: product.has_variants ? ['sku', 'price'] : ['price'], summary: product.has_variants ? `${product.skus.length} Master SKUs · ${sources.length} source listing(s)` : `${product.retail_price || 'No price'} ${product.price_currency}` },
@@ -189,7 +190,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
       <div className="max-w-48 space-y-1"><Label htmlFor={`${prefix}-master-currency`}>Master currency *</Label><Input id={`${prefix}-master-currency`} className="h-11" value={product.price_currency} maxLength={3} aria-invalid={!/^[A-Z]{3}$/.test(product.price_currency)} onChange={event => update({ price_currency: event.target.value.toUpperCase() })} /></div>
       <div className="hidden grid-cols-3 gap-3 px-3 text-xs text-muted-foreground sm:grid"><span>Master variant SKU</span><span>Option values (use / between options)</span><span>Price ({product.price_currency})</span></div>
       {product.skus.map((sku, index) => <div key={sku.id} className="grid gap-3 rounded-lg bg-muted/20 p-3 sm:grid-cols-3">{(['sku_code', 'variation_name', 'price'] as const).map(key => <div key={key} className="space-y-1"><Label className="sm:sr-only" htmlFor={`${prefix}-sku-${index}-${key}`}>{key === 'sku_code' ? 'Master variant SKU' : key === 'variation_name' ? 'Option values (use / between options)' : `Price (${product.price_currency})`}</Label><Input id={`${prefix}-sku-${index}-${key}`} className="h-11" value={sku[key] ?? ''} type={key === 'price' ? 'number' : 'text'} min={key === 'price' ? '0' : undefined} onChange={event => update({ skus: product.skus.map((item, i) => i === index ? { ...item, [key]: key === 'price' ? Number(event.target.value) : event.target.value } : item) })} /></div>)}{!originalSkuIds.has(sku.id) && <Button variant="ghost" className="h-11 sm:col-span-3" onClick={() => update({ skus: product.skus.filter(item => item.id !== sku.id) })}><Trash2 className="size-4" />Remove variant SKU</Button>}</div>)}<Button variant="outline" className="h-11" onClick={() => update({ skus: [...product.skus, { id: `intake-sku-${crypto.randomUUID()}`, sku_code: '', variation_name: '', price: undefined, weight_g: 0, units_per_carton: 1, status: 'active' }] })}><Plus className="size-4" />Add variant SKU</Button>
-      <ListingSkuMappings product={product} sources={sources} mappings={mappings} onChange={onMappingsChange} />
+      <ListingSkuMappings product={product} sources={sources} mappings={mappings} verifiedSingles={verifiedSingles} onChange={onMappingsChange} />
     </>)}
 
     {!product.has_variants && section('price', <>{mappingRow('retail_price')}<div className="max-w-48 space-y-1"><Label htmlFor={`${prefix}-currency`}>Currency *</Label><Input id={`${prefix}-currency`} className="h-11" maxLength={3} value={product.price_currency} onChange={event => update({ price_currency: event.target.value.toUpperCase() })} /></div>{!reviewFirst && <p className="text-xs text-muted-foreground">No currency conversion. Warehouse stock and shop prices stay unchanged.</p>}</>)}

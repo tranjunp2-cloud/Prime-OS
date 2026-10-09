@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, RefreshCw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Product } from '@/lib/product-store';
@@ -7,21 +7,30 @@ import { variantMappingError, type VariantMappings } from '@/lib/listing-master-
 import { resolveSourceSkuMappings, sourceSkuDataError, sourceSkuItems, suggestSourceSkuMappings } from '@/lib/listing-sku-mapping';
 
 /** Relationship fields; SKU proposals are reviewed in the adjacent completion form. */
-export function ListingSkuMappings({ product, sources, mappings, onChange, onReload, compact = false }: {
+export function ListingSkuMappings({ product, sources, mappings, onChange, onReload, compact = false, focusRequest = 0, verifiedSingles = [] }: {
   product: Product; sources: CatalogImportItem[]; mappings: VariantMappings;
   onChange: (value: VariantMappings) => void;
   onReload?: (sourceId: string) => void;
   compact?: boolean;
+  focusRequest?: number;
+  verifiedSingles?: string[];
 }) {
   const prefix = useId();
-  const skus = product.skus.filter(sku => sku.status === 'active');
+  const section = useRef<HTMLElement>(null);
+  const skus = product.skus.filter(sku => sku.status === 'active' && sku.sku_code.trim());
   const resolved = Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, product, mappings[source.id])]));
-  const issue = variantMappingError(sources, product, resolved);
+  const issue = variantMappingError(sources, product, resolved, verifiedSingles);
   const [expanded, setExpanded] = useState(!compact || Boolean(issue));
   useEffect(() => { if (issue) setExpanded(true); }, [issue]);
+  useEffect(() => {
+    if (!focusRequest) return;
+    setExpanded(true);
+    section.current?.focus({ preventScroll: true });
+    section.current?.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+  }, [focusRequest]);
   const total = sources.reduce((sum, source) => sum + sourceSkuItems(source).length, 0);
   const chosen = Object.values(resolved).flat().filter(row => skus.some(sku => sku.id === row.master_sku_id)).length;
-  return <section className={compact ? 'overflow-hidden rounded-lg border' : 'space-y-4 border-t pt-4'} aria-label="Map source SKUs">
+  return <section ref={section} tabIndex={-1} className={`${compact ? 'overflow-hidden rounded-lg border' : 'space-y-4 border-t pt-4'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`} aria-label="Map source SKUs">
     {compact ? <button type="button" aria-expanded={expanded} aria-controls={`${prefix}-mapping-body`} onClick={() => setExpanded(value => !value)} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">SKU mapping</span><span className={`mt-1 block text-xs ${issue ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>{issue ? 'SKU matches need review' : `${chosen}/${total} SKU pairs proposed · Not confirmed`}</span></span><span className="text-xs text-muted-foreground">{expanded ? 'Hide matches' : 'Review matches'}</span><ChevronDown className={`size-4 shrink-0 text-muted-foreground ${expanded ? 'rotate-180' : ''}`} /></button> : <><h3 className="text-sm font-semibold">Map source SKUs</h3><p className="text-xs leading-5 text-muted-foreground">Shop SKUs are filled from listing data. Review the suggested matches before confirming.</p></>}
     <div id={`${prefix}-mapping-body`} hidden={compact && !expanded} className={compact ? 'space-y-4 border-t p-4' : 'space-y-4'}>
     {!skus.length && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">This Master has no available variant SKUs. Set up SKUs in this review, or save the link and finish later.</p>}
@@ -44,16 +53,17 @@ export function ListingSkuMappings({ product, sources, mappings, onChange, onRel
           <div className="hidden grid-cols-2 gap-4 border-b bg-muted/30 px-4 py-2.5 text-xs font-medium text-muted-foreground sm:grid"><span>Shop SKU</span><span>Master SKU</span></div>
           {items.map((item, index) => {
             const row = rows[index];
+            const duplicate = Boolean(row.master_sku_id && rows.some((other, otherIndex) => otherIndex !== index && other.master_sku_id === row.master_sku_id));
             const suggested = !mappings[source.id] && suggestions[index]?.master_sku_id;
             const hintId = `${prefix}-${source.id}-${index}-hint`;
             return <div key={`${item.sku}:${index}`} className="grid gap-3 border-b p-4 last:border-0 sm:grid-cols-2 sm:items-center sm:gap-4">
               <div className="min-w-0 space-y-1"><p className="text-sm font-medium">{item.label || 'Variant name not provided'}</p><p className="break-all font-mono text-xs text-muted-foreground">{item.sku || 'SKU code not loaded'}</p></div>
               <div className="min-w-0 space-y-1.5">
                 <label htmlFor={`${hintId}-select`} className="block text-xs text-muted-foreground sm:hidden">Master SKU</label>
-                <select id={`${hintId}-select`} aria-label={`Master SKU for shop SKU ${index + 1}`} aria-describedby={hintId} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(sourceError) || !skus.length} value={row.master_sku_id} onChange={event => onChange({ ...mappings, [source.id]: rows.map((value, i) => i === index ? { ...value, master_sku_id: event.target.value } : value) })}>
+                <select id={`${hintId}-select`} aria-label={`Master SKU for shop SKU ${index + 1}`} aria-describedby={hintId} aria-invalid={duplicate || undefined} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(sourceError) || !skus.length} value={row.master_sku_id} onChange={event => onChange({ ...mappings, [source.id]: rows.map((value, i) => i === index ? { ...value, master_sku_id: event.target.value } : value) })}>
                   <option value="">Choose Master SKU</option>{skus.map(sku => <option key={sku.id} value={sku.id}>{sku.sku_code} · {sku.variation_name}</option>)}
                 </select>
-                <p id={hintId} className="text-xs text-muted-foreground">{sourceError ? 'Waiting for complete listing data' : suggested ? `Suggested · ${suggestions[index].reason}` : row.master_sku_id ? 'Selected for linking' : 'No match selected'}</p>
+                <p id={hintId} className={`text-xs ${duplicate ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>{sourceError ? 'Waiting for complete listing data' : duplicate ? 'Already selected for another source SKU in this listing' : suggested ? `Suggested · ${suggestions[index].reason}` : row.master_sku_id ? 'Selected for linking' : 'No match selected'}</p>
               </div>
             </div>;
           })}

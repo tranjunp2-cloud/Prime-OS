@@ -381,7 +381,7 @@ describe('Listing review drawer', () => {
     expect(screen.getByRole('group', { name: 'Differences to check' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Back to listings' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Review suggestion' })[1]);
-    expect(screen.getByText('SKU mapping needs review')).toBeVisible();
+    expect(screen.getByRole('note', { name: 'SKU mapping needs review' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Link to this Master' })).toBeDisabled();
     expect(getCatalogImportItems({ requireConfirmation: true }).every(item => !item.confirmed)).toBe(true);
   });

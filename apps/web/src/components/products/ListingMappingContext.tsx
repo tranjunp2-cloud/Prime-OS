@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronUp, Package, Plus } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronUp, Package, Plus, TriangleAlert } from 'lucide-react';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { Button } from '@/components/ui/button';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
@@ -11,6 +11,8 @@ type Props = {
   listings: CatalogImportItem[];
   activeIndex: number;
   reviewedIds: string[];
+  needsSkuReviewIds?: string[];
+  proposed?: boolean;
   master: Product;
   masterImage: ReactNode;
   onView: (index: number) => void;
@@ -29,7 +31,7 @@ function ListingThumbnail({ listing }: { listing: CatalogImportItem }) {
 }
 
 /** Review navigation and the shared destination, not a preview of already-saved links. */
-export function ListingMappingContext({ listings, activeIndex, reviewedIds, master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
+export function ListingMappingContext({ listings, activeIndex, reviewedIds, needsSkuReviewIds = [], proposed = false, master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
   const headingId = useId();
   const listId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -69,6 +71,7 @@ export function ListingMappingContext({ listings, activeIndex, reviewedIds, mast
           {visible.map(({ listing, index }) => {
             const active = activeIndex === index;
             const checked = reviewedIds.includes(listing.id);
+            const needsReview = !checked && needsSkuReviewIds.includes(listing.id);
             return <li key={listing.id}>
               <button ref={active ? activeRow : undefined} type="button" aria-label={`View listing ${index + 1}: ${listing.title} · ${listing.storeName}`} aria-pressed={active}
                 className={`flex w-full min-w-0 items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${active ? 'border-primary bg-primary/5' : 'border-transparent'}`}
@@ -80,8 +83,8 @@ export function ListingMappingContext({ listings, activeIndex, reviewedIds, mast
                   <span className="block break-all font-mono text-xs leading-5 text-muted-foreground">{listing.channelSku || 'SKU not provided'}</span>
                   <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs leading-5">
                     <span className="break-words text-muted-foreground">{listing.brand || 'Brand not provided'} · {listing.variants === 0 ? 'SKU structure unknown' : `${listing.variants} SKU${listing.variants === 1 ? '' : 's'}`}</span>
-                    <span className={`inline-flex items-center gap-1 ${active ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                      {checked && <Check className="size-3.5 shrink-0" aria-hidden="true" />}{checked ? 'Checked · not saved' : active ? 'Checking now' : 'To check'}
+                    <span className={`inline-flex items-center gap-1 ${needsReview ? 'text-amber-700 dark:text-amber-300' : active ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                      {checked ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : needsReview ? <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" /> : null}{checked ? 'Checked · not saved' : needsReview ? 'Needs SKU review' : active ? 'Checking now' : 'To check'}
                     </span>
                   </span>
                 </span>
@@ -105,6 +108,7 @@ export function ListingMappingContext({ listings, activeIndex, reviewedIds, mast
               <p className="break-all font-mono text-xs leading-5 text-muted-foreground">{master.sku_code}</p>
               <p className="break-words text-xs leading-5 text-muted-foreground">{master.brand || 'Brand not provided'} · {master.category || 'No category'}</p>
               <p className="text-xs leading-5 text-muted-foreground">{hasVariants ? `${master.skus.length} variant SKUs` : 'Single product · 1 SKU'} · Master {master.status === 'published' ? 'Active' : 'Draft'}</p>
+              {proposed && <p className="text-xs leading-5 text-amber-700 dark:text-amber-300">Proposed changes · not saved</p>}
             </div>
           </div>
           <div className="flex items-center gap-1 border-t pt-3">

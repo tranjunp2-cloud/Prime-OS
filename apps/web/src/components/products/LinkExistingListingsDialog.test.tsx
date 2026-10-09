@@ -78,7 +78,7 @@ describe('Link existing listings from a fixed Master', () => {
     const { onLinked } = mount(); select(0); select(1); review(2);
     expect(screen.getByRole('button', { name: 'Link 2 listings' })).toBeDisabled();
     acknowledge(); fireEvent.click(screen.getByRole('button', { name: 'Link 2 listings' }));
-    expect(onLinked).toHaveBeenCalledWith({ productId: master.id, reviewSaved: true }, before.record_version, items.slice(0, 2));
+    expect(onLinked).toHaveBeenCalledWith({ productId: master.id, reviewSaved: true, masterUpdated: false, deferred: false }, before.record_version, items.slice(0, 2));
     const after = getProductById(master.id)!;
     expect(after.channels).toHaveLength(2);
     for (const field of ['name', 'sku_code', 'brand', 'description', 'images', 'inventory', 'retail_price', 'status', 'channel_overrides'] as const) expect(after[field]).toEqual(before[field]);
@@ -119,7 +119,7 @@ describe('Link existing listings from a fixed Master', () => {
     expect(screen.getByRole('button', { name: 'Link 1 listing' })).toBeDisabled();
     expect(screen.getByText(/It needs a variant Master/)).toBeVisible();
   });
-  it('requires explicit mapping for every variant and saves the exact mappings', () => {
+  it('preserves suggested matches, requires every cleared pair to be resolved, and saves the exact mappings', () => {
     const sku = getProducts().flatMap(product => product.skus)[0];
     updateProduct(master.id, { id: master.id, has_variants: true, product_type: 'variant', skus: [
       { ...sku, id: 'master-small', sku_code: 'SMALL', variation_name: 'Small', status: 'active' },
@@ -128,6 +128,9 @@ describe('Link existing listings from a fixed Master', () => {
     items[0] = { ...items[0], variants: 2, variantItems: [{ sku: 'SHOP-S', label: 'Small' }, { sku: 'SHOP-L', label: 'Large' }] };
     saveCatalogImportItems(items); mount(); select(0); review(); acknowledge();
     expect(screen.getByRole('button', { name: 'Link 1 listing' })).toBeDisabled();
+    expect(screen.getByLabelText('Master SKU for shop SKU 1')).toHaveValue('master-small');
+    expect(screen.getByLabelText('Master SKU for shop SKU 2')).toHaveValue('master-large');
+    fireEvent.change(screen.getByLabelText('Master SKU for shop SKU 2'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('Master SKU for shop SKU 1'), { target: { value: 'master-small' } });
     expect(screen.getByRole('button', { name: 'Link 1 listing' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Master SKU for shop SKU 2'), { target: { value: 'master-large' } });
