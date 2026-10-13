@@ -13,6 +13,8 @@ import { ListingChannelReadiness } from './ListingChannelReadiness';
 import { savedListingCatalog, type ListingIntakeCatalog } from '@/lib/listing-intake-catalog';
 import { canCopyListingPrice, confirmListingIntake, intakeSku, pendingMappingReviews, snapshotListingMatch, snapshotListingSource, suggestedListingBrandId } from '@/lib/product-listing-intake';
 import { resolveSourceSkuMappings, sourceSkuDataError } from '@/lib/listing-sku-mapping';
+import { hydrateReviewSkuSources } from '@/lib/listing-review-source';
+import { proposeListingReview } from '@/lib/listing-auto-proposal';
 import { listingMappingRecovery } from '@/lib/listing-mapping-recovery';
 import { pendingReviewFor, prepareReviewVariants, resolvedReviewMappings } from '@/lib/listing-review-progress';
 import { evidenceSummary, groupEvidenceSummary, listingMatchEvidence, rankMasterCandidates, safeListingUrl, suggestedMasterForReview } from '@/lib/listing-match-evidence';
@@ -24,7 +26,7 @@ import { ListingComparisonTable } from './ListingComparisonTable';
 import { ListingSkuMappings } from './ListingSkuMappings';
 import { ListingSaveSummary } from './ListingSaveSummary';
 import { ListingReviewHelp } from './ListingReviewHelp';
-import { assertMasterComplete, completionFields, newListingMasterPreview, prepareMasterCompletion, reviewMasterSignature, variantMappingError, type VariantMappings } from '@/lib/listing-master-completion';
+import { assertMasterComplete, completionFields, newListingMasterPreview, reviewMasterSignature, variantMappingError, type VariantMappings } from '@/lib/listing-master-completion';
 
 export type IntakeStage = 'queue' | 'group' | 'choose' | 'compare' | 'create' | 'complete';
 type Props = {
@@ -41,13 +43,15 @@ type Props = {
   onSaved: (result: ReturnType<typeof confirmListingIntake>, created: boolean) => void;
 };
 
-function creationPreview(source: CatalogImportItem, products: Product[], previous?: Product, forceVariants = false) {
-  return prepareMasterCompletion(newListingMasterPreview(source, {
+function creationPreview(source: CatalogImportItem, products: Product[], previous?: Product, forceVariants = false, sources = [source]) {
+  const preview = newListingMasterPreview(source, {
     name: source.title, sku: previous?.sku_code ?? intakeSku(products),
     productType: forceVariants || source.variants > 1 ? 'variant' : 'single',
     categoryId: previous?.categoryId, brandId: suggestedListingBrandId(source),
     copySourcePrice: canCopyListingPrice(source),
-  }), [source]);
+  });
+  // Propose every selected listing, not only the listing supplying the title.
+  return proposeListingReview({ ...preview, skus: [] }, [source, ...sources.filter(item => item.id !== source.id)], products);
 }
 
 function Photo({ src, name, onZoom, small = false }: { src?: string; name: string; onZoom?: (src: string, name: string) => void; small?: boolean }) {
@@ -60,7 +64,7 @@ function Photo({ src, name, onZoom, small = false }: { src?: string; name: strin
 
 export function ListingMasterReview({ catalog = savedListingCatalog, listings, initialMode, onBack, backLabel = 'Back to listings', remainingCount, batchProgress, onSkip, onStageChange, onDirtyChange, onSaved }: Props) {
   // Keep reviewed values stable while the seller is comparing. Saving checks a fresh snapshot.
-  const [sources, setSources] = useState(() => structuredClone(listings));
+  const [sources, setSources] = useState(() => hydrateReviewSkuSources(listings, catalog.listings()));
   const [mode, setMode] = useState(initialMode);
   // Only initialize once: choosing another Master must not reapply the suggestion.
   const [master, setMaster] = useState<Product | null>(() => initialMode === 'existing'
@@ -72,7 +76,8 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const [reviewedIds, setReviewedIds] = useState<string[]>([]);
   const [sourceId, setSourceId] = useState(sources[0]?.id || '');
   // Keep the creation proposal separate so visiting the existing-Master finder never discards it.
-  const [newProduct, setNewProduct] = useState(() => creationPreview(sources[0], catalog.products(), undefined, sources.some(source => source.variants > 1)));
+  const [creationProposal] = useState(() => creationPreview(sources[0], catalog.products(), undefined, sources.some(source => source.variants > 1), sources));
+  const [newProduct, setNewProduct] = useState(creationProposal.product);
   const [creationDirty, setCreationDirty] = useState(false);
   const [replacementSourceId, setReplacementSourceId] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
@@ -83,16 +88,18 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const [mappingFocusRequest, setMappingFocusRequest] = useState(0);
   const recoveryId = useId();
   const structureCheck = useRef<HTMLButtonElement>(null);
+  const [initialProposal] = useState(() => master && !pending ? proposeListingReview(master, sources, catalog.products()) : null);
   const [completion, setCompletion] = useState<Product | null>(() => master && pending
     ? savedDraftCurrent ? { ...structuredClone(master), ...structuredClone(pending.master_draft) }
-      : master.status === 'draft' ? prepareReviewVariants(master, sources) : null : null);
-  const [completing, setCompleting] = useState(Boolean(completion));
-  const [mediaReady, setMediaReady] = useState(false);
-  const [existingMappings, setExistingMappings] = useState<VariantMappings>(() => master ? Object.fromEntries(sources.flatMap(source => {
+      : master.status === 'draft' ? prepareReviewVariants(master, sources) : null
+      : initialProposal && master && reviewMasterSignature(initialProposal.product) !== reviewMasterSignature(master) ? initialProposal.product : null);
+  const [completing, setCompleting] = useState(Boolean(pending && completion));
+  const [mediaReady, setMediaReady] = useState(true);
+  const [existingMappings, setExistingMappings] = useState<VariantMappings>(() => initialProposal?.mappings ?? (master ? Object.fromEntries(sources.flatMap(source => {
     const progress = pendingReviewFor(source, master);
     return progress?.draft_mappings ? [[source.id, structuredClone(progress.draft_mappings)]] : [];
-  })) : {});
-  const [creationMappings, setCreationMappings] = useState<VariantMappings>({});
+  })) : {}));
+  const [creationMappings, setCreationMappings] = useState<VariantMappings>(creationProposal.mappings);
   const [listingDrafts, setListingDrafts] = useState<Record<string, ListingDraftValues>>({});
   const mappings = mode === 'new' ? creationMappings : existingMappings;
   const setMappings = mode === 'new' ? setCreationMappings : setExistingMappings;
@@ -131,7 +138,9 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const missing = compareRows.filter(row => row.state === 'missing');
   const matches = compareRows.filter(row => row.state === 'match');
   const comparisonMaster = completion ?? master;
-  const blocked = Boolean(comparisonMaster && [current].some(item => (item.variants === 0 && !verifiedSingles.includes(item.id))
+  const proposedSkuCount = completion?.skus.filter(sku => !master?.skus.some(previous => previous.id === sku.id)).length ?? 0;
+  const comparisonSources = groupedComparison ? sources : [current];
+  const blocked = Boolean(comparisonMaster && comparisonSources.some(item => (item.variants === 0 && !verifiedSingles.includes(item.id))
     || (item.variants > 1 && !comparisonMaster.has_variants && comparisonMaster.product_type !== 'variant')));
   const unknownStructure = sources.some(item => item.variants === 0);
   const existingLinks = sources.filter(item => item.existingLinkReview);
@@ -143,23 +152,22 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const confirmLabel = groupedComparison
     ? existingLinks.length ? alreadyLinkedHere ? `Confirm all ${sources.length} links` : `Confirm Master for all ${sources.length} listings` : `Link all ${sources.length} listings`
     : existingLinks.length ? existingLinks.every(item => item.existingLinkReview?.productId === master?.id) ? 'Confirm mapping' : 'Move to this Master' : 'Link to this Master';
-  const reviewedCount = reviewedIds.length;
   const resolvedMappings = mode === 'existing' && comparisonMaster
     ? Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, comparisonMaster, mappings[source.id])])) : mappings;
-  const mappingError = comparisonMaster ? variantMappingError([current], comparisonMaster, resolvedMappings, verifiedSingles) : '';
-  const mappingRecovery = stage === 'compare' && comparisonMaster ? listingMappingRecovery(current, comparisonMaster, resolvedMappings, verifiedSingles) : null;
+  const mappingError = comparisonMaster ? variantMappingError(comparisonSources, comparisonMaster, resolvedMappings, verifiedSingles) : '';
+  const mappingRecovery = stage === 'compare' && !groupedComparison && comparisonMaster ? listingMappingRecovery(current, comparisonMaster, resolvedMappings, verifiedSingles) : null;
   const needsSkuReviewIds = groupedComparison && comparisonMaster ? sources.filter(source => listingMappingRecovery(source, comparisonMaster, resolvedMappings, verifiedSingles)).map(source => source.id) : [];
-  const canSave = mode === 'new' ? (sources.length === 1 || acknowledged) && (!unknownStructure || verifiedStructure) && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master) && !blocked && !mappingError;
+  const canSave = mode === 'new' ? (sources.length === 1 || acknowledged) && (!unknownStructure || verifiedStructure) && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master) && !blocked && !mappingError && (!groupedComparison || acknowledged);
   const canDefer = mode === 'new' ? Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master);
   let completionError = '';
   if (editingDetails && reviewProduct) {
     try { assertMasterComplete(reviewProduct, sources, catalog.products()); }
     catch (reason) { completionError = reason instanceof Error ? reason.message : 'Complete required details.'; }
-    completionError ||= variantMappingError(stage === 'compare' ? [current] : sources, reviewProduct, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, reviewProduct, mappings[source.id])])), mode === 'new' && verifiedStructure ? sources.map(item => item.id) : verifiedSingles);
+    completionError ||= variantMappingError(stage === 'compare' ? comparisonSources : sources, reviewProduct, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, reviewProduct, mappings[source.id])])), mode === 'new' && verifiedStructure ? sources.map(item => item.id) : verifiedSingles);
   }
   const confirmationError = mode === 'new' && sources.length > 1 && !acknowledged ? 'Confirm that all selected listings represent the same product before activating.'
     : mode === 'new' && unknownStructure && !verifiedStructure ? 'Check the source SKU structure and confirm the product type before activating.'
-    : mode === 'existing' && stage === 'complete' && sources.length > 1 && !acknowledged ? 'Confirm that you reviewed all selected listings before saving.' : '';
+    : mode === 'existing' && (stage === 'complete' || groupedComparison) && sources.length > 1 && !acknowledged ? 'Confirm that you reviewed all selected listings before saving.' : '';
   const completionFeedback = completionError.startsWith('Complete required details before activating:')
     ? stage === 'compare' ? `${completionError.replace('Complete required details before activating:', 'Complete these Master fields:')} Or save progress and finish later.`
       : master?.status === 'published' ? 'Complete the highlighted sections before saving these changes, or save progress.' : 'Complete the highlighted sections to activate, or save a draft.'
@@ -186,15 +194,21 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     if (index < 0) return;
     const source = sources[index];
     setSourceId(id); setSourceIndex(index); setAcknowledged(false); setVerifiedStructure(false); setError('');
-    setMappings({}); setMediaReady(false); setReplacementSourceId('');
-    setNewProduct(previous => creationPreview(source, catalog.products(), previous, sources.some(item => item.variants > 1)));
+    const proposal = creationPreview(source, catalog.products(), newProduct, sources.some(item => item.variants > 1), sources);
+    setCreationMappings(proposal.mappings); setMediaReady(false); setReplacementSourceId('');
+    setNewProduct(proposal.product);
     setCreationDirty(false); setDirty(true);
   };
   const updateNewProduct = (product: Product) => {
     if (product.has_variants !== newProduct.has_variants) { setVerifiedStructure(false); setAcknowledged(false); }
     setNewProduct(product); setCreationDirty(true); setDirty(true); setError('');
   };
-  const compare = (product: Product) => { setMaster(structuredClone(product)); resetReview(); setSourceIndex(0); };
+  const compare = (product: Product) => {
+    const proposal = proposeListingReview(product, sources, catalog.products());
+    setMaster(structuredClone(product)); resetReview(); setSourceIndex(0);
+    setCompletion(reviewMasterSignature(proposal.product) === reviewMasterSignature(product) ? null : proposal.product);
+    setExistingMappings(proposal.mappings); setMediaReady(true);
+  };
   const completeHere = () => {
     if (!master) return;
     setCompletion(previous => previous && (previous.has_variants || !sources.some(source => source.variants > 1)) ? previous : prepareReviewVariants(previous ?? master, sources));
@@ -216,9 +230,16 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       setError('This listing is no longer available for review. Return to listings and select it again.');
       return;
     }
-    setSources(items => items.map(source => source.id === id ? structuredClone(latest) : source));
-    setMappings(value => Object.fromEntries(Object.entries(value).filter(([key]) => key !== id)));
+    const nextSources = sources.map(source => source.id === id ? structuredClone(latest) : source);
+    const keptMappings = Object.fromEntries(Object.entries(mappings).filter(([key]) => key !== id));
+    setSources(nextSources);
+    if (comparisonMaster) {
+      const proposal = proposeListingReview(comparisonMaster, nextSources, catalog.products(), keptMappings);
+      setCompletion(master && reviewMasterSignature(proposal.product) === reviewMasterSignature(master) ? null : proposal.product);
+      setMappings(proposal.mappings); setMediaReady(true);
+    } else setMappings(keptMappings);
     setReviewedIds(value => value.filter(reviewed => reviewed !== id));
+    setAcknowledged(false);
     setVerifiedSingles(value => value.filter(verified => verified !== id));
     setError('');
     setReloadNotice(sourceSkuDataError(latest) ? 'SKU details are still missing from the imported data. Sync this listing from its channel, then reload here.' : 'Listing data reloaded. Review the updated SKU matches.');
@@ -226,7 +247,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const save = (confirmedSummary = false) => {
     if (groupEditing || ((stage === 'compare' || !editingDetails) && !canSave) || saveLock.current || confirmationError) return;
     if (editingDetails && (!reviewProduct || completionError || !mediaReady || (mode === 'new' && !canSave))) return;
-    if (mode === 'existing' && !completing) {
+    if (mode === 'existing' && !completing && !groupedComparison) {
       const accepted = [...new Set([...reviewedIds, current.id])];
       setReviewedIds(accepted);
       if (sources.length > 1) setDirty(true);
@@ -298,7 +319,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {stage !== 'complete' && existingLinks.length > 0 && <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><p className="font-medium">Review an existing link</p><p>{[...new Set(existingLinks.flatMap(item => item.existingLinkReview!.issues))].join(' · ')}</p><p className="text-muted-foreground">The current link is unchanged until you confirm. Choosing another Master or creating a new Master moves only the selected links; Master stock is not transferred.</p></div>}
 
       {sources.length > 1 && stage === 'choose' && <SelectedListingsOverview listings={sources} />}
-      {groupedComparison && master && <ListingMappingContext disabled={groupEditing} listings={sources} activeIndex={sourceIndex} reviewedIds={reviewedIds} needsSkuReviewIds={needsSkuReviewIds} proposed={Boolean(completion)} master={comparisonMaster!} masterImage={<Photo src={comparisonMaster!.images[0]} name={comparisonMaster!.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={() => changeDestination('existing')} onCreateMaster={() => changeDestination('new')} />}
+      {groupedComparison && master && <ListingMappingContext layout="matrix" disabled={groupEditing} listings={sources} activeIndex={sourceIndex} reviewedIds={reviewedIds} needsSkuReviewIds={needsSkuReviewIds} proposed={Boolean(completion)} master={comparisonMaster!} masterImage={<Photo src={comparisonMaster!.images[0]} name={comparisonMaster!.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={() => changeDestination('existing')} onCreateMaster={() => changeDestination('new')} />}
 
       {current && stage !== 'complete' && !groupedComparison && !(stage === 'choose' && sources.length > 1) && <div className={master && mode === 'existing' ? 'grid gap-3 sm:grid-cols-2' : ''}>
         <div role="group" aria-label="Source listing" className="min-w-0 rounded-xl border bg-muted/20 p-3">{stage === 'compare' && <p className="mb-2 text-xs font-medium text-muted-foreground">Source listing</p>}{sourceCard(current)}</div>
@@ -337,6 +358,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       </div>}
 
       {stage === 'compare' && master && <>
+        {proposedSkuCount > 0 && <div role="note" aria-label="Automatic SKU proposals" className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5"><Plus className="mt-0.5 size-4 shrink-0 text-primary" /><div><p className="text-xs font-medium">{proposedSkuCount} new Master SKU{proposedSkuCount === 1 ? '' : 's'} proposed · Not saved</p><p className="mt-1 text-xs text-muted-foreground">Review the filled pairs and prices below. Confirm these listings belong to the same product; edit or remove any incorrect proposal.</p>{!master.has_variants && <p className="mt-1 text-xs text-muted-foreground">Saving adds variants to this Master. Existing stock is preserved, not split.</p>}</div><ListingReviewHelp label="Automatic mapping proposals">Existing matches are selected first. Unmatched source SKUs get separate proposed Master rows. A new row is not proof that two products match. Same-currency source prices are copied; otherwise the current Master base price is suggested and labelled. Nothing is saved, published or synced until you confirm.</ListingReviewHelp></div>}
         {mappingRecovery && <div role="note" aria-label="SKU mapping needs review" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
           <div className="min-w-0 flex-1"><p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300"><TriangleAlert className="size-4 shrink-0" />{mappingRecovery.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{mappingRecovery.detail}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">You can link and finish later. Unconfirmed mappings cannot be used for price or stock sync.</p></div>
           <Button variant="outline" className="h-11" disabled={groupEditing} onClick={() => {
@@ -346,19 +368,23 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
             else { structureCheck.current?.focus({ preventScroll: true }); structureCheck.current?.scrollIntoView?.({ block: 'center', behavior: 'auto' }); }
           }}>{mappingRecovery.actionLabel}<ArrowRight className="size-4" /></Button>
         </div>}
-        {current.variants === 0 && <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm leading-6"><Checkbox ref={structureCheck} disabled={groupEditing} className="mt-1 shrink-0" checked={verifiedSingles.includes(current.id)} onCheckedChange={checked => { setVerifiedSingles(ids => checked === true ? [...ids, current.id] : ids.filter(id => id !== current.id)); setReviewedIds([]); setDirty(true); }} /><span>Source structure is not recorded. I checked the shop listing: its product, pack quantity and SKU structure match this Master. I will map any variant SKUs below.</span></label>}
-        {differences.length > 0 && <div role="group" aria-label="Differences to check" className="overflow-hidden rounded-lg border border-amber-500/30">
+        {!groupedComparison && current.variants === 0 && <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm leading-6"><Checkbox ref={structureCheck} disabled={groupEditing} className="mt-1 shrink-0" checked={verifiedSingles.includes(current.id)} onCheckedChange={checked => { setVerifiedSingles(ids => checked === true ? [...ids, current.id] : ids.filter(id => id !== current.id)); setReviewedIds([]); setDirty(true); }} /><span>Source structure is not recorded. I checked the shop listing: its product, pack quantity and SKU structure match this Master. I will map any variant SKUs below.</span></label>}
+        {!groupedComparison && differences.length > 0 && <div role="group" aria-label="Differences to check" className="overflow-hidden rounded-lg border border-amber-500/30">
           <div className="flex items-center gap-2 bg-amber-500/5 px-3 py-2.5"><TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-amber-700 dark:text-amber-300" /><h3 className="text-xs font-semibold">Check product identity</h3><ListingReviewHelp label="Product differences">Different values do not automatically mean a different product. Check brand, model and pack size before linking. No Master value is overwritten by linking.</ListingReviewHelp></div>
           {differences.map(row => <div key={row.key} className="grid gap-x-3 gap-y-1 px-3 py-2 text-xs sm:grid-cols-[120px_1fr_1fr]"><p className="font-medium text-amber-700 dark:text-amber-300">{row.label} differs</p><p className="min-w-0 break-words"><span className="text-muted-foreground">Listing: </span>{row.listing}</p><p className="min-w-0 break-words"><span className="text-muted-foreground">Master: </span>{row.master}</p></div>)}
         </div>}
-        {(comparisonMaster!.has_variants || comparisonMaster!.product_type === 'variant') && <ListingSkuMappings key={`${current.id}:${master.id}`} compact focusRequest={mappingFocusRequest} verifiedSingles={verifiedSingles} product={comparisonMaster!} sources={[current]} mappings={mappings} onReload={mappingRecovery?.action === 'reload' ? undefined : reloadSource} onChange={value => { setMappings(value); setReviewedIds(ids => ids.filter(id => id !== current.id)); setDirty(true); setError(''); }} />}
+        {!groupedComparison && (comparisonMaster!.has_variants || comparisonMaster!.product_type === 'variant') && <ListingSkuMappings key={`${current.id}:${master.id}`} compact focusRequest={mappingFocusRequest} verifiedSingles={verifiedSingles} product={comparisonMaster!} sources={[current]} mappings={mappings} onReload={mappingRecovery?.action === 'reload' ? undefined : reloadSource} onChange={value => { setMappings(value); setReviewedIds(ids => ids.filter(id => id !== current.id)); setDirty(true); setError(''); }} />}
         <div className="space-y-2">
-          {(skuDifference || missing.length > 0) && <p className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" /><span>{skuDifference && 'Shop and Master SKU codes differ; this can be normal. '}{missing.length > 0 && `${missing.length} identity fields unverified.`}</span><ListingReviewHelp label="Unverified product fields">{missing.length ? `Not provided: ${missing.map(row => row.label).join(', ')}. Missing data is not evidence of a match. Check the actual product before linking.` : 'Shop identifiers do not have to use the same code as the Master.'}</ListingReviewHelp></p>}
-          {matches.length > 0 && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Check className="size-3.5" />Matches: {matches.map(row => row.label).join(', ')}.</p>}
+          {!groupedComparison && (skuDifference || missing.length > 0) && <p className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" /><span>{skuDifference && 'Shop and Master SKU codes differ; this can be normal. '}{missing.length > 0 && `${missing.length} identity fields unverified.`}</span><ListingReviewHelp label="Unverified product fields">{missing.length ? `Not provided: ${missing.map(row => row.label).join(', ')}. Missing data is not evidence of a match. Check the actual product before linking.` : 'Shop identifiers do not have to use the same code as the Master.'}</ListingReviewHelp></p>}
+          {!groupedComparison && matches.length > 0 && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Check className="size-3.5" />Matches: {matches.map(row => row.label).join(', ')}.</p>}
           <ListingComparisonTable key={`${current.id}:${master.id}`} baseline={master} product={comparisonMaster!} current={current} sources={sources}
+            skuMatrix={{ mappings, verifiedSingles, onReload: reloadSource,
+              onVerify: (id, checked) => { setVerifiedSingles(ids => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id)); setAcknowledged(false); setDirty(true); setError(''); },
+              onMappingsChange: value => { setMappings(value); setAcknowledged(false); setDirty(true); setError(''); } }}
             onSetupSkus={completeHere} onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }}
-            onChange={next => { setCompletion(reviewMasterSignature(next) === reviewMasterSignature(master) ? null : next); setMediaReady(true); setReviewedIds([]); setDirty(true); setError(''); }} />
+            onChange={next => { setCompletion(reviewMasterSignature(next) === reviewMasterSignature(master) ? null : next); setMediaReady(true); setReviewedIds([]); setAcknowledged(false); setDirty(true); setError(''); }} />
         </div>
+        {groupedComparison && <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm leading-6"><Checkbox className="mt-1 shrink-0" disabled={groupEditing} checked={acknowledged} onCheckedChange={checked => setAcknowledged(checked === true)} /><span>I reviewed all {sources.length} listings{sources.length > 4 ? ', including hidden columns,' : ''} and confirm they represent this product.</span></label>}
       </>}
       {reloadNotice && <p role="status" className="text-sm text-muted-foreground">{reloadNotice}</p>}
       {stage === 'complete' && completion && <>
@@ -379,21 +405,16 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {stage !== 'choose' && (reviewProduct || master) && <ListingChannelReadiness product={(reviewProduct || master)!} activateMaster={editingDetails} sources={sources} mappings={mappings} drafts={listingDrafts} disabled={groupEditing} onChange={value => { setListingDrafts(value); setDirty(true); }} />}
     </div>
     <div role="group" aria-label="Review actions" className={`max-h-[55dvh] shrink-0 overflow-y-auto border-t bg-background px-4 py-3 sm:px-6 ${editingDetails ? 'grid gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center' : 'space-y-3'}`}>
-      {groupEditing && <p role="status" className="col-span-full text-xs text-muted-foreground">Apply or cancel your edits before {groupedComparison ? 'switching listings or saving' : 'saving this Master'}.</p>}
+      {groupEditing && <p role="status" className="col-span-full text-xs text-muted-foreground">Apply or cancel your edits before {groupedComparison ? 'changing the group or saving' : 'saving this Master'}.</p>}
       {mappingRecovery && !groupEditing && <p id={recoveryId} className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300">{mappingRecovery.title}. {groupedComparison ? 'You can view another listing or link all and finish later.' : 'You can link now and finish later.'}</p>}
       {editingDetails && !groupEditing && (confirmationError || completionError || !mediaReady) && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300" role="status">{confirmationError || completionFeedback || 'Wait for the image upload to finish.'}</p>}
+      {groupedComparison && !groupEditing && (needsSkuReviewIds.length > 0 || !editingDetails && !acknowledged) && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300">{needsSkuReviewIds.length ? `SKU mapping needs review for ${needsSkuReviewIds.length} of ${sources.length} listings. Check the SKU rows in the table or link all and finish later.` : confirmationError}</p>}
       {error && <p role="alert" className="col-span-full rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><Info className="mt-0.5 size-3.5 shrink-0" />{mode === 'new' ? 'Nothing is published; sync stays off.' : editingDetails ? 'Only reviewed Master changes and links are saved. Nothing is published; sync is unchanged.' : 'Link only. Master data, shop content, stock and sync stay unchanged.'}</p><span role="status">{groupedComparison ? `${reviewedCount} of ${sources.length} checked · Changes not saved` : remainingCount !== undefined ? `${remainingCount} listing${remainingCount === 1 ? '' : 's'} left to review` : `${sources.length} listing${sources.length === 1 ? '' : 's'} selected`}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><Info className="mt-0.5 size-3.5 shrink-0" />{mode === 'new' ? 'Nothing is published; sync stays off.' : editingDetails ? 'Only reviewed Master changes and links are saved. Nothing is published; sync is unchanged.' : 'Link only. Master data, shop content, stock and sync stay unchanged.'}</p><span role="status">{groupedComparison ? `${sources.length} listings · ${acknowledged ? 'Group reviewed' : 'Review required'} · Changes not saved` : remainingCount !== undefined ? `${remainingCount} listing${remainingCount === 1 ? '' : 's'} left to review` : `${sources.length} listing${sources.length === 1 ? '' : 's'} selected`}</span></div>
       {(stage !== 'choose' || onSkip) && <div className="col-span-full flex flex-wrap items-center justify-end gap-2">
-        {groupedComparison && <nav aria-label="Browse selected listings" className="mr-auto flex items-center gap-1">
-          <Button variant="ghost" className="h-11 px-2" aria-label="Previous listing" disabled={groupEditing || sourceIndex === 0} onClick={() => changeSource(sourceIndex - 1)}><ArrowLeft className="size-4" /></Button>
-          <span className="text-xs tabular-nums text-muted-foreground">{sourceIndex + 1} / {sources.length}</span>
-          <Button variant="ghost" className="h-11 px-2 text-xs" disabled={groupEditing || sourceIndex === sources.length - 1} onClick={() => changeSource(sourceIndex + 1)}>Next listing<ArrowRight className="size-4" /></Button>
-          <ListingReviewHelp label="Browsing listings">Viewing another listing does not mark it checked or save any links. Your applied mapping choices are kept.</ListingReviewHelp>
-        </nav>}
         {onSkip && <Button variant="ghost" className="mr-auto h-11" disabled={groupEditing} onClick={() => { if (dirty || groupDirty) setDiscardSkip(true); else onSkip(); }}>Skip for now</Button>}
         {stage !== 'choose' && <><Button variant="outline" className="h-11 w-full sm:w-auto" disabled={!canDefer || groupEditing} onClick={() => setDeferOpen(true)}>{deferLabel}</Button>
-        <Button className="h-11 w-full sm:w-auto" aria-describedby={mappingRecovery && !groupEditing ? recoveryId : undefined} disabled={groupEditing || (editingDetails ? !reviewProduct || Boolean(confirmationError || completionError) || !mediaReady || ((mode === 'new' || stage === 'compare') && !canSave) : !canSave)} onClick={() => save()}>{stage === 'compare' && sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Mark checked & next' : editingDetails ? completeLabel : confirmLabel}<ArrowRight className="size-4" /></Button></>}
+        <Button className="h-11 w-full sm:w-auto" aria-describedby={mappingRecovery && !groupEditing ? recoveryId : undefined} disabled={groupEditing || (editingDetails ? !reviewProduct || Boolean(confirmationError || completionError) || !mediaReady || ((mode === 'new' || stage === 'compare') && !canSave) : !canSave)} onClick={() => save()}>{stage === 'compare' && !groupedComparison && sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Mark checked & next' : editingDetails ? completeLabel : confirmLabel}<ArrowRight className="size-4" /></Button></>}
       </div>}
     </div>
     {summaryOpen && (reviewProduct || master) && <ListingSaveSummary product={editingDetails ? reviewProduct! : master!} baseline={mode === 'existing' ? master ?? undefined : undefined} sources={sources} mappings={mappings} listingDrafts={listingDrafts} editing={editingDetails} creating={mode === 'new'} confirmLabel={editingDetails ? completeLabel : confirmLabel} onBack={() => setSummaryOpen(false)} onConfirm={() => save(true)} />}

@@ -2,7 +2,7 @@ import type { CatalogImportItem } from './catalog-import-store';
 import { getProducts, type Product, type ProductType } from './product-store';
 import { getProductCatalogSettings, resolveCatalogCategory } from './product-catalog-settings-store';
 import { getStoredMasterReadiness } from './product-master-readiness';
-import { sourceSkuDataError, sourceSkuItems } from './listing-sku-mapping';
+import { hasVerifiedLegacySingleStructure, sourceSkuDataError, sourceSkuItems } from './listing-sku-mapping';
 import { fieldMappingErrors, initialFieldMappings, importedFieldCandidates, mappingDecision, suggestAttributeFields } from './listing-field-mapping';
 
 export type MasterCompletion = Pick<Product, 'name' | 'description' | 'category' | 'categoryId' | 'images' | 'retail_price' | 'price_currency' | 'specifications' | 'pkg_length' | 'pkg_width' | 'pkg_height' | 'pkg_weight' | 'variant_options' | 'skus'> & Partial<Pick<Product, 'has_variants' | 'product_type' | 'brand' | 'brandId' | 'gtin' | 'mpn' | 'model_number' | 'pack_quantity' | 'field_mappings'>>;
@@ -105,10 +105,14 @@ export function assertMasterComplete(product: Product, sources: CatalogImportIte
 }
 export function variantMappingError(sources: CatalogImportItem[], product: Product, mappings: VariantMappings = {}, verifiedSingles: string[] = []) {
   for (const source of sources) {
+    // Preserve the existing, explicit legacy single-product identity review; no SKU pair is created.
+    if (!product.has_variants && product.product_type !== 'variant' && hasVerifiedLegacySingleStructure(source, verifiedSingles)) continue;
     const count = source.variants === 0 && verifiedSingles.includes(source.id)
-      ? product.has_variants ? mappings[source.id]?.length ?? 0 : 1 : source.variants;
+      ? product.has_variants || product.product_type === 'variant' ? mappings[source.id]?.length ?? 0 : sourceSkuItems(source).length : source.variants;
     if (!product.has_variants && product.product_type !== 'variant') {
       if (count !== 1) return 'These listings need variant-SKU matching. Choose a variant Master or create one from this listing.';
+      const sourceError = sourceSkuDataError(source);
+      if (sourceError) return sourceError;
       continue;
     }
     const sourceError = sourceSkuDataError(source);

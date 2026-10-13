@@ -1,4 +1,4 @@
-import { confirmationBlocker as sharedConfirmationBlocker, packingSlipBlocker } from '../../../../packages/order-workflow/rules.js';
+import { confirmationBlocker as sharedConfirmationBlocker, paymentAndConfirmationBlocker as sharedPaymentAndConfirmationBlocker, packingSlipBlocker } from '../../../../packages/order-workflow/rules.js';
 import type { OrderRecord } from './orders-api';
 import { prototypeWorkflowOrder } from './order-prototype';
 import { workflowBlocker } from './order-processing';
@@ -12,6 +12,10 @@ export { packingSlipBlocker };
 export function confirmationBlocker(order: OrderRecord, canWrite: boolean) {
   if (order.source !== 'demo' && !canWrite) return 'Order write access is required.';
   return sharedConfirmationBlocker(prototypeWorkflowOrder(order));
+}
+export function paymentAndConfirmationBlocker(order: OrderRecord, canWrite: boolean) {
+  if (order.source !== 'demo' && !canWrite) return 'Order write access is required.';
+  return sharedPaymentAndConfirmationBlocker(prototypeWorkflowOrder(order));
 }
 export function batchBlocker(order: OrderRecord, action: BatchAction, canWrite: boolean, warehouse = '') {
   if (action === 'print') return packingSlipBlocker(order);

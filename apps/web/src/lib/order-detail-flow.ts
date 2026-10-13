@@ -1,5 +1,5 @@
 import { completionBlocker } from './order-processing';
-import { confirmationBlocker } from './order-bulk';
+import { confirmationBlocker, paymentAndConfirmationBlocker } from './order-bulk';
 import { hasActiveReturn } from './order-work-queues';
 import { orderLabels, orderStageLabels, orderDisplayStatus, type CanonicalStatus, type OrderRecord } from './orders-api';
 
@@ -55,6 +55,7 @@ export function getOrderDetailPermissions(order: OrderRecord, canWrite: boolean)
     editDraft: editable && order.source !== 'demo' && !order.hold?.active && order.canonicalStatus === 'draft',
     submit: editable && !order.hold?.active && order.canonicalStatus === 'draft',
     confirm: !confirmationBlocker(order, canWrite),
+    confirmPaymentAndOrder: !paymentAndConfirmationBlocker(order, canWrite),
     cancel: editable && !order.hold?.active && early,
     warehouse: editable && early,
     payment: editable && !terminal && !['Paid', 'Refunded', 'Partially refunded'].includes(order.payment.state),

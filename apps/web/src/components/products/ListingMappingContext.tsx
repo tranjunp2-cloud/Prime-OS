@@ -7,6 +7,7 @@ import type { Product } from '@/lib/product-store';
 import { ListingReviewHelp } from './ListingReviewHelp';
 
 type Props = {
+  layout?: 'queue' | 'matrix';
   disabled?: boolean;
   listings: CatalogImportItem[];
   activeIndex: number;
@@ -31,7 +32,7 @@ function ListingThumbnail({ listing }: { listing: CatalogImportItem }) {
 }
 
 /** Review navigation and the shared destination, not a preview of already-saved links. */
-export function ListingMappingContext({ listings, activeIndex, reviewedIds, needsSkuReviewIds = [], proposed = false, master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
+export function ListingMappingContext({ layout = 'queue', listings, activeIndex, reviewedIds, needsSkuReviewIds = [], proposed = false, master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
   const headingId = useId();
   const listId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -51,6 +52,16 @@ export function ListingMappingContext({ listings, activeIndex, reviewedIds, need
     if (activeBounds.top < bounds.top) list.scrollTop -= bounds.top - activeBounds.top;
     else if (activeBounds.bottom > bounds.bottom) list.scrollTop += activeBounds.bottom - bounds.bottom;
   }, [activeIndex, expanded]);
+
+  if (layout === 'matrix') return <section aria-labelledby={headingId} className="space-y-3">
+    <div className="flex flex-wrap items-center gap-2"><h3 id={headingId} className="flex items-center gap-2 text-sm font-semibold">{listings.length} listings <ArrowRight aria-hidden="true" className="size-4 text-muted-foreground" /><span className="sr-only">to </span>1 Product Master</h3><ListingReviewHelp label="Linking multiple listings">Compare all selected listings together. Each row selects one shared Master value; it does not make shop values identical. Nothing is saved until you confirm. Linking does not enable sync.</ListingReviewHelp></div>
+    <p className="text-xs text-muted-foreground">All selected listings will link to this Master. Check that they represent the same product.</p>
+    <div role="group" aria-label="Shared destination Master" className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-3">
+      {masterImage}
+      <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">Destination Master · For all {listings.length} listings</p><p className="mt-1 break-words text-sm font-semibold">{master.name}</p><p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{master.sku_code}</span> · {hasVariants ? `${master.skus.length} variant SKUs` : 'Single product · 1 SKU'} · {proposed ? 'Proposed changes · not saved' : `Master ${master.status === 'published' ? 'Active' : 'Draft'}`}</p></div>
+      <div className="flex flex-wrap gap-1"><Button variant="outline" className="h-11 text-xs" disabled={disabled} onClick={onChangeMaster}>Change Master for all</Button><Button variant="ghost" className="h-11 text-xs" disabled={disabled} onClick={onCreateMaster}><Plus className="size-3.5" />Create a new Master for all</Button></div>
+    </div>
+  </section>;
 
   return <section aria-labelledby={headingId} className="space-y-3">
     <div>

@@ -1,15 +1,82 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import {cleanup, fireEvent, render, screen, within} from '@testing-library/react';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {OrderWorkspaceDetail} from './OrderWorkspaceDetail';
 import {getOrderDetailFlow, getOrderDetailStatus, getOrderDetailSteps, getOrderDetailPermissions} from '@/lib/order-detail-flow';
 import {ordersApi, type OrderRecord, type CanonicalStatus} from '@/lib/orders-api';
 vi.mock('@/lib/orders-api', async (load) => ({...await load<typeof import('@/lib/orders-api')>(), ordersApi:{command:vi.fn()}}));
 const order: OrderRecord = { id: 'order-test', orderKey: 'MAN-TEST', requestKey: 'req-1', version: 1, source: 'manual', canonicalStatus: 'created', orderedAt: '2026-09-10T10:00:00Z', currencyCode: 'VND', buyerSnapshot: { name: 'Lan', phone: '0900123456', email: '' }, shippingAddressSnapshot: { address: '123 Le Loi', city: 'HCM', country: 'VN', postalCode: '' }, lines: [{ sku: 'SKU-A', name: 'Product A', quantity: 2, unitPrice: 50000, lineTotal: 100000 }], totals: { subtotal: 100000, grandTotal: 100000 }, payment: { state: 'Unpaid', method: 'COD', reference: '' }, metadata: { store: 'Manual', warehouse: 'HCM', assignee: 'Unassigned', notes: '', tags: [] }, transitions: [], shipments: [], returnRequests: [], exceptions: [], activity: [] };
-afterEach(()=>{cleanup(); vi.clearAllMocks();});
+beforeEach(() => {vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });});
+afterEach(()=>{cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals();});
 function mount(record=order) {return render(<OrderWorkspaceDetail order={record} canWrite onClose={()=>{}} onUpdated={()=>{}} onEditDraft={()=>{}}/>);}
 describe('Order detail workflows',()=>{
+  it('confirms an unpaid bank transfer and the order in one dialog, then shows Preparing', async () => {
+    const bankOrder = {...order, needsPaymentVerification: true, payment: {state: 'Unpaid', method: 'Bank transfer', reference: 'BANK-123'}};
+    const updated = {...bankOrder, canonicalStatus: 'acknowledged' as const, version: 2, needsPaymentVerification: false, payment: {...bankOrder.payment, state: 'Paid'}};
+    const onUpdated = vi.fn();
+    vi.mocked(ordersApi.command).mockResolvedValue({data: updated});
+    const view = render(<OrderWorkspaceDetail order={bankOrder} canWrite onClose={()=>{}} onUpdated={onUpdated} onEditDraft={()=>{}} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Confirm payment & order'}));
+    const dialog = within(screen.getByRole('dialog', {name: 'Confirm payment & order'}));
+    expect(dialog.getByText('₫100,000')).toBeVisible();
+    const submit = dialog.getByRole('button', {name: 'Confirm payment & order'});
+    const checkbox = dialog.getByRole('checkbox', {name: /I have verified/});
+    const reference = dialog.getByLabelText('Payment reference / Evidence');
+    expect(checkbox).not.toBeChecked();
+    expect(submit).toBeDisabled();
+    fireEvent.click(checkbox);
+    fireEvent.change(reference, {target: {value: '  '}});
+    expect(submit).toBeDisabled();
+    fireEvent.change(reference, {target: {value: ' BANK-123 '}});
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
+    expect(ordersApi.command).toHaveBeenCalledTimes(1);
+    expect(ordersApi.command).toHaveBeenCalledWith(bankOrder, {action: 'confirm-payment-order', reference: 'BANK-123', paymentReceived: true, requestId: expect.any(String)});
+    expect(screen.queryByRole('dialog', {name: 'Confirm Order'})).not.toBeInTheDocument();
+    view.rerender(<OrderWorkspaceDetail order={updated} canWrite onClose={()=>{}} onUpdated={onUpdated} onEditDraft={()=>{}} />);
+    expect(screen.getByRole('list', {name: 'Order lifecycle'}).querySelector('[aria-current="step"]')).toHaveTextContent('Preparing');
+    expect(within(screen.getByRole('region', {name: 'Order summary'})).getByText('Bank transfer · Paid')).toBeVisible();
+    expect(screen.getByText('Payment recorded and order confirmed. Ready to prepare.')).toBeVisible();
+  });
+  it('preserves the form and request ID when combined confirmation must be retried', async () => {
+    vi.mocked(ordersApi.command).mockRejectedValue(new Error('Connection lost. Please retry.'));
+    mount({...order, payment: {state: 'Unpaid', method: 'Bank transfer', reference: 'BANK-123'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Confirm payment & order'}));
+    const dialog = within(screen.getByRole('dialog', {name: 'Confirm payment & order'}));
+    fireEvent.click(dialog.getByRole('checkbox'));
+    const submit = dialog.getByRole('button', {name: 'Confirm payment & order'});
+    fireEvent.click(submit);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost');
+    expect(dialog.getByRole('checkbox')).toBeChecked();
+    fireEvent.click(submit);
+    await waitFor(() => expect(ordersApi.command).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(ordersApi.command).mock.calls[1][1]).toEqual(vi.mocked(ordersApi.command).mock.calls[0][1]);
+    await waitFor(() => expect(submit).toBeEnabled());
+  });
+  it.each([
+    {state: 'Unpaid', method: 'COD', reference: ''},
+    {state: 'Paid', method: 'Bank transfer', reference: 'BANK-123'},
+  ])('keeps ordinary confirmation for $method / $state without recording payment', async payment => {
+    const record = {...order, payment};
+    vi.mocked(ordersApi.command).mockResolvedValue({data: {...record, canonicalStatus: 'acknowledged'}});
+    mount(record);
+    expect(screen.queryByRole('button', {name: 'Confirm payment & order'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Confirm Order'}));
+    const dialog = within(screen.getByRole('dialog', {name: 'Confirm Order'}));
+    expect(dialog.queryByRole('checkbox')).not.toBeInTheDocument();
+    fireEvent.click(dialog.getByRole('button', {name: 'Confirm Order'}));
+    await screen.findByText('Order updated.');
+    expect(ordersApi.command).toHaveBeenCalledWith(record, {action: 'transition', toStatus: 'acknowledged', reason: undefined});
+  });
+  it('does not enable combined confirmation for read-only orders or unresolved exceptions', () => {
+    const bankOrder = {...order, payment: {state: 'Unpaid', method: 'Bank transfer', reference: ''}};
+    render(<OrderWorkspaceDetail order={bankOrder} canWrite={false} onClose={()=>{}} onUpdated={()=>{}} onEditDraft={()=>{}} />);
+    expect(screen.getByRole('button', {name: 'Confirm payment & order'})).toBeDisabled();
+    expect(getOrderDetailPermissions(bankOrder, false).confirmPaymentAndOrder).toBe(false);
+    expect(getOrderDetailPermissions({...bankOrder, exceptions: [{id: 'issue', summary: 'Invalid address', status: 'open'}]}, true).confirmPaymentAndOrder).toBe(false);
+  });
   it('shows one preparation action for seller prototypes and a platform update for marketplace fulfillment',()=>{
     const prototype={...order,source:'demo',canonicalStatus:'fulfillment_in_progress' as const,operations:{work:{preparedAt:order.orderedAt}},payment:{...order.payment,state:'Paid'}};
     const view=mount(prototype);
@@ -32,7 +99,7 @@ describe('Order detail workflows',()=>{
     expect(screen.getByRole('button',{name:'Inventory details for SKU-A'})).toHaveTextContent('Available · 2');
     expect(screen.getByText('Ship-by deadline')).toBeInTheDocument();
     expect(screen.getByText('1.2 kg')).toBeInTheDocument();
-    expect(screen.getByText('Estimated net settlement')).not.toBeVisible();
+    expect(screen.getByText('Estimated net settlement')).toBeVisible();
     HTMLElement.prototype.scrollIntoView = vi.fn();
     fireEvent.click(screen.getByRole('button',{name:'Payment details'}));
     expect(screen.getByText('Estimated net settlement')).toBeVisible();
@@ -94,7 +161,6 @@ describe('Order detail workflows',()=>{
     expect(screen.getByRole('button',{name:'Confirm Order'})).toBeEnabled();
     expect(screen.getByRole('button',{name:'Restart prototype'})).toBeEnabled();
     expect(screen.getByRole('list',{name:'Order lifecycle'})).toBeVisible();
-    expect(screen.getByText(/No real payments, shipments or stock changes/)).toBeVisible();
     expect(screen.getByText('Sample deadline · No live SLA')).toBeVisible();
     expect(screen.queryByText(/Overdue/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Edit note'}));
@@ -118,8 +184,8 @@ describe('Order detail workflows',()=>{
   it('keeps progress visible and guides prepaid orders through payment before preparation',()=>{
     const prepaid={...order,payment:{...order.payment,method:'Bank transfer'}};
     const view=mount(prepaid);
-    expect(screen.getByRole('button',{name:'Confirm Order'})).toBeEnabled();
-    expect(screen.getByText(/Payment is required before preparation/)).toBeVisible();
+    expect(screen.getByRole('button',{name:'Confirm payment & order'})).toBeEnabled();
+    expect(screen.getByText(/Verify the bank transfer was received/)).toBeVisible();
     const confirmed={...prepaid,canonicalStatus:'acknowledged' as const};
     view.rerender(<OrderWorkspaceDetail order={confirmed} canWrite onClose={()=>{}} onUpdated={()=>{}} onEditDraft={()=>{}} />);
     const workflow=within(screen.getByRole('region',{name:'Current order step'}));

@@ -51,14 +51,15 @@ describe('Review progress recovery UI', () => {
     catalog.saveListings([item]);
     const saved = vi.fn();
     render(<ListingMasterReview catalog={catalog} listings={[item]} initialMode="existing" onBack={vi.fn()} onSaved={saved} />);
-    expect(screen.getByRole('button', { name: 'Link to this Master' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save Master changes & link' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Set up SKUs & details' })).toBeEnabled();
     click('Link now, finish later'); click('Keep reviewing');
     expect(catalog.products()[0].channels).toHaveLength(0);
     click('Link now, finish later'); click('Link & save progress');
     expect(saved).toHaveBeenCalledWith(expect.objectContaining({ deferred: true }), false);
     expect(catalog.products()[0]).toMatchObject({ status: 'published', has_variants: false, skus: [] });
-    expect(catalog.products()[0].channels[0].review_pending?.issues).toEqual(['3 SKUs need mapping']);
+    expect(catalog.products()[0].channels[0].review_pending?.sku_mapping_pending).toBe(true);
+    expect(catalog.products()[0].channels[0].review_pending?.master_draft?.skus).toHaveLength(3);
   });
   it('prefills actual source SKUs in inline setup without committing proposed Master changes', () => {
     const { source, catalog } = fixture();

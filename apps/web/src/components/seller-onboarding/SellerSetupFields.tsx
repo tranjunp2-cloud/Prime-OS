@@ -3,6 +3,7 @@ import { Check, ChevronDown, Globe2, Layers3, Package, PenLine, ShieldCheck, Sto
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { SellerDemo } from './demo-state';
+import { SellerMarketFields } from './SellerMarketFields';
 
 function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: (id: string, hintId?: string) => ReactNode }) {
   const id = useId();
@@ -32,7 +33,7 @@ export function SellerSetupFields({ data, update, toggleChannel }: Props) {
   const input = (key: 'name' | 'business' | 'email' | 'warehouse' | 'address', label: string, placeholder: string, hint?: string) => (
     <Field label={label} hint={hint} required>{(id, hintId) => <Input id={id} aria-describedby={hintId} required className="seller-input" value={data[key]} type={key === 'email' ? 'email' : 'text'} autoComplete={key === 'email' ? 'email' : key === 'business' ? 'organization' : key === 'address' ? 'street-address' : 'off'} placeholder={placeholder} onChange={event => update({ [key]: event.target.value })} />}</Field>
   );
-  const select = (key: 'language' | 'currency' | 'theme' | 'timezone' | 'market' | 'sellerType', label: string, options: string[], hint?: string) => (
+  const select = (key: 'language' | 'currency' | 'theme' | 'timezone' | 'sellerType', label: string, options: string[], hint?: string) => (
     <Field label={label} hint={hint}>{(id, hintId) => <div className="seller-select-wrap"><select id={id} aria-describedby={hintId} className="seller-input" value={data[key]} onChange={event => update({ [key]: event.target.value })}>{options.map(option => <option key={option}>{option}</option>)}</select><ChevronDown aria-hidden="true" /></div>}</Field>
   );
 
@@ -53,7 +54,7 @@ export function SellerSetupFields({ data, update, toggleChannel }: Props) {
   </>;
 
   if (data.step === 1) return <>
-    {select('market', 'Primary market', ['Vietnam', 'Japan', 'Singapore', 'United States'], 'Start with your main market. You can expand to more markets later.')}
+    <SellerMarketFields data={data} update={update} />
     <fieldset className="seller-field-section"><legend className="seller-section-title">Choose your sales channels <span className="seller-optional">Optional</span></legend>
       <p className="seller-field-hint">Select the places where you already sell, or continue without a channel.</p>
       <div className="seller-channel-grid">{channels.map(channel => {

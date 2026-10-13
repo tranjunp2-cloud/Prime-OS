@@ -2,7 +2,7 @@ import { createPrimeAuthHeaders, resolvePrimeBackendBase } from '@/lib/prime/bac
 import { restoreOrderPrototype, runOrderPrototype } from './order-prototype';
 
 export type CanonicalStatus = 'draft' | 'created' | 'acknowledged' | 'allocated' | 'fulfillment_in_progress' | 'partially_shipped' | 'shipped' | 'delivered' | 'closed' | 'canceled';
-export type ShipmentTrackingStatus = 'created' | 'ready_for_pickup' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivery_failed' | 'delivered' | 'returning' | 'returned';
+export type ShipmentTrackingStatus = 'created' | 'ready_for_pickup' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivery_failed' | 'delivered' | 'returning' | 'returned' | 'ready_for_collection' | 'collected';
 export interface ShipmentTrackingEvent { id: string; status: ShipmentTrackingStatus; occurredAt: string; location?: string; description?: string; source: 'carrier' | 'seller' | 'prototype' }
 export interface OrderLine { inventory?: { onHand: number; committed: number; reservedForOrder?: number; checkedAt: string; warehouse: string }; imageUrl?: string; variant?: string; id?: string; sku: string; name: string; quantity: number; unitPrice: number; lineTotal?: number }
 export interface ManualOrderInput {
@@ -27,7 +27,7 @@ export interface OrderRecord extends Omit<ManualOrderInput, 'metadata' | 'canoni
   totals: { subtotal?: number; discount?: number; shipping?: number; tax?: number; grandTotal: number };
   metadata: Omit<ManualOrderInput['metadata'], 'tags'> & { tags: string[] };
   transitions: { fromStatus: string; toStatus: string; reason: string; transitionedAt: string }[];
-  shipments: { id?: string; source?: string; service?: string; collectionMethod?: 'pickup' | 'dropoff'; collectionAt?: string; pickedUpAt?: string; pickupReference?: string; deliveredAt?: string; deliveryReference?: string; deliveryOutcome?: 'in_transit' | 'failed' | 'returning' | 'returned' | 'delivered'; carrier: string; tracking: string; status: string; labelUrl?: string; trackingEvents?: ShipmentTrackingEvent[] }[];
+  shipments: { id?: string; source?: string; service?: string; deliveryMethod?: 'carrier' | 'store_pickup'; collectionMethod?: 'pickup' | 'dropoff'; collectionAt?: string; pickedUpAt?: string; pickupReference?: string; deliveredAt?: string; deliveryReference?: string; deliveryOutcome?: 'in_transit' | 'failed' | 'returning' | 'returned' | 'delivered'; carrier: string; tracking: string; status: string; labelUrl?: string; trackingEvents?: ShipmentTrackingEvent[] }[];
   returnRequests: { id: string; status: string; reason: string; items: unknown[] }[];
   exceptions: { id: string; summary: string; status: string; at: string }[];
   activity: { id: string; at: string; message: string; actor: string }[];
@@ -40,13 +40,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 export const ordersApi = {
   list: async () => {
+    if (import.meta.env.VITE_PRIME_PROTOTYPE === 'true') {
+      const { listPrototypeOrders } = await import('./order-prototype-data');
+      return {data: listPrototypeOrders(), canWrite: true, currentUserName: 'PrimeOS Admin'};
+    }
     const result = await request<{ data: OrderRecord[]; canWrite: boolean; currentUserName?: string }>('');
     return {...result, data: result.data.map(restoreOrderPrototype)};
   },
-  create: (input: ManualOrderInput) => request<{ data: OrderRecord }>('', { method: 'POST', body: JSON.stringify(input) }),
-  command: async (order: OrderRecord, action: Record<string, unknown>): Promise<{data: OrderRecord}> => order.source === 'demo'
-    ? {data: runOrderPrototype(order, action)}
-    : request<{ data: OrderRecord }>(`/${encodeURIComponent(order.id)}/actions`, { method: 'POST', body: JSON.stringify({ ...action, version: order.version }) }),
+  create: async (input: ManualOrderInput) => {
+    if (import.meta.env.VITE_PRIME_PROTOTYPE === 'true') {
+      const { createPrototypeOrder } = await import('./order-prototype-data');
+      return {data: createPrototypeOrder(input)};
+    }
+    return request<{ data: OrderRecord }>('', { method: 'POST', body: JSON.stringify(input) });
+  },
+  command: async (order: OrderRecord, action: Record<string, unknown>): Promise<{data: OrderRecord}> => {
+    if (order.source === 'demo') return {data: runOrderPrototype(order, action)};
+    if (import.meta.env.VITE_PRIME_PROTOTYPE === 'true') throw new Error('Only sample orders can be changed in the prototype.');
+    return request<{ data: OrderRecord }>(`/${encodeURIComponent(order.id)}/actions`, { method: 'POST', body: JSON.stringify({ ...action, version: order.version }) });
+  },
 };
 export const orderStageLabels = {
   confirmation: 'Awaiting confirmation', preparing: 'Preparing', ready: 'Ready to ship',

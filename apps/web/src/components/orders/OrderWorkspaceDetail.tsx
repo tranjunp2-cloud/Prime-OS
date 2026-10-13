@@ -1,4 +1,5 @@
 import { OrderShipmentJourney } from './OrderShipmentJourney';
+import { OrderShippingDetails } from './OrderShippingDetails';
 import { OrderProcessingDialog } from './OrderProcessingDialog';
 import { confirmationBlocker } from '@/lib/order-bulk';
 import { orderNextAction, paymentAllowsPreparation, type ProcessingAction } from '@/lib/order-processing';
@@ -11,11 +12,11 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { CopyValue } from './CopyValue';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { orderAddressLines } from '@/lib/order-address';
-import { HandlingTypeBadge } from './HandlingTypeBadge';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Box, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Printer, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -25,12 +26,13 @@ import { getOrderDetailFlow, getOrderDetailStatus, getOrderDetailSteps, getOrder
 import { printPackingSlips } from '@/lib/order-print';
 import { cn } from '@/lib/utils';
 
-type Action = 'hold' | 'release-hold' | 'submit' | 'confirm' | 'cancel' | 'close' | 'payment' | 'assign' | 'warehouse' | 'note' | 'exception';
+type Action = 'hold' | 'release-hold' | 'submit' | 'confirm' | 'confirm-payment-order' | 'cancel' | 'close' | 'payment' | 'assign' | 'warehouse' | 'note' | 'exception';
 const actionCopy: Record<Action, { title: string; description: string; label?: string; submit: string }> = {
   hold: {title:'Hold Order',description:'Pause processing until the issue is resolved.',label:'Hold reason',submit:'Put on hold'},
   'release-hold':{title:'Release hold',description:'Resume the order at its existing lifecycle step.',label:'Release reason',submit:'Release hold'},
   submit: { title: 'Submit draft order', description: 'Move this draft to the confirmation queue. This does not reserve stock.', submit: 'Submit order' },
   confirm: { title: 'Confirm Order', description: 'Confirm the customer details and items, then prepare the order at your dispatch warehouse.', submit: 'Confirm Order' },
+  'confirm-payment-order': { title: 'Confirm payment & order', description: 'Verify the bank transfer was received, then move the order to Preparing. This does not charge the customer.', label: 'Payment reference / Evidence', submit: 'Confirm payment & order' },
   cancel: { title: 'Cancel order', description: 'Stop this order before fulfillment. Cancellation does not automatically refund a payment.', label: 'Cancellation reason', submit: 'Cancel order' },
   close: { title: 'Complete order', description: 'Finish this delivered order. The order will become read-only for lifecycle changes.', submit: 'Complete order' },
   payment: { title: 'Confirm payment', description: 'Record a payment already received. This does not charge the customer.', label: 'Payment reference / Evidence', submit: 'Record payment' },
@@ -52,11 +54,13 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   const setTab = (section: DetailTab) => {
     if (section === 'activity') { setHistoryOpen(true); return; }
     const element = sections.current[section];
-    if (element instanceof HTMLDetailsElement) element.open = true;
     element?.scrollIntoView({behavior:'smooth',block:'start'});
   };
   const [action, setAction] = useState<Action | null>(null);
   const [value, setValue] = useState('');
+  const [paymentReceived, setPaymentReceived] = useState(false);
+  const commandPending = useRef(false);
+  const confirmationRequest = useRef<{reference: string; requestId: string} | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -74,7 +78,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   // Read-only real orders still show the next step without enabling it.
   const actionPermissions = getOrderDetailPermissions(order, true);
   const needsPayment = !preparation && actionPermissions.payment && (order.needsPaymentVerification || Boolean(order.payment.reference) || (['acknowledged','allocated','fulfillment_in_progress'].includes(order.canonicalStatus) && !paymentAllowsPreparation(order)) || order.canonicalStatus === 'delivered');
-  const primary: Action | null = order.hold?.active ? (actionPermissions.editable ? 'release-hold' : null) : flow.focus === 'returns' ? null : actionPermissions.submit ? 'submit' : actionPermissions.confirm ? 'confirm' : needsPayment ? 'payment' : actionPermissions.close ? 'close' : null;
+  const primary: Action | null = order.hold?.active ? (actionPermissions.editable ? 'release-hold' : null) : flow.focus === 'returns' ? null : actionPermissions.submit ? 'submit' : actionPermissions.confirmPaymentAndOrder ? 'confirm-payment-order' : actionPermissions.confirm ? 'confirm' : needsPayment ? 'payment' : actionPermissions.close ? 'close' : null;
   const processingNotice = order.source === 'demo'
     ? ''
     : !canWrite ? 'Read-only access — you can view this order but cannot process it.'
@@ -83,21 +87,36 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
     : primary === 'confirm' ? `Review items, delivery address and payment terms.${!paymentAllowsPreparation(order) ? ' Payment is required before preparation.' : ''}`
     : primary ? actionCopy[primary].description
     : processingNotice && order.source !== 'demo' && order.source !== 'manual' ? 'Await the next update from the source channel.'
-    : order.source === 'demo' && nextWork?.key === 'delivery' ? 'Follow Shipment journey and simulate the next carrier update.'
+    : order.source === 'demo' && nextWork?.key === 'delivery' ? 'Follow Delivery history and simulate the next carrier update.'
     : marketplaceStep ? marketplaceStep.action === 'marketplace-ready' ? 'The marketplace warehouse prepares this order. Simulate its ready-to-ship update.' : 'The marketplace arranges handover. Simulate the carrier pickup update.'
     : nextWork ? processingHints[nextWork.key] : flow.description;
   const actionBlocker = processingNotice || (order.canonicalStatus === 'created' && !primary && confirmationBlocker(order, canWrite)) || marketplaceStep?.blocker || (!primary && nextWork?.blocker) || (order.canonicalStatus === 'delivered' && !actionPermissions.close && completionBlocker(order)) || '';
-  const begin = (next: Action, initial = '') => { setAction(next); setValue(initial || (order.source === 'demo' && next === 'payment' ? `DEMO-PAYMENT-${order.orderKey}` : '')); setError(''); setSuccess(''); };
+  const begin = (next: Action, initial = '') => {
+    setAction(next);
+    const paymentAction = next === 'payment' || next === 'confirm-payment-order';
+    setValue(initial || (paymentAction ? order.payment.reference || (order.source === 'demo' ? `DEMO-PAYMENT-${order.orderKey}` : '') : ''));
+    setPaymentReceived(false);
+    confirmationRequest.current = null;
+    setError(''); setSuccess('');
+  };
   async function run(payload: Record<string, unknown>) {
-    if (pending) return;
+    if (commandPending.current) return;
+    commandPending.current = true;
     setPending(true); setError('');
-    try { const result = await ordersApi.command(order, payload); onUpdated(result.data); setAction(null); setValue(''); setSuccess('Order updated.'); }
+    try { const result = await ordersApi.command(order, payload); onUpdated(result.data); setAction(null); setValue(''); setSuccess(payload.action === 'confirm-payment-order' ? 'Payment recorded and order confirmed. Ready to prepare.' : 'Order updated.'); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not update this order.'); }
-    finally { setPending(false); }
+    finally { commandPending.current = false; setPending(false); }
   }
   function print() { try { printPackingSlips([order]); } catch (e) { setError((e as Error).message); } }
   function submitAction() {
     if (!action) return;
+    if (action === 'confirm-payment-order') {
+      if (!paymentReceived || !value.trim() || !permissions.confirmPaymentAndOrder) return;
+      const reference = value.trim();
+      if (confirmationRequest.current?.reference !== reference) confirmationRequest.current = {reference, requestId: crypto.randomUUID()};
+      void run({action, reference, paymentReceived: true, requestId: confirmationRequest.current.requestId});
+      return;
+    }
     const nextStatus = { submit: 'created', confirm: 'acknowledged', cancel: 'canceled', close: 'closed' };
     if (action === 'hold' || action === 'release-hold') { void run({action,reason:value}); } else if (action in nextStatus) {
       void run({ action: 'transition', toStatus: nextStatus[action as keyof typeof nextStatus], reason: action === 'cancel' ? value : undefined });
@@ -119,6 +138,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
             {hasActiveReturn(order) && <StatusPill tone="attention">Return in progress</StatusPill>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {order.source === 'demo' && <Button variant="outline" disabled={pending || Boolean(action) || Boolean(processingAction)} onClick={() => { onUpdated(restartOrderPrototype(order)); setError(''); setSuccess('Prototype restarted. Confirm the order to try the flow again.'); }}>Restart prototype</Button>}
             {showPackingSlipInHeader && <Button variant="outline" disabled={packingSlipDisabled} title={packingSlipDisabledReason} onClick={print}><Printer aria-hidden="true" className="size-4" />Print packing slip</Button>}
               {(permissions.editable || order.lines.length > 0) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" disabled={pending}>More<ChevronDown className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{permissions.editable && !order.hold?.active && ['created','acknowledged','allocated','fulfillment_in_progress'].includes(order.canonicalStatus) && <DropdownMenuItem onSelect={()=>begin('hold')}>Hold Order</DropdownMenuItem>}<DropdownMenuItem onSelect={() => setTab('activity')}>View audit log</DropdownMenuItem>
                 {hasPackingSlip && !showPackingSlipInHeader && <DropdownMenuItem disabled={packingSlipDisabled} title={packingSlipDisabledReason} onSelect={print}><Printer aria-hidden="true" className="mr-2 size-4" />{packingSlipMenuLabel}</DropdownMenuItem>}
@@ -143,7 +163,6 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <section aria-label="Current order step" className="border-b px-4 py-3 sm:px-6">
           <h2 className="sr-only">{flow.title}</h2>
-          {order.source === 'demo' && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs"><p className="text-muted-foreground"><span className="font-medium text-primary">Prototype</span> · Changes stay in this browser tab. No real payments, shipments or stock changes.</p><Button variant="outline" size="sm" disabled={pending || Boolean(action) || Boolean(processingAction)} onClick={() => { onUpdated(restartOrderPrototype(order)); setError(''); setSuccess('Prototype restarted. Confirm the order to try the flow again.'); }}>Restart prototype</Button></div>}
           <OrderProgress order={order} />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5">
             <div className="min-w-0 flex-1 basis-64">
@@ -178,15 +197,15 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
               <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
                 <div className="min-w-0 space-y-4"><div ref={(node) => { sections.current.items = node; }}><Panel title={`Products (${order.lines.length})`} icon={<Box className="size-4" />}>
                   <Items order={order} />
-                  <details ref={(node) => { sections.current.payment = node; }} className="mt-3 border-t pt-3">
-                    <summary className="cursor-pointer text-sm font-medium focus-visible:outline focus-visible:outline-primary">Payment breakdown &amp; settlement</summary>
+                  <section aria-label="Payment breakdown & settlement" ref={(node) => { sections.current.payment = node; }} className="mt-3 border-t pt-3">
+                    <h3 className="text-sm font-semibold">Payment breakdown &amp; settlement</h3>
                     <div className="mt-3"><Totals order={order} compact />
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm"><span>{order.payment.method} · {order.payment.state}</span>{permissions.payment && <Button size="sm" variant="outline" disabled={pending} onClick={() => begin('payment')}>Confirm payment</Button>}</div>
                       {order.payment.reference && <Field label="Payment reference" value={order.payment.reference} />}
                       {order.operations?.settlement && <Settlement order={order} />}
                       {order.canonicalStatus === 'canceled' && order.payment.state === 'Paid' && <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Payment was received. Cancellation does not automatically refund it.</p>}
                     </div>
-                  </details>
+                  </section>
                 </Panel></div>
                   <Panel title="Owner & notes" action={permissions.ownerAndNotes && <TextAction onClick={() => begin('note', order.metadata.notes)}>Edit note</TextAction>}>
                     <div className="flex items-center justify-between gap-2 text-sm"><span>{order.metadata.assignee}</span>{permissions.ownerAndNotes && <TextAction onClick={() => begin('assign', order.metadata.assignee)}>Assign</TextAction>}</div>
@@ -200,7 +219,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
                     <p className="mt-3 border-t pt-3 text-sm leading-6">{orderAddressLines(order.shippingAddressSnapshot, order.buyerSnapshot.phone, order.buyerSnapshot.email).map((line,index) => <span key={index} className="block">{line}</span>)}</p>
                     {order.metadata.tags.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{order.metadata.tags.join(' · ')}</p>}
                   </Panel>
-                  <section ref={(node) => { sections.current.delivery = node; }}><ShippingDetails order={order} /></section>
+                  <section ref={(node) => { sections.current.delivery = node; }}><OrderShippingDetails order={order} /></section>
                   <div ref={shipmentJourney}><OrderShipmentJourney order={order} onUpdated={onUpdated} disabled={pending || Boolean(action) || Boolean(processingAction)} /></div>
                   {order.operations?.invoice?.requested && <Panel title="VAT invoice"><Field label="Company" value={order.operations.invoice.company} /><Field label="Tax ID" value={order.operations.invoice.taxId} /><Field label="Billing address" value={order.operations.invoice.address} /></Panel>}
 
@@ -215,7 +234,23 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}><SheetContent className="overflow-y-auto sm:max-w-lg"><SheetHeader><SheetTitle>Order activity</SheetTitle><SheetDescription>Recorded events for {order.orderKey}</SheetDescription></SheetHeader><ol className="mt-6 space-y-4">{history.map((event) => <li key={event.key} className="border-b pb-3"><p className="text-sm font-medium">{event.title}</p><p className="text-sm text-muted-foreground">{event.detail}</p><time className="text-xs text-muted-foreground">{formatDate(event.at)}</time></li>)}</ol>{!history.length && <p className="mt-4 text-sm text-muted-foreground">No activity recorded.</p>}</SheetContent></Sheet>
       {processingAction && <OrderProcessingDialog order={order} action={processingAction} onClose={() => setProcessingAction(null)} onUpdated={updated => { onUpdated(updated); setSuccess('Order updated. Continue with the next step above.'); }} />}
       <Dialog open={action !== null} onOpenChange={(open) => !open && !pending && setAction(null)}>
-        <DialogContent>{action && <><DialogHeader><DialogTitle>{actionCopy[action].title}</DialogTitle><DialogDescription>{actionCopy[action].description}</DialogDescription></DialogHeader><form onSubmit={(event) => { event.preventDefault(); submitAction(); }} className="space-y-4">{order.source === 'demo' && <p className="text-xs text-primary">Prototype · This action is simulated in this browser tab.</p>}<p className="text-xs text-muted-foreground">{order.orderKey} · {order.buyerSnapshot.name}</p>{actionCopy[action].label && <label className="grid gap-2 text-sm font-medium">{actionCopy[action].label}{['note', 'cancel', 'exception'].includes(action) ? <Textarea autoFocus required={action !== 'note'} maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} rows={4} /> : <Input autoFocus required maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} />}</label>}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={pending} onClick={() => setAction(null)}>Back</Button><Button type="submit" variant={action === 'cancel' ? 'destructive' : 'default'} disabled={pending}>{pending ? 'Saving…' : actionCopy[action].submit}</Button></div></form></>}</DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">{action && <>
+          <DialogHeader><DialogTitle>{actionCopy[action].title}</DialogTitle><DialogDescription>{actionCopy[action].description}</DialogDescription></DialogHeader>
+          <form onSubmit={(event) => { event.preventDefault(); submitAction(); }} className="space-y-4">
+            <p className="text-xs text-muted-foreground">{order.orderKey} · {order.buyerSnapshot.name}</p>
+            {action === 'confirm-payment-order' && <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm"><span>Bank transfer · Unpaid</span><strong className="tabular-nums">{orderMoney(order.totals.grandTotal, order.currencyCode)}</strong></div>}
+            {actionCopy[action].label && <label className="grid gap-2 text-sm font-medium">{actionCopy[action].label}{['note', 'cancel', 'exception'].includes(action) ? <Textarea autoFocus required={action !== 'note'} maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} rows={4} /> : <Input autoFocus required maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} />}</label>}
+            {action === 'confirm-payment-order' && <div className="space-y-2">
+              <label className="flex cursor-pointer items-start gap-2 text-sm leading-5"><Checkbox className="mt-0.5" checked={paymentReceived} disabled={pending} onCheckedChange={(checked) => setPaymentReceived(checked === true)} /><span>I have verified that the payment was received{order.source === 'demo' ? ' (simulated)' : ''}.</span></label>
+              <p className="text-xs text-muted-foreground">If payment has not arrived, go back and keep the order awaiting confirmation.</p>
+            </div>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" disabled={pending} onClick={() => setAction(null)}>Back</Button>
+              <Button type="submit" variant={action === 'cancel' ? 'destructive' : 'default'} disabled={pending || (action === 'confirm-payment-order' && (!paymentReceived || !value.trim() || !permissions.confirmPaymentAndOrder))}>{pending ? 'Saving…' : actionCopy[action].submit}</Button>
+            </div>
+          </form>
+        </>}</DialogContent>
       </Dialog>
     </SheetContent>
   </Sheet>;
@@ -271,31 +306,6 @@ function ShipDeadline({order}: {order: OrderRecord}) {
     <span className={cn(overdue && 'text-rose-700 dark:text-rose-300')}>{Number.isFinite(due) ? new Date(due).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Not provided'}</span>
     {order.source === 'demo' ? <span className="w-full text-xs font-normal text-muted-foreground">Sample deadline · No live SLA</span> : Number.isFinite(due) && active ? <span className={cn('w-full text-xs font-normal',overdue ? 'text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}>{overdue ? 'Overdue' : 'Remaining'} · {duration}</span> : !active && <span className="w-full text-xs font-normal text-muted-foreground">{order.canonicalStatus === 'draft' ? 'Starts after submission' : order.canonicalStatus === 'canceled' ? 'Not applicable' : 'Dispatch complete'}</span>}
   </SummaryField>;
-}
-
-function ShippingDetails({ order }: { order: OrderRecord }) {
-  const parcel = order.operations?.package;
-  const carrier = order.operations?.carrier || order.shipments[0]?.carrier;
-  const service = order.operations?.service || order.shipments[0]?.service;
-  const showPacking = ['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus);
-  return <Panel title="Shipping & packaging">
-    <div className="flex flex-wrap items-center gap-2"><HandlingTypeBadge order={order} />{order.metadata.shippingMode && <span className="text-xs text-muted-foreground">{order.metadata.shippingMode === 'platform' ? 'Platform shipping' : 'Seller shipping'}</span>}</div>
-    {carrier && <p className="mt-2 text-sm font-medium">{carrier}{service && <span className="font-normal text-muted-foreground"> · {service}</span>}</p>}
-    {!carrier && <p className="mt-2 text-sm text-muted-foreground">Carrier not assigned</p>}
-    {parcel && <p className="mt-3 border-t pt-3 text-sm"><span>{parcel.weightKg} kg</span><span className="mx-2 text-muted-foreground">·</span><span>{parcel.lengthCm} × {parcel.widthCm} × {parcel.heightCm} cm</span></p>}
-    {showPacking && !parcel && <p className="mt-3 text-xs text-muted-foreground">Add package weight and dimensions when packing.</p>}
-    {showPacking && <p className="mt-2 text-xs text-muted-foreground">{order.operations?.work?.labelAttachedAt ? 'Carrier label attached' : `Shipping label · ${order.operations?.printStatus?.shippingLabel || 'Not reported'}`}</p>}
-    <details className="mt-3 border-t pt-3">
-      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Stock reservation &amp; print status</summary>
-      <div className="mt-2">
-        <Field label="Reservation" value={order.reservation || 'Not reserved'} />
-        <Field label="Pick list" value={order.operations?.printStatus?.pickList || 'Not reported'} />
-        <Field label="Shipping label" value={order.operations?.work?.labelAttachedAt ? `Attached · ${formatDate(order.operations.work.labelAttachedAt)}` : order.operations?.printStatus?.shippingLabel || 'Not reported'} />
-        <Field label="Packing slip" value={order.operations?.printStatus?.packingSlip || 'Not reported'} />
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">Opening the print dialog does not confirm a physical print. Verify the carrier label is attached before finishing packing.</p>
-      </div>
-    </details>
-  </Panel>;
 }
 
 const processingHints: Record<ProcessingAction, string> = {

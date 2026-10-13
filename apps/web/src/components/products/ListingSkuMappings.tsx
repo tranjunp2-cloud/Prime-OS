@@ -7,13 +7,15 @@ import { variantMappingError, type VariantMappings } from '@/lib/listing-master-
 import { resolveSourceSkuMappings, sourceSkuDataError, sourceSkuItems, suggestSourceSkuMappings } from '@/lib/listing-sku-mapping';
 
 /** Relationship fields; SKU proposals are reviewed in the adjacent completion form. */
-export function ListingSkuMappings({ product, sources, mappings, onChange, onReload, compact = false, focusRequest = 0, verifiedSingles = [] }: {
+export function ListingSkuMappings({ product, sources, mappings, onChange, onReload, compact = false, focusRequest = 0, verifiedSingles = [], disabled = false, embedded = false }: {
   product: Product; sources: CatalogImportItem[]; mappings: VariantMappings;
   onChange: (value: VariantMappings) => void;
   onReload?: (sourceId: string) => void;
   compact?: boolean;
   focusRequest?: number;
   verifiedSingles?: string[];
+  disabled?: boolean;
+  embedded?: boolean;
 }) {
   const prefix = useId();
   const section = useRef<HTMLElement>(null);
@@ -30,8 +32,8 @@ export function ListingSkuMappings({ product, sources, mappings, onChange, onRel
   }, [focusRequest]);
   const total = sources.reduce((sum, source) => sum + sourceSkuItems(source).length, 0);
   const chosen = Object.values(resolved).flat().filter(row => skus.some(sku => sku.id === row.master_sku_id)).length;
-  return <section ref={section} tabIndex={-1} className={`${compact ? 'overflow-hidden rounded-lg border' : 'space-y-4 border-t pt-4'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`} aria-label="Map source SKUs">
-    {compact ? <button type="button" aria-expanded={expanded} aria-controls={`${prefix}-mapping-body`} onClick={() => setExpanded(value => !value)} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">SKU mapping</span><span className={`mt-1 block text-xs ${issue ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>{issue ? 'SKU matches need review' : `${chosen}/${total} SKU pairs proposed · Not confirmed`}</span></span><span className="text-xs text-muted-foreground">{expanded ? 'Hide matches' : 'Review matches'}</span><ChevronDown className={`size-4 shrink-0 text-muted-foreground ${expanded ? 'rotate-180' : ''}`} /></button> : <><h3 className="text-sm font-semibold">Map source SKUs</h3><p className="text-xs leading-5 text-muted-foreground">Shop SKUs are filled from listing data. Review the suggested matches before confirming.</p></>}
+  return <section ref={section} tabIndex={-1} className={`${compact ? 'overflow-hidden rounded-lg border' : embedded ? 'space-y-3' : 'space-y-4 border-t pt-4'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`} aria-label={embedded ? `Map SKUs for ${sources[0].storeName} · ${sources[0].channelSku}` : 'Map source SKUs'}>
+    {compact ? <button type="button" aria-expanded={expanded} aria-controls={`${prefix}-mapping-body`} onClick={() => setExpanded(value => !value)} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">SKU mapping</span><span className={`mt-1 block text-xs ${issue ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>{issue ? 'SKU matches need review' : `${chosen}/${total} SKU pairs proposed · Not confirmed`}</span></span><span className="text-xs text-muted-foreground">{expanded ? 'Hide matches' : 'Review matches'}</span><ChevronDown className={`size-4 shrink-0 text-muted-foreground ${expanded ? 'rotate-180' : ''}`} /></button> : !embedded && <><h3 className="text-sm font-semibold">Map source SKUs</h3><p className="text-xs leading-5 text-muted-foreground">Shop SKUs are filled from listing data. Review the suggested matches before confirming.</p></>}
     <div id={`${prefix}-mapping-body`} hidden={compact && !expanded} className={compact ? 'space-y-4 border-t p-4' : 'space-y-4'}>
     {!skus.length && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">This Master has no available variant SKUs. Set up SKUs in this review, or save the link and finish later.</p>}
     {sources.map(source => {
@@ -42,12 +44,12 @@ export function ListingSkuMappings({ product, sources, mappings, onChange, onRel
       const selectedCount = rows.filter(row => skus.some(sku => sku.id === row.master_sku_id)).length;
       return <div key={source.id} className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <p className="font-medium">{source.storeName} · {source.channelSku}</p>
+          {!embedded && <p className="font-medium">{source.storeName} · {sources.length > 1 && `${source.channel} · `}{source.channelSku}</p>}
           <p className="text-muted-foreground">Listing: {source.variants || items.length} SKUs · Master: {skus.length} SKUs{!sourceError && ` · ${selectedCount}/${items.length} selected`}</p>
         </div>
         {sourceError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
           <div className="min-w-0 flex-1 space-y-1"><p className="flex items-center gap-2 text-sm font-medium"><TriangleAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-300" />Listing SKU data is incomplete</p><p className="text-xs leading-5 text-muted-foreground">{items.length} of {source.variants || 'unknown'} SKUs loaded. {sourceError.includes('duplicate') ? 'Duplicate SKU codes were received. ' : ''}Reload the imported listing data. If details are still missing, sync this listing from its channel first.</p></div>
-          {onReload && <Button variant="outline" className="h-11" onClick={() => onReload(source.id)}><RefreshCw className="size-4" />Reload listing data</Button>}
+          {onReload && <Button variant="outline" className="h-11" disabled={disabled} onClick={() => onReload(source.id)}><RefreshCw className="size-4" />Reload listing data</Button>}
         </div>}
         {!!items.length && <div className="overflow-hidden rounded-lg border">
           <div className="hidden grid-cols-2 gap-4 border-b bg-muted/30 px-4 py-2.5 text-xs font-medium text-muted-foreground sm:grid"><span>Shop SKU</span><span>Master SKU</span></div>
@@ -60,7 +62,7 @@ export function ListingSkuMappings({ product, sources, mappings, onChange, onRel
               <div className="min-w-0 space-y-1"><p className="text-sm font-medium">{item.label || 'Variant name not provided'}</p><p className="break-all font-mono text-xs text-muted-foreground">{item.sku || 'SKU code not loaded'}</p></div>
               <div className="min-w-0 space-y-1.5">
                 <label htmlFor={`${hintId}-select`} className="block text-xs text-muted-foreground sm:hidden">Master SKU</label>
-                <select id={`${hintId}-select`} aria-label={`Master SKU for shop SKU ${index + 1}`} aria-describedby={hintId} aria-invalid={duplicate || undefined} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(sourceError) || !skus.length} value={row.master_sku_id} onChange={event => onChange({ ...mappings, [source.id]: rows.map((value, i) => i === index ? { ...value, master_sku_id: event.target.value } : value) })}>
+                <select id={`${hintId}-select`} aria-label={`Master SKU for shop SKU ${index + 1}${sources.length > 1 || embedded ? ` · ${source.storeName} · ${source.channelSku}` : ''}`} aria-describedby={hintId} aria-invalid={duplicate || undefined} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled || Boolean(sourceError) || !skus.length} value={row.master_sku_id} onChange={event => onChange({ ...mappings, [source.id]: rows.map((value, i) => i === index ? { ...value, master_sku_id: event.target.value } : value) })}>
                   <option value="">Choose Master SKU</option>{skus.map(sku => <option key={sku.id} value={sku.id}>{sku.sku_code} · {sku.variation_name}</option>)}
                 </select>
                 <p id={hintId} className={`text-xs ${duplicate ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>{sourceError ? 'Waiting for complete listing data' : duplicate ? 'Already selected for another source SKU in this listing' : suggested ? `Suggested · ${suggestions[index].reason}` : row.master_sku_id ? 'Selected for linking' : 'No match selected'}</p>

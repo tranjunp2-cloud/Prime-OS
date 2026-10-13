@@ -4,8 +4,57 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createOrderStore, validateManualOrder } from '../src/orders.js';
+import { demoOrders, hydrateDemoShipmentHistory } from '../../../packages/order-workflow/demo-orders.js';
 
 const input = () => ({ orderKey: 'MAN-TEST', requestKey: 'request-test', canonicalStatus: 'created', currencyCode: 'VND', buyerSnapshot: { name: 'Test customer', phone: '0900123456', email: '' }, shippingAddressSnapshot: { address: '123 Test', city: 'HCM', country: 'VN' }, lines: [{ sku: 'SKU-A', name: 'Test product', quantity: 2, unitPrice: 50000 }], totals: { discount: 10000, shipping: 20000, tax: 0, grandTotal: 1 }, payment: { state: 'Unpaid', method: 'COD' }, metadata: { store: 'Manual' } });
+test('combined confirmation saves payment and status atomically and safely replays a lost response', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'prime-payment-confirm-'));
+  try {
+    const file = path.join(dir, 'orders.json');
+    const store = createOrderStore(file);
+    const order = store.create({...input(), payment: {state: 'Unpaid', method: 'Bank transfer', reference: 'BANK-123'}}, 'operator');
+    writeFileSync(file, JSON.stringify({orders: [{...order, needsPaymentVerification: true}]}));
+    const command = {action: 'confirm-payment-order', reference: ' BANK-123 ', paymentReceived: true, version: order.version, requestId: 'confirm-1'};
+    const confirmed = store.command(order.id, command, 'operator');
+    assert.equal(confirmed.payment.state, 'Paid');
+    assert.equal(confirmed.payment.reference, 'BANK-123');
+    assert.equal(confirmed.canonicalStatus, 'acknowledged');
+    assert.equal(confirmed.needsPaymentVerification, false);
+    assert.equal(confirmed.version, order.version + 1);
+    assert.equal(confirmed.transitions.length, 1);
+    assert.deepEqual(confirmed.activity.slice(0, 2).map(event => event.message), ['Order confirmed — ready to prepare', 'Payment confirmed with reference']);
+    assert.deepEqual(createOrderStore(file).list().find(item => item.id === order.id), confirmed);
+    assert.deepEqual(store.command(order.id, command, 'operator'), confirmed);
+    assert.throws(() => store.command(order.id, {...command, requestId: 'confirm-2'}, 'operator'), /Order changed/);
+    assert.throws(() => store.command(order.id, {...command, reference: 'DIFFERENT'}, 'operator'), /already used/);
+    assert.deepEqual(store.list().find(item => item.id === order.id), confirmed);
+  } finally { rmSync(dir, {recursive: true, force: true}); }
+});
+test('invalid combined confirmation never saves payment, status or audit entries', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'prime-payment-reject-'));
+  try {
+    const file = path.join(dir, 'orders.json');
+    const store = createOrderStore(file);
+    const order = store.create({...input(), payment: {state: 'Unpaid', method: 'Bank transfer'}}, 'operator');
+    const command = {action: 'confirm-payment-order', reference: 'BANK-123', paymentReceived: true, version: order.version, requestId: 'confirm-1'};
+    for (const fields of [{paymentReceived: false}, {paymentReceived: undefined}, {reference: ''}, {reference: ' '.repeat(5)}, {reference: 'a'.repeat(1001)}]) {
+      assert.throws(() => store.command(order.id, {...command, ...fields}, 'operator'));
+      assert.deepEqual(store.list().find(item => item.id === order.id), order);
+    }
+    for (const patch of [
+      {source: 'channel'}, {canonicalStatus: 'draft'}, {canonicalStatus: 'acknowledged'},
+      {hold: {active: true}}, {lines: []}, {syncError: true}, {reservation: 'Allocation failed'},
+      {exceptions: [{status: 'open'}]}, {returnRequests: [{status: 'requested'}]},
+      {payment: {state: 'Unpaid', method: 'COD'}}, {payment: {state: 'Unpaid', method: 'Card'}},
+      {payment: {...order.payment, state: 'Paid'}},
+    ]) {
+      const blocked = {...order, ...patch};
+      writeFileSync(file, JSON.stringify({orders: [blocked]}));
+      assert.throws(() => store.command(order.id, command, 'operator'));
+      assert.deepEqual(store.list().find(item => item.id === order.id), blocked);
+    }
+  } finally { rmSync(dir, {recursive: true, force: true}); }
+});
 test('manual orders persist, recompute totals, deduplicate retry and reject stale commands', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'prime-orders-'));
   try {
@@ -52,6 +101,49 @@ test('sample data covers every lifecycle and remains separate from saved manual 
     assert.equal(migrated.find(o=>o.id===examples[0].id).lines.length,2);
     assert.equal(migrated.length,examples.length+1);
   } finally { rmSync(dir,{recursive:true,force:true}); }
+});
+
+test('sample journeys cover carrier delivery, store collection and returns in chronological order', () => {
+  const examples = demoOrders();
+  for (const order of examples) {
+    for (const shipment of order.shipments) {
+      assert.ok(shipment.trackingEvents.length > 0);
+      assert.ok(shipment.trackingEvents.every(event => event.source === 'prototype'));
+      const times = shipment.trackingEvents.map(event => Date.parse(event.occurredAt));
+      assert.ok(times.every(Number.isFinite));
+      assert.deepEqual(times, [...times].sort((a, b) => a - b));
+      assert.ok(times[0] >= Date.parse(order.orderedAt));
+    }
+  }
+  const pickup = examples.find(order => order.orderKey === 'POS-240812-0931').shipments[0];
+  assert.deepEqual(pickup.trackingEvents.map(event => event.status), ['created', 'ready_for_collection', 'collected']);
+  assert.equal(pickup.pickedUpAt, undefined);
+  const delivered = examples.find(order => order.canonicalStatus === 'delivered').shipments[0];
+  assert.deepEqual(delivered.trackingEvents.map(event => event.status), ['created', 'ready_for_pickup', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered']);
+  const returned = examples.find(order => order.orderKey === 'LZD-240811-1515').shipments[0];
+  assert.equal(returned.deliveryOutcome, 'returned');
+  assert.equal(returned.trackingEvents.at(-1).status, 'returned');
+});
+
+test('legacy sample history is hydrated without replacing edits, real shipments or restarted progress', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'prime-history-'));
+  try {
+    const file = path.join(dir, 'orders.json');
+    const sample = demoOrders().find(order => order.canonicalStatus === 'delivered');
+    const legacy = {...sample, version: 3, metadata: {...sample.metadata, notes: 'Keep note'}, shipments: sample.shipments.map(({carrier, tracking, status}) => ({carrier, tracking, status}))};
+    writeFileSync(file, JSON.stringify({orders: [legacy]}));
+    const refreshed = createOrderStore(file).list().find(order => order.id === sample.id);
+    assert.equal(refreshed.version, 3);
+    assert.equal(refreshed.metadata.notes, 'Keep note');
+    assert.deepEqual(refreshed.shipments[0].trackingEvents, sample.shipments[0].trackingEvents);
+    for (const changed of [
+      {...legacy, source: 'manual'},
+      {...legacy, canonicalStatus: 'created', shipments: []},
+      {...legacy, orderedAt: '2026-10-12T12:00:00Z'},
+      {...legacy, shipments: [{...legacy.shipments[0], deliveredAt: '2026-10-12T12:00:00Z'}]},
+      {...legacy, shipments: [{...legacy.shipments[0], tracking: 'NEW-TRACKING'}]},
+    ]) assert.deepEqual(hydrateDemoShipmentHistory(changed, sample), changed);
+  } finally { rmSync(dir, {recursive: true, force: true}); }
 });
 
 test('handling type is explicit and validated independently from channel', () => {

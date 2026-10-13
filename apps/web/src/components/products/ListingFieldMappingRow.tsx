@@ -7,19 +7,22 @@ import type { Product } from '@/lib/product-store';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
 import { convertField, fieldCandidateId, fieldValue, importedFieldCandidates, mappingDecision, writeMappedField, type MappingTarget } from '@/lib/listing-field-mapping';
 
-type Props = { product: Product; baseline?: Product; sources: CatalogImportItem[]; target: MappingTarget; onChange: (product: Product) => void; multiline?: boolean; children?: (value: string | number, set: (value: string | number) => void, id: string) => ReactNode };
+type Props = { product: Product; baseline?: Product; sources: CatalogImportItem[]; target: MappingTarget; onChange: (product: Product) => void; multiline?: boolean; initialSourceId?: string; initialFieldKey?: string; children?: (value: string | number, set: (value: string | number) => void, id: string) => ReactNode };
 
 /** Source snapshots are read-only. Editing the result never writes back to a shop. */
-export function ListingFieldMappingRow({ product, baseline, sources, target, onChange, multiline, children }: Props) {
+export function ListingFieldMappingRow({ product, baseline, sources, target, onChange, multiline, initialSourceId, initialFieldKey, children }: Props) {
   const id = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(initialSourceId));
   const [query, setQuery] = useState('');
-  const [picked, setPicked] = useState('');
+  const [picked, setPicked] = useState(() => {
+    const initial = importedFieldCandidates(sources).find(field => field.source.id === initialSourceId && field.key === initialFieldKey);
+    return initial ? fieldCandidateId(initial) : '';
+  });
   const [mappedValue, setMappedValue] = useState('');
   const value = fieldValue(product, target.key);
   const decision = product.field_mappings?.[target.key];
   const unchanged = baseline && String(value) === String(fieldValue(baseline, target.key));
-  const candidates = importedFieldCandidates(sources).filter(field => field.kind === target.kind);
+  const candidates = importedFieldCandidates(sources).filter(field => field.kind === target.kind && (!initialSourceId || field.source.id === initialSourceId));
   const source = decision?.source;
   const current = source && candidates.find(field => field.source.channel === source.channel && field.source.storeName === source.shop && field.source.listingId === source.listingId && field.key === source.fieldKey);
   const selected = candidates.find(field => fieldCandidateId(field) === picked);

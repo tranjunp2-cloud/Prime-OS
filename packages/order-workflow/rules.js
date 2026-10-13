@@ -25,6 +25,10 @@ export function confirmationBlocker(order) {
   if (order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) return 'Review the payment evidence before confirming.';
   return null;
 }
+export function paymentAndConfirmationBlocker(order) {
+  if (order.payment.method !== 'Bank transfer' || order.payment.state !== 'Unpaid') return 'Combined confirmation is only available for unpaid bank transfers.';
+  return confirmationBlocker({...order, payment: {...order.payment, state: 'Paid'}, needsPaymentVerification: false});
+}
 // Eligibility for the packing queue. Historical reprints remain a separate action.
 export function packingSlipBlocker(order) {
   if (order.metadata.handlingType !== 'self') return 'Packing slips in this queue are for seller-fulfilled orders.';

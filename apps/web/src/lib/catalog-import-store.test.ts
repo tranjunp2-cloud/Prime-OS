@@ -55,6 +55,33 @@ describe('catalog import demo scenarios', () => {
     expect(items[0].variantItems![0].label).not.toBe(items[1].variantItems![0].label);
   });
 
+  it('provides full child records for every multi-SKU prototype listing, including Notebook Limited Edition', () => {
+    const items = getCatalogImportItems({ requireConfirmation: true }).filter(item => item.variants > 1);
+    expect(items.length).toBeGreaterThan(2);
+    for (const item of items) {
+      expect(item.variantItems, item.id).toHaveLength(item.variants);
+      expect(new Set(item.variantItems!.map(sku => sku.sku)).size, item.id).toBe(item.variants);
+      expect(item.variantItems!.every(sku => sku.sku && sku.label && sku.price?.currency === item.currency), item.id).toBe(true);
+      expect(item.variantItems!.reduce((total, sku) => total + (sku.stock ?? 0), 0), item.id).toBe(item.channelStock);
+    }
+    const notebook = items.find(item => item.id === 'imp-009')!;
+    expect(notebook.variantItems?.map(sku => sku.label)).toEqual(['Black / A5', 'Black / B5']);
+    expect(notebook.confirmed).not.toBe(true);
+  });
+
+  it('fills omitted Notebook records without changing the seller decision, or using the selected Master', () => {
+    const notebook = getCatalogImportItems({ requireConfirmation: true }).find(item => item.id === 'imp-009')!;
+    const legacy = { ...notebook, variantItems: undefined, suggestedProductId: 'different-master', resolvedProductId: 'my-choice', confirmed: true };
+    saveCatalogImportItems([legacy]);
+    const before = window.localStorage.getItem('prime-catalog-import-review-v12');
+    const [loaded] = getCatalogImportItems({ requireConfirmation: true });
+    expect(loaded.variantItems).toEqual(notebook.variantItems);
+    expect(loaded).toMatchObject({ suggestedProductId: 'different-master', resolvedProductId: 'my-choice', confirmed: true });
+    expect(window.localStorage.getItem('prime-catalog-import-review-v12')).toBe(before);
+    saveCatalogImportItems([{ ...legacy, variantItems: [{ sku: 'USER-SKU', label: 'User snapshot' }] }]);
+    expect(getCatalogImportItems({ requireConfirmation: true })[0].variantItems).toEqual([{ sku: 'USER-SKU', label: 'User snapshot' }]);
+  });
+
   it('backfills only absent demo SKU details without resetting persisted decisions or writing storage', () => {
     const original = getCatalogImportItems({ requireConfirmation: true }).find(item => item.id === 'imp-002')!;
     const legacy = { ...original, variantItems: undefined, resolution: 'ignore' as const, confirmed: true, resolvedProductId: 'user-chosen-master', price: 123 };

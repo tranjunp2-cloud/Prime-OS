@@ -4,7 +4,7 @@ import type { Product } from '@/lib/product-store';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
 import type { VariantMappings } from '@/lib/listing-master-completion';
 import { fieldValue } from '@/lib/listing-field-mapping';
-import { resolveSourceSkuMappings, sourceSkuDataError, sourceSkuItems } from '@/lib/listing-sku-mapping';
+import { resolveSourceSkuMappings, sourceSkuDataError, sourceSkuItems, suggestSourceSkuMappings } from '@/lib/listing-sku-mapping';
 import { assignedCategoryAttributes } from '@/lib/category-schema';
 import { getProductCatalogSettings, resolveCatalogCategory } from '@/lib/product-catalog-settings-store';
 import { ListingReviewHelp } from './ListingReviewHelp';
@@ -49,16 +49,18 @@ export function ListingMasterSummary({ group, product, sources, mappings, imageS
       const rows = resolveSourceSkuMappings(source, product, mappings[source.id]);
       const items = sourceSkuItems(source);
       const incomplete = sourceSkuDataError(source);
+      const suggestions = suggestSourceSkuMappings(source, product);
       return <div key={source.id}>
         <p className="mb-2 text-xs text-muted-foreground">{source.storeName} · {source.channel}</p>
         <div className="overflow-hidden rounded-md border">
           <div className="hidden grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_100px] gap-3 bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:grid"><span>Shop SKU</span><span /><span>Proposed Master SKU</span><span className="text-right">Price</span></div>
           {items.map((item, index) => {
             const sku = product.skus.find(sku => sku.id === rows[index]?.master_sku_id && sku.status === 'active');
+            const suggested = !mappings[source.id] || suggestions[index]?.master_sku_id === sku?.id || sku?.id === `proposal-${source.id}-${index}`;
             return <div key={`${item.sku}:${index}`} className="grid gap-x-3 gap-y-1 border-t px-3 py-2.5 first:border-0 sm:grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)_100px] sm:items-center">
               <div className="min-w-0"><p className="break-all font-mono text-xs">{item.sku}</p><p className="mt-0.5 break-words text-xs text-muted-foreground">{item.label}</p></div>
               <ArrowRight className="hidden size-3.5 text-muted-foreground sm:block" aria-hidden="true" />
-              <div className="min-w-0"><span className="text-xs text-muted-foreground sm:hidden">Master: </span><span className={`break-all font-mono text-xs ${!sku ? 'text-amber-700 dark:text-amber-300' : ''}`}>{sku?.sku_code || 'No match'}</span><p className="mt-0.5 break-words text-xs text-muted-foreground">{sku?.variation_name}</p><p className="mt-0.5 text-xs text-muted-foreground">{incomplete ? 'Source data incomplete' : sku ? mappings[source.id] ? 'Selected · not linked yet' : 'Suggested · review before saving' : 'Needs matching'}</p></div>
+              <div className="min-w-0"><span className="text-xs text-muted-foreground sm:hidden">Master: </span><span className={`break-all font-mono text-xs ${!sku ? 'text-amber-700 dark:text-amber-300' : ''}`}>{sku?.sku_code || 'No match'}</span><p className="mt-0.5 break-words text-xs text-muted-foreground">{sku?.variation_name}</p><p className="mt-0.5 text-xs text-muted-foreground">{incomplete ? 'Source data incomplete' : sku ? suggested ? 'Suggested · review before saving' : 'Selected · not linked yet' : 'Needs matching'}</p></div>
               <p className="text-xs sm:text-right">{sku?.price !== undefined && sku.price > 0 ? `${sku.price.toLocaleString()} ${product.price_currency}` : <span className="text-amber-700 dark:text-amber-300">No price</span>}</p>
             </div>;
           })}

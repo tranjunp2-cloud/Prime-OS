@@ -63,4 +63,17 @@ describe('Source SKU prefill and conservative suggestions', () => {
   it('uses the recorded shop code for a single-SKU source', () => {
     expect(sourceSkuItems({ ...source, variants: 1, variantItems: undefined })).toEqual([{ sku: 'PARENT', label: 'Single product' }]);
   });
+  it('prefills equivalent complete variant values even when shops order the options differently', () => {
+    const reordered = { ...source, variantItems: source.variantItems!.map(item => ({ ...item, label: item.label.split(' / ').reverse().join(' | ') })) };
+    expect(suggestSourceSkuMappings(reordered, product).map(row => row.master_sku_id)).toEqual(['hc-a4', 'hc-a5', 'sc-a5']);
+    const ambiguous = { skus: [...product.skus, { ...product.skus[0], id: 'same-options', sku_code: 'OTHER', variation_name: 'A5 / Hardcover' }] };
+    expect(suggestSourceSkuMappings({ ...source, variants: 1, variantItems: [{ sku: 'SHOP-OTHER', label: 'Hardcover / A5' }] }, ambiguous)[0].master_sku_id).toBe('');
+  });
+  it('prefills newly received SKU rows while preserving explicit edits and cleared pairs', () => {
+    const result = resolveSourceSkuMappings(source, product, [{ shop_sku: 'SHOP-A4', master_sku_id: '' }]);
+    expect(result.map(row => row.master_sku_id)).toEqual(['', 'hc-a5', 'sc-a5']);
+    const changed = resolveSourceSkuMappings(source, product, [{ shop_sku: 'SHOP-A4', master_sku_id: 'sc-a5' }]);
+    expect(changed[0].master_sku_id).toBe('sc-a5');
+    expect(changed[2].master_sku_id).toBe(''); // Do not auto-pair a second shop SKU to the seller's chosen target.
+  });
 });

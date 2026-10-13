@@ -20,6 +20,7 @@ export const workflowActions: WorkflowAction[];
 export function activeReturn(order:WorkflowOrder):boolean;
 export function paymentAllowsPreparation(order:WorkflowOrder):boolean;
 export function confirmationBlocker(order:WorkflowOrder):string|null;
+export function paymentAndConfirmationBlocker(order:WorkflowOrder):string|null;
 export function packingSlipBlocker(order:WorkflowOrder):string|null;
 export function completionBlocker(order:WorkflowOrder):string|null;
 export function workflowBlocker(order:WorkflowOrder,action:WorkflowAction):string|null;

@@ -6,27 +6,32 @@ import { Label } from '@/components/ui/label';
 import type { Product } from '@/lib/product-store';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
 import { listingMatchEvidence, packTitleHint } from '@/lib/listing-match-evidence';
-import { fieldMappingErrors, fieldValue, MASTER_MAPPING_TARGETS, type MappingTarget } from '@/lib/listing-field-mapping';
+import { convertField, fieldMappingErrors, fieldValue, mappingDecision, MASTER_MAPPING_TARGETS, writeMappedField, type FieldCandidate, type MappingTarget } from '@/lib/listing-field-mapping';
 import { getProductCatalogSettings } from '@/lib/product-catalog-settings-store';
 import { richTextPlainText } from '@/lib/product-master-readiness';
 import { ListingFieldMappingRow } from './ListingFieldMappingRow';
 import { ListingReviewHelp } from './ListingReviewHelp';
+import { ListingGroupComparison } from './ListingGroupComparison';
+import type { SkuMatrixControls } from './ListingSkuMatrixRows';
 
 type Props = {
   baseline: Product; product: Product; current: CatalogImportItem; sources: CatalogImportItem[];
   onChange: (product: Product) => void; onEditingChange: (editing: boolean, dirty: boolean) => void;
   onSetupSkus: () => void;
+  skuMatrix: SkuMatrixControls;
 };
 
 /** All comparisons stay visible. Row edits only update a proposal, never the stored Master. */
-export function ListingComparisonTable({ baseline, product, current, sources, onChange, onEditingChange, onSetupSkus }: Props) {
+export function ListingComparisonTable({ baseline, product, current, sources, onChange, onEditingChange, onSetupSkus, skuMatrix }: Props) {
   const prefix = useId();
-  const [editor, setEditor] = useState<{ key: string; product: Product } | null>(null);
+  const editorTrigger = useRef<HTMLElement | null>(null);
+  const [editor, setEditor] = useState<{ key: string; product: Product; sourceId?: string; fieldKey?: string } | null>(null);
   const [error, setError] = useState('');
+  const [skuEditing, setSkuEditing] = useState(false);
   const callback = useRef(onEditingChange);
   callback.current = onEditingChange;
-  const isEditing = Boolean(editor);
-  const dirty = Boolean(editor && JSON.stringify(editor.product) !== JSON.stringify(product));
+  const isEditing = Boolean(editor) || skuEditing;
+  const dirty = skuEditing || Boolean(editor && JSON.stringify(editor.product) !== JSON.stringify(product));
   useEffect(() => { callback.current(isEditing, dirty); }, [isEditing, dirty]);
   useEffect(() => () => callback.current(false, false), []);
   const settings = getProductCatalogSettings();
@@ -49,7 +54,7 @@ export function ListingComparisonTable({ baseline, product, current, sources, on
     if (key === 'brandId') return item.brand;
     if (key === 'categoryId') return item.category;
     if (key === 'description') return richTextPlainText(item.description);
-    if (key === 'retail_price') return variant ? item.skus.filter(sku => sku.status === 'active').map(sku => `${sku.sku_code}: ${sku.price == null ? 'No price' : sku.price.toLocaleString()} ${item.price_currency}`).join('\n') : item.retail_price > 0 ? `${item.retail_price.toLocaleString()} ${item.price_currency}` : '';
+    if (key === 'retail_price') return item.has_variants || item.product_type === 'variant' ? item.skus.filter(sku => sku.status === 'active').map(sku => `${sku.sku_code}: ${sku.price == null ? 'No price' : sku.price.toLocaleString()} ${item.price_currency}`).join('\n') : item.retail_price > 0 ? `${item.retail_price.toLocaleString()} ${item.price_currency}` : '';
     if (key === 'structure') return item.has_variants || item.product_type === 'variant' ? `With variants · ${item.skus.length} SKUs` : 'Single product · 1 SKU';
     return String(fieldValue(item, key));
   };
@@ -73,11 +78,38 @@ export function ListingComparisonTable({ baseline, product, current, sources, on
       if (dirty) onChange(draft);
     }
     setEditor(null); setError('');
-    requestAnimationFrame(() => document.getElementById(`${prefix}-${key}-edit`)?.focus());
+    requestAnimationFrame(() => (editorTrigger.current?.isConnected ? editorTrigger.current : document.getElementById(`${prefix}-${key}-edit`))?.focus());
   };
   const text = (value: string, description = false) => !value ? <span className="text-muted-foreground">Not provided</span>
     : description && value.length > 180 ? <div><p className="line-clamp-3 whitespace-pre-line">{value}</p><details className="mt-1 text-xs"><summary className="w-fit cursor-pointer py-2 text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring">Read full description</summary><p className="whitespace-pre-line py-2">{value}</p></details></div>
     : <span className="whitespace-pre-line">{value}</span>;
+  const openEditor = (key: string, source?: CatalogImportItem, field?: FieldCandidate) => {
+    editorTrigger.current = document.activeElement as HTMLElement | null;
+    setEditor({ key, product: structuredClone(product), sourceId: source?.id, fieldKey: field?.key }); setError('');
+    requestAnimationFrame(() => document.getElementById(`${prefix}-${key}-editor`)?.querySelector<HTMLElement>('textarea, input, select')?.focus());
+  };
+  const renderEditor = (row: typeof rows[number]) => editor?.key === row.key && <section id={`${prefix}-${row.key}-editor`} aria-label={`Edit Master ${row.label}`} className="space-y-3 p-4">
+    {row.key === 'retail_price' && variant ? <div className="space-y-3">{editor.product.skus.filter(sku => sku.status === 'active').map(sku => <div key={sku.id} className="grid items-center gap-2 sm:grid-cols-2"><Label htmlFor={`${prefix}-${sku.id}-price`}>{sku.sku_code} · {sku.variation_name}</Label><Input id={`${prefix}-${sku.id}-price`} className="h-11" type="number" min="0" step="any" value={sku.price ?? ''} onChange={event => setEditor({ ...editor, product: { ...editor.product, skus: editor.product.skus.map(item => item.id === sku.id ? { ...item, price: event.target.value === '' ? undefined : Number(event.target.value) } : item) } })} /></div>)}</div>
+      : <ListingFieldMappingRow key={`${editor.key}:${editor.sourceId || ''}`} product={editor.product} baseline={baseline} sources={sources} target={targetFor(row.key)} initialSourceId={editor.sourceId} initialFieldKey={editor.fieldKey} multiline={row.key === 'description'} onChange={next => { setEditor({ ...editor, product: next }); setError(''); }} />}
+    {row.key === 'retail_price' && <div className="space-y-1.5"><Label htmlFor={`${prefix}-currency`}>Master currency</Label><Input id={`${prefix}-currency`} className="h-11 max-w-40" maxLength={3} value={editor.product.price_currency} onChange={event => { setEditor({ ...editor, product: { ...editor.product, price_currency: event.target.value.toUpperCase() } }); setError(''); }} /><p className="text-xs text-muted-foreground">Shop prices and currencies are unchanged. Changing currency does not convert amounts; review every Master price.</p></div>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">Proposal only · applies to this shared Master, not the source listing.</p><div className="flex gap-2"><Button variant="ghost" className="h-11" onClick={() => close(false)}>Cancel edit</Button><Button className="h-11" onClick={() => close(true)}>Apply to review</Button></div></div>
+  </section>;
+  if (sources.length > 1) return <ListingGroupComparison baseline={baseline} product={product} sources={sources} rows={rows} format={format} text={text} prefix={prefix} editingKey={editor?.key} onEdit={openEditor} renderEditor={renderEditor} onSetupSkus={onSetupSkus}
+    skuMatrix={skuMatrix} skuEditing={skuEditing} onSkuEditingChange={setSkuEditing} onChange={onChange}
+    onUse={(key, candidate) => {
+      const target = targetFor(key), result = convertField(candidate, target, product.price_currency);
+      if (result.error || (target.required && (target.kind === 'text' ? !richTextPlainText(String(result.value)) : !(Number(result.value) > 0)))) { openEditor(key, candidate.source, candidate); return; }
+      onChange(writeMappedField(product, target, result.value, mappingDecision(candidate, result.value, 'source', result.transform)));
+    }} onReset={key => {
+      const next = writeMappedField(product, targetFor(key), fieldValue(baseline, key), { mode: 'master', value: fieldValue(baseline, key) });
+      if (key === 'brandId') next.brand = baseline.brand;
+      if (key === 'categoryId') next.category = baseline.category;
+      if (key === 'retail_price') { next.skus = structuredClone(product.skus).map(sku => { const previous = baseline.skus.find(old => old.id === sku.id); return previous ? { ...sku, price: previous.price } : sku; }); next.price_currency = baseline.price_currency; }
+      if (baseline.field_mappings?.[key]) next.field_mappings![key] = structuredClone(baseline.field_mappings[key]); else delete next.field_mappings![key];
+      if (!Object.keys(next.field_mappings!).length && !baseline.field_mappings) delete next.field_mappings;
+      onChange(next);
+    }} />;
   return <section aria-label="Comparison fields" className="overflow-hidden rounded-xl border">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
       <div className="flex items-center gap-1"><h3 className="text-sm font-semibold">Comparison fields</h3><ListingReviewHelp label="Comparison fields">Required labels apply to Master activation, not identical values across shops. Edit any supported row to change its source or proposed Master value. Nothing is saved until the final confirmation.</ListingReviewHelp></div>

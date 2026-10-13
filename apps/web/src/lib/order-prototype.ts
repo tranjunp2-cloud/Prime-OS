@@ -1,7 +1,8 @@
-import { completionBlocker, confirmationBlocker, paymentAllowsPreparation, workflowActions, workflowBlocker, type WorkflowAction } from '../../../../packages/order-workflow/rules.js';
+import { completionBlocker, confirmationBlocker, paymentAndConfirmationBlocker, paymentAllowsPreparation, workflowActions, workflowBlocker, type WorkflowAction } from '../../../../packages/order-workflow/rules.js';
 import type { CanonicalStatus, OrderRecord, ShipmentTrackingStatus } from './orders-api';
 import { prototypeTrackingOptions, shipmentTrackingLabels } from './order-shipment-history';
 import { preparationPackageError, preparationPaymentKind, prototypePreparation } from './order-preparation';
+import { hydrateDemoShipmentHistory } from '../../../../packages/order-workflow/demo-orders.js';
 
 const storageKey = 'prime.order-prototype.v1';
 type Session = { initial: OrderRecord; current: OrderRecord };
@@ -22,7 +23,7 @@ export function prototypeWorkflowOrder(order: OrderRecord): OrderRecord {
 export function restoreOrderPrototype(order: OrderRecord): OrderRecord {
   if (order.source !== 'demo') return order;
   const session = sessions()[order.id];
-  return session?.initial.source === 'demo' && session.current.source === 'demo' && session.initial.version === order.version ? copy(session.current) : order;
+  return session?.initial.source === 'demo' && session.current.source === 'demo' && session.initial.version === order.version ? hydrateDemoShipmentHistory(copy(session.current), order) : order;
 }
 function assertDemo(order: OrderRecord) {
   if (order.source !== 'demo') throw new Error('Prototype actions are available only for sample orders.');
@@ -87,6 +88,19 @@ function applyPrototypeCommand(order: OrderRecord, input: Record<string, unknown
       if (to === 'canceled') required(input.reason, 'Cancellation reason');
       transition(to);
       message = `Prototype status updated to ${to}`;
+      break;
+    }
+    case 'confirm-payment-order': {
+      const blocker = paymentAndConfirmationBlocker(workflowOrder);
+      if (blocker) throw new Error(blocker);
+      if (input.paymentReceived !== true) throw new Error('Verify that the payment was received before confirming this order.');
+      const reference = required(input.reference, 'Sample payment reference');
+      if (reference.length > 1000) throw new Error('Payment reference must be at most 1000 characters.');
+      current.payment = {...current.payment, state: 'Paid', reference};
+      current.needsPaymentVerification = false;
+      current.activity.unshift({id: crypto.randomUUID(), at: now, actor: 'Prototype', message: 'Payment received (simulated)'});
+      transition('acknowledged');
+      message = 'Order confirmed — ready to prepare (simulated)';
       break;
     }
     case 'payment':

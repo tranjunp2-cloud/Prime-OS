@@ -21,6 +21,44 @@ beforeEach(() => {sessionStorage.clear(); vi.stubGlobal('fetch', vi.fn());});
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Interactive order prototype', () => {
+  it('records payment and confirmation together with separate history entries and one version change', async () => {
+    const initial = {...sample, needsPaymentVerification: true, payment: {...sample.payment, reference: 'BANK-123'}};
+    const {data: confirmed} = await ordersApi.command(initial, {action: 'confirm-payment-order', reference: ' BANK-123 ', paymentReceived: true});
+    expect(confirmed.canonicalStatus).toBe('acknowledged');
+    expect(orderDisplayStatus(confirmed)).toBe('Preparing');
+    expect(confirmed.payment).toEqual({...initial.payment, state: 'Paid', reference: 'BANK-123'});
+    expect(confirmed.needsPaymentVerification).toBe(false);
+    expect(confirmed.version).toBe(initial.version + 1);
+    expect(confirmed.transitions).toHaveLength(1);
+    expect(confirmed.activity.map(event => event.message)).toEqual(['Order confirmed — ready to prepare (simulated)', 'Payment received (simulated)']);
+    expect(restoreOrderPrototype(initial)).toEqual(confirmed);
+    expect(initial.payment.state).toBe('Unpaid');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each([
+    {reference: '', paymentReceived: true},
+    {reference: 'BANK-123', paymentReceived: false},
+    {reference: 'BANK-123'},
+  ])('does not save either change when combined confirmation is incomplete: %j', fields => {
+    expect(() => runOrderPrototype(sample, {action: 'confirm-payment-order', ...fields})).toThrow();
+    expect(restoreOrderPrototype(sample)).toEqual(sample);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('keeps payment unpaid when confirmation is blocked, and rejects stale confirmation', () => {
+    for (const patch of [
+      {hold: {active: true, reason: 'Review address', at: sample.orderedAt, actor: 'Test'}},
+      {exceptions: [{id: 'issue', summary: 'Invalid address', status: 'open'}]},
+      {syncError: true},
+      {payment: {...sample.payment, method: 'COD'}},
+    ]) {
+      const blocked = {...sample, ...patch};
+      expect(() => runOrderPrototype(blocked, {action: 'confirm-payment-order', reference: 'BANK-123', paymentReceived: true})).toThrow();
+      expect(restoreOrderPrototype(blocked)).toEqual(blocked);
+    }
+    const confirmed = runOrderPrototype(sample, {action: 'confirm-payment-order', reference: 'BANK-123', paymentReceived: true});
+    expect(() => runOrderPrototype(sample, {action: 'confirm-payment-order', reference: 'BANK-123', paymentReceived: true})).toThrow(/changed/);
+    expect(restoreOrderPrototype(sample)).toEqual(confirmed);
+  });
   function pickedUpOrder() {
     let order=runOrderPrototype(sample,{action:'transition',toStatus:'acknowledged'});
     for(const input of [

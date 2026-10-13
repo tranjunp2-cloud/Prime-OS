@@ -12,6 +12,7 @@ export interface SellerDemo {
   theme: string;
   timezone: string;
   market: string;
+  additionalMarkets: string[];
   channels: string[];
   connected: string[];
   business: string;
@@ -22,7 +23,7 @@ export interface SellerDemo {
   catalog: string;
 }
 export const freshSellerDemo = (): SellerDemo => ({
-  step: 0, view: 'setup', completed: [], deferred: [], name: '', language: 'Tiếng Việt', currency: 'VND', theme: 'System', timezone: 'Asia/Ho_Chi_Minh', market: 'Vietnam', channels: [], connected: [], business: '', sellerType: 'Business', email: '', warehouse: '', address: '', catalog: 'later',
+  step: 0, view: 'setup', completed: [], deferred: [], name: '', language: 'Tiếng Việt', currency: 'VND', theme: 'System', timezone: 'Asia/Ho_Chi_Minh', market: 'Vietnam', additionalMarkets: [], channels: [], connected: [], business: '', sellerType: 'Business', email: '', warehouse: '', address: '', catalog: 'later',
 });
 export function readSellerDemo(): SellerDemo {
   try {
@@ -38,8 +39,15 @@ export function readSellerDemo(): SellerDemo {
     // Existing demo progress predates per-step deferral. Keep it when upgrading.
     const deferred = raw.deferred ?? [];
     if (!Array.isArray(deferred) || !deferred.every((v: unknown) => Number.isInteger(v) && Number(v) > 0 && Number(v) <= 4)) return defaults;
+    const additionalMarkets = raw.additionalMarkets ?? [];
+    if (!Array.isArray(additionalMarkets) || !additionalMarkets.every((value: unknown) => typeof value === 'string')) return defaults;
     if (![raw.channels, raw.connected].every(v => Array.isArray(v) && v.every(item => typeof item === 'string'))) return defaults;
-    return { ...defaults, ...raw, completed: [...new Set<number>(raw.completed)], deferred: [...new Set<number>(deferred)].filter(step => !raw.completed.includes(step)) };
+    return {
+      ...defaults, ...raw,
+      completed: [...new Set<number>(raw.completed)],
+      deferred: [...new Set<number>(deferred)].filter(step => !raw.completed.includes(step)),
+      additionalMarkets: [...new Set<string>(additionalMarkets.map(value => value.trim()))].filter(value => value && value !== raw.market),
+    };
   } catch { return freshSellerDemo(); }
 }
 
