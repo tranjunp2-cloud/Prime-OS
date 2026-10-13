@@ -1,16 +1,9 @@
 import { Info, Store, Truck } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { isStorePickupOrder } from '@/lib/order-shipment-history';
-import type { OrderRecord } from '@/lib/orders-api';
+import { orderStockStatusLabel, type OrderRecord } from '@/lib/orders-api';
 import { HandlingTypeBadge } from './HandlingTypeBadge';
 import type { ReactNode } from 'react';
-
-const stockLabels: Record<string, string> = {
-  Reserved: 'Reserved for this order',
-  Dispatched: 'Deducted from stock',
-  Released: 'Reservation released',
-  'Allocation failed': 'Reservation failed',
-};
 
 export function OrderShippingDetails({order}: {order: OrderRecord}) {
   const pickup = isStorePickupOrder(order);
@@ -32,8 +25,8 @@ export function OrderShippingDetails({order}: {order: OrderRecord}) {
           {parcel && <Fact label="Parcel"><span className="block">{parcel.weightKg} kg</span><span className="block text-xs text-muted-foreground">{parcel.lengthCm} × {parcel.widthCm} × {parcel.heightCm} cm</span></Fact>}
           {showPacking && !parcel && <p className="py-1 text-xs text-muted-foreground">Add parcel measurements when packing.</p>}
         </>}
-      <Fact label={<span className="inline-flex items-center gap-1">Stock status<InfoHint label="About stock status">Reserved stock is held for this order. Deducted stock has left the available inventory.</InfoHint></span>}>
-        {stockLabels[order.reservation || ''] || order.reservation || 'Not reserved'}
+      <Fact label={<span className="inline-flex items-center gap-1">Stock status<InfoHint label="About stock status">Stock can be reserved while an order awaits confirmation. Reserving reduces stock available to other orders; on-hand stock is deducted at dispatch. Missing reservation data does not mean no stock is held.</InfoHint></span>}>
+        {orderStockStatusLabel(order)}
       </Fact>
       <div className="relative mt-2 border-t pt-2">
         <details>

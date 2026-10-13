@@ -22,6 +22,7 @@ export function confirmationBlocker(order) {
   if (order.exceptions.some(item => item.status === 'open')) return 'Resolve the open issues before confirming.';
   if (order.syncError) return 'Resolve the channel sync error before confirming.';
   if (order.reservation === 'Allocation failed') return 'Review the stock allocation failure before confirming.';
+  if (order.reservation === 'Reservation expired') return 'The stock hold expired. Review stock before confirming.';
   if (order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) return 'Review the payment evidence before confirming.';
   return null;
 }
@@ -59,6 +60,7 @@ export function workflowBlocker(order, action) {
   if (['draft', 'created', 'closed', 'canceled'].includes(order.canonicalStatus)) return 'This action is not available at the current order stage.';
   if (order.canonicalStatus === 'partially_shipped' || order.shipments.length > 1) return 'Split shipments require separate fulfillment handling.';
   if (['prepare', 'record-shipment', 'pack', 'handover'].includes(action)) {
+    if (['Allocation failed', 'Reservation expired'].includes(order.reservation)) return 'Resolve the stock reservation issue before processing.';
     if (order.exceptions.some(item => item.status === 'open')) return 'Resolve the open issues before processing.';
     if (!paymentAllowsPreparation(order)) return 'Record payment before preparing a prepaid order. Unpaid COD orders can proceed.';
   }

@@ -116,6 +116,16 @@ describe('Order detail workflows',()=>{
     expect(getOrderDetailStatus(ready)).toBe('Ready to ship');
     expect(getOrderDetailSteps(ready).find(step=>step.current)?.label).toBe('Ready to ship');
   });
+  it('does not interpret a missing reservation quantity as zero or sufficient stock', () => {
+    mount({...order, lines: [{...order.lines[0], inventory: {onHand: 45, committed: 10, warehouse: 'HCM', checkedAt: '2026-09-10T09:00:00Z'}}]});
+    expect(screen.getByText('Reservation not reported')).toBeVisible();
+    const stock = screen.getByRole('button', {name: 'Inventory details for SKU-A'});
+    expect(stock).toHaveTextContent('Availability not reported');
+    fireEvent.click(stock);
+    expect(screen.getByText('Reserved for this order at last check')).toBeVisible();
+    expect(screen.getByText('Reservation data is missing for this check.')).toBeVisible();
+    expect(screen.queryByText('Sufficient at last check')).not.toBeInTheDocument();
+  });
   it('requires explicit confirmation and preserves server errors in the dialog',async()=>{
     vi.mocked(ordersApi.command).mockRejectedValue(new Error('Order changed. Refresh and try again.'));
     mount(); fireEvent.click(screen.getByRole('button',{name:'Confirm Order'}));

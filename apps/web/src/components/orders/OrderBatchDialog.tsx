@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ordersApi, type OrderRecord } from '@/lib/orders-api';
-import { batchBlocker, packingSlipBlocker, type BatchAction } from '@/lib/order-bulk';
+import { batchBlocker, packingSlipBlocker, packingSlipQueueBlocker, type BatchAction } from '@/lib/order-bulk';
 import { printPackingSlips } from '@/lib/order-print';
 
 const labels: Record<BatchAction, string> = {confirm: 'Confirm orders', prepare: 'Prepare orders', handover: 'Record carrier pickups', print: 'Print packing slips'};
@@ -28,7 +28,7 @@ export function OrderBatchDialog({orders, canWrite, initialAction, scope = 'sele
   const locked = useRef(false);
   const printAttempt = useRef<{ids: string[]; skipped: Result[]}>({ids: [], skipped: []});
   const requests = useRef(new Map<string, {signature: string; id: string; sent: boolean}>());
-  const candidates = orders.map(order => ({order, reason: batchBlocker(order, action, canWrite, warehouse) || (action === 'handover' && order.shipments[0]?.carrier !== carrier ? 'Choose this carrier in a separate pickup batch.' : null)}));
+  const candidates = orders.map(order => ({order, reason: (scope === 'filtered' && action === 'print' ? packingSlipQueueBlocker(order) : batchBlocker(order, action, canWrite, warehouse)) || (action === 'handover' && order.shipments[0]?.carrier !== carrier ? 'Choose this carrier in a separate pickup batch.' : null)}));
   const eligible = candidates.filter(item => !item.reason);
   const chosen = eligible.filter(item => !excludedIds.includes(item.order.id));
   const blocked: Result[] = candidates.filter(item => item.reason).map(({order, reason}) => ({id: order.id, orderKey: order.orderKey, status: 'skipped', message: reason!}));
@@ -87,7 +87,8 @@ export function OrderBatchDialog({orders, canWrite, initialAction, scope = 'sele
       for (const id of ids) {
         const order = fresh.data.find(item => item.id === id);
         const original = orders.find(item => item.id === id)!;
-        const reason = order ? packingSlipBlocker(order) : 'Order no longer exists.';
+        const isReprint = results.some(result => result.id === id && result.status === 'success');
+        const reason = order ? (scope === 'filtered' && action === 'print' && !isReprint ? packingSlipQueueBlocker(order) : packingSlipBlocker(order)) : 'Order no longer exists.';
         if (reason) output.push({id, orderKey: original.orderKey, status: 'skipped', message: reason});
         else {
           documents.push(order!);
@@ -109,8 +110,8 @@ export function OrderBatchDialog({orders, canWrite, initialAction, scope = 'sele
     <div className="min-h-0 space-y-4 overflow-y-auto">
       {prototypeCount > 0 && <p className="rounded-md bg-primary/5 p-3 text-xs text-muted-foreground">{prototypeCount} prototype order(s) · Changes to these orders stay in this browser tab.</p>}
       {!initialAction && <label className="grid gap-1.5 text-sm font-medium">Action<select className="h-10 rounded-md border bg-background px-3" disabled={pending || results.length > 0} value={action} onChange={e => {setAction(e.target.value as BatchAction); setError(''); setPrintNotice('');}}>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>}
-      {action === 'confirm' && <p className="text-xs text-muted-foreground">Confirmation moves orders to Preparing. Payment and physical stock checks remain separate.</p>}
-      {action === 'prepare' && <label className="grid gap-1.5 text-sm font-medium">Dispatch warehouse override (optional)<Input disabled={pending || results.length > 0} placeholder="Use each order's assigned warehouse" value={warehouse} onChange={e => setWarehouse(e.target.value)}/><span className="text-xs font-normal text-muted-foreground">Preparation does not reserve inventory. Verify physical stock before packing.</span></label>}
+      {action === 'confirm' && <p className="text-xs text-muted-foreground">Confirmation moves orders to Preparing and keeps any existing stock reservation. Payment and physical stock checks remain separate.</p>}
+      {action === 'prepare' && <label className="grid gap-1.5 text-sm font-medium">Dispatch warehouse override (optional)<Input disabled={pending || results.length > 0} placeholder="Use each order's assigned warehouse" value={warehouse} onChange={e => setWarehouse(e.target.value)}/><span className="text-xs font-normal text-muted-foreground">Review the stock reservation and verify items before packing. Changing warehouse requires a new stock check.</span></label>}
       {action === 'handover' && <><label className="grid gap-1.5 text-sm font-medium">Pickup carrier<select className="h-10 rounded-md border bg-background px-3" disabled={pending || results.length > 0} value={carrier} onChange={e => {setCarrier(e.target.value); setAccepted(false);}}><option value="">Choose one carrier</option>{carriers.map(name => <option key={name} value={name}>{name}</option>)}</select></label><label className="grid gap-1.5 text-sm font-medium">Carrier pickup evidence / Reference<Input required disabled={pending || results.length > 0} value={reference} onChange={e => setReference(e.target.value)}/></label><label className="flex gap-2 text-sm"><Checkbox disabled={pending || results.length > 0} checked={accepted} onCheckedChange={checked => setAccepted(checked === true)}/>The carrier has accepted every eligible parcel in this selection.</label></>}
       {!results.length && <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2"><label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><Checkbox aria-label="Select all eligible orders in this batch" disabled={pending || !eligible.length} checked={chosen.length === eligible.length && eligible.length > 0 ? true : chosen.length ? 'indeterminate' : false} onCheckedChange={checked => setExcludedIds(ids => checked === true ? ids.filter(id => !eligible.some(item => item.order.id === id)) : [...new Set([...ids, ...eligible.map(item => item.order.id)])])}/>{chosen.length} selected</label><p className="text-xs text-muted-foreground">{eligible.length} eligible · {blocked.length} will be skipped</p></div>

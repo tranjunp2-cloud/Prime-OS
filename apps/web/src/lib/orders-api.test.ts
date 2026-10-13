@@ -22,8 +22,8 @@ describe('Orders API environment routing', () => {
   it('loads the complete sample set without a backend or login in standalone prototype mode', async () => {
     const {ordersApi} = await import('./orders-api');
     const result = await ordersApi.list();
-    expect(result.data).toHaveLength(13);
-    expect(result.data.filter(order => order.canonicalStatus === 'draft')).toHaveLength(1);
+    expect(result.data).toHaveLength(46);
+    expect(result.data.filter(order => order.canonicalStatus === 'draft')).toHaveLength(3);
     expect(result.data.every(order => order.source === 'demo')).toBe(true);
     expect(result.canWrite).toBe(true);
     expect(fetch).not.toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe('Orders API environment routing', () => {
     vi.resetModules();
     const {ordersApi: reloaded} = await import('./orders-api');
     const result = await reloaded.list();
-    expect(result.data).toHaveLength(14);
+    expect(result.data).toHaveLength(47);
     expect(result.data.find(order => order.id === draft.id)).toEqual(confirmed.data);
     expect(fetch).not.toHaveBeenCalled();
   });

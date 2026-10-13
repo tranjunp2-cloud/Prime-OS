@@ -1,8 +1,10 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Columns3, LockKeyhole, Pencil, RotateCcw, TriangleAlert } from 'lucide-react';
+import { ArrowRight, Check, Columns3, Ellipsis, LockKeyhole, Pencil, RotateCcw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
 import type { Product } from '@/lib/product-store';
@@ -11,6 +13,7 @@ import { richTextPlainText } from '@/lib/product-master-readiness';
 import { ListingReviewHelp } from './ListingReviewHelp';
 import { ListingSkuMatrixRows, type SkuMatrixControls } from './ListingSkuMatrixRows';
 import { sourceMatrixState } from '@/lib/listing-sku-matrix';
+import { chainReviewTouchScroll } from '@/lib/chain-review-touch-scroll';
 
 type Row = { key: string; label: string; source: string; required?: boolean; evidence?: string };
 type Props = {
@@ -19,13 +22,38 @@ type Props = {
   text: (value: string, description?: boolean) => ReactNode;
   editingKey?: string;
   renderEditor: (row: Row) => ReactNode;
-  onEdit: (key: string, source?: CatalogImportItem, field?: FieldCandidate) => void;
-  onUse: (key: string, field: FieldCandidate) => void;
+  onEdit: (key: string, source?: CatalogImportItem, field?: FieldCandidate, returnFocus?: HTMLElement) => void;
+  onUse: (key: string, field: FieldCandidate, returnFocus?: HTMLElement) => void;
   onReset: (key: string) => void;
   onSetupSkus: () => void;
   skuMatrix: SkuMatrixControls; skuEditing: boolean; onSkuEditingChange: (editing: boolean) => void;
   onChange: (product: Product) => void;
 };
+
+function SourceFieldMenu({ label, disabled, canUse, onUse, onEdit }: {
+  label: string; disabled: boolean; canUse: boolean; onUse: (returnFocus?: HTMLElement) => void; onEdit: (returnFocus?: HTMLElement) => void;
+}) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  return <DropdownMenu open={open} onOpenChange={next => { setOpen(next); setTooltipOpen(false); }}>
+    <Tooltip open={tooltipOpen && !open} onOpenChange={setTooltipOpen}>
+      <DropdownMenuTrigger asChild><TooltipTrigger asChild>
+        <Button ref={trigger} type="button" variant="ghost" size="icon" disabled={disabled} aria-label={`Data options for ${label}`}
+          className="-my-1 -mr-1 size-8 shrink-0 text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [@media(pointer:coarse)]:size-11">
+          <Ellipsis className="size-4" aria-hidden="true" />
+        </Button>
+      </TooltipTrigger></DropdownMenuTrigger>
+      <TooltipContent className="text-xs motion-reduce:animate-none">Data options</TooltipContent>
+    </Tooltip>
+    <DropdownMenuContent align="end" collisionPadding={12} className="min-w-48 motion-reduce:animate-none" onCloseAutoFocus={event => {
+      if (trigger.current?.disabled) event.preventDefault();
+    }}>
+      {canUse && <DropdownMenuItem className="min-h-9 gap-2 cursor-pointer [@media(pointer:coarse)]:min-h-11" onSelect={() => onUse(trigger.current ?? undefined)}><ArrowRight className="size-4" aria-hidden="true" />Use for Master</DropdownMenuItem>}
+      <DropdownMenuItem className="min-h-9 gap-2 cursor-pointer [@media(pointer:coarse)]:min-h-11" onSelect={() => onEdit(trigger.current ?? undefined)}><Pencil className="size-4" aria-hidden="true" />Change source field</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>;
+}
 
 /** Columns are presentation only: hiding a source never acknowledges or excludes it from saving. */
 export function ListingGroupComparison({ baseline, product, sources, rows, prefix, format, text, editingKey, renderEditor, onEdit, onUse, onReset, onSetupSkus, skuMatrix, skuEditing, onSkuEditingChange, onChange }: Props) {
@@ -33,6 +61,11 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
   const [differencesOnly, setDifferencesOnly] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const [editorWidth, setEditorWidth] = useState<number>();
+  useEffect(() => {
+    const element = scroller.current;
+    const review = element?.closest<HTMLElement>('[data-listing-review-scroll]');
+    if (element && review) return chainReviewTouchScroll(element, review);
+  }, []);
   useEffect(() => {
     const element = scroller.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
@@ -82,12 +115,15 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
                 const selected = decision?.mode === 'source' && decision.source?.listingId === source.listingId && decision.source.channel === source.channel && decision.source.shop === source.storeName && String(decision.source.rawValue) === String(field?.value) && decision.source.unit === field?.unit && decision.source.currency === field?.currency;
                 const mismatch = sourceText && !['sku_code', 'retail_price', 'categoryId', 'structure'].includes(row.key) && normal(sourceText) !== normal(value);
                 return <td key={source.id} className={`border-b border-r p-3 align-top ${selected ? 'bg-primary/5' : ''}`}>
-                  <div className="break-words text-sm leading-5">{text(sourceText, row.key === 'description')}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 break-words text-sm leading-5">{text(sourceText, row.key === 'description')}</div>
+                    {useSource && <SourceFieldMenu label={`${row.label} in ${source.storeName} · ${source.channelSku}`} disabled={locked} canUse={Boolean(field && sourceText.trim() && !selected)}
+                      onUse={returnFocus => field && onUse(row.key, field, returnFocus)} onEdit={returnFocus => onEdit(row.key, source, field, returnFocus)} />}
+                  </div>
                   {field && <p className="mt-1 text-xs text-muted-foreground">Source: {field.label}</p>}
                   {mismatch && <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300"><TriangleAlert className="size-3 shrink-0" aria-hidden="true" />Different value</p>}
                   {row.key === 'retail_price' && <p className="mt-1 text-xs text-muted-foreground">{hasVariants ? 'Listing price · review individual SKU prices' : source.currency !== product.price_currency ? 'Different currency · no automatic conversion' : 'Shop price can differ'}</p>}
-                  {selected && <p className="mt-2 flex items-center gap-1 text-xs font-medium text-primary"><Check className="size-3" />Selected source</p>}
-                  {useSource && <div className="mt-1 flex flex-wrap gap-x-2"><Button variant="ghost" className="h-9 px-0 text-xs text-primary [@media(pointer:coarse)]:h-11" disabled={locked || !field || selected} aria-label={`Use ${row.label} from ${source.storeName} · ${source.channelSku}`} onClick={() => field && onUse(row.key, field)}>Use value</Button><Button variant="ghost" className="h-9 px-0 text-xs text-muted-foreground [@media(pointer:coarse)]:h-11" disabled={locked} aria-label={`Change source field for ${row.label} in ${source.storeName} · ${source.channelSku}`} onClick={() => onEdit(row.key, source, field)}>Change field</Button></div>}
+                  {selected && <p className="mt-2 flex items-center gap-1 text-xs font-medium text-primary"><Check className="size-3" aria-hidden="true" />Selected</p>}
                 </td>;
               })}
               <td className="border-b bg-muted p-3 align-top md:sticky md:right-0 md:z-10">
@@ -102,9 +138,9 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
           </Fragment>;
 
   };
-  return <section aria-label="Comparison fields" className="min-w-0 overflow-hidden rounded-xl border bg-background">
+  return <TooltipProvider delayDuration={200}><section aria-label="Comparison fields" className="min-w-0 overflow-hidden rounded-xl border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
-      <div><div className="flex items-center gap-1"><h3 className="text-sm font-semibold">Compare all listings</h3><ListingReviewHelp label="Comparison fields">Each shop column is a read-only source. Use a value or change its source field to propose one shared Master value. SKU rows match the same variant across shops. Shop codes, prices and categories can differ. Linking does not make shop values identical or turn on sync.</ListingReviewHelp></div><p className="mt-1 text-xs text-muted-foreground">Product details and SKU pairs in one table · Nothing saved yet</p></div>
+      <div><div className="flex items-center gap-1"><h3 className="text-sm font-semibold">Compare all listings</h3><ListingReviewHelp label="Comparison fields">Each shop column is a read-only source. Open a cell’s (…) Data options to use its value for the Master or change the source field. Selected marks the source used for the shared Master value. SKU rows match the same variant across shops. Shop codes, prices and categories can differ. Linking does not make shop values identical or turn on sync.</ListingReviewHelp></div><p className="mt-1 text-xs text-muted-foreground">Product details and SKU pairs in one table · Nothing saved yet</p></div>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs"><Checkbox checked={differencesOnly} disabled={locked} onCheckedChange={value => setDifferencesOnly(value === true)} />Differences & missing data</label>
         {sources.length > 4 && <Popover><PopoverTrigger asChild><Button variant="outline" className="h-11 text-xs" disabled={locked}><Columns3 className="size-4" />Listings {visible.length}/{sources.length}</Button></PopoverTrigger><PopoverContent align="end" className="w-80 space-y-3"><p className="text-sm font-medium">Choose up to 4 columns</p><p className="text-xs text-muted-foreground">All {sources.length} listings remain in this group. Hidden columns are not automatically reviewed.</p><div className="max-h-72 overflow-auto">{sources.map(source => <label key={source.id} className="flex min-h-11 items-start gap-2 py-2 text-xs"><Checkbox className="mt-1" checked={visibleIds.includes(source.id)} disabled={visibleIds.includes(source.id) ? visible.length === 1 : visible.length >= 4} onCheckedChange={checked => setVisibleIds(ids => checked === true ? [...ids, source.id] : ids.filter(id => id !== source.id))} /><span className="min-w-0"><span className="block font-medium">{source.storeName} · {source.channel}</span><span className="block break-words text-muted-foreground">{source.title} · {source.channelSku}</span></span></label>)}</div></PopoverContent></Popover>}
@@ -113,7 +149,8 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
     {visible.length < sources.length && <p className="border-b bg-muted/20 px-4 py-2 text-xs text-muted-foreground">Showing {visible.length} of {sources.length} listings · {sources.length - visible.length} hidden. Saving still checks the entire group.</p>}
     {hiddenIssues.length > 0 && <div role="status" aria-label="Hidden listings need SKU review" className="flex flex-wrap items-center gap-x-3 border-b bg-amber-500/5 px-4 py-2"><p className="text-xs text-amber-700 dark:text-amber-300">{hiddenIssues.length} hidden listing(s) need SKU review:</p>{hiddenIssues.map(source => <Button key={source.id} variant="ghost" className="h-11 px-0 text-xs" disabled={locked} aria-label={`Show SKU review for ${source.storeName} · ${source.channelSku}`} onClick={() => setVisibleIds(ids => [...ids.slice(0, 3), source.id])}>{source.storeName} · {source.channelSku} — Show</Button>)}</div>}
     <p className="border-b px-4 py-2 text-xs text-muted-foreground md:hidden">Scroll sideways to compare shops and the Master result.</p>
-    <div ref={scroller} className="max-h-[68dvh] overflow-auto overscroll-contain" tabIndex={0} role="region" aria-label="Scroll to compare listing fields">
+    {/* Hand vertical scrolling to the review at either edge; keep horizontal gestures inside the matrix. */}
+    <div ref={scroller} className="max-h-[68dvh] overflow-auto overscroll-x-contain overscroll-y-auto" tabIndex={0} role="region" aria-label="Scroll to compare listing fields">
       <table aria-label="Product identity comparison" className="w-full table-fixed border-separate border-spacing-0 text-left text-sm" style={{ minWidth: 150 + visible.length * 220 + 270 }}>
         <colgroup><col style={{ width: 150 }} />{visible.map(source => <col key={source.id} />)}<col style={{ width: 270 }} /></colgroup>
         <thead className="sticky top-0 z-30"><tr>
@@ -129,5 +166,5 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
       </table>
       {!displayedRows.length && <p className="p-4 text-xs text-muted-foreground">No product field differences. SKU pairs remain visible for review.</p>}
     </div>
-  </section>;
+  </section></TooltipProvider>;
 }

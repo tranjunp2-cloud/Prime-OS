@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ordersApi, type OrderRecord, type ShipmentTrackingEvent, type ShipmentTrackingStatus } from '@/lib/orders-api';
 import { getShipmentHistory, isStorePickup, isStorePickupOrder, prototypeTrackingOptions, shipmentReference, shipmentTrackingLabel, shipmentTrackingLabels } from '@/lib/order-shipment-history';
 import { cn } from '@/lib/utils';
+import { shippingLabelUrl } from '@/lib/order-shipping-label';
 import { CopyValue } from './CopyValue';
 
 const date = (value: string) => new Date(value).toLocaleString('en-GB', {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'});
@@ -36,12 +37,13 @@ export function OrderShipmentJourney({order, onUpdated, disabled = false}: {orde
         const latest = events[0];
         const storePickup = isStorePickup(shipment);
         const reference = shipmentReference(order, shipment);
+        const labelUrl = shippingLabelUrl(order, shipment);
         const key = shipment.id || shipment.tracking || String(index);
         return <div key={key} role="group" aria-label={`Journey for ${shipment.tracking}`} className="space-y-3 border-b pb-3 last:border-0 last:pb-0">
           <div><p className="text-sm font-medium">{shipment.carrier}<span className="font-normal text-muted-foreground"> · {latest ? shipmentTrackingLabel(latest.status, storePickup) : storePickup && shipment.status === 'Delivered' ? 'Collected by customer' : shipment.status}</span></p>
             {reference.value && <p className="flex flex-wrap items-center gap-1 break-all text-xs text-muted-foreground">{reference.label} · {reference.value}<CopyValue value={reference.value} label={reference.label.toLowerCase()} /></p>}
             {!storePickup && shipment.collectionMethod && <p className="mt-1 text-xs text-muted-foreground">{shipment.collectionMethod === 'pickup' ? 'Carrier pickup' : 'Drop-off'}{shipment.collectionAt && ` · ${date(shipment.collectionAt)}`}</p>}
-            {!storePickup && shipment.labelUrl?.startsWith('https://') && <a className="inline-flex min-h-9 items-center text-xs font-medium text-primary underline underline-offset-4" href={shipment.labelUrl} target="_blank" rel="noopener noreferrer">Open carrier label</a>}
+            {!storePickup && labelUrl && <a className="inline-flex min-h-9 items-center text-xs font-medium text-primary underline underline-offset-4" href={labelUrl} target="_blank" rel="noopener noreferrer">{labelUrl.startsWith('/') ? 'Open sample label' : 'Open carrier label'}</a>}
           </div>
           {events.length === 0 ? <p className="text-xs leading-5 text-muted-foreground">{storePickup ? 'No store pickup events have been recorded yet.' : 'No delivery events have been recorded yet.'}</p>
             : order.source !== 'demo' && !storePickup && !events.some(event => event.source === 'carrier') && <p className="text-xs leading-5 text-muted-foreground">No carrier tracking updates received. Seller records are shown below.</p>}

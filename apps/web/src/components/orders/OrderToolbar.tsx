@@ -24,9 +24,9 @@ export function OrderToolbar(props: Props) {
     return () => observer.disconnect();
   }, []);
   const fields = [
-    {...props.status, visible: width >= 870, width: 'w-[200px]'},
-    {...props.action, visible: width >= 660, width: 'w-[210px]'},
-    {...props.shop, visible: width >= 1040, width: 'w-[140px]'},
+    {...props.status, visible: width >= 890, width: 'w-[200px]'},
+    {...props.action, visible: width >= 680, width: 'w-[230px]'},
+    {...props.shop, visible: width >= 1060, width: 'w-[140px]'},
     {...props.payment, visible: false, width: 'w-[140px]'},
   ];
   const collapsed = fields.filter(field => !field.visible);

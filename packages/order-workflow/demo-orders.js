@@ -1,4 +1,6 @@
 import { legacyOrderExamples } from './demo-order-examples.js';
+import { demoOrderScenarios } from './demo-order-scenarios.js';
+import { hydrateDemoStock } from './demo-stock.js';
 
 function sampleShipment({id, status, store, warehouse, number, returned, transitions}) {
   const storePickup = store === 'PrimePOS';
@@ -50,7 +52,7 @@ export function hydrateDemoShipmentHistory(order, sample) {
 // Synthetic examples only. Never merge these fields into operator-created orders.
 export function demoOrders() {
   const stages = ['created', 'closed', 'created', 'fulfillment_in_progress', 'shipped', 'closed', 'acknowledged', 'created', 'draft', 'allocated', 'partially_shipped', 'delivered', 'canceled'];
-  return stages.map((status, i) => {
+  const legacy = stages.map((status, i) => {
     const old = legacyOrderExamples[i % legacyOrderExamples.length];
     const id = i < 8 ? old.id : `DEMO-260910-${String(i + 1).padStart(4, '0')}`;
     const subtotal = i < 8 ? Number(old.total.replace(/\D/g, '')) : 720000;
@@ -88,4 +90,5 @@ export function demoOrders() {
       exceptions: [], transitions, activity: [{id:`${id}-created`,at,message:'Sample order created',actor:'Demo operator'}],
     };
   });
+  return [...legacy, ...demoOrderScenarios(legacy)].map(order => hydrateDemoStock(order, order.lines[0]?.inventory?.checkedAt || order.orderedAt));
 }

@@ -83,8 +83,9 @@ export function ListingComparisonTable({ baseline, product, current, sources, on
   const text = (value: string, description = false) => !value ? <span className="text-muted-foreground">Not provided</span>
     : description && value.length > 180 ? <div><p className="line-clamp-3 whitespace-pre-line">{value}</p><details className="mt-1 text-xs"><summary className="w-fit cursor-pointer py-2 text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring">Read full description</summary><p className="whitespace-pre-line py-2">{value}</p></details></div>
     : <span className="whitespace-pre-line">{value}</span>;
-  const openEditor = (key: string, source?: CatalogImportItem, field?: FieldCandidate) => {
-    editorTrigger.current = document.activeElement as HTMLElement | null;
+  const openEditor = (key: string, source?: CatalogImportItem, field?: FieldCandidate, returnFocus?: HTMLElement) => {
+    // Menu items unmount after selection; return to their persistent trigger instead.
+    editorTrigger.current = returnFocus ?? document.activeElement as HTMLElement | null;
     setEditor({ key, product: structuredClone(product), sourceId: source?.id, fieldKey: field?.key }); setError('');
     requestAnimationFrame(() => document.getElementById(`${prefix}-${key}-editor`)?.querySelector<HTMLElement>('textarea, input, select')?.focus());
   };
@@ -97,9 +98,9 @@ export function ListingComparisonTable({ baseline, product, current, sources, on
   </section>;
   if (sources.length > 1) return <ListingGroupComparison baseline={baseline} product={product} sources={sources} rows={rows} format={format} text={text} prefix={prefix} editingKey={editor?.key} onEdit={openEditor} renderEditor={renderEditor} onSetupSkus={onSetupSkus}
     skuMatrix={skuMatrix} skuEditing={skuEditing} onSkuEditingChange={setSkuEditing} onChange={onChange}
-    onUse={(key, candidate) => {
+    onUse={(key, candidate, returnFocus) => {
       const target = targetFor(key), result = convertField(candidate, target, product.price_currency);
-      if (result.error || (target.required && (target.kind === 'text' ? !richTextPlainText(String(result.value)) : !(Number(result.value) > 0)))) { openEditor(key, candidate.source, candidate); return; }
+      if (result.error || (target.required && (target.kind === 'text' ? !richTextPlainText(String(result.value)) : !(Number(result.value) > 0)))) { openEditor(key, candidate.source, candidate, returnFocus); return; }
       onChange(writeMappedField(product, target, result.value, mappingDecision(candidate, result.value, 'source', result.transform)));
     }} onReset={key => {
       const next = writeMappedField(product, targetFor(key), fieldValue(baseline, key), { mode: 'master', value: fieldValue(baseline, key) });

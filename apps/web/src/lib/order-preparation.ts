@@ -19,6 +19,7 @@ export function prototypePreparation(order: OrderRecord) {
   const marketplace = order.metadata.handlingType === 'marketplace';
   if (!marketplace && order.readyForPickup) return null;
   const blocker = order.hold?.active ? 'Release the order hold first.'
+    : ['Allocation failed', 'Reservation expired'].includes(order.reservation || '') ? 'Resolve the stock reservation issue first.'
     : activeReturn(order) ? 'Resolve the active return first.'
     : order.exceptions.some(issue => issue.status === 'open') ? 'Resolve the open issues first.'
     : order.shipments.length > 1 ? 'Review split shipments separately.'

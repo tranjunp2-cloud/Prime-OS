@@ -38,6 +38,10 @@ describe('Orders workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
     expect(screen.queryByRole('button', { name: 'MAN-TEST' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'MAN-SECOND' })).toBeInTheDocument();
+    const nav = within(screen.getByRole('navigation', {name: 'Order lifecycle', hidden: true}));
+    expect(nav.getByRole('button', {name: 'Awaiting confirmation 1', hidden: true})).toBeInTheDocument();
+    expect(nav.getByRole('button', {name: 'To ship 1', hidden: true})).toBeInTheDocument();
+    expect(nav.getByRole('button', {name: 'All 2', hidden: true})).toBeInTheDocument();
   });
   it('does not report empty results or urgent issues while loading or when the endpoint is missing', async () => {
     let rejectRequest!: (error: Error) => void;
@@ -107,7 +111,7 @@ describe('Orders workspace', () => {
     fireEvent.click(stageFilters.getByRole('button',{name:'All 3'}));
     expect(screen.getByRole('button',{name:'MAN-TEST'})).toBeInTheDocument();
   });
-  it('keeps review accessible across lifecycle stages and scopes it to the selected shop', async () => {
+  it('keeps review totals stable while shop filters narrow the selected stage', async () => {
     const allocation={...order,id:'allocation',orderKey:'ALLOCATION',canonicalStatus:'allocated' as const,reservation:'Allocation failed'};
     const sync={...order,id:'sync',orderKey:'SYNC',canonicalStatus:'allocated' as const,syncError:true,metadata:{...order.metadata,store:'Shopee'}};
     const routine={...order,id:'routine',orderKey:'ROUTINE',canonicalStatus:'allocated' as const};
@@ -122,10 +126,10 @@ describe('Orders workspace', () => {
     expect(screen.getByText('Channel sync failed')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Filter by shop'),{target:{value:'Manual'}});
     expect(screen.queryByRole('button',{name:'SYNC'})).not.toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Needs review 1'})).toHaveAttribute('aria-pressed','true');
+    expect(screen.getByRole('button',{name:'Needs review 2'})).toHaveAttribute('aria-pressed','true');
     fireEvent.click(screen.getByRole('button',{name:'ALLOCATION'}));
     fireEvent.click(screen.getByRole('button',{name:'Close'}));
-    expect(screen.getByRole('button',{name:'Needs review 1'})).toHaveAttribute('aria-pressed','true');
+    expect(screen.getByRole('button',{name:'Needs review 2'})).toHaveAttribute('aria-pressed','true');
     fireEvent.click(screen.getByRole('button',{name:'Shipping 1',hidden:true}));
     fireEvent.click(screen.getByRole('button',{name:'Needs review 1'}));
     expect(screen.getByRole('button',{name:'FAILED'})).toBeInTheDocument();
@@ -160,24 +164,26 @@ describe('Orders workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await screen.findByRole('button', { name: 'MAN-TEST' }); expect(screen.getByRole('button', { name: 'Create order' })).toBeDisabled();
   });
-  it('keeps counts and rows scoped to the same shop, warehouse, payment and date filters, excluding drafts', async () => {
+  it('keeps lifecycle and draft totals unchanged by shop, warehouse, payment, date, search and action filters', async () => {
     const second = {...order, id:'second', orderKey:'SECOND', orderedAt:'2026-09-11T10:00:00Z', canonicalStatus:'delivered' as const, metadata:{...order.metadata,store:'Shopee',warehouse:'HN'}};
     const completed = {...order, id:'completed', orderKey:'CLOSED', canonicalStatus:'closed' as const, payment:{...order.payment,state:'Paid'}};
     const draft = {...order, id:'draft', orderKey:'DRAFT', canonicalStatus:'draft' as const};
     vi.mocked(ordersApi.list).mockResolvedValue({data:[order,second,completed,draft],canWrite:true}); mount();
     await screen.findByRole('button',{name:'MAN-TEST'});
     const nav=within(screen.getByRole('navigation',{name:'Order lifecycle',hidden:true}));
+    const totals = () => nav.getAllByRole('button', {hidden:true}).map(button => button.textContent);
+    const originalTotals = totals();
     expect(nav.getByRole('button',{name:'All 3',hidden:true})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'DRAFT'})).not.toBeInTheDocument();
     expect(screen.getByRole('button',{name:'Draft orders (1)'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'On hold (0)'})).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Filter by shop'),{target:{value:'Manual'}});
-    expect(nav.getByRole('button',{name:'All 2',hidden:true})).toBeInTheDocument();
-    expect(nav.getByRole('button',{name:'Delivered 0',hidden:true})).toBeInTheDocument();
+    expect(totals()).toEqual(originalTotals);
+    expect(screen.queryByRole('button',{name:'SECOND'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Filters',exact:true}));
     fireEvent.change(screen.getByLabelText('Warehouse / Branch'),{target:{value:'HCM'}});
     fireEvent.change(screen.getByLabelText('Payment status'),{target:{value:'Paid'}});
-    expect(nav.getByRole('button',{name:'All 1',hidden:true})).toBeInTheDocument();
+    expect(totals()).toEqual(originalTotals);
     expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
     expect(screen.getByRole('button',{name:'CLOSED'})).toBeInTheDocument();
     expect(screen.getByRole('button',{name:'Remove Warehouse: HCM filter'})).toBeInTheDocument();
@@ -185,12 +191,21 @@ describe('Orders workspace', () => {
     expect(nav.getByRole('button',{name:'All 3',hidden:true})).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('From date'),{target:{value:'2026-09-10'}});
     fireEvent.change(screen.getByLabelText('To date'),{target:{value:'2026-09-10'}});
-    expect(nav.getByRole('button',{name:'All 2',hidden:true})).toBeInTheDocument();
+    expect(totals()).toEqual(originalTotals);
     expect(screen.queryByRole('button',{name:'SECOND'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
+    fireEvent.change(screen.getByLabelText('Search orders'),{target:{value:'MAN-TEST'}});
+    expect(totals()).toEqual(originalTotals);
+    expect(screen.queryByRole('button',{name:'CLOSED'})).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Available actions'),{target:{value:'label'}});
+    expect(screen.getByText('No matching orders')).toBeVisible();
+    expect(totals()).toEqual(originalTotals);
+    expect(screen.getByRole('button',{name:'Draft orders (1)'})).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
     fireEvent.click(screen.getByRole('button',{name:'Draft orders (1)'}));
     expect(screen.getByRole('button',{name:'DRAFT'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
+    expect(totals()).toEqual(originalTotals);
   });
   it('separates delivered from completed and keeps rejected returns in the current stage',async()=>{
     const delivered={...order,id:'delivered',orderKey:'DELIVERED',canonicalStatus:'delivered' as const,returnRequests:[{id:'r',status:'rejected',reason:'Test',items:[]}]};
@@ -297,11 +312,44 @@ describe('Orders workspace', () => {
     expect(vi.mocked(ordersApi.command).mock.calls.map(([record]) => record.id)).toEqual(matching.slice(0, 24).map(record => record.id));
   });
 
+  it('offers a shipping label queue for current unprinted orders with stable tab counts', async () => {
+    const preparing: OrderRecord = {...order, payment: {...order.payment, state: 'Paid'}, canonicalStatus: 'acknowledged', metadata: {...order.metadata, handlingType: 'self'}, operations: {printStatus: {shippingLabel: 'Not printed'}}, shipments: [{carrier: 'GHN', tracking: 'TRACK', status: 'Shipment created', labelUrl: 'https://carrier.example/label.pdf'}]};
+    const ready = {...preparing, id: 'ready', orderKey: 'READY', canonicalStatus: 'fulfillment_in_progress' as const, readyForPickup: true};
+    const printed = {...preparing, id: 'printed', orderKey: 'PRINTED', operations: {printStatus: {shippingLabel: 'Printed · Seller'}}};
+    const shipped = {...preparing, id: 'shipped', orderKey: 'SHIPPED', canonicalStatus: 'shipped' as const};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [preparing, ready, printed, shipped], canWrite: true});
+    mount(); await screen.findByRole('button', {name: 'MAN-TEST'});
+    const nav = screen.getByRole('navigation', {name: 'Order lifecycle'});
+    const counts = nav.textContent;
+    fireEvent.change(screen.getByLabelText('Available actions'), {target: {value: 'label'}});
+    expect(screen.getByRole('option', {name: 'Shipping label not printed'})).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'PRINTED'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'SHIPPED'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'READY', exact: true})).not.toBeInTheDocument();
+    expect(screen.getByText('Preparing orders with shipping labels awaiting printing.')).toBeInTheDocument();
+    expect(nav.textContent).toBe(counts);
+    fireEvent.click(screen.getByRole('button', {name: 'Review labels for 1 orders'}));
+    const dialog = within(screen.getByRole('dialog', {name: 'Print shipping labels'}));
+    await waitFor(() => expect(dialog.getAllByRole('button', {name: 'Open label · TRACK'})).toHaveLength(1));
+    expect(ordersApi.command).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole('button', {name: 'Done'}));
+    fireEvent.change(screen.getByLabelText('Search orders'), {target: {value: 'no match'}});
+    expect(screen.getByRole('button', {name: 'Review labels for 0 orders'})).toBeDisabled();
+  });
+
   it('offers print review without table selection or writes, and handles no matching orders', async () => {
     const printable = {...order, canonicalStatus: 'acknowledged' as const, metadata: {...order.metadata, handlingType: 'self' as const}};
-    vi.mocked(ordersApi.list).mockResolvedValue({data: [printable], canWrite: false});
+    const printed = {...printable, id: 'printed', orderKey: 'ALREADY-PRINTED', operations: {printStatus: {packingSlip: 'Printed · Seller'}}};
+    const ready = {...printable, id: 'ready', orderKey: 'ALREADY-PACKED', canonicalStatus: 'fulfillment_in_progress' as const, readyForPickup: true, operations: {printStatus: {packingSlip: 'Not printed'}}};
+    vi.mocked(ordersApi.list).mockResolvedValue({data: [printable, printed, ready], canWrite: false});
     mount(); await screen.findByRole('button', {name: 'MAN-TEST'});
+    const nav = screen.getByRole('navigation', {name: 'Order lifecycle'});
+    const counts = nav.textContent;
+    expect(screen.getByRole('option', {name: 'Packing slip not printed'})).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Available actions'), {target: {value: 'print'}});
+    expect(screen.queryByRole('button', {name: 'ALREADY-PRINTED'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'ALREADY-PACKED'})).not.toBeInTheDocument();
+    expect(nav.textContent).toBe(counts);
     fireEvent.click(screen.getByRole('button', {name: 'Print all 1 orders'}));
     const dialog = within(screen.getByRole('dialog', {name: 'Print packing slips'}));
     expect(dialog.getByRole('checkbox', {name: 'Include MAN-TEST'})).toBeChecked();
@@ -311,6 +359,29 @@ describe('Orders workspace', () => {
     expect(screen.getByRole('checkbox', {name: 'Select orders on this page'})).not.toBeChecked();
     fireEvent.change(screen.getByLabelText('Search orders'), {target: {value: 'no match'}});
     expect(screen.getByRole('button', {name: 'Print all 0 orders'})).toBeDisabled();
+  });
+
+  it('rechecks the unprinted queue before printing and skips newly packed or printed orders', async () => {
+    const preparing = {...order, canonicalStatus: 'acknowledged' as const, metadata: {...order.metadata, handlingType: 'self' as const}};
+    const second = {...preparing, id: 'second', orderKey: 'SECOND'};
+    vi.mocked(ordersApi.list).mockResolvedValueOnce({data: [preparing, second], canWrite: true}).mockResolvedValue({data: [
+      {...preparing, canonicalStatus: 'fulfillment_in_progress', readyForPickup: true},
+      {...second, operations: {printStatus: {packingSlip: 'Printed · Seller'}}},
+    ], canWrite: true});
+    const close = vi.fn();
+    const open = vi.spyOn(window, 'open').mockReturnValue({close} as unknown as Window);
+    try {
+      mount(); await screen.findByRole('button', {name: 'MAN-TEST'});
+      fireEvent.change(screen.getByLabelText('Available actions'), {target: {value: 'print'}});
+      fireEvent.click(screen.getByRole('button', {name: 'Print all 2 orders'}));
+      const dialog = within(screen.getByRole('dialog', {name: 'Print packing slips'}));
+      fireEvent.click(dialog.getByRole('button', {name: 'Print 2 packing slips'}));
+      await waitFor(() => expect(dialog.getByLabelText('Batch results')).toHaveTextContent('0 sent to print dialog · 0 failed · 2 skipped'));
+      expect(dialog.getByText(/already ready to ship/)).toBeInTheDocument();
+      expect(dialog.getByText(/already recorded as printed/)).toBeInTheDocument();
+      expect(close).toHaveBeenCalledOnce();
+      expect(ordersApi.command).not.toHaveBeenCalled();
+    } finally { open.mockRestore(); }
   });
 
 });

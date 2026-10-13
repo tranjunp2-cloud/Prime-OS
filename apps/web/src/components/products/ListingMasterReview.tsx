@@ -308,7 +308,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
 
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     <h2 ref={heading} tabIndex={-1} className="sr-only">{title}</h2>
-    <div ref={scrollArea} className={`min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${stage === 'choose' || stage === 'create' ? 'space-y-3' : 'space-y-4'}`}>
+    <div ref={scrollArea} data-listing-review-scroll className={`min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 sm:p-6 ${stage === 'choose' || stage === 'create' ? 'space-y-3' : 'space-y-4'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="-ml-3 h-11" disabled={stage === 'complete' && groupEditing} onClick={() => {
         if (stage === 'complete') { setCompleting(false); setError(''); }
         else if (dirty || groupDirty) setDiscardBack(true);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
 import { editListingSection, applyListingSection, completeListingDetails, confirmListingSave } from '@/test/fixtures/complete-listing-details';
@@ -32,6 +32,12 @@ const mount = (sources = listings.slice(0, 1), initialMode: 'existing' | 'new' =
   return { onSaved, onBack };
 };
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+const openDataOptions = (field: string, shop: string) => {
+  const trigger = screen.getByRole('button', { name: `Data options for ${field} in ${shop} · COMPARE-12` });
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  return within(screen.getByRole('menu'));
+};
+const useCellValue = (field: string, shop: string) => fireEvent.click(openDataOptions(field, shop).getByRole('menuitem', { name: 'Use for Master' }));
 const compare = () => click(`Compare with ${target.name}`);
 const acknowledgeGroup = () => fireEvent.click(screen.getByRole('checkbox', { name: /^I reviewed all/ }));
 const skuSelect = (code: string, source: CatalogImportItem) => {
@@ -122,6 +128,16 @@ describe('Fast evidence-based Master review', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Review before saving' })).getByRole('button', { name: 'Link all 2 listings' }));
     expect(onSaved).toHaveBeenCalledOnce();
     expect(getProductById(target.id)?.status).toBe('draft');
+  });
+  it('lets vertical scrolling leave the comparison table but contains it within the review', () => {
+    mount(listings);
+    const matrixScroll = screen.getByRole('region', { name: 'Scroll to compare listing fields' });
+    expect(matrixScroll).toHaveClass('overflow-auto', 'overscroll-x-contain', 'overscroll-y-auto');
+    expect(matrixScroll).not.toHaveClass('overscroll-contain');
+    const reviewScroll = matrixScroll.parentElement!.closest('.overflow-y-auto');
+    expect(reviewScroll).toHaveClass('overscroll-y-contain');
+    expect(reviewScroll).not.toContainElement(screen.getByRole('group', { name: 'Review actions' }));
+    expect(matrixScroll.querySelector('thead')).toHaveClass('sticky', 'top-0');
   });
   it.each(['choose', 'compare', 'create'])('provides a non-saving Back to listings action in the %s stage', stage => {
     const { onBack, onSaved } = mount(stage === 'choose' ? [{ ...listings[0], suggestedProductId: undefined }] : listings.slice(0, 1), stage === 'create' ? 'new' : 'existing');
@@ -239,19 +255,19 @@ describe('Fast evidence-based Master review', () => {
     listings = listings.map((source, index) => ({ ...source, title: `Listing ${index + 1} title`, description: `Description from listing ${index + 1}` }));
     const { onSaved } = mount(listings);
     acknowledgeGroup();
-    click('Use Title from Shop b · COMPARE-12');
+    useCellValue('Title', 'Shop b');
     expect(screen.getByRole('checkbox', { name: /^I reviewed all/ })).not.toBeChecked();
     const titleRow = screen.getByRole('rowheader', { name: /^Title/ }).closest('tr')!;
     expect(within(titleRow).getAllByText('Listing 2 title')).toHaveLength(2);
     expect(titleRow).toHaveTextContent(`Current: ${target.name}`);
     expect(titleRow).toHaveTextContent('Shop b · Listing title · Not saved');
-    click('Use Description from Shop a · COMPARE-12');
+    useCellValue('Description', 'Shop a');
     click('Undo Master Title change');
     expect(titleRow).toHaveTextContent('Keep current Master value');
-    expect(titleRow).not.toHaveTextContent('Selected source');
+    expect(within(titleRow).queryByText('Selected', { exact: true })).not.toBeInTheDocument();
     expect(getProductById(target.id)?.name).toBe(target.name);
     expect(onSaved).not.toHaveBeenCalled();
-    click('Use Title from Shop b · COMPARE-12');
+    useCellValue('Title', 'Shop b');
     acknowledgeGroup();
     confirmListingSave('Save Master changes & link');
     const saved = getProductById(target.id)!;
@@ -262,7 +278,7 @@ describe('Fast evidence-based Master review', () => {
   it('opens a source-specific field correction from a listing cell and leaves other columns intact', () => {
     listings[1] = { ...listings[1], mappingFields: [{ key: 'display_name', label: 'Display name', value: 'Correct provider title', kind: 'text' }] };
     mount(listings);
-    click('Change source field for Title in Shop b · COMPARE-12');
+    fireEvent.click(openDataOptions('Title', 'Shop b').getByRole('menuitem', { name: 'Change source field' }));
     const picker = within(screen.getByRole('region', { name: 'Choose source for Product name' }));
     expect(picker.queryByRole('radio', { name: /Shop a/ })).not.toBeInTheDocument();
     fireEvent.click(picker.getByRole('radio', { name: /Shop b · Display name/ }));
@@ -273,6 +289,41 @@ describe('Fast evidence-based Master review', () => {
     expect(within(row).getAllByText('Correct provider title')).toHaveLength(2);
     expect(row).toHaveTextContent('Source: Listing title');
     expect(getProductById(target.id)?.name).toBe(target.name);
+  });
+  it('replaces repeated source actions with a persistent menu and marks the selected source', () => {
+    mount(listings);
+    const table = screen.getByRole('table', { name: 'Product identity comparison' });
+    expect(within(table).queryByRole('button', { name: /^(Use (Title|Description)|Change source field)/ })).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'Data options for Title in Shop b · COMPARE-12' });
+    expect(trigger).toBeVisible();
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    useCellValue('Title', 'Shop b');
+    const cell = trigger.closest('td')!;
+    expect(cell).toHaveClass('bg-primary/5');
+    expect(within(cell).getByText('Selected', { exact: true })).toBeVisible();
+    const menu = openDataOptions('Title', 'Shop b');
+    expect(menu.queryByRole('menuitem', { name: 'Use for Master' })).not.toBeInTheDocument();
+    expect(menu.getByRole('menuitem', { name: 'Change source field' })).toBeVisible();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(getProductById(target.id)?.name).toBe(target.name);
+  });
+  it('only offers field correction for an empty source and disables other menus during an edit', async () => {
+    listings[1] = { ...listings[1], description: undefined };
+    mount(listings);
+    const trigger = screen.getByRole('button', { name: 'Data options for Description in Shop b · COMPARE-12' });
+    expect(trigger.closest('td')).toHaveTextContent('Not provided');
+    const menu = openDataOptions('Description', 'Shop b');
+    expect(menu.getAllByRole('menuitem')).toHaveLength(1);
+    expect(menu.queryByRole('menuitem', { name: 'Use for Master' })).not.toBeInTheDocument();
+    fireEvent.click(menu.getByRole('menuitem', { name: 'Change source field' }));
+    expect(screen.getByRole('region', { name: 'Choose source for Product description' })).toBeVisible();
+    expect(trigger).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Data options for Title in Shop a · COMPARE-12' })).toBeDisabled();
+    click('Cancel edit');
+    expect(trigger).toBeEnabled();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(getProductById(target.id)?.description).toBe(target.description);
   });
   it('does not copy a price in a different currency without explicit correction', () => {
     updateProduct(target.id, { id: target.id, price_currency: 'JPY', retail_price: 2000 });
@@ -289,7 +340,7 @@ describe('Fast evidence-based Master review', () => {
   it('returns to link-only after undoing the final change, without requiring Draft activation', () => {
     updateProduct(target.id, { id: target.id, field_mappings: undefined, description: '', retail_price: 0 });
     mount(listings);
-    click('Use Title from Shop a · COMPARE-12');
+    useCellValue('Title', 'Shop a');
     expect(screen.getByRole('button', { name: 'Save, activate & link' })).toBeDisabled();
     click('Undo Master Title change');
     click('Undo Master Description change');
@@ -318,7 +369,7 @@ describe('Fast evidence-based Master review', () => {
   it('keeps a hidden source decision when changing the visible columns without acknowledging review', () => {
     listings = Array.from({ length: 5 }, (_, index) => ({ ...listings[0], id: `column-${index}`, listingId: `column-${index}`, storeName: `Shop ${index + 1}`, title: `Source title ${index + 1}` }));
     mount(listings);
-    click('Use Title from Shop 1 · COMPARE-12');
+    useCellValue('Title', 'Shop 1');
     click('Listings 4/5');
     fireEvent.click(screen.getByRole('checkbox', { name: /Shop 1 ·/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Shop 5 ·/ }));

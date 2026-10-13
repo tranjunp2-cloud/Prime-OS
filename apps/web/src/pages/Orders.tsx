@@ -3,13 +3,14 @@ import { OrderToolbar } from '@/components/orders/OrderToolbar';
 import { batchBlocker, actionFilterLabels, matchesActionFilter, type ActionFilter, type BatchAction } from '@/lib/order-bulk';
 import { OrderBatchDialog } from '@/components/orders/OrderBatchDialog';
 import { orderNextAction, orderDeadline, deadlineLabel } from '@/lib/order-processing';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { OrderShippingLabelsDialog } from '@/components/orders/OrderShippingLabelsDialog';
 import { OrderNavigation } from '@/components/orders/OrderNavigation';
 import { OrderLifecycleBadge } from '@/components/orders/OrderLifecycleBadge';
 import { workQueues, matchesOrderQueue, hasReturnHistory, getQueueFilters, matchesQueueFilter, type OrderQueue } from '@/lib/order-work-queues';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { HandlingTypeBadge } from '@/components/orders/HandlingTypeBadge';
 import { printPackingSlips } from '@/lib/order-print';
+import { shippingLabelQueueBlocker } from '@/lib/order-shipping-label';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Download,
@@ -27,7 +28,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { cn } from '@/lib/utils';
-import { ordersApi, orderRow, orderLabels, exportOrders, getOrderAttentionReasons, type OrderRecord } from '@/lib/orders-api';
+import { ordersApi, orderRow, orderLabels, orderStockStatusLabel, exportOrders, getOrderAttentionReasons, type OrderRecord } from '@/lib/orders-api';
 import { ManualOrderDialog } from '@/components/orders/ManualOrderDialog';
 import { OrderWorkspaceDetail } from '@/components/orders/OrderWorkspaceDetail';
 
@@ -100,7 +101,7 @@ export default function Orders() {
   const [batchAction, setBatchAction] = useState<BatchAction | undefined>();
   const [batchScope, setBatchScope] = useState<'selected' | 'filtered'>('selected');
   const [actionFilter, setActionFilter] = useState<ActionFilter>('all');
-  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [labelOrders, setLabelOrders] = useState<OrderRecord[] | null>(null);
   const [detailQueue, setDetailQueue] = useState<string[]>([]);
   const [startProcessing, setStartProcessing] = useState(false);
   const [bulkWarehouse, setBulkWarehouse] = useState('');
@@ -129,7 +130,7 @@ export default function Orders() {
   const detail = params.get('order') || routeParams.id || null;
   const setDetail = (id: string | null, process = false, keepQueue = false) => { setStartProcessing(process); if (id && !keepQueue) setDetailQueue([...new Set([...filtered.map(order => order.id), id])]); const next = new URLSearchParams(params); if (id) next.set('order', id); else next.delete('order'); setParams(next, { replace: true }); };
   const [filtersOpen, setFiltersOpen] = useState(false);
-  // All counters and table rows start from the same shop/search/date/payment scope.
+  // Filters narrow table results; navigation counts always describe the loaded order workspace.
   const scopeOrders = useMemo(() => orders.filter(order => {
     const matchesSearch = !search || `${order.orderKey} ${order.customer} ${order.phone} ${order.store} ${order.marketplaceOrderId || ''} ${order.lines.map(line => `${line.sku} ${line.name}`).join(' ')} ${order.shipments.map(shipment => shipment.tracking).join(' ')}`.toLowerCase().includes(search.toLowerCase());
     const matchesWorkspaceView = view === 'all' || (view === 'fulfillment'
@@ -149,10 +150,11 @@ export default function Orders() {
       && (!dateTo || new Date(order.orderedAt) <= new Date(`${dateTo}T23:59:59.999`));
   }), [orders, search, view, activeView, currentUserName, paymentFilter, channel, canonical, settlementFilter, warehouseFilter, carrierFilter, tagFilter, notesFilter, dateFrom, dateTo, now]);
   const scoped = scopeOrders.filter(order => (!heldOnly || order.hold?.active) && matchesActionFilter(order, actionFilter, canWrite));
-  const statuses = statusDefinitions.map(item => ({ ...item, count: scoped.filter(order => matchesOrderQueue(order, item.key)).length }));
-  const draftCount = scoped.filter(order => order.canonicalStatus === 'draft').length;
+  const statuses = statusDefinitions.map(item => ({ ...item, count: orders.filter(order => matchesOrderQueue(order, item.key)).length }));
+  const draftCount = orders.filter(order => order.canonicalStatus === 'draft').length;
+  const stageTotals = orders.filter(order => matchesOrderQueue(order, status));
   const stageOrders = scoped.filter(order => matchesOrderQueue(order, status));
-  const subFilters = getQueueFilters(status).map(item => ({ ...item, count: stageOrders.filter(order => matchesQueueFilter(order, item.key)).length }));
+  const subFilters = getQueueFilters(status).map(item => ({ ...item, count: stageTotals.filter(order => matchesQueueFilter(order, item.key)).length }));
   const filtered = stageOrders.filter(order => matchesQueueFilter(order, subStatus)).sort((a, b) => sort === 'deadline' ? ((orderDeadline(a) ?? Infinity) - (orderDeadline(b) ?? Infinity)) || a.orderedAt.localeCompare(b.orderedAt) : sort === 'oldest' ? a.orderedAt.localeCompare(b.orderedAt) : b.orderedAt.localeCompare(a.orderedAt));
   const currentScope = scopeOrders.filter(order => matchesOrderQueue(order, status) && matchesQueueFilter(order, subStatus));
   const holdCount = currentScope.filter(order => order.hold?.active).length;
@@ -190,6 +192,7 @@ export default function Orders() {
   const selectedOrders = records.filter(order => selected.includes(order.id));
   const confirmCount = selectedOrders.filter(order => !batchBlocker(order, 'confirm', canWrite)).length;
   const printCount = selectedOrders.filter(order => !batchBlocker(order, 'print', canWrite)).length;
+  const labelCount = selectedOrders.filter(order => !shippingLabelQueueBlocker(order)).length;
   const allPageSelected = visible.length > 0 && visible.every(order => selected.includes(order.id));
   const openBatch = (action?: BatchAction) => { setBatchScope('selected'); setBatchAction(action); setBatchOrders(selectedOrders); };
   const filteredBatchAction = actionFilter === 'confirm' || actionFilter === 'print' ? actionFilter : null;
@@ -200,6 +203,11 @@ export default function Orders() {
     setBatchAction(filteredBatchAction);
     // Capture all matching pages now; later refreshes must not expand this batch.
     setBatchOrders(filtered.map(order => byId.get(order.id)!));
+  };
+  const openFilteredLabels = () => {
+    if (loading || loadError || !filtered.length) return;
+    const byId = new Map(records.map(order => [order.id, order]));
+    setLabelOrders(filtered.map(order => byId.get(order.id)!));
   };
   const resetDetailedFilters = () => { setPaymentFilter('all'); setHeldOnly(false); setCanonical('all'); setSettlementFilter('all'); setWarehouseFilter('all'); setCarrierFilter('all'); setDateFrom(''); setDateTo(''); setTagFilter(''); setNotesFilter(''); setActiveView(null); const next = new URLSearchParams(params); next.delete(workflowParam); setParams(next, { replace: true }); };
   const clearFilters = () => {
@@ -240,7 +248,17 @@ export default function Orders() {
     <OrderNavigation items={statuses} value={status} loaded={hasLoaded} onChange={setLifecycleStatus} />
     {status === 'draft' && <div className="flex flex-wrap items-center gap-2 text-sm"><strong>Draft orders</strong><span className="text-muted-foreground">Not submitted yet. Drafts are kept separate from All.</span><Button variant="ghost" size="sm" onClick={() => setLifecycleStatus('all')}>Back to all orders</Button></div>}
     <div role="group" aria-label="Order stage filters" className="flex flex-wrap items-center gap-2">
-      {[{ key: 'all', label: 'All', count: stageOrders.length }, ...subFilters].map(item => <button key={item.key} type="button" aria-pressed={subStatus === item.key} onClick={() => setSubStatus(item.key)} className={cn('inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring', subStatus === item.key ? 'border-primary/30 bg-primary/10 font-medium text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>{item.label}{' '}<span className="text-xs tabular-nums">{hasLoaded ? item.count : '—'}</span></button>)}
+      {[{ key: 'all', label: 'All', count: stageTotals.length }, ...subFilters].map(item => {
+        const button = <button key={item.key} type="button" aria-pressed={subStatus === item.key} onClick={() => setSubStatus(item.key)} className={cn('inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring', subStatus === item.key ? 'border-primary/30 bg-primary/10 font-medium text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>{item.label}{' '}<span className="text-xs tabular-nums">{hasLoaded ? item.count : '—'}</span>{item.key === 'review' && <Info aria-hidden="true" className="size-3.5 shrink-0" />}</button>;
+        return item.key === 'review' ? <TooltipProvider key={item.key} delayDuration={150}><Tooltip>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent side="bottom" align="start" className="w-80 max-w-[calc(100vw-1.5rem)] space-y-2 whitespace-normal p-3 text-xs leading-relaxed">
+            <p>Orders needing attention: payment verification, stock issues, holds, overdue processing or pickup, failed deliveries, sync errors, or unresolved issues.</p>
+            <p>Some warnings only flag urgency. Blocking issues must be resolved before the affected action can continue.</p>
+            <p className="text-muted-foreground">Each order is counted once within the current status tab.</p>
+          </TooltipContent>
+        </Tooltip></TooltipProvider> : button;
+      })}
     </div>
     {status === 'delivered' && <p className="text-xs text-muted-foreground">Delivered to the customer. Waiting for the order to be completed.</p>}
     {status === 'completed' && <p className="text-xs text-muted-foreground">Completed orders. Settlement is tracked separately in the payment details.</p>}
@@ -284,6 +302,10 @@ export default function Orders() {
         <div className="min-w-0"><p className="text-sm font-medium" role="status">{filtered.length} orders ready to {filteredBatchAction === 'print' ? 'print' : 'confirm'}</p><p className="mt-0.5 text-xs text-muted-foreground">All matching orders across all pages. Review before processing.</p></div>
         <Button className="shrink-0" disabled={loading || !!loadError || !filtered.length} onClick={openFilteredBatch}>{filteredBatchAction === 'print' ? `Print all ${filtered.length} orders` : `Review & confirm ${filtered.length} orders`}</Button>
       </section>}
+      {actionFilter === 'label' && hasLoaded && selected.length === 0 && <section aria-label="Shipping labels awaiting printing" className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0"><p className="text-sm font-medium" role="status">{filtered.length} orders awaiting shipping label printing</p><p className="mt-0.5 text-xs text-muted-foreground">Preparing orders with shipping labels awaiting printing.</p></div>
+        <Button className="shrink-0" disabled={loading || !!loadError || !filtered.length} onClick={openFilteredLabels}>Review labels for {filtered.length} orders</Button>
+      </section>}
         {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm" aria-label="Order selection"><span>{selected.length} orders selected.</span>{filtered.length > visible.length && selected.length < filtered.length && <Button size="sm" variant="link" onClick={() => setSelected(filtered.map(order => order.id))}>Select all {filtered.length} matching orders</Button>}<Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear selection</Button></div>}
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="max-h-[65vh] overflow-auto">
@@ -312,7 +334,7 @@ export default function Orders() {
                   <td hidden={hiddenColumns.includes('TOTAL / PAYMENT')} className="min-w-[135px] px-3 py-3 text-right"><p className="whitespace-nowrap font-semibold leading-7 tabular-nums">{order.total}</p><p className={cn('text-xs', order.paymentState === 'Paid' ? 'text-emerald-700 dark:text-emerald-400' : order.paymentState === 'Refunded' ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground')}>{order.paymentState}</p></td>
                   <td hidden={hiddenColumns.includes('FULFILLMENT')} className="min-w-[195px] max-w-64 px-3 py-3">
                     <p className="leading-7">{shipment ? shipment.carrier : order.warehouse}</p>
-                    <p className="break-words text-xs text-muted-foreground">{shipment ? shipment.tracking : order.canonicalStatus === 'canceled' ? 'Fulfillment stopped' : order.reservation === 'Not reserved' ? (order.canonicalStatus === 'draft' ? 'Not submitted' : order.source === 'manual' ? 'Not reserved · Check physical stock' : 'Awaiting stock allocation') : order.reservation}</p>
+                    <p className="break-words text-xs text-muted-foreground">{shipment ? shipment.tracking : order.canonicalStatus === 'canceled' ? 'Fulfillment stopped' : orderStockStatusLabel(order)}</p>
                     {order.shipments.length > 1 && <p className="mt-1 text-xs text-muted-foreground">+{order.shipments.length - 1} more shipment(s)</p>}
                   </td>
                   <td hidden={hiddenColumns.includes('ASSIGNEE')} className="px-3 py-4">{order.assignee}</td>
@@ -328,9 +350,10 @@ export default function Orders() {
       <span className="mr-auto hidden text-sm sm:block">{selected.length} orders selected</span>
       <Button aria-label={`Confirm orders (${confirmCount})`} className="min-w-0 flex-1 sm:flex-none" disabled={!confirmCount || loading} onClick={() => openBatch('confirm')}><span className="sm:hidden">Confirm ({confirmCount})</span><span className="hidden sm:inline">Confirm orders ({confirmCount})</span></Button>
       <Button aria-label={`Print packing slips (${printCount})`} className="min-w-0 flex-1 sm:flex-none" variant="outline" disabled={!printCount || loading} onClick={() => openBatch('print')}><span className="sm:hidden">Print ({printCount})</span><span className="hidden sm:inline">Print packing slips ({printCount})</span></Button>
+      {actionFilter === 'label' && <Button aria-label={`Shipping labels (${labelCount})`} className="min-w-0 flex-1 sm:flex-none" disabled={!labelCount || loading || !!loadError} onClick={() => setLabelOrders(selectedOrders)}><span className="sm:hidden">Labels ({labelCount})</span><span className="hidden sm:inline">Shipping labels ({labelCount})</span></Button>}
       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="shrink-0" aria-label="More bulk actions"><Ellipsis className="size-4" aria-hidden="true"/><span className="hidden sm:inline">More</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
         <DropdownMenuItem disabled={loading || !selectedOrders.some(order => order.source === 'demo' || canWrite)} onSelect={() => openBatch()}>More processing</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setLabelsOpen(true)}>Shipping labels</DropdownMenuItem>
+        {actionFilter !== 'label' && <DropdownMenuItem disabled={!labelCount || loading || !!loadError} onSelect={() => setLabelOrders(selectedOrders)}>Shipping labels awaiting printing ({labelCount})</DropdownMenuItem>}
         {selectedOrders.some(order => ['partially_shipped', 'shipped', 'delivered', 'closed'].includes(order.canonicalStatus)) && <DropdownMenuItem disabled={selectedOrders.some(order => !order.lines.length || order.hold?.active || !['partially_shipped', 'shipped', 'delivered', 'closed'].includes(order.canonicalStatus))} onSelect={() => { try { printPackingSlips(selectedOrders); } catch(e) { setNotice((e as Error).message); } }}>Reprint packing slips</DropdownMenuItem>}
         <DropdownMenuItem disabled={!canWrite || selectedOrders.some(order => order.source === 'demo' || !['draft', 'created', 'acknowledged'].includes(order.canonicalStatus))} onSelect={() => setBulkOpen(true)}>Reassign warehouse</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => exportOrders(selectedOrders)}>Export selected</DropdownMenuItem>
@@ -342,7 +365,7 @@ export default function Orders() {
 
     {batchOrders && <OrderBatchDialog orders={batchOrders} canWrite={canWrite} initialAction={batchAction} scope={batchScope} onClose={() => { setBatchOrders(null); setSelected([]); }} onUpdated={updated} />}
     {columnsOpen && <Sheet open onOpenChange={setColumnsOpen}><SheetContent><SheetHeader><SheetTitle>Visible columns</SheetTitle><SheetDescription>Choose the information shown in the orders table.</SheetDescription></SheetHeader><div className="mt-4 grid gap-1">{headers.map(header => <label key={header} className="flex min-h-11 items-center gap-2 text-sm"><Checkbox checked={!hiddenColumns.includes(header)} disabled={header === 'ORDER'} onCheckedChange={checked => setHiddenColumns(columns => checked ? columns.filter(column => column !== header) : [...columns, header])}/>{header === 'STATUS' ? 'ORDER STATUS' : header === 'PROCESSING DEADLINE' ? 'SHIP BY' : header === 'FULFILLMENT' ? 'FULFILLMENT / DELIVERY' : header}</label>)}</div><Button className="mt-4" variant="outline" onClick={() => setColumnsOpen(false)}>Done</Button></SheetContent></Sheet>}
-    {labelsOpen && <Dialog open onOpenChange={setLabelsOpen}><DialogContent><DialogHeader><DialogTitle>Carrier shipping labels</DialogTitle><DialogDescription>Open the original carrier documents to print. Opening a label does not confirm it was printed or attached.</DialogDescription></DialogHeader><ul className="max-h-[60vh] divide-y overflow-auto">{records.filter(order => selected.includes(order.id)).map(order => <li key={order.id} className="py-3 text-sm"><p className="font-medium">{order.orderKey}</p>{order.shipments.some(shipment => shipment.labelUrl?.startsWith('https://')) ? order.shipments.filter(shipment => shipment.labelUrl?.startsWith('https://')).map((shipment, index) => <a key={index} className="mt-1 flex min-h-10 items-center text-primary underline" href={shipment.labelUrl} target="_blank" rel="noopener noreferrer">Open label · {shipment.tracking}</a>) : <p className="text-muted-foreground">No carrier label link. Add the shipment or use the original document supplied by your carrier.</p>}</li>)}</ul></DialogContent></Dialog>}
+    {labelOrders && <OrderShippingLabelsDialog orders={labelOrders} onClose={() => setLabelOrders(null)} />}
     {bulkOpen && <Sheet open onOpenChange={(v) => !v && !bulkPending && setBulkOpen(false)}><SheetContent><SheetHeader><SheetTitle>Reassign preferred warehouse</SheetTitle><SheetDescription>Update warehouse preference. Inventory reservations are managed by fulfillment.</SheetDescription></SheetHeader><form className="mt-6 space-y-4" onSubmit={async (event) => { event.preventDefault(); setBulkPending(true); const failures: string[] = []; for (const order of records.filter((o) => selected.includes(o.id))) { try { const r = await ordersApi.command(order, { action: 'warehouse', warehouse: bulkWarehouse }); updated(r.data); } catch(e) { failures.push(`${order.orderKey}: ${(e as Error).message}`); } } setNotice(failures.length ? failures.join('; ') : 'Warehouse preferences updated.'); setBulkPending(false); setBulkOpen(false); }}><label className="grid gap-2">Warehouse<Input required value={bulkWarehouse} onChange={(e) => setBulkWarehouse(e.target.value)} /></label><Button disabled={bulkPending}>{bulkPending ? 'Updating…' : 'Apply to selected'}</Button></form></SheetContent></Sheet>}
 
   </div>;

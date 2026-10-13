@@ -3,6 +3,7 @@ import type { CanonicalStatus, OrderRecord, ShipmentTrackingStatus } from './ord
 import { prototypeTrackingOptions, shipmentTrackingLabels } from './order-shipment-history';
 import { preparationPackageError, preparationPaymentKind, prototypePreparation } from './order-preparation';
 import { hydrateDemoShipmentHistory } from '../../../../packages/order-workflow/demo-orders.js';
+import { hydrateDemoStock, moveDemoStockWarehouse, reserveDemoStock, settleDemoStock } from '../../../../packages/order-workflow/demo-stock.js';
 
 const storageKey = 'prime.order-prototype.v1';
 type Session = { initial: OrderRecord; current: OrderRecord };
@@ -23,7 +24,11 @@ export function prototypeWorkflowOrder(order: OrderRecord): OrderRecord {
 export function restoreOrderPrototype(order: OrderRecord): OrderRecord {
   if (order.source !== 'demo') return order;
   const session = sessions()[order.id];
-  return session?.initial.source === 'demo' && session.current.source === 'demo' && session.initial.version === order.version ? hydrateDemoShipmentHistory(copy(session.current), order) : order;
+  const saved = session?.initial.source === 'demo' && session.current.source === 'demo' && session.initial.version === order.version;
+  const restored = saved ? hydrateDemoShipmentHistory(copy(session.current), order) : order;
+  const current = hydrateDemoStock(restored);
+  if (saved && current !== restored) save({initial: session.initial, current});
+  return current;
 }
 function assertDemo(order: OrderRecord) {
   if (order.source !== 'demo') throw new Error('Prototype actions are available only for sample orders.');
@@ -36,13 +41,15 @@ function required(value: unknown, label: string): string {
 export function restartOrderPrototype(order: OrderRecord): OrderRecord {
   assertDemo(order);
   const initial = copy(sessions()[order.id]?.initial || order);
-  const current = copy(initial);
+  let current = copy(initial);
   const now = new Date().toISOString();
   Object.assign(current, {canonicalStatus: 'created', version: order.version + 1, orderedAt: now, shipments: [], transitions: [], returnRequests: [], exceptions: [], hold: undefined, readyForPickup: false, pickupOverdue: false, syncError: false, slaRisk: false, sla: 'Not scheduled', reservation: 'Not reserved', needsPaymentVerification: false});
   current.payment = current.metadata.handlingType === 'marketplace' || current.metadata.shippingMode === 'platform' || preparationPaymentKind(current) === 'gateway' ? copy(initial.payment) : {...current.payment, state: 'Unpaid', reference: ''};
   current.operations = {...current.operations, work: undefined, shipBy: new Date(Date.now() + 86400000).toISOString(), printStatus: {pickList: 'Not printed', shippingLabel: 'Not printed', packingSlip: 'Not printed'}};
   if (current.operations.settlement) current.operations.settlement.status = 'estimated';
   current.activity = [{id: crypto.randomUUID(), at: now, actor: 'Prototype', message: 'Prototype restarted — awaiting confirmation'}];
+  delete current.reservationExpiresAt;
+  current = reserveDemoStock(current, now);
   save({initial, current});
   return copy(current);
 }
@@ -52,7 +59,8 @@ export function runOrderPrototype(order: OrderRecord, input: Record<string, unkn
   assertDemo(order);
   const existing = sessions()[order.id];
   if (existing && existing.current.version !== order.version) throw new Error('Prototype changed. Refresh this order and try again.');
-  const current = applyPrototypeCommand(order, input);
+  const hydrated = hydrateDemoStock(order);
+  const current = applyPrototypeCommand(hydrated, input);
   save({initial: existing?.initial || copy(order), current});
   return copy(current);
 }
@@ -86,7 +94,9 @@ function applyPrototypeCommand(order: OrderRecord, input: Record<string, unknown
       if (to === 'closed') { const blocker = completionBlocker(workflowOrder); if (blocker) throw new Error(blocker); }
       if (to === 'acknowledged') { const blocker = confirmationBlocker(workflowOrder); if (blocker) throw new Error(blocker); }
       if (to === 'canceled') required(input.reason, 'Cancellation reason');
+      if (to === 'canceled') Object.assign(current, settleDemoStock(current, now));
       transition(to);
+      if (to === 'created') Object.assign(current, reserveDemoStock(current, now));
       message = `Prototype status updated to ${to}`;
       break;
     }
@@ -116,8 +126,9 @@ function applyPrototypeCommand(order: OrderRecord, input: Record<string, unknown
       message = 'Payment gateway reported payment received (simulated)';
       break;
     case 'prepare':
-      current.metadata.warehouse = required(input.warehouse, 'Dispatch warehouse');
-      if (current.metadata.warehouse === 'Unassigned') throw new Error('Choose a dispatch warehouse.');
+      { const warehouse = required(input.warehouse, 'Dispatch warehouse');
+        if (warehouse === 'Unassigned') throw new Error('Choose a dispatch warehouse.');
+        Object.assign(current, moveDemoStockWarehouse(current, warehouse, now)); }
       current.operations = {...current.operations, work: {preparedAt: now, preparedBy: 'Prototype', stockMode: 'physical-check'}};
       if (input.shipBy) current.operations.shipBy = new Date(String(input.shipBy)).toISOString();
       transition('fulfillment_in_progress');
@@ -153,6 +164,7 @@ function applyPrototypeCommand(order: OrderRecord, input: Record<string, unknown
       Object.assign(current.shipments[0], {status: 'In transit', deliveryOutcome: 'in_transit', pickedUpAt: now, pickupReference: required(input.reference, 'Sample pickup reference')});
       current.readyForPickup = false;
       current.pickupOverdue = false;
+      Object.assign(current, settleDemoStock(current, now, true));
       transition('shipped');
       track('picked_up', current.metadata.warehouse, String(input.reference));
       message = 'Carrier pickup (simulated)';
@@ -194,7 +206,7 @@ function applyPrototypeCommand(order: OrderRecord, input: Record<string, unknown
     }
     case 'note': current.metadata.notes = String(input.note || ''); message = 'Internal note updated'; break;
     case 'assign': current.metadata.assignee = required(input.assignee, 'Owner'); message = 'Owner updated'; break;
-    case 'warehouse': current.metadata.warehouse = required(input.warehouse, 'Warehouse'); message = 'Dispatch warehouse updated'; break;
+    case 'warehouse': Object.assign(current, moveDemoStockWarehouse(current, required(input.warehouse, 'Warehouse'), now)); message = 'Dispatch warehouse updated'; break;
     case 'hold':
       if (!['created', 'acknowledged', 'allocated', 'fulfillment_in_progress'].includes(current.canonicalStatus)) throw new Error('Only orders before dispatch can be held.');
       current.hold = {active: true, reason: required(input.reason, 'Hold reason'), actor: 'Prototype', at: now}; message = 'Order put on hold'; break;

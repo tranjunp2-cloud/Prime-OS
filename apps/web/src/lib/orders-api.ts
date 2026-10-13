@@ -32,6 +32,7 @@ export interface OrderRecord extends Omit<ManualOrderInput, 'metadata' | 'canoni
   exceptions: { id: string; summary: string; status: string; at: string }[];
   activity: { id: string; at: string; message: string; actor: string }[];
   needsPaymentVerification?: boolean; sla?: string; slaRisk?: boolean; reservation?: string; syncError?: boolean; readyForPickup?: boolean; pickupOverdue?: boolean;
+  prototypeStockVersion?: 1; reservationExpiresAt?: string;
 }
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = createPrimeAuthHeaders(); if (init.body) headers.set('Content-Type', 'application/json');
@@ -76,9 +77,18 @@ export function orderDisplayStatus(order: OrderRecord): string {
 }
 export function orderMoney(amount: number, currency = 'VND') { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount); }
 export function orderRow(order: OrderRecord) {
-  return { ...order, date: new Date(order.orderedAt).toLocaleString(), customer: order.buyerSnapshot.name, phone: order.buyerSnapshot.phone, tags: order.metadata.tags, store: order.metadata.store, owner: order.source === 'manual' ? 'Manual order' : 'Example order', warehouse: order.metadata.warehouse, total: orderMoney(order.totals.grandTotal, order.currencyCode), paymentState: order.payment.state, status: orderDisplayStatus(order), sla: order.sla || 'Not scheduled', slaRisk: order.slaRisk || false, assignee: order.metadata.assignee, reservation: order.reservation || 'Not reserved', carrier: order.shipments[0]?.carrier || 'Not assigned', tracking: order.shipments[0]?.tracking || 'Pending', needsPaymentVerification: !['draft','closed','canceled'].includes(order.canonicalStatus) && order.payment.state === 'Unpaid' && Boolean(order.needsPaymentVerification || order.payment.reference?.trim()), syncError: order.syncError || false, readyForPickup: order.readyForPickup || false, pickupOverdue: order.pickupOverdue || false };
+  return { ...order, date: new Date(order.orderedAt).toLocaleString(), customer: order.buyerSnapshot.name, phone: order.buyerSnapshot.phone, tags: order.metadata.tags, store: order.metadata.store, owner: order.source === 'manual' ? 'Manual order' : 'Example order', warehouse: order.metadata.warehouse, total: orderMoney(order.totals.grandTotal, order.currencyCode), paymentState: order.payment.state, status: orderDisplayStatus(order), sla: order.sla || 'Not scheduled', slaRisk: order.slaRisk || false, assignee: order.metadata.assignee, reservation: order.reservation || 'Not reported', carrier: order.shipments[0]?.carrier || 'Not assigned', tracking: order.shipments[0]?.tracking || 'Pending', needsPaymentVerification: !['draft','closed','canceled'].includes(order.canonicalStatus) && order.payment.state === 'Unpaid' && Boolean(order.needsPaymentVerification || order.payment.reference?.trim()), syncError: order.syncError || false, readyForPickup: order.readyForPickup || false, pickupOverdue: order.pickupOverdue || false };
 }
 export type OrderRow = ReturnType<typeof orderRow>;
+export function orderStockStatusLabel(order: Pick<OrderRecord, 'reservation' | 'canonicalStatus'>) {
+  if (order.canonicalStatus === 'draft') return 'Not submitted';
+  const labels: Record<string, string> = {
+    Reserved: 'Reserved for this order', Dispatched: 'Deducted from stock', Released: 'Reservation released',
+    'Allocation failed': 'Not enough stock to reserve', 'Reservation expired': 'Stock reservation expired',
+    'Not reserved': 'No stock reserved', 'Not reported': 'Reservation not reported',
+  };
+  return labels[order.reservation || ''] || order.reservation || 'Reservation not reported';
+}
 export function exportOrders(records: OrderRecord[]) {
   const cell = (v: unknown) => `"${String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""')}"`;
   const rows = [['Order', 'Date', 'Customer', 'Phone', 'Channel', 'Warehouse', 'Status', 'Payment', 'Currency', 'Total', 'Tracking', 'Owner'], ...records.map((o) => [o.orderKey, o.orderedAt, o.buyerSnapshot.name, o.buyerSnapshot.phone, o.metadata.store, o.metadata.warehouse, o.canonicalStatus, o.payment.state, o.currencyCode, o.totals.grandTotal, o.shipments.map((s) => s.tracking).join('; '), o.metadata.assignee])];
@@ -94,6 +104,7 @@ export function getOrderAttentionReasons(order: OrderRecord): string[] {
   const active = !['draft', 'closed', 'canceled'].includes(order.canonicalStatus);
   if (active && order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) reasons.push('Payment evidence to review');
   if (active && order.reservation === 'Allocation failed') reasons.push('Allocation failed');
+  if (active && order.reservation === 'Reservation expired') reasons.push('Stock reservation expired');
   if (active && order.pickupOverdue) reasons.push('Pickup overdue');
   if (active && /breached|overdue/i.test(order.sla || '') && !order.pickupOverdue) reasons.push('Processing overdue');
   if (order.syncError) reasons.push('Channel sync failed');
