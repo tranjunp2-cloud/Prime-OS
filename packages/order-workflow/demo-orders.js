@@ -1,6 +1,7 @@
 import { legacyOrderExamples } from './demo-order-examples.js';
 import { demoOrderScenarios } from './demo-order-scenarios.js';
 import { hydrateDemoStock } from './demo-stock.js';
+import { demoCustomerPurchases } from './demo-customer-purchases.js';
 
 function sampleShipment({id, status, store, warehouse, number, returned, transitions}) {
   const storePickup = store === 'PrimePOS';
@@ -49,6 +50,32 @@ export function hydrateDemoShipmentHistory(order, sample) {
   })};
 }
 
+// Upgrade only the exact old synthetic buyer contact. Operator changes are kept.
+export function hydrateDemoBuyerSnapshot(order, sample) {
+  if (order.source !== 'demo' || sample?.source !== 'demo' || order.id !== sample.id || order.buyerSnapshot.phoneCountry) return order;
+  const buyer = order.buyerSnapshot;
+  const match = /^(customer|ordercase)(\d+)@example\.com$/.exec(buyer.email);
+  if (!match || buyer.email !== sample.buyerSnapshot.email || buyer.name !== sample.buyerSnapshot.name) return order;
+  const oldPhone = `09000${match[1] === 'customer' ? '0' : '1'}${match[2].padStart(4, '0')}`;
+  if (buyer.phone !== oldPhone) return order;
+  return { ...order, buyerSnapshot: { ...buyer, phone: sample.buyerSnapshot.phone, phoneCountry: sample.buyerSnapshot.phoneCountry } };
+}
+
+// Fill the missing refund in the exact legacy partial-refund fixture. Never
+// estimate a real refund, overwrite an explicit amount or replace user edits.
+export function hydrateDemoRefundAmount(order, sample) {
+  if (order.source !== 'demo' || sample?.source !== 'demo' || order.id !== 'DEMO-REFUND-PARTIAL' || order.id !== sample.id || order.payment.refundedMerchandiseAmount !== undefined) return order;
+  const refund = sample.payment.refundedMerchandiseAmount;
+  if (!Number.isFinite(refund)) return order;
+  const financialSnapshot = value => JSON.stringify([
+    value.canonicalStatus, value.orderedAt, value.currencyCode, value.totals,
+    value.lines.map(({id, sku, quantity, unitPrice, lineTotal}) => ({id, sku, quantity, unitPrice, lineTotal})),
+    value.returnRequests, value.payment.state, value.payment.method, value.payment.reference,
+  ]);
+  if (financialSnapshot(order) !== financialSnapshot(sample)) return order;
+  return {...order, payment: {...order.payment, refundedMerchandiseAmount: refund}};
+}
+
 // Synthetic examples only. Never merge these fields into operator-created orders.
 export function demoOrders() {
   const stages = ['created', 'closed', 'created', 'fulfillment_in_progress', 'shipped', 'closed', 'acknowledged', 'created', 'draft', 'allocated', 'partially_shipped', 'delivered', 'canceled'];
@@ -72,7 +99,7 @@ export function demoOrders() {
     const transitions = progress.slice(1).map((toStatus, n) => ({ fromStatus: progress[n], toStatus, reason: toStatus === 'canceled' ? 'Customer requested cancellation · Sample' : '', transitionedAt: new Date(Date.parse(at) + (n + 1) * 3600000).toISOString() }));
     if (returned) transitions.find(event => event.toStatus === 'closed').transitionedAt = '2026-09-11T10:00:00.000Z';
     return { id, orderKey: id, requestKey: `demo-${id}`, source: 'demo', demoVersion: 4, version: 1, canonicalStatus: status, orderedAt: at, currencyCode: 'VND',
-      buyerSnapshot: { name: old.customer, phone: `090000${String(i + 1).padStart(4, '0')}`, email: `customer${i + 1}@example.com` },
+      buyerSnapshot: { name: old.customer, phone: `090000${String(i + 1).padStart(4, '0')}`, phoneCountry: 'VN', email: `customer${i + 1}@example.com` },
       shippingAddressSnapshot: { address: `${i + 10} Nguyen Hue · Sample address`, city: 'Ho Chi Minh City', country: 'VN', postalCode: '700000' },
       lines, totals: { subtotal, discount: 20000, shipping: 20000, tax: 0, grandTotal: subtotal }, payment,
       metadata: { handlingType: [2, 4, 5].includes(i) ? 'marketplace' : 'self', store: old.store, warehouse: old.warehouse, assignee: old.assignee, tags: old.tags, notes: 'Synthetic demonstration order. Please check the items before packing.' },
@@ -90,5 +117,6 @@ export function demoOrders() {
       exceptions: [], transitions, activity: [{id:`${id}-created`,at,message:'Sample order created',actor:'Demo operator'}],
     };
   });
-  return [...legacy, ...demoOrderScenarios(legacy)].map(order => hydrateDemoStock(order, order.lines[0]?.inventory?.checkedAt || order.orderedAt));
+  const examples = [...legacy, ...demoOrderScenarios(legacy)];
+  return [...examples, ...demoCustomerPurchases(examples)].map(order => hydrateDemoStock(order, order.lines[0]?.inventory?.checkedAt || order.orderedAt));
 }

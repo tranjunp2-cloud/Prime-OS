@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { Megaphone, Target, TrendingUp, UsersRound } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
+import { DemoDataModeToggle } from '@/components/shared/DemoDataModeToggle';
+import { EmptyState } from '@/components/system/EmptyState';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -116,6 +120,7 @@ function MarketingOverview() {
 }
 
 export function PrimeMarketingPage() {
+  const { noData } = useDemoDataMode();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get('view');
   const activeView: MarketingView = views.includes(requestedView as MarketingView) ? requestedView as MarketingView : 'campaigns';
@@ -132,7 +137,7 @@ export function PrimeMarketingPage() {
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl border bg-card text-primary shadow-sm"><Megaphone className="size-5" aria-hidden="true" /></span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Marketing</h1>
+            <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-semibold tracking-tight">Marketing</h1><DemoDataModeToggle /></div>
             <p className="mt-1 text-sm text-muted-foreground">Plan audiences, operate campaigns, create content, and measure performance without mixing customer record management into the workflow.</p>
           </div>
         </div>
@@ -145,12 +150,14 @@ export function PrimeMarketingPage() {
         </Tabs>
       </div>
 
+      {noData ? <div className="p-4 md:p-6"><EmptyState className="min-h-80" icon={<Megaphone aria-hidden="true" />} title={{ overview: 'No marketing activity yet', campaigns: 'No campaigns yet', audiences: 'No audiences yet', sources: 'No marketing sources connected', content: 'No marketing content yet', analytics: 'No campaign performance yet' }[activeView]} description={{ overview: 'Connect a sales channel and bring in your first customers to start planning campaigns.', campaigns: 'Connect your channels and sync customers before choosing an audience for your first campaign.', audiences: 'Customers from your orders will be available to build campaign audiences. No customer data has been synced yet.', sources: 'Connect a channel to start tracking where customers and orders come from.', content: 'Connect a channel first so you can prepare content for the right destination.', analytics: 'Campaign results will appear after your first campaign starts receiving activity. No sample revenue or conversion rates are shown.' }[activeView]} action={<div className="flex flex-wrap justify-center gap-2"><Button asChild><Link to="/sales-channels/connected-channels">Connect sales channel</Link></Button><Button asChild variant="outline"><Link to="/customers">View customers</Link></Button></div>} /></div> : <>
       {activeView === 'overview' ? <MarketingOverview /> : null}
       {activeView === 'campaigns' ? <PrimeCrmCampaignsSimplePage /> : null}
       {activeView === 'audiences' ? <PrimeCrmReengagementSimplePage /> : null}
       {activeView === 'sources' ? <PrimeCrmSourcesSimplePage /> : null}
       {activeView === 'content' ? <PrimeTowerPage towerId="content-creator-ops" /> : null}
       {activeView === 'analytics' ? <MarketingAnalytics /> : null}
+      </>}
     </div>
   );
 }

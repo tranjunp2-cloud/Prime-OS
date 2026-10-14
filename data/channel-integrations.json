@@ -160,6 +160,52 @@
       "errors": 4,
       "last_sync_at": "2026-08-14T07:00:00.000Z",
       "poll_count": 0
+    },
+    {
+      "id": "channel_shopify",
+      "platform": "shopify",
+      "name": "Shopify",
+      "store_name": "Prime Beauty Singapore",
+      "region": "SG",
+      "type": "E-Commerce/Web",
+      "status": "INITIAL_SYNCING",
+      "synced_listings": 287,
+      "sync_progress": 36,
+      "physical_warehouse_id": "wh_crossborder_01",
+      "sync_services": {
+        "price": true,
+        "stock": true,
+        "orders": true
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "CREATE_NEW_MASTERS",
+      "errors": 0,
+      "last_sync_at": "2026-10-13T05:58:00.000Z",
+      "poll_count": 0
+    },
+    {
+      "id": "channel_woocommerce",
+      "platform": "woocommerce",
+      "name": "WooCommerce",
+      "store_name": "Prime Beauty Wholesale",
+      "region": "VN",
+      "type": "E-Commerce/Web",
+      "status": "CONNECTED",
+      "synced_listings": 538,
+      "sync_progress": 100,
+      "physical_warehouse_id": "wh_hn_01",
+      "sync_services": {
+        "price": true,
+        "stock": true,
+        "orders": false
+      },
+      "is_default_pickup": false,
+      "is_default_return": false,
+      "catalog_strategy": "MANUAL_LATER",
+      "errors": 0,
+      "last_sync_at": "2026-10-13T05:42:00.000Z",
+      "poll_count": 0
     }
   ]
 }

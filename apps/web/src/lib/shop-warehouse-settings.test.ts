@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { channelIntegrationsApi } from './channel-integrations-api';
+import { demoConnectedChannels } from './channel-integrations-demo';
 import { getProducts, type ChannelListing } from './product-store';
 import { connectionWarehouseChoices, loadConnectedShops, readConnectedShops, saveShopWarehouse, shopWarehouse } from './shop-warehouse-settings';
 import { shopWarehouseImpact } from './shop-warehouse-impact';
@@ -77,5 +78,14 @@ describe('shared shop default warehouse', () => {
     const reviewed = masterSyncPlan(sameCounts, listing, preference).signature;
     api.mockResolvedValue({ data: [{ ...shop, warehouse: target }] });
     await expect(refreshShopDefaultReview(sameCounts, listing, preference, reviewed)).rejects.toThrow('default warehouse changed');
+  });
+  it('uses complete demo channel data when the preview API requires login', async () => {
+    vi.spyOn(channelIntegrationsApi, 'channels').mockRejectedValueOnce(new Error('Login required. Please sign in again.'));
+    const shops = await loadConnectedShops();
+    expect(shops).toHaveLength(9);
+    expect(new Set(shops.map(item => item.status))).toEqual(new Set(['CONNECTED', 'EXPIRED', 'SYNC_ERROR', 'INITIAL_SYNCING']));
+    expect(new Set(shops.map(item => item.type))).toEqual(new Set(['E-Commerce/Web', 'Marketplace', 'Retail POS']));
+    expect(shops.some(item => !item.warehouse)).toBe(true);
+    expect(readConnectedShops()).toEqual({ shops: demoConnectedChannels, status: 'ready' });
   });
 });

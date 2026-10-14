@@ -26,7 +26,7 @@ import { getOrderDetailFlow, getOrderDetailStatus, getOrderDetailSteps, getOrder
 import { printPackingSlips } from '@/lib/order-print';
 import { cn } from '@/lib/utils';
 
-type Action = 'hold' | 'release-hold' | 'submit' | 'confirm' | 'confirm-payment-order' | 'cancel' | 'close' | 'payment' | 'assign' | 'warehouse' | 'note' | 'exception';
+type Action = 'hold' | 'release-hold' | 'submit' | 'confirm' | 'confirm-payment-order' | 'cancel' | 'close' | 'payment' | 'assign' | 'warehouse' | 'note';
 const actionCopy: Record<Action, { title: string; description: string; label?: string; submit: string }> = {
   hold: {title:'Hold Order',description:'Pause processing until the issue is resolved.',label:'Hold reason',submit:'Put on hold'},
   'release-hold':{title:'Release hold',description:'Resume the order at its existing lifecycle step.',label:'Release reason',submit:'Release hold'},
@@ -39,7 +39,6 @@ const actionCopy: Record<Action, { title: string; description: string; label?: s
   assign: { title: 'Assign order owner', description: 'Choose the person or team responsible for following up on this order.', label: 'Person or team', submit: 'Save owner' },
   warehouse: { title: 'Change preferred warehouse', description: 'Update the warehouse preference before allocation. No inventory will be reserved by this change.', label: 'Preferred warehouse', submit: 'Save warehouse' },
   note: { title: 'Edit order notes', description: 'Save instructions or context for the operations team.', label: 'Order notes', submit: 'Save notes' },
-  exception: { title: 'Record order exception', description: 'Describe the issue that needs investigation or follow-up.', label: 'Issue description', submit: 'Record exception' },
 };
 export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEditDraft, onNext, onPrevious, positionLabel, startProcessing = false }: {
   order: OrderRecord; canWrite: boolean; onClose: () => void; onUpdated: (order: OrderRecord) => void; onEditDraft: () => void; onNext?: () => void; onPrevious?: () => void; positionLabel?: string; startProcessing?: boolean;
@@ -121,7 +120,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
     if (action === 'hold' || action === 'release-hold') { void run({action,reason:value}); } else if (action in nextStatus) {
       void run({ action: 'transition', toStatus: nextStatus[action as keyof typeof nextStatus], reason: action === 'cancel' ? value : undefined });
     } else {
-      const field = { payment: 'reference', assign: 'assignee', warehouse: 'warehouse', note: 'note', exception: 'summary' };
+      const field = { payment: 'reference', assign: 'assignee', warehouse: 'warehouse', note: 'note' };
       void run({ action, [field[action as keyof typeof field]]: value });
     }
   }
@@ -142,7 +141,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
             {showPackingSlipInHeader && <Button variant="outline" disabled={packingSlipDisabled} title={packingSlipDisabledReason} onClick={print}><Printer aria-hidden="true" className="size-4" />{packingSlipMenuLabel}</Button>}
               {(permissions.editable || order.lines.length > 0) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" disabled={pending}>More<ChevronDown className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{permissions.editable && !order.hold?.active && ['created','acknowledged','allocated','fulfillment_in_progress'].includes(order.canonicalStatus) && <DropdownMenuItem onSelect={()=>begin('hold')}>Hold Order</DropdownMenuItem>}<DropdownMenuItem onSelect={() => setTab('activity')}>View audit log</DropdownMenuItem>
                 {hasPackingSlip && !showPackingSlipInHeader && <DropdownMenuItem disabled={packingSlipDisabled} title={packingSlipDisabledReason} onSelect={print}><Printer aria-hidden="true" className="mr-2 size-4" />{packingSlipMenuLabel}</DropdownMenuItem>}
-                {permissions.editable && <><DropdownMenuItem onSelect={() => begin('assign', order.metadata.assignee)}>Assign owner</DropdownMenuItem><DropdownMenuItem onSelect={() => begin('note', order.metadata.notes)}>Edit notes</DropdownMenuItem><DropdownMenuItem onSelect={() => begin('exception')}>Record exception</DropdownMenuItem></>}
+                {permissions.editable && <><DropdownMenuItem onSelect={() => begin('assign', order.metadata.assignee)}>Assign owner</DropdownMenuItem><DropdownMenuItem onSelect={() => begin('note', order.metadata.notes)}>Edit notes</DropdownMenuItem></>}
                 {permissions.warehouse && <DropdownMenuItem onSelect={() => begin('warehouse', order.metadata.warehouse)}>Change preferred warehouse</DropdownMenuItem>}
                 {permissions.cancel && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => begin('cancel')}>Cancel order</DropdownMenuItem></>}
               </DropdownMenuContent></DropdownMenu>}
@@ -239,7 +238,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
           <form onSubmit={(event) => { event.preventDefault(); submitAction(); }} className="space-y-4">
             <p className="text-xs text-muted-foreground">{order.orderKey} · {order.buyerSnapshot.name}</p>
             {action === 'confirm-payment-order' && <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm"><span>Bank transfer · Unpaid</span><strong className="tabular-nums">{orderMoney(order.totals.grandTotal, order.currencyCode)}</strong></div>}
-            {actionCopy[action].label && <label className="grid gap-2 text-sm font-medium">{actionCopy[action].label}{['note', 'cancel', 'exception'].includes(action) ? <Textarea autoFocus required={action !== 'note'} maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} rows={4} /> : <Input autoFocus required maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} />}</label>}
+            {actionCopy[action].label && <label className="grid gap-2 text-sm font-medium">{actionCopy[action].label}{['note', 'cancel'].includes(action) ? <Textarea autoFocus required={action !== 'note'} maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} rows={4} /> : <Input autoFocus required maxLength={1000} disabled={pending} value={value} onChange={(e) => setValue(e.target.value)} />}</label>}
             {action === 'confirm-payment-order' && <div className="space-y-2">
               <label className="flex cursor-pointer items-start gap-2 text-sm leading-5"><Checkbox className="mt-0.5" checked={paymentReceived} disabled={pending} onCheckedChange={(checked) => setPaymentReceived(checked === true)} /><span>I have verified that the payment was received{order.source === 'demo' ? ' (simulated)' : ''}.</span></label>
               <p className="text-xs text-muted-foreground">If payment has not arrived, go back and keep the order awaiting confirmation.</p>

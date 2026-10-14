@@ -43,7 +43,7 @@ describe('Overview no-data demos', () => {
 
   it('opens Home directly in no-data mode without fetching the populated snapshot', () => {
     mount(<PrimeGrowthOSPage />, '/admin/dashboard?demo=no-data');
-    expect(screen.getByRole('heading', { name: 'Your workspace is ready for its first activity' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sales setup' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'No data' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('heading', { name: 'No channels connected' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'View analytics' })).toHaveAttribute('href', '/client-reports?demo=no-data');

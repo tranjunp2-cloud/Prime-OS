@@ -30,6 +30,7 @@ import { useI18n } from '@/lib/i18n/I18nContext';
 import { getLocaleMeta, SUPPORTED_LOCALES, type Locale } from '@/lib/i18n/dictionaries';
 import { cn } from '@/lib/utils';
 import { UserFeedbackWidget } from '@/components/system/UserFeedbackWidget';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
 
 const localeCodes: Record<Locale, string> = { 'en-US': 'EN', 'ja-JP': 'JA', 'vi-VN': 'VI' };
 const themes: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
@@ -43,6 +44,7 @@ function getInitials(name: string) {
 }
 
 export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
+  const { noData } = useDemoDataMode();
   const [open, setOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { user, signOut } = useAuth();
@@ -70,7 +72,7 @@ export function SidebarUserFooter({ collapsed }: { collapsed: boolean }) {
 
             <div className={cn('hidden shrink-0 items-center gap-1', !collapsed && 'md:flex')}>
               <Tooltip><TooltipTrigger asChild><button type="button" onClick={() => setOpen((value) => !value)} className="grid size-11 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" aria-label="More user options" aria-expanded={open}><MoreHorizontal className="size-4" /></button></TooltipTrigger><TooltipContent>More options</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('notifications:open'))} className="relative grid size-11 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" aria-label="Notifications, 1 unread"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">1</span></button></TooltipTrigger><TooltipContent>Notifications</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('notifications:open'))} className="relative grid size-11 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" aria-label={noData ? "Notifications" : "Notifications, 1 unread"}><Bell className="size-4" />{!noData && <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">1</span>}</button></TooltipTrigger><TooltipContent>Notifications</TooltipContent></Tooltip>
             </div>
           </div>
         </PopoverAnchor>

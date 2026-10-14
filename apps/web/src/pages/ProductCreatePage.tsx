@@ -28,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { addProduct, updateProduct, getProductById, getAllSkus, getProducts, isDemoProduct, type Product, type ChannelListing, type ProductType, type ProductAssociation } from '@/lib/product-store';
+import { writeDemoDataMode } from '@/lib/demo-data-mode';
 import { ProductActivityHistory } from '@/components/products/ProductActivityHistory';
 import { ProductWorkspaceHelp } from '@/components/products/ProductWorkspaceHelp';
 import { ProductSalesPerformance } from '@/components/products/ProductSalesPerformance';
@@ -2746,6 +2747,7 @@ export default function ProductCreatePage() {
       return false;
     }
     if (!options.silent) toast({ title: storedProduct ? copy.updated : copy.created, description: formatMessage(storedProduct ? copy.updatedDescription : copy.createdDescription, { name: payload.name }) });
+    if (!storedProduct) writeDemoDataMode('with-data');
     setVariantItems(items => items.map(item => ({ ...item, id: variants.find(sku => sku.sku_code === item.sku_code.trim().toUpperCase())?.id ?? item.id })));
 
     baselineSnapshotRef.current = latestSnapshotRef.current;

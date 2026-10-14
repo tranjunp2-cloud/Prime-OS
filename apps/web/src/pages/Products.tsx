@@ -1,4 +1,7 @@
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
+import { DemoDataModeToggle } from '@/components/shared/DemoDataModeToggle';
+import { writeDemoDataMode } from '@/lib/demo-data-mode';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, AlertTriangle, Archive, Boxes, CheckCircle2, ChevronDown, CircleDot, Columns3, Copy, Download, ExternalLink, FileSpreadsheet, Info, Layers3, Link2, MoreHorizontal, PackageX, Pencil, Plus, RotateCcw, Search, Send, ShoppingBag, SlidersHorizontal, Store, Tags, Trash2, Unplug, Upload, Warehouse, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -327,7 +330,16 @@ export default function Products() {
     setIntakeStage('queue');
     setIntakeOpen(true);
   };
-  const previewMode: ProductOnboardingPreview | undefined = workspaceMode !== 'master' ? undefined : queryParams.get('preview') === 'no-channels' ? 'no-channels' : queryParams.get('preview') === 'first-product' ? 'no-products' : undefined;
+  const { noData } = useDemoDataMode();
+  const previousNoData = useRef(noData);
+  useEffect(() => {
+    if (previousNoData.current === noData) return;
+    previousNoData.current = noData;
+    setIntakeOpen(false); setCreateOpen(false); setConnectOpen(false); setImportOpen(false);
+    setSelectedIds([]); setCatalogView('all'); clearCatalogFilters();
+    // Each preview starts from the unfiltered list, including cross-tab mode changes.
+  }, [noData]);
+  const previewMode: ProductOnboardingPreview | undefined = workspaceMode !== 'master' ? undefined : noData ? (queryParams.get('preview') === 'first-product' ? 'no-products' : 'no-channels') : undefined;
   const previewIntro = Boolean(previewMode);
   const previewCatalogRef = useRef<ListingIntakeCatalog | null>(null);
   if (previewMode === 'no-products' && !previewCatalogRef.current) previewCatalogRef.current = createEmptyListingCatalog(pendingListingReviews().map(withFirstMasterDemoData));
@@ -377,23 +389,11 @@ export default function Products() {
   const showingIntro = introMode === 'intro';
   const showQueueBanner = introMode === 'catalog' && reviewListings.length > 0;
   const channelSetup = useProductChannelSetup(showingIntro && workspaceMode === 'master' && !previewIntro, queryParams.get('shop'));
-  const selectedDemo = previewMode ?? (introMode === 'catalog' ? 'with-data' : channelSetup.snapshot.status === 'loaded' && channelSetup.snapshot.channels.length === 0 ? 'no-channels' : 'no-products');
   useEffect(() => {
     if (!products.length || hasCreatedMaster || previewIntro || workspaceMode !== 'master') return;
     setHasCreatedMaster(true);
     try { localStorage.setItem('prime-product-intro-completed-v1', '1'); } catch { /* Keep the in-session state. */ }
   }, [products.length, hasCreatedMaster, previewIntro, workspaceMode]);
-  function selectProductDemo(mode: 'with-data' | ProductOnboardingPreview) {
-    const params = new URLSearchParams(location.search);
-    if (mode === 'with-data') params.delete('preview');
-    else params.set('preview', mode === 'no-channels' ? 'no-channels' : 'first-product');
-    params.delete('q');
-    setIntakeOpen(false);
-    setSelectedIds([]);
-    setCatalogView('all');
-    clearCatalogFilters();
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  }
   const openProductDraft = (id: string) => navigate(`/products/${encodeURIComponent(id)}/edit?section=product-data`);
 
   useEffect(() => {
@@ -586,6 +586,7 @@ export default function Products() {
     }, { requirePersistence: true });
     setCreateOpen(false);
     toast({ title: 'Product Master draft created', description: `${input.name} · ${input.sku} is ready for enrichment.` });
+    writeDemoDataMode('with-data');
     navigate(`/products/${id}/edit?section=product-data`);
   }
 
@@ -609,15 +610,7 @@ export default function Products() {
       title={workspaceMode === 'master' ? 'Product Master' : 'Channel Listings'}
       description={workspaceMode === 'master' ? 'Manage shared product data across your shops.' : `Manage ${selectedListingChannel.label} content, readiness and sync without changing Product Master.`}
       icon={workspaceMode === 'master' ? ShoppingBag : Layers3}
-      titleAccessory={workspaceMode === 'master' ? <div className="flex flex-wrap items-center gap-2 sm:ml-3" role="group" aria-label="Product demo mode">
-        <span className="text-xs font-medium text-muted-foreground">Demo</span>
-        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-          {([{ mode: 'with-data', label: 'With data', hint: 'Show your saved products. No data is changed.' }, { mode: 'no-products', label: 'No products', hint: 'Preview no Product Masters with shop listings to review. Saved data is kept.' }, { mode: 'no-channels', label: 'No channels', hint: 'Preview no Product Masters and no connected channels. Saved data and connections are kept.' }] as const).map(({ mode, label, hint }) => {
-            const selected = selectedDemo === mode;
-            return <Button key={mode} size="sm" variant="ghost" aria-pressed={selected} disabled={mode === 'with-data' && products.length === 0} title={hint} onClick={() => selectProductDemo(mode)} className={cn('h-8 border px-3 text-xs motion-reduce:transition-none', selected ? 'border-primary/50 bg-primary/10 text-foreground hover:bg-primary/15' : 'border-transparent text-muted-foreground hover:text-foreground')}>{label}</Button>;
-          })}
-        </div>
-      </div> : undefined}
+      titleAccessory={<DemoDataModeToggle />}
       actions={workspaceMode === 'master' && !showingIntro ? <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="outline" className="h-11" onClick={() => setImportOpen(true)}><Upload className="size-4" />Import products</Button><Button className="h-11" onClick={() => setCreateOpen(true)}><Plus className="size-4" />Create Product Master</Button></div> : undefined}
     />
 

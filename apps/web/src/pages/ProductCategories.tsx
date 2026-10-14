@@ -5,6 +5,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { EmptyState } from '@/components/system/EmptyState';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
 import { ConfirmDialog } from '@/components/system/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -349,6 +351,7 @@ function attributeForPurpose(attribute: AttributeDefinition, purpose: NonNullabl
 }
 
 export default function ProductCategories() {
+  const { noData, setMode } = useDemoDataMode();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { pathname, search: locationSearch } = useLocation();
@@ -404,6 +407,7 @@ export default function ProductCategories() {
     toast({ title: isCreating ? 'Category created' : 'Category configuration saved', description: 'Existing values are preserved. Live listings have not changed.' });
     setPendingCategorySave(null);
     setDrawerOpen(false);
+    if (noData) setMode('with-data');
     if (returnTo) returnToProduct();
   }
 
@@ -424,7 +428,12 @@ export default function ProductCategories() {
     navigate(returnTo);
   }
 
-  useEffect(() => { saveProductCatalogSettings({ categories, attributes, brands, attributeGroups }); }, [categories, attributes, brands, attributeGroups]);
+  useEffect(() => { if (!noData) saveProductCatalogSettings({ categories, attributes, brands, attributeGroups }); }, [categories, attributes, brands, attributeGroups, noData]);
+  useEffect(() => {
+    if (!noData) return;
+    setDrawerOpen(false); setAttributeDrawerOpen(false); setBrandDrawerOpen(false); setGroupManagerOpen(false);
+    setDeleteTarget(null); setAttributeDeleteTarget(null); setBrandDeleteTarget(null); setPendingCategorySave(null);
+  }, [noData]);
 
   const rows = useMemo<CategoryRow[]>(() => {
     const productsByCategory = new Map<string, typeof products>();
@@ -494,7 +503,7 @@ export default function ProductCategories() {
   });
 
   useEffect(() => {
-    if (viewTab !== 'categories' || !locationSearch || handledCategoryDeepLink.current === locationSearch) return;
+    if (noData || viewTab !== 'categories' || !locationSearch || handledCategoryDeepLink.current === locationSearch) return;
     const params = new URLSearchParams(locationSearch);
     const requestedCategory = params.get('category');
     if (!requestedCategory) return;
@@ -507,10 +516,10 @@ export default function ProductCategories() {
     setIsCreating(false);
     setDrawerTab(params.get('panel') === 'attributes' ? 'attributes' : 'general');
     setDrawerOpen(true);
-  }, [locationSearch, rows, viewTab]);
+  }, [noData, categories, locationSearch, rows, viewTab]);
 
   useEffect(() => {
-    if (viewTab !== 'attributes' || !locationSearch || handledAttributeDeepLink.current === locationSearch) return;
+    if (noData || viewTab !== 'attributes' || !locationSearch || handledAttributeDeepLink.current === locationSearch) return;
     const params = new URLSearchParams(locationSearch);
     const requestedAttribute = params.get('attribute');
     if (!requestedAttribute) return;
@@ -521,7 +530,7 @@ export default function ProductCategories() {
     setAttributeDraft(match);
     setIsCreatingAttribute(false);
     setAttributeDrawerOpen(true);
-  }, [attributes, locationSearch, viewTab]);
+  }, [noData, attributes, locationSearch, viewTab]);
   const productsByBrand = useMemo(() => new Map(brands.map(brand => {
     const identities = [brand.name, brand.code, ...brand.aliases].map(value => value.trim().toLowerCase());
     return [brand.id, products.filter(product => product.brandId === brand.id || identities.includes(product.brand.trim().toLowerCase()))];
@@ -607,6 +616,7 @@ export default function ProductCategories() {
     saveProductCatalogSettings({ categories, attributes: nextAttributes, brands, attributeGroups });
     toast({ title: isCreatingAttribute ? 'Attribute created' : 'Attribute updated', description: `${normalized.name} is ready to assign to product categories.` });
     setAttributeDrawerOpen(false);
+    if (noData) setMode('with-data');
     if (returnTo) returnToProduct();
   }
 
@@ -640,6 +650,7 @@ export default function ProductCategories() {
     setBrands(current => isCreatingBrand ? [...current, normalized] : current.map(item => item.id === normalized.id ? normalized : item));
     toast({ title: isCreatingBrand ? 'Brand created' : 'Brand updated', description: `${normalized.name} is available for Product Master selection.` });
     setBrandDrawerOpen(false);
+    if (noData) setMode('with-data');
   }
   const brandDeleteProducts = brandDeleteTarget ? productsByBrand.get(brandDeleteTarget.id) ?? [] : [];
   const brandDeleteMappingCount = brandDeleteTarget ? Object.values(brandDeleteTarget.mappings).filter(Boolean).length : 0;
@@ -669,7 +680,7 @@ export default function ProductCategories() {
         <TabsTrigger value="categories" className="min-h-10 flex-1 gap-2 rounded-md px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><FolderTree className="size-4" />Categories</TabsTrigger>
         <TabsTrigger value="attributes" className="min-h-10 flex-1 gap-2 rounded-md px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Layers3 className="size-4" />Attribute library</TabsTrigger>
       </TabsList> : null}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {noData ? <EmptyState className="min-h-80" icon={<pageMeta.icon aria-hidden="true" />} title={viewTab === 'categories' ? 'No categories yet' : viewTab === 'attributes' ? 'No attributes yet' : 'No brands yet'} description={viewTab === 'categories' ? 'Create a category to organize your products. Assign attributes when you are ready.' : viewTab === 'attributes' ? 'Create reusable product fields, then assign them to categories.' : 'Add your first brand to keep product names and marketplace mappings consistent.'} action={<Button onClick={viewTab === 'categories' ? createCategory : viewTab === 'attributes' ? createAttribute : createBrand}><Plus className="size-4" />{viewTab === 'categories' ? 'New category' : viewTab === 'attributes' ? 'New attribute' : 'Add Brand'}</Button>} /> : <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div className="relative max-w-xl flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder={viewTab === 'categories' ? 'Search category paths or required attributes...' : viewTab === 'attributes' ? 'Search global attribute definitions...' : 'Search brand, code, manufacturer or country...'} className="pl-9" /></div>
           <p className="text-xs text-slate-500 sm:ml-auto">{viewTab === 'categories' ? `${filteredCategoryRows.length} categories` : viewTab === 'attributes' ? `${filteredAttributes.length} reusable attributes` : `${filteredBrands.length} brands`}</p>
@@ -720,7 +731,7 @@ export default function ProductCategories() {
           <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="border-b border-slate-200 bg-slate-50/70"><tr>{['BRAND', 'PRODUCT MASTERS', 'CHANNEL MAPPING', 'ACTIONS'].map(label => <th key={label} className={cn('px-4 py-3 text-xs font-semibold tracking-wide text-slate-500', label === 'ACTIONS' && 'text-right')}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filteredBrands.map(brand => { const linkedProducts = productsByBrand.get(brand.id) ?? []; const mappedCount = Object.values(brand.mappings).filter(Boolean).length; return <tr key={brand.id} tabIndex={0} onClick={() => editBrand(brand)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editBrand(brand); } }} className="cursor-pointer hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{brand.name.slice(0, 1)}</span><div><div className="flex items-center gap-2"><p className="text-sm font-semibold text-slate-900">{brand.name}</p>{brand.source === 'imported' ? <Badge variant="outline" className="h-5 text-[10px]">Imported</Badge> : null}{brand.status === 'Inactive' ? <Badge variant="outline" className="h-5 text-[10px] text-slate-500">Inactive</Badge> : null}</div><p className="mt-0.5 font-mono text-xs text-slate-500">{brand.code}</p></div></div></td><td className="px-4 py-3"><BrandUsageSummary brand={brand} products={linkedProducts} /></td><td className="px-4 py-3"><button type="button" onClick={event => { event.stopPropagation(); setBrandDraft(brand); setIsCreatingBrand(false); setBrandDrawerTab('mapping'); setBrandDrawerOpen(true); }} className={cn('inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-xs font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', mappedCount ? 'bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/20 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-300')}><span className={cn('size-1.5 rounded-full', mappedCount ? 'bg-emerald-500' : 'bg-amber-500')} />{mappedCount}/5 configured<ChevronRight className="size-3.5" /></button></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`Edit ${brand.name}`} onClick={event => { event.stopPropagation(); editBrand(brand); }} className="grid size-9 place-items-center rounded-md text-slate-500 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Pencil className="size-4" /></button></TooltipTrigger><TooltipContent>Edit brand</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`Delete ${brand.name}`} onClick={event => { event.stopPropagation(); setBrandDeleteTarget(brand); }} className="grid size-9 place-items-center rounded-md text-slate-500 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"><Trash2 className="size-4" /></button></TooltipTrigger><TooltipContent>{linkedProducts.length || mappedCount ? 'Remove usage and mappings before deleting' : 'Delete brand'}</TooltipContent></Tooltip></div></td></tr>; })}</tbody></table></div>
           {filteredBrands.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">No brands match this search.</div> : null}
         </TabsContent>
-      </div>
+      </div>}
     </Tabs>
 
     <ManagedCategoryConfigurationDrawer open={drawerOpen} category={selectedCategory} categories={categories} initialParentId={createParentId} creating={isCreating} tab={drawerTab} attributes={attributes} attributeGroups={attributeGroups} onTabChange={setDrawerTab} onClose={() => setDrawerOpen(false)} onEditAttribute={editAttribute} onCreateAttribute={(attribute) => { setAttributes(current => [...current, attribute]); toast({ title: 'Attribute created and assigned', description: `${attribute.name} is now available in this category.` }); }} saveLabel={returnTo ? 'Save & return to product' : undefined} onSave={reviewCategorySave} />

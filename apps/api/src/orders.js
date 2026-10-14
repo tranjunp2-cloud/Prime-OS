@@ -4,7 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { applyOrderWorkflow } from './order-workflow.js';
 import { workflowActions, completionBlocker, confirmationBlocker, paymentAndConfirmationBlocker } from '../../../packages/order-workflow/rules.js';
 import { demoOrders } from './orders-demo.js';
-import { hydrateDemoShipmentHistory } from '../../../packages/order-workflow/demo-orders.js';
+import { hydrateDemoShipmentHistory, hydrateDemoBuyerSnapshot, hydrateDemoRefundAmount } from '../../../packages/order-workflow/demo-orders.js';
 import { validateManualOrder } from '../../../packages/order-workflow/manual-order.js';
 export { validateManualOrder } from '../../../packages/order-workflow/manual-order.js';
 
@@ -34,6 +34,8 @@ export function createOrderStore(filePath = process.env.PRIME_ORDER_STORE_PATH |
       const examples = demoOrders();
       db.orders = db.orders.map((order) => order.source === 'demo' && order.demoVersion !== 4 ? examples.find((sample) => sample.id === order.id) || order : order);
       db.orders = db.orders.map(order => hydrateDemoShipmentHistory(order, examples.find(sample => sample.id === order.id)));
+      db.orders = db.orders.map(order => hydrateDemoBuyerSnapshot(order, examples.find(sample => sample.id === order.id)));
+      db.orders = db.orders.map(order => hydrateDemoRefundAmount(order, examples.find(sample => sample.id === order.id)));
       if (db.orders.some((order) => order.source === 'demo')) {
         for (const sample of examples) if (!db.orders.some((order) => order.id === sample.id)) db.orders.push(sample);
       }

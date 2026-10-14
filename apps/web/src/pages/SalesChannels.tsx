@@ -1,8 +1,10 @@
 import { useConnectedShops } from '@/hooks/use-connected-shops';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
+import { writeDemoDataMode } from '@/lib/demo-data-mode';
 import { shopWarehouse, merchantWarehouses } from '@/lib/shop-warehouse-settings';
 import { ShopDefaultWarehouseForm } from '@/components/channels/ShopDefaultWarehouseForm';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -11,6 +13,7 @@ import {
   CircleAlert,
   DollarSign,
   Download,
+  Info,
   Link2,
   ListRestart,
   Package,
@@ -35,6 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { cn } from '@/lib/utils';
 import { ConnectStoreWizardModal } from '@/components/channels/ConnectStoreWizardModal';
@@ -91,13 +95,18 @@ const statusIcons: Record<ConnectionStatus, LucideIcon> = {
 
 function toStoreChannel(channel: ConnectedChannelRecord): StoreChannel {
   const statusMap = { CONNECTED: 'Connected', EXPIRED: 'Expired', SYNC_ERROR: 'Sync Error', INITIAL_SYNCING: 'Initial Syncing' } as const;
-  return { id: channel.id, platform: channel.platform, name: channel.name, account: channel.store_name, avatar: channel.name.slice(0, 2).toUpperCase(), avatarClass: 'bg-indigo-600 text-white', type: channel.type === 'Social' ? 'E-Commerce/Web' : channel.type, status: statusMap[channel.status], listings: channel.synced_listings, warehouse: shopWarehouse(channel.warehouse)?.name ?? null, priceSync: channel.sync_services.price, inventorySync: channel.sync_services.stock, orderSync: channel.sync_services.orders, token: 'Secure credential stored', lastSync: channel.status === 'INITIAL_SYNCING' ? `Initial sync · ${channel.sync_progress}%` : 'Just now', errors: channel.errors, syncProgress: channel.sync_progress };
+  const lastSyncDate = new Date(channel.last_sync_at);
+  const lastSync = Number.isNaN(lastSyncDate.getTime()) ? 'Not synced yet' : new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(lastSyncDate);
+  return { id: channel.id, platform: channel.platform, name: channel.name, account: channel.store_name, avatar: channel.name.slice(0, 2).toUpperCase(), avatarClass: 'bg-indigo-600 text-white', type: channel.type === 'Social' ? 'E-Commerce/Web' : channel.type, status: statusMap[channel.status], listings: channel.synced_listings, warehouse: shopWarehouse(channel.warehouse)?.name ?? null, priceSync: channel.sync_services.price, inventorySync: channel.sync_services.stock, orderSync: channel.sync_services.orders, token: 'Secure credential stored', lastSync: channel.status === 'INITIAL_SYNCING' ? `Initial sync · ${channel.sync_progress}%` : lastSync === 'Not synced yet' ? lastSync : `Last sync · ${lastSync}`, errors: channel.errors, syncProgress: channel.sync_progress };
 }
 
-function KpiCard({ label, value, detail, icon: Icon, tone = 'indigo', active, onClick }: { label: string; value: string; detail: string; icon: LucideIcon; tone?: 'indigo' | 'emerald' | 'amber' | 'rose'; active?: boolean; onClick?: () => void }) {
+function KpiCard({ label, value, detail, tooltip, icon: Icon, tone = 'indigo', active, onClick }: { label: string; value: string; detail: string; tooltip: string; icon: LucideIcon; tone?: 'indigo' | 'emerald' | 'amber' | 'rose'; active?: boolean; onClick?: () => void }) {
   const tones = { indigo: 'bg-indigo-50 text-indigo-700', emerald: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-700', rose: 'bg-rose-50 text-rose-700' };
-  const content = <><div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p><span className={cn('grid size-8 place-items-center rounded-lg', tones[tone])}><Icon className="size-4" /></span></div><p className="mt-3 text-2xl font-bold tabular-nums text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></>;
-  return onClick ? <button type="button" onClick={onClick} className={cn('rounded-xl border bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2', active ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200')} aria-pressed={active}>{content}</button> : <article className="rounded-xl border border-slate-200 bg-white p-4">{content}</article>;
+  const content = <><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-1.5"><p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p><Info className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" /></div><span className={cn('grid size-7 shrink-0 place-items-center rounded-md', tones[tone])}><Icon className="size-3.5" aria-hidden="true" /></span></div><div className="mt-2 flex min-w-0 items-baseline gap-2"><p className="shrink-0 text-xl font-bold tabular-nums text-slate-950">{value}</p><p className="truncate text-[11px] text-slate-500">{detail}</p></div></>;
+  const className = cn('min-h-[84px] rounded-xl border bg-white p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2', onClick && 'hover:border-indigo-300 hover:shadow-sm', active ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200');
+  return <Tooltip><TooltipTrigger asChild>{onClick ? <button type="button" onClick={onClick} className={className} aria-pressed={active} aria-label={`${label}: ${value}. ${detail}`}>{content}</button> : <article className={className} tabIndex={0} aria-label={`${label}: ${value}. ${detail}`}>{content}</article>}</TooltipTrigger><TooltipContent side="bottom" className="max-w-xs text-xs leading-5">{tooltip}</TooltipContent></Tooltip>;
 }
 
 function BrandLogo({ id, name }: { id: string; name: string }) {
@@ -108,6 +117,8 @@ function BrandLogo({ id, name }: { id: string; name: string }) {
   if (id === 'amazon') return <svg viewBox="0 0 32 32" className={common} role="img" aria-label={`${name} logo`}><rect width="32" height="32" rx="8" fill="#111827"/><path d="M10 19c3.5 2.6 8.5 3 12.5.5" fill="none" stroke="#FF9900" strokeWidth="2" strokeLinecap="round"/><path d="m21 18 2.5 1.1-1.2 2" fill="none" stroke="#FF9900" strokeWidth="1.5" strokeLinecap="round"/><path d="M14 17v-3c0-2 5-2 5 0v4m-5-2c0 2 5 2 5-.5" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>;
   if (id === 'rakuten') return <svg viewBox="0 0 32 32" className={common} role="img" aria-label={`${name} logo`}><rect width="32" height="32" rx="8" fill="#BF0000"/><path d="M10 9h7c5 0 5 7 0 7h-4v7h-3V9Zm3 3v2h4c1.7 0 1.7-2 0-2h-4Zm4 4 6 7h-4l-5-7h3Z" fill="white"/></svg>;
   if (id === 'primeweb') return <svg viewBox="0 0 32 32" className={common} role="img" aria-label={`${name} logo`}><rect width="32" height="32" rx="8" fill="#4F46E5"/><circle cx="16" cy="16" r="8" fill="none" stroke="white" strokeWidth="1.8"/><path d="M8 16h16M16 8c3 3 3 13 0 16M16 8c-3 3-3 13 0 16" fill="none" stroke="white" strokeWidth="1.5"/></svg>;
+  if (id === 'shopify') return <svg viewBox="0 0 32 32" className={common} role="img" aria-label={`${name} logo`}><rect width="32" height="32" rx="8" fill="#95BF47"/><path d="M10 11.5 12.5 9l1.3.3c.5-1.4 1.4-2.3 2.5-2.3 1.4 0 2.2 1.3 2.5 3.1l2.2.6 1 13.3-12.5 2L10 11.5Z" fill="white"/><path d="M18.2 13.6c-1-.5-2.5-.5-2.5.5 0 1.5 3.8 1 3.8 3.8 0 2.2-1.8 3.7-4.4 3.7-1.5 0-2.8-.5-3.6-1.1l1-2.3c.8.5 1.7.9 2.7.9.7 0 1.2-.3 1.2-.8 0-1.2-3.1-.8-3.1-3.5 0-2.2 1.8-3.8 4.5-3.8.9 0 1.7.2 2.2.5l-1.8 2.1Z" fill="#5E8E3E"/></svg>;
+  if (id === 'woocommerce') return <svg viewBox="0 0 32 32" className={common} role="img" aria-label={`${name} logo`}><rect width="32" height="32" rx="8" fill="#96588A"/><path d="M6 9h20v11H15l-4 4 .5-4H6V9Z" fill="white"/><text x="8" y="17" fill="#96588A" fontSize="7" fontWeight="700">Woo</text></svg>;
   return <svg viewBox="0 0 32 32" className={common} role="img" aria-label={`${name} logo`}><rect width="32" height="32" rx="8" fill="#059669"/><path d="M8 11h16v10H8z" fill="none" stroke="white" strokeWidth="2"/><path d="M11 21v3m10-3v3M12 15h8" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>;
 }
 
@@ -128,6 +139,8 @@ function SyncServices({ channel }: { channel: StoreChannel }) {
 
 export function ConnectedChannelsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const demoState = useDemoDataMode().noData ? 'no-data' : 'data';
   const connections = useConnectedShops();
   const [channels, setChannels] = useState<StoreChannel[]>([]);
   const warehouses = [...new Set([...merchantWarehouses().map(w => w.name), ...channels.flatMap(c => c.warehouse ? [c.warehouse] : [])])];
@@ -141,6 +154,10 @@ export function ConnectedChannelsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [newlyConnected, setNewlyConnected] = useState<ConnectedChannelRecord | null>(null);
+  useEffect(() => {
+    if (demoState !== 'no-data') return;
+    setSelectedChannel(null); setSelectedIds([]); setNewlyConnected(null); setWizardOpen(false);
+  }, [demoState]);
 
   const loadChannels = useCallback(async () => { await connections.reload().catch(() => {}); }, [connections.reload]);
   useEffect(() => {
@@ -165,6 +182,7 @@ export function ConnectedChannelsPage() {
   }, [loadChannels]);
 
   const handleConnected = (record: ConnectedChannelRecord) => {
+    setDemoState('data');
     setNewlyConnected(record);
     setChannels((current) => [toStoreChannel(record), ...current.filter((item) => item.id !== record.id)]);
     toast.success('Store connected. Next, prepare your products.', {
@@ -172,7 +190,7 @@ export function ConnectedChannelsPage() {
       action: { label: 'Go to Products', onClick: () => navigate(`/products/master-catalog?getting-started=1&shop=${encodeURIComponent(record.id)}`) },
       duration: 12000,
     });
-    pollNewChannel(record.id);
+    if (record.status === 'INITIAL_SYNCING') pollNewChannel(record.id);
   };
 
   const pendingErrors = channels.reduce((total, channel) => total + channel.errors, 0);
@@ -205,20 +223,35 @@ export function ConnectedChannelsPage() {
     toast.success(`${selectedChannel.name} reconnected`);
   };
 
+  const setDemoState = (value: 'data' | 'no-data') => {
+    writeDemoDataMode(value === 'no-data' ? 'no-data' : 'with-data');
+    const next = new URLSearchParams(searchParams);
+    if (value === 'no-data') next.set('demo', 'no-data');
+    else next.delete('demo');
+    setSearchParams(next);
+    setSelectedChannel(null);
+    setSelectedIds([]);
+    setShowErrorStores(false);
+    setQuery('');
+    setFilter('All');
+    setWarehouseFilter('all');
+  };
+
   return (
     <div className="min-h-full bg-background p-4 md:p-6">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <WorkspacePageHeader title="Connected Channels" description="Manage every connected storefront, marketplace store, and retail location from one directory." icon={Store} actions={<Button type="button" onClick={() => setWizardOpen(true)}><Plus className="size-4" />Connect Store</Button>} />
+        <WorkspacePageHeader title="Connected Channels" description="Manage every connected storefront, marketplace store, and retail location from one directory." icon={Store} titleAccessory={<div className="flex flex-wrap items-center gap-2 sm:ml-3" role="group" aria-label="Sales Channels demo mode"><span className="text-xs font-medium text-muted-foreground">Demo</span><div className="flex gap-1 rounded-lg border border-border bg-card p-1">{([{ value: 'data', label: 'With data' }, { value: 'no-data', label: 'No data' }] as const).map(({ value, label }) => { const selected = demoState === value; return <Button key={value} type="button" size="sm" variant="ghost" aria-pressed={selected} onClick={() => setDemoState(value)} className={cn('h-8 border px-3 text-xs motion-reduce:transition-none', selected ? 'border-primary/50 bg-primary/10 text-foreground hover:bg-primary/15' : 'border-transparent text-muted-foreground hover:text-foreground')}>{label}</Button>; })}</div></div>} actions={<Button type="button" onClick={() => setWizardOpen(true)}><Plus className="size-4" />Connect Store</Button>} />
 
+        {demoState === 'no-data' ? <section className="overflow-hidden rounded-2xl border border-dashed border-border bg-card" aria-labelledby="no-channels-title"><div className="mx-auto flex max-w-2xl flex-col items-center px-6 py-14 text-center md:py-20"><span className="relative grid size-16 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><Store className="size-7" aria-hidden="true" /><span className="absolute -bottom-1.5 -right-1.5 grid size-7 place-items-center rounded-full border-4 border-card bg-primary text-primary-foreground"><Plus className="size-3.5" aria-hidden="true" /></span></span><h2 id="no-channels-title" className="mt-6 text-xl font-semibold text-foreground">Connect your first sales channel</h2><p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">Bring your marketplace, online store, or retail location into one workspace. Prime OS can then keep products, inventory, prices, and orders in sync.</p><Button type="button" className="mt-6 min-h-11" onClick={() => setWizardOpen(true)}><Link2 className="size-4" aria-hidden="true" />Connect a store</Button><div className="mt-10 grid w-full gap-3 text-left sm:grid-cols-3" aria-label="Connection setup steps">{[['1', 'Choose a channel', 'Select a marketplace, website, or POS.'], ['2', 'Authorize securely', 'Grant access without sharing passwords.'], ['3', 'Set sync rules', 'Choose a warehouse and what to sync.']].map(([step, title, detail]) => <article key={step} className="rounded-xl border border-border bg-background/70 p-4"><span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{step}</span><h3 className="mt-3 text-sm font-semibold text-foreground">{title}</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p></article>)}</div><p className="mt-6 text-xs text-muted-foreground">You can disconnect a channel or change its sync rules at any time.</p></div></section> : <>
         {connections.status === 'error' && <div role="alert" className="flex items-center gap-3 rounded-lg border p-3 text-sm text-destructive"><p>{connections.error}</p><Button variant="outline" onClick={loadChannels}>Reload shops</Button></div>}
         {(connections.status === 'loading' || connections.status === 'idle') && <p role="status" className="text-sm">Loading shops…</p>}
         {newlyConnected && <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4" aria-label="Next step after connecting a shop"><div><h2 className="text-sm font-semibold">Shop connected. Next: prepare your products.</h2><p className="mt-1 text-sm text-muted-foreground">Use existing shop listings or create a new Product Master. You choose what gets linked.</p></div><div className="flex gap-2"><Button variant="ghost" onClick={() => setNewlyConnected(null)}>Later</Button><Button onClick={() => navigate(`/products/master-catalog?getting-started=1&shop=${encodeURIComponent(newlyConnected.id)}`)}>Go to Products<ArrowRight className="size-4" /></Button></div></section>}
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Channel summary">
-          <KpiCard label="Connected Stores" value={String(channels.length)} detail={`${healthyCount} healthy connections`} icon={Store} />
-          <KpiCard label="Published Listings" value={publishedListings.toLocaleString('en-US')} detail="Across all connected stores" icon={Boxes} tone="emerald" />
-          <KpiCard label="System Sync Health" value={`${channels.length ? Math.round((healthyCount / channels.length) * 100) : 0}%`} detail={`${healthyCount} of ${channels.length} stores healthy`} icon={ShieldCheck} tone={healthyCount === channels.length ? 'emerald' : 'amber'} />
-          <KpiCard label="Pending Sync Errors" value={String(pendingErrors)} detail={showErrorStores ? 'Filtering stores requiring review' : 'Click to review affected stores'} icon={CircleAlert} tone={pendingErrors ? 'rose' : 'emerald'} active={showErrorStores} onClick={() => setShowErrorStores((value) => !value)} />
-        </section>
+        <TooltipProvider><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Channel summary">
+          <KpiCard label="Connected Stores" value={String(channels.length)} detail={`${healthyCount} healthy`} tooltip="The total number of sales accounts connected to Prime OS. A healthy connection is authorized and syncing without errors." icon={Store} />
+          <KpiCard label="Published Listings" value={publishedListings.toLocaleString('en-US')} detail="Across all stores" tooltip="The combined number of product listings currently linked from all connected stores. This is not the number of unique Product Masters." icon={Boxes} tone="emerald" />
+          <KpiCard label="System Sync Health" value={`${channels.length ? Math.round((healthyCount / channels.length) * 100) : 0}%`} detail={`${healthyCount}/${channels.length} stores healthy`} tooltip="The percentage of connected stores whose authorization and synchronization are working normally." icon={ShieldCheck} tone={healthyCount === channels.length ? 'emerald' : 'amber'} />
+          <KpiCard label="Pending Sync Errors" value={String(pendingErrors)} detail={showErrorStores ? 'Error filter active' : 'Needs review'} tooltip="The number of failed price, inventory, or order synchronization operations waiting for seller review. Select this card to filter affected stores." icon={CircleAlert} tone={pendingErrors ? 'rose' : 'emerald'} active={showErrorStores} onClick={() => setShowErrorStores((value) => !value)} />
+        </section></TooltipProvider>
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-200 p-4">
@@ -245,12 +278,13 @@ export function ConnectedChannelsPage() {
           </div>
           {!visibleChannels.length ? <div className="border-t border-slate-200 px-6 py-14 text-center"><p className="font-semibold text-slate-900">No matching channels</p><p className="mt-1 text-sm text-slate-500">Clear the search or choose another channel type.</p></div> : null}
         </section>
+        </>}
       </div>
 
-      <Sheet open={Boolean(selectedChannel)} onOpenChange={(open) => { if (!open && !warehouseSaving) setSelectedChannel(null); }}>
+      <Sheet open={demoState !== 'no-data' && Boolean(selectedChannel)} onOpenChange={(open) => { if (!open && !warehouseSaving) setSelectedChannel(null); }}>
         <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[600px]">
           {selectedChannel ? <>
-            <SheetHeader className="border-b border-slate-200 px-6 py-5 pr-14"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg border border-slate-200 bg-white"><BrandLogo id={selectedChannel.id} name={selectedChannel.name} /></span><div><SheetTitle>{selectedChannel.name} configuration</SheetTitle><SheetDescription>{selectedChannel.account} · {selectedChannel.type}</SheetDescription></div></div></SheetHeader>
+            <SheetHeader className="border-b border-slate-200 px-6 py-5 pr-14"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg border border-slate-200 bg-white"><BrandLogo id={selectedChannel.platform ?? selectedChannel.id} name={selectedChannel.name} /></span><div><SheetTitle>{selectedChannel.name} configuration</SheetTitle><SheetDescription>{selectedChannel.account} · {selectedChannel.type}</SheetDescription></div></div></SheetHeader>
             <Tabs value={drawerTab} onValueChange={(value) => { if (!warehouseSaving) setDrawerTab(value as DrawerTab); }} className="flex min-h-0 flex-1 flex-col">
               <TabsList className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none border-b border-slate-200 bg-white px-4 py-0">
                 {[['connection', 'Connection & Auth'], ['warehouse', 'Default warehouse'], ['pricing', 'Pricing'], ['rules', 'Sync Rules'], ['logs', 'Logs & Retry']].map(([value, label]) => <TabsTrigger key={value} value={value} className="min-h-11 rounded-none border-b-2 border-transparent px-3 text-xs data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:shadow-none">{label}</TabsTrigger>)}

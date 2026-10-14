@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="Japanese Design Reference — Protective sleeve">
+<rect width="900" height="900" fill="#f5f2ec"/><rect x="40" y="40" width="820" height="820" rx="28" fill="#fff"/>
+<text x="80" y="105" font-family="Arial,sans-serif" font-size="22" fill="#64748b" letter-spacing="2">PRIME • PROTOTYPE REFERENCE</text>
+<rect x="250" y="192" width="390" height="480" rx="10" fill="#d9c4a0" stroke="#a78b61" stroke-width="4"/><path d="M265 215h360v70H265z" fill="#baa079"/><rect x="289" y="307" width="311" height="250" rx="8" fill="#f5f2ec"/><text x="328" y="389" font-family="Arial" font-size="24" fill="#183e43">JAPANESE DESIGN</text><text x="349" y="431" font-family="Arial" font-size="20" fill="#64748b">REFERENCE BOOK</text><path d="M343 478h204m-204 15h204m-204 15h204" stroke="#183e43" stroke-width="5"/><path d="M270 605h355" stroke="#a78b61" stroke-width="3" stroke-dasharray="8 8"/>
+<text x="80" y="785" font-family="Arial,sans-serif" font-size="32" font-weight="700" fill="#172033">Japanese Design Reference</text>
+<text x="80" y="823" font-family="Arial,sans-serif" font-size="21" fill="#64748b">Protective sleeve • Illustrative demo asset</text>
+</svg>

@@ -1,4 +1,5 @@
 import { channelIntegrationsApi, type ChannelWarehouse, type ConnectedChannelRecord } from './channel-integrations-api';
+import { demoConnectedChannels } from './channel-integrations-demo';
 import { DEMO_WAREHOUSE_ALIASES } from './demo-warehouse-locations';
 import { getWarehouseById, getWarehouses } from './warehouse-store';
 
@@ -18,6 +19,9 @@ const listeners = new Set<() => void>();
 export const readConnectedShops = () => snapshot;
 export function subscribeConnectedShops(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function publish(next: Snapshot) { snapshot = next; listeners.forEach(listener => listener()); }
+function isAuthenticationError(error: unknown) {
+  return error instanceof Error && /login required|sign in|unauthori[sz]ed|\b401\b/i.test(error.message);
+}
 
 /** Keep raw server warehouse IDs for compare-and-swap; normalize names only for display. */
 export function loadConnectedShops(): Promise<ConnectedChannelRecord[]> {
@@ -28,6 +32,10 @@ export function loadConnectedShops(): Promise<ConnectedChannelRecord[]> {
     if (request === revision) publish({ shops: data, status: 'ready' });
     return snapshot.shops;
   }).catch(error => {
+    if (isAuthenticationError(error)) {
+      if (request === revision) publish({ shops: demoConnectedChannels, status: 'ready' });
+      return demoConnectedChannels;
+    }
     if (request === revision) publish({ ...snapshot, status: 'error', error: error instanceof Error ? error.message : 'Could not load shops.' });
     throw error;
   }).finally(() => { if (pending === work) pending = undefined; });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import Orders from './Orders';
 import { ordersApi, type OrderRecord } from '@/lib/orders-api';
@@ -9,6 +9,10 @@ import { ordersApi, type OrderRecord } from '@/lib/orders-api';
 vi.mock('@/lib/orders-api', async (load) => ({ ...await load<typeof import('@/lib/orders-api')>(), ordersApi: { list: vi.fn(), create: vi.fn(), command: vi.fn() } }));
 const order: OrderRecord = { id: 'order-test', orderKey: 'MAN-TEST', requestKey: 'req-1', version: 1, source: 'manual', canonicalStatus: 'created', orderedAt: '2026-09-10T10:00:00Z', currencyCode: 'VND', buyerSnapshot: { name: 'Lan', phone: '0900123456', email: '' }, shippingAddressSnapshot: { address: '123 Le Loi', city: 'HCM', country: 'VN', postalCode: '' }, lines: [{ sku: 'SKU-A', name: 'Product A', quantity: 2, unitPrice: 50000, lineTotal: 100000 }], totals: { subtotal: 100000, grandTotal: 100000 }, payment: { state: 'Unpaid', method: 'COD', reference: '' }, metadata: { store: 'Manual', warehouse: 'HCM', assignee: 'Unassigned', notes: '', tags: [] }, transitions: [], shipments: [], returnRequests: [], exceptions: [], activity: [] };
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
+beforeEach(() => {
+  localStorage.removeItem('prime:demo-data-mode:v1');
+  localStorage.removeItem('prime:overview-demo-mode');
+});
 function mount(url = '/orders') { return render(<MemoryRouter initialEntries={[url]}><Orders /></MemoryRouter>); }
 describe('Orders workspace', () => {
   it('sorts by the real ship-by deadline before orders with no deadline', async () => {
@@ -59,14 +63,51 @@ describe('Orders workspace', () => {
     vi.mocked(ordersApi.list).mockResolvedValue({ data: [], canWrite: true }); mount();
     expect(await screen.findByText('No orders yet')).toBeInTheDocument();
     expect(screen.queryByLabelText('Urgent actions')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search order, customer or tracking...')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create order' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Connect sales channel' })).toHaveAttribute('href', '/sales-channels/connected-channels');
   });
-  it('retains loaded orders when refresh fails', async () => {
-    vi.mocked(ordersApi.list).mockResolvedValueOnce({ data: [order], canWrite: true }).mockRejectedValue(new Error('Unavailable'));
-    mount(); await screen.findByRole('button', { name: 'MAN-TEST' });
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Showing the last loaded data');
+  it('previews no orders and restores the existing records without selections or stale filters', async () => {
+    vi.mocked(ordersApi.list).mockResolvedValue({ data: [order], canWrite: true });
+    mount('/orders?status=pending');
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select order-test' }));
+    expect(screen.getByLabelText('Bulk order actions')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Available actions' }), { target: { value: 'confirm' } });
+    fireEvent.click(screen.getByRole('button', { name: 'No data', exact: true }));
+    expect(screen.getByRole('heading', { name: 'No orders yet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'No data', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByLabelText('Bulk order actions')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Process matching orders')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'With data' }));
     expect(screen.getByRole('button', { name: 'MAN-TEST' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All 1' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('checkbox', { name: 'Select order-test' })).not.toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Available actions' })).toHaveValue('all');
+    expect(ordersApi.list).toHaveBeenCalledOnce();
+    expect(ordersApi.command).not.toHaveBeenCalled();
+    expect(ordersApi.create).not.toHaveBeenCalled();
+  });
+  it('opens the no-data preview from its URL and respects read-only access', async () => {
+    vi.mocked(ordersApi.list).mockResolvedValue({ data: [order], canWrite: false });
+    mount('/orders?demo=no-data&order=order-test');
+    await waitFor(() => expect(ordersApi.list).toHaveBeenCalledOnce());
+    expect(screen.getByRole('heading', { name: 'No orders yet' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create order' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'With data' }));
+    expect(await screen.findByRole('button', { name: 'MAN-TEST' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it('distinguishes an empty filter result and restores the complete list', async () => {
+    vi.mocked(ordersApi.list).mockResolvedValue({ data: [order], canWrite: true });
+    mount('/orders?status=shipping');
+    expect(await screen.findByRole('heading', { name: 'No matching orders' })).toBeInTheDocument();
+    expect(screen.queryByText('No orders yet')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All 1' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View all orders' }));
+    expect(screen.getByRole('button', { name: 'MAN-TEST' })).toBeInTheDocument();
   });
   it('loads server records, filters by phone, and opens real item details', async () => {
     vi.mocked(ordersApi.list).mockResolvedValue({ data: [order], canWrite: true }); mount();
@@ -93,22 +134,31 @@ describe('Orders workspace', () => {
   });
   it('offers one review filter, counts affected orders once, and excludes routine unpaid orders', async () => {
     const routine={...order,payment:{...order.payment,method:'Bank transfer'}};
-    const flagged={...order,id:'flagged',orderKey:'FLAGGED',syncError:true,pickupOverdue:true,needsPaymentVerification:true};
+    const hold={active:true,reason:'Waiting for customer confirmation',at:order.orderedAt,actor:'Seller'};
+    const flagged={...order,id:'flagged',orderKey:'FLAGGED',hold,syncError:true,pickupOverdue:true,needsPaymentVerification:true};
     const overdue={...order,id:'overdue',orderKey:'OVERDUE',sla:'Breached by 30m'};
-    vi.mocked(ordersApi.list).mockResolvedValue({data:[routine,flagged,overdue],canWrite:true});mount();
-    const review=await screen.findByRole('button',{name:'Needs review 2'});
+    const held={...order,id:'held',orderKey:'HELD',hold};
+    vi.mocked(ordersApi.list).mockResolvedValue({data:[routine,flagged,overdue,held],canWrite:true});mount();
+    const review=await screen.findByRole('button',{name:'Needs review 3'});
     expect(screen.queryByLabelText('Order summary')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Urgent actions')).not.toBeInTheDocument();
     expect(screen.queryByRole('button',{name:/Needs attention/})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:/^On hold/})).not.toBeInTheDocument();
     fireEvent.click(review);
     expect(screen.queryByRole('button',{name:'MAN-TEST'})).not.toBeInTheDocument();
     expect(screen.getByRole('button',{name:'FLAGGED'})).toBeInTheDocument();
     expect(screen.getByRole('button',{name:'OVERDUE'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'HELD'})).toBeInTheDocument();
     expect(review).toHaveAttribute('aria-pressed','true');
     expect(screen.queryByRole('button',{name:'Remove Needs review filter'})).not.toBeInTheDocument();
-    const stageFilters=within(screen.getByRole('group',{name:'Order stage filters'}));
-    expect(stageFilters.getByRole('button',{name:'All 3'})).toBeInTheDocument();
-    fireEvent.click(stageFilters.getByRole('button',{name:'All 3'}));
+    expect(screen.queryByRole('group',{name:'Order stage filters'})).not.toBeInTheDocument();
+    const navigation=within(screen.getByRole('navigation',{name:'Order lifecycle'}));
+    expect(navigation.getAllByRole('button')).toHaveLength(8);
+    expect(screen.getAllByRole('button',{name:'All 4'})).toHaveLength(1);
+    expect(screen.queryByRole('button',{name:'More order statuses'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox',{name:'Order status view'})).not.toBeInTheDocument();
+    fireEvent.click(review);
+    expect(review).toHaveAttribute('aria-pressed','false');
     expect(screen.getByRole('button',{name:'MAN-TEST'})).toBeInTheDocument();
   });
   it('keeps review totals stable while shop filters narrow the selected stage', async () => {
@@ -124,6 +174,15 @@ describe('Orders workspace', () => {
     expect(screen.getByRole('button',{name:'Needs review 2'})).toHaveAttribute('aria-pressed','true');
     expect(screen.getAllByText('Allocation failed').length).toBeGreaterThan(0);
     expect(screen.getByText('Channel sync failed')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox',{name:'Order status',exact:true}),{target:{value:'preparing'}});
+    expect(screen.getByRole('combobox',{name:'Order status',exact:true})).toHaveValue('preparing');
+    fireEvent.click(screen.getByRole('button',{name:'Needs review 2'}));
+    expect(screen.getByRole('button',{name:'Needs review 2'})).toHaveAttribute('aria-pressed','true');
+    expect(screen.queryByRole('button',{name:'ROUTINE'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Needs review 2'}));
+    expect(screen.getByRole('button',{name:'ROUTINE'})).toBeInTheDocument();
+    expect(screen.getByRole('combobox',{name:'Order status',exact:true})).toHaveValue('preparing');
+    fireEvent.click(screen.getByRole('button',{name:'Needs review 2'}));
     fireEvent.change(screen.getByLabelText('Filter by shop'),{target:{value:'Manual'}});
     expect(screen.queryByRole('button',{name:'SYNC'})).not.toBeInTheDocument();
     expect(screen.getByRole('button',{name:'Needs review 2'})).toHaveAttribute('aria-pressed','true');
@@ -138,10 +197,13 @@ describe('Orders workspace', () => {
     fireEvent.click(screen.getByRole('button',{name:'Clear filters'}));
     expect(screen.getByRole('button',{name:'Needs review 1'})).toHaveAttribute('aria-pressed','false');
   });
-  it('creates an order, updates the list, and displays the saved detail', async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue({ data: [], canWrite: true });
-    vi.mocked(ordersApi.create).mockResolvedValue({ data: order }); mount();
-    const create = screen.getByRole('button', { name: 'Create order' }); await waitFor(() => expect(create).toBeEnabled()); fireEvent.click(create);
+  it.each([false, true])('creates an order from the empty state and displays the saved detail (demo: %s)', async noDataDemo => {
+    const existing = { ...order, id: 'existing', orderKey: 'EXISTING' };
+    vi.mocked(ordersApi.list).mockResolvedValue({ data: noDataDemo ? [existing] : [], canWrite: true });
+    vi.mocked(ordersApi.create).mockResolvedValue({ data: order }); mount(noDataDemo ? '/orders?demo=no-data' : '/orders');
+    await screen.findByRole('heading', { name: 'No orders yet' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create order' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Create order' }));
     const values = { 'Customer name': 'Lan', 'Phone number': '0900123456', 'Street address': '123 Le Loi', 'City / Province': 'HCM', 'Item 1 SKU': 'SKU-A', 'Item 1 name': 'Product A', 'Item 1 quantity': '2', 'Item 1 unit price': '50000' };
     Object.entries(values).forEach(([label, value]) => fireEvent.change(screen.getByLabelText(label), { target: { value } }));
     const submit = screen.getAllByRole('button', { name: 'Create order' }).find((b) => b.getAttribute('type') === 'submit')!;
@@ -149,10 +211,15 @@ describe('Orders workspace', () => {
     await waitFor(() => expect(ordersApi.create).toHaveBeenCalledOnce());
     expect(vi.mocked(ordersApi.create).mock.calls[0][0]).toMatchObject({ canonicalStatus: 'created', buyerSnapshot: { name: 'Lan' }, lines: [{ quantity: 2, unitPrice: 50000 }] });
     expect(await screen.findByRole('heading', { name: 'MAN-TEST' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    expect(screen.getByRole('button', { name: 'With data' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'MAN-TEST' })).toBeInTheDocument();
+    if (noDataDemo) expect(screen.getByRole('button', { name: 'EXISTING' })).toBeInTheDocument();
   });
   it('keeps the entered form after a server failure and shows its error', async () => {
     vi.mocked(ordersApi.list).mockResolvedValue({ data: [], canWrite: true });
     vi.mocked(ordersApi.create).mockRejectedValue(new Error('Order reference already exists.')); mount();
+    await screen.findByRole('heading', { name: 'No orders yet' });
     const create = screen.getByRole('button', { name: 'Create order' }); await waitFor(() => expect(create).toBeEnabled()); fireEvent.click(create);
     fireEvent.submit(screen.getByLabelText('Order reference').closest('form')!);
     expect(await screen.findByRole('alert')).toHaveTextContent('Order reference already exists.');
@@ -225,12 +292,12 @@ describe('Orders workspace', () => {
     vi.mocked(ordersApi.list).mockResolvedValue({data:[preparing,ready],canWrite:true});mount('/orders?status=ready&orderStage=pickup');
     await screen.findByRole('button',{name:'READY'});
     expect(screen.queryByRole('button',{name:'PREPARING'})).not.toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Ready to ship 1'})).toHaveAttribute('aria-pressed','true');
+    expect(screen.getByRole('combobox',{name:'Order status',exact:true})).toHaveValue('pickup');
     fireEvent.click(screen.getByRole('button',{name:'READY'}));
     expect(within(screen.getByRole('region',{name:'Current order step'})).getByRole('heading',{name:'Ready to ship'})).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Close',exact:true}));
     expect(screen.queryByRole('button',{name:'PREPARING'})).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'Preparing 1'}));
+    fireEvent.change(screen.getByRole('combobox',{name:'Order status',exact:true}),{target:{value:'preparing'}});
     expect(screen.getByRole('button',{name:'PREPARING'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'READY'})).not.toBeInTheDocument();
   });
@@ -258,7 +325,7 @@ describe('Orders workspace', () => {
     vi.mocked(ordersApi.list).mockResolvedValue({data: [order, preparing, ready, demo, prepaid, held, channel], canWrite: true});
     mount(); await screen.findByRole('button', {name: 'MAN-TEST'});
     fireEvent.change(screen.getByRole('combobox', {name: 'Order status', exact: true}), {target: {value: 'pickup'}});
-    expect(screen.getByRole('button', {name: 'Ready to ship 1'})).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('combobox', {name: 'Order status', exact: true})).toHaveValue('pickup');
     expect(screen.getByRole('button', {name: 'READY', exact: true})).toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'PREPARING', exact: true})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Awaiting confirmation 5', hidden: true}));

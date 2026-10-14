@@ -16,6 +16,8 @@ import type { MasterSyncPreference } from '@/lib/listing-master-sync';
 let records = structuredClone(warehouseDemoShops);
 const warehouse = { id: 'wh_crjp', name: 'CyberRecord Japan HQ', code: 'CR-JP', address: 'Tokyo' };
 beforeEach(() => {
+  localStorage.removeItem('prime:demo-data-mode:v1');
+  localStorage.removeItem('prime:overview-demo-mode');
   records = structuredClone(warehouseDemoShops);
   vi.spyOn(channelIntegrationsApi, 'channels').mockImplementation(async () => ({ data: structuredClone(records) }));
   vi.spyOn(channelIntegrationsApi, 'linkWarehouse').mockImplementation(async (id, target, expected) => {
@@ -64,6 +66,16 @@ it('surfaces a stale save, reloads current settings, and cancel sends no write',
   await screen.findByText('Current default: Reseller Singapore');
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   expect(close).toHaveBeenCalledOnce(); expect(channelIntegrationsApi.linkWarehouse).toHaveBeenCalledTimes(1);
+});
+
+it('switches between populated and no-channel demo states with an onboarding CTA', async () => {
+  render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={['/sales-channels/connected-channels?demo=no-data']}><ConnectedChannelsPage /></MemoryRouter></QueryClientProvider>);
+  expect(await screen.findByRole('heading', { name: 'Connect your first sales channel' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Connect a store' })).toBeVisible();
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'With data' }));
+  expect(await screen.findByRole('table')).toBeVisible();
+  expect(screen.queryByRole('heading', { name: 'Connect your first sales channel' })).not.toBeInTheDocument();
 });
 
 it('lets a listing choose inheritance or an explicit warehouse without leaving the editor', async () => {

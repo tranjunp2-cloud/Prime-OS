@@ -16,6 +16,8 @@ const dismissedKey = 'prime-product-guide-dismissed-v1';
 let records: productStore.Product[] = [];
 const page = () => <MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>;
 beforeEach(() => {
+  localStorage.removeItem('prime:demo-data-mode:v1');
+  localStorage.removeItem('prime:overview-demo-mode');
   records = [];
   localStorage.removeItem(completedKey);
   localStorage.removeItem(dismissedKey);

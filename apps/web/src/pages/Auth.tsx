@@ -7,10 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LockKeyhole, ShieldCheck } from 'lucide-react';
-import { seedDemoData } from '@/lib/demo-data-seeder';
 import { useI18n } from '@/lib/i18n/I18nContext';
 import { getAuthDictionary } from '@/lib/i18n/shell-dictionaries';
-import { defaultHomePath } from '@/components/seller-onboarding/demo-state';
+import { sessionEntryPath } from '@/components/seller-onboarding/demo-state';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -24,9 +23,9 @@ export default function Auth() {
   const navigate = useNavigate();
   const authCopy = getAuthDictionary(locale);
 
-  // Redirect if already logged in
-  if (user) {
-    return <Navigate to={defaultHomePath()} replace />;
+  // Visiting login with an active session is not a new sign-in.
+  if (user && !isLoading && !formError) {
+    return <Navigate to={sessionEntryPath()} replace />;
   }
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -45,18 +44,8 @@ export default function Auth() {
       const currentUserId = authRes.session?.account?.id;
       if (!currentUserId) throw new Error(authCopy.noValidSession);
 
-      setStatusText(authCopy.loadingWorkspace);
-      const seedRes = await seedDemoData(currentUserId);
-
-      if (seedRes.success) {
-        toast({
-          title: authCopy.welcomeTitle,
-          description: authCopy.workspaceLoaded,
-        });
-        navigate(defaultHomePath(), { replace: true });
-      } else {
-        throw new Error(authCopy.loadWorkspaceFailed);
-      }
+      toast({ title: authCopy.welcomeTitle });
+      navigate(sessionEntryPath(), { replace: true });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       const rawMessage = error.message || authCopy.unableToSignIn;

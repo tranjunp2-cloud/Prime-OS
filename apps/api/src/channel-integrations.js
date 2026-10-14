@@ -33,8 +33,10 @@ function seedStore() {
     ['rakuten', 'Rakuten', 'Prime Beauty JP', 'Marketplace', 'CONNECTED', 416, 'wh_crossborder_01', true, true, true, 0],
     ['primepos', 'PrimePOS', 'District 1 Flagship', 'Retail POS', 'CONNECTED', 1240, 'wh_d1_01', true, true, true, 0],
     ['tiktok_shop', 'TikTok Shop', 'Prime Live Store', 'Marketplace', 'SYNC_ERROR', 803, null, true, false, true, 4],
+    ['shopify', 'Shopify', 'Prime Beauty Singapore', 'E-Commerce/Web', 'INITIAL_SYNCING', 287, 'wh_crossborder_01', true, true, true, 0],
+    ['woocommerce', 'WooCommerce', 'Prime Beauty Wholesale', 'E-Commerce/Web', 'CONNECTED', 538, 'wh_hn_01', true, true, false, 0],
   ];
-  return { channels: base.map(([platform, name, store_name, type, status, synced_listings, warehouse_id, price, stock, orders, errors]) => ({ id: `channel_${platform}`, platform, name, store_name, region: platform === 'amazon' ? 'US' : 'VN', type, status, synced_listings, sync_progress: status === 'CONNECTED' ? 100 : 0, physical_warehouse_id: warehouse_id, sync_services: { price, stock, orders }, is_default_pickup: platform === 'primeweb', is_default_return: platform === 'primeweb', catalog_strategy: 'AUTO_MATCH_SKU', errors, last_sync_at: '2026-08-14T07:00:00.000Z', poll_count: 0 })) };
+  return { channels: base.map(([platform, name, store_name, type, status, synced_listings, warehouse_id, price, stock, orders, errors]) => ({ id: `channel_${platform}`, platform, name, store_name, region: platform === 'amazon' ? 'US' : platform === 'shopify' ? 'SG' : 'VN', type, status, synced_listings, sync_progress: status === 'CONNECTED' ? 100 : status === 'INITIAL_SYNCING' ? 36 : 0, physical_warehouse_id: warehouse_id, sync_services: { price, stock, orders }, is_default_pickup: platform === 'primeweb', is_default_return: platform === 'primeweb', catalog_strategy: platform === 'shopify' ? 'CREATE_NEW_MASTERS' : platform === 'woocommerce' ? 'MANUAL_LATER' : 'AUTO_MATCH_SKU', errors, last_sync_at: '2026-10-13T05:42:00.000Z', poll_count: 0 })) };
 }
 
 function ensureStore() { fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true }); if (!fs.existsSync(STORE_PATH)) fs.writeFileSync(STORE_PATH, JSON.stringify(seedStore(), null, 2)); }

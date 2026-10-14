@@ -27,13 +27,14 @@ beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserv
 afterEach(() => { cleanup(); vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Seller order processing', () => {
-  it('shows known details as summaries and only reveals prefilled fields when editing', () => {
+  it('shows shipping summaries and preserves saved measurements without a measurements section', async () => {
     const prototype = {...order, source: 'demo', canonicalStatus: 'acknowledged' as const, shipments: [], operations: {carrier: 'GHN', service: 'Standard', shipBy: '2026-10-09T09:00:00Z', package: {weightKg: 1.2, lengthCm: 25, widthCm: 18, heightCm: 10}}};
     render(<OrderProcessingDialog order={prototype} action="prepare-shipment" onClose={vi.fn()} onUpdated={vi.fn()}/>);
     expect(screen.queryByLabelText('Dispatch warehouse')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Carrier')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
-    expect(screen.getByText('1.2 kg · 25 × 18 × 10 cm')).toBeVisible();
+    expect(screen.queryByRole('region', {name: 'Parcel measurements'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Edit parcel measurements'})).not.toBeInTheDocument();
     expect(screen.getByText('Sample tracking · DEMO-MAN-FIRST')).toBeVisible();
     expect(screen.queryByLabelText('Tracking number (sample)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Use sample values'})).not.toBeInTheDocument();
@@ -48,8 +49,11 @@ describe('Seller order processing', () => {
     expect(screen.getByLabelText('Dispatch warehouse')).toHaveValue('HCM');
     expect(screen.getByLabelText('Ship-by deadline (optional)')).not.toHaveValue('');
     expect(screen.getByLabelText('Carrier')).toHaveValue('GHN');
-    fireEvent.click(screen.getByRole('button', {name: 'Edit parcel measurements'}));
-    expect(screen.getByLabelText('Weight (kg)')).toHaveValue(1.2);
+    vi.mocked(ordersApi.command).mockResolvedValue({data: prototype});
+    fireEvent.click(screen.getByRole('checkbox', {name: /I checked all 2 units/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Mark ready to ship'}));
+    await waitFor(() => expect(ordersApi.command).toHaveBeenCalledOnce());
+    expect(vi.mocked(ordersApi.command).mock.calls[0][1].package).toEqual(prototype.operations.package);
   });
   it('uses a simulated gateway update for cards, without manual evidence or mandatory measurements', async () => {
     const prototype = {...order, source: 'demo', payment: {...order.payment, method: 'Card'}};
@@ -70,22 +74,21 @@ describe('Seller order processing', () => {
     expect(payload).not.toHaveProperty('paymentReference');
     expect(payload.package).toBeUndefined();
   });
-  it('requires evidence only for manual payment and keeps invalid measurements recoverable', () => {
-    render(<OrderProcessingDialog order={{...order, source:'demo', payment:{...order.payment, method:'Bank transfer', reference:'BANK-123'}}} action="prepare-shipment" onClose={vi.fn()} onUpdated={vi.fn()}/>);
+  it('requires manual payment evidence without blocking on hidden optional measurements', async () => {
+    const prototype = {...order, source:'demo', payment:{...order.payment, method:'Bank transfer', reference:'BANK-123'}, operations:{...order.operations, package:{weightKg:2, lengthCm:0, widthCm:0, heightCm:0}}};
+    vi.mocked(ordersApi.command).mockResolvedValue({data:prototype});
+    render(<OrderProcessingDialog order={prototype} action="prepare-shipment" onClose={vi.fn()} onUpdated={vi.fn()}/>);
     expect(screen.getByLabelText('Payment reference / Evidence')).toHaveValue('BANK-123');
     expect(screen.queryByRole('button', {name:'Simulate payment update'})).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', {name: 'Payment has been received (simulated).'})).not.toBeChecked();
+    expect(screen.getByRole('button', {name:'Mark ready to ship'})).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', {name: 'Payment has been received (simulated).'}));
     fireEvent.click(screen.getByRole('checkbox', {name: /I checked all 2 units/}));
     expect(screen.getByRole('button', {name:'Mark ready to ship'})).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', {name:'Edit parcel measurements'}));
-    fireEvent.change(screen.getByLabelText('Weight (kg)'), {target:{value:'2'}});
-    expect(screen.getByRole('button', {name:'Mark ready to ship'})).toBeDisabled();
-    expect(screen.getByRole('alert')).toHaveTextContent('leave all measurements empty');
-    fireEvent.change(screen.getByLabelText('Weight (kg)'), {target:{value:''}});
-    expect(screen.getByRole('checkbox', {name: /I checked all 2 units/})).not.toBeChecked();
-    fireEvent.click(screen.getByRole('checkbox', {name: /I checked all 2 units/}));
-    expect(screen.getByRole('button', {name:'Mark ready to ship'})).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:'Mark ready to ship'}));
+    await waitFor(() => expect(ordersApi.command).toHaveBeenCalledOnce());
+    expect(vi.mocked(ordersApi.command).mock.calls[0][1].package).toBeUndefined();
   });
   it('keeps platform shipping and deadlines read-only and submits only seller checks', async () => {
     const prototype = {...order, source:'demo', metadata:{...order.metadata, shippingMode:'platform' as const}, operations:{shipBy:'2026-10-10T09:00:00Z'}, shipments:[]};

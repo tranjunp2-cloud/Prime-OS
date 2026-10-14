@@ -91,7 +91,7 @@ const SEED_WAREHOUSES: Warehouse[] = [
 let _warehouses: Warehouse[] = [...SEED_WAREHOUSES];
 export const WAREHOUSE_STORAGE_KEY = 'primeos-managed-warehouses-v1';
 
-function savedWarehouses(): Warehouse[] {
+export function savedWarehouses(): Warehouse[] {
   if (typeof window === 'undefined') return [];
   const raw = window.localStorage.getItem(WAREHOUSE_STORAGE_KEY);
   if (!raw) return [];

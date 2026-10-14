@@ -1,4 +1,5 @@
 import { createPrimeAuthHeaders, resolvePrimeBackendBase } from '@/lib/prime/backend-auth';
+import { createDemoConnectedChannel, demoAvailablePlatforms, demoChannelWarehouses } from './channel-integrations-demo';
 
 export type ChannelCategory = 'Marketplaces' | 'E-Commerce/Web' | 'Retail POS' | 'Social';
 export type CatalogStrategy = 'AUTO_MATCH_SKU' | 'CREATE_NEW_MASTERS' | 'MANUAL_LATER';
@@ -52,12 +53,34 @@ async function request<T>(path: string, init: RequestInit = {}) {
   return body as T;
 }
 
+function isAuthenticationError(error: unknown) {
+  return error instanceof Error && /login required|sign in|unauthori[sz]ed|\b401\b/i.test(error.message);
+}
+
 export const channelIntegrationsApi = {
-  platforms: () => request<{ data: AvailablePlatform[] }>('/api/v1/channels/available-platforms'),
-  warehouses: () => request<{ data: ChannelWarehouse[] }>('/api/v1/warehouses'),
+  platforms: async () => {
+    try { return await request<{ data: AvailablePlatform[]; demo?: boolean }>('/api/v1/channels/available-platforms'); }
+    catch (error) {
+      if (!isAuthenticationError(error)) throw error;
+      return { data: demoAvailablePlatforms, demo: true };
+    }
+  },
+  warehouses: async () => {
+    try { return await request<{ data: ChannelWarehouse[]; demo?: boolean }>('/api/v1/warehouses'); }
+    catch (error) {
+      if (!isAuthenticationError(error)) throw error;
+      return { data: demoChannelWarehouses, demo: true };
+    }
+  },
   channels: () => request<{ data: ConnectedChannelRecord[] }>('/api/v1/channels'),
   linkWarehouse: (id: string, warehouse: ChannelWarehouse, expectedWarehouseId: string | null) => request<{ data: ConnectedChannelRecord }>(`/api/v1/channels/${encodeURIComponent(id)}/warehouse`, { method: 'PATCH', body: JSON.stringify({ warehouse, expected_warehouse_id: expectedWarehouseId }) }),
-  connect: (payload: ConnectChannelPayload) => request<{ data: ConnectedChannelRecord }>('/api/v1/channels/connect', { method: 'POST', body: JSON.stringify(payload) }),
+  connect: async (payload: ConnectChannelPayload) => {
+    try { return await request<{ data: ConnectedChannelRecord; demo?: boolean }>('/api/v1/channels/connect', { method: 'POST', body: JSON.stringify(payload) }); }
+    catch (error) {
+      if (!isAuthenticationError(error)) throw error;
+      return { data: createDemoConnectedChannel(payload), demo: true };
+    }
+  },
   syncStatus: (id: string) => request<{ id: string; status: ConnectedChannelRecord['status']; synced_listings: number; sync_progress: number }>(`/api/v1/channels/${encodeURIComponent(id)}/sync-status`),
   authorizationUrl: (platform: string, region: string) => {
     const query = new URLSearchParams({ region, return_origin: window.location.origin });

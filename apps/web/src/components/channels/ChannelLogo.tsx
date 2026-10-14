@@ -11,6 +11,9 @@ export function ChannelLogo({ channel, size = 'md', muted = false }: { channel: 
       case 'primepos':
       case 'pos':
         return <svg viewBox="0 0 48 48" className="size-full"><rect width="48" height="48" rx="12" fill="#ECFEFF" /><path d="M12 20h24l-2.5-8h-19L12 20Z" fill="#0891B2" /><path d="M14 22v13h20V22M19 35v-8h10v8" fill="none" stroke="#0891B2" strokeWidth="3" strokeLinejoin="round" /></svg>;
+      case 'primeinbox':
+        // Reuse the indigo chat identity from PrimeInboxWorkspace, not a social network logo.
+        return <svg viewBox="0 0 48 48" className="size-full"><rect width="48" height="48" rx="12" fill="#4F46E5" /><path d="M37 23.3a13 13 0 0 1-18.8 11.6L11 37l2.1-7.2A13 13 0 1 1 37 23.3Z" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>;
       case 'shopee':
         return <svg viewBox="0 0 48 48" className="size-full"><path d="M10 16h28l-2 27H12l-2-27Z" fill="#EE4D2D" /><path d="M17 17v-4a7 7 0 0 1 14 0v4" fill="none" stroke="#EE4D2D" strokeWidth="3" /><path d="M29.5 23.5c-1.4-1.1-3-1.7-5.2-1.7-3 0-5 1.5-5 3.8 0 5.5 10.2 2.1 10.2 7.4 0 2.3-2.1 4-5.4 4-2.2 0-4.1-.7-5.6-2" fill="none" stroke="white" strokeWidth="2.6" strokeLinecap="round" /></svg>;
       case 'lazada':

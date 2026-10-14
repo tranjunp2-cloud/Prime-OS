@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { SalesSetupSettings } from '@/components/onboarding/SalesSetupSettings';
 import { TeamAccessConfiguration } from '@/components/settings/TeamAccessConfiguration';
 
 type SettingsKey = 'general' | 'team-access' | 'payments' | 'shipping-delivery' | 'customer-data' | 'templates-notifications';
@@ -137,7 +138,7 @@ function TemplatesConfiguration() {
 }
 
 function ConfigurationSurface({ page }: { page: SettingsKey }) {
-  if (page === 'general') return <GeneralConfiguration />;
+  if (page === 'general') return <div className="space-y-4"><SalesSetupSettings /><GeneralConfiguration /></div>;
   if (page === 'team-access') return <TeamConfiguration />;
   if (page === 'payments') return <PaymentsConfiguration />;
   if (page === 'shipping-delivery') return <ShippingConfiguration />;

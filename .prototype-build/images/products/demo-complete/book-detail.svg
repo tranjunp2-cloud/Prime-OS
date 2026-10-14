@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="Japanese Design Reference — Interior layout">
+<rect width="900" height="900" fill="#f5f2ec"/><rect x="40" y="40" width="820" height="820" rx="28" fill="#fff"/>
+<text x="80" y="105" font-family="Arial,sans-serif" font-size="22" fill="#64748b" letter-spacing="2">PRIME • PROTOTYPE REFERENCE</text>
+<path d="M115 283q155-38 335 0v362q-170-40-335 0zM450 283q165-38 335 0v362q-170-40-335 0z" fill="#f2eedf" stroke="#c2bcaa" stroke-width="3"/><path d="M450 283v362" stroke="#b5ac94" stroke-width="5"/><rect x="163" y="335" width="225" height="170" fill="#d6c390"/><circle cx="275" cy="420" r="59" fill="#183e43"/><path d="M175 544h207m-207 24h175m-175 24h197" stroke="#a8a18e" stroke-width="5"/><path d="M500 326h226m-226 27h180m-180 40h224m-224 22h224m-224 22h201" stroke="#a8a18e" stroke-width="5"/><rect x="510" y="491" width="205" height="98" fill="#183e43"/><path d="M530 570 571 512 615 570 656 512 698 570" fill="none" stroke="#d6c390" stroke-width="4"/>
+<text x="80" y="785" font-family="Arial,sans-serif" font-size="32" font-weight="700" fill="#172033">Japanese Design Reference</text>
+<text x="80" y="823" font-family="Arial,sans-serif" font-size="21" fill="#64748b">Interior layout • Illustrative demo asset</text>
+</svg>

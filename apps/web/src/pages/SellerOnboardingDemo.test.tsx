@@ -31,6 +31,10 @@ const mount = (returnTo?: string, url = '/demo/no-data') => render(
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
 afterEach(cleanup);
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }));
+const setupOption = (name: string) => {
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Sales setup options' }), { key: 'Enter' });
+  return screen.getByRole('menuitem', { name });
+};
 const fill = (label: string, value: string) => fireEvent.change(screen.getByRole('textbox', { name: label, exact: true }), { target: { value } });
 
 describe('Seller first-time demo', () => {
@@ -58,13 +62,13 @@ describe('Seller first-time demo', () => {
     click('Open workspace');
     expect(screen.getByLabelText('Current URL')).toHaveTextContent('/admin/dashboard?demo=no-data');
     expect(screen.getByRole('heading', { name: 'Home: Omnichannel Overview' })).toBeVisible();
-    expect(screen.getByText(/Initial setup complete/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sales setup' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'No data', exact: true })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('region', { name: 'Operations Pipeline' })).toHaveTextContent('No activity yet');
     expect(screen.queryByText('HydraGlow Essence 30ml')).not.toBeInTheDocument();
     expect(fetchGrowthOsSnapshot).not.toHaveBeenCalled();
     expect(readSellerDemo().completed).toHaveLength(5);
-    fireEvent.click(screen.getByRole('link', { name: 'Review setup' }));
+    fireEvent.click(setupOption('Review workspace details'));
     expect(screen.getByRole('heading', { name: 'Start your catalog' })).toBeVisible();
     expect(readSellerDemo().name).toBe('Review store');
   });
@@ -77,7 +81,7 @@ describe('Seller first-time demo', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Where do you sell?' })).toBeVisible();
     click('Go to workspace');
-    fireEvent.click(screen.getByRole('link', { name: 'Resume setup' }));
+    fireEvent.click(setupOption('Continue workspace details'));
     expect(screen.getByRole('heading', { name: 'Where do you sell?' })).toBeVisible();
     click('Restart demo');
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Restart demo' }));
@@ -104,7 +108,7 @@ describe('Seller first-time demo', () => {
     mount();
     click('Open workspace');
     expect(screen.getByLabelText('Current URL')).toHaveTextContent('/admin/dashboard?demo=no-data');
-    expect(screen.getByRole('heading', { name: 'Your workspace is ready for its first activity' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sales setup' })).toBeVisible();
     expect(fetchGrowthOsSnapshot).not.toHaveBeenCalled();
     expect(readSellerDemo().catalog).toBe(catalog);
   });
@@ -121,11 +125,11 @@ describe('Seller first-time demo', () => {
     expect(screen.getByRole('heading', { name: 'Confirm your workspace' })).toBeVisible();
     fill('Workspace name', 'Minimal workspace');
     click('Go to workspace');
-    expect(screen.getByText(/4 setup steps left/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sales setup' })).toBeVisible();
     expect(readSellerDemo().completed).toEqual([0]);
     expect(readSellerDemo().deferred).toEqual([1, 2, 3, 4]);
     expect(defaultHomePath()).toBe('/admin/dashboard?demo=no-data');
-    expect(screen.getByRole('link', { name: 'Resume setup' })).toHaveAttribute('href', '/demo/no-data?step=2');
+    expect(setupOption('Continue workspace details')).toHaveAttribute('href', '/demo/no-data?step=2');
   });
   it('defers a step without validation or completion and resumes the first missing step from Home', () => {
     localStorage.setItem(SELLER_DEMO_KEY, JSON.stringify({ ...freshSellerDemo(), name: 'Shop', step: 1, completed: [0, 2, 3], business: 'Shop', email: 'seller@example.com', warehouse: 'Main', address: 'Demo address' }));
@@ -142,9 +146,8 @@ describe('Seller first-time demo', () => {
     expect(screen.getByRole('button', { name: /Markets & channels.*Set up later/ })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Your catalog/ }));
     click('Open workspace');
-    expect(screen.getByText(/1 setup step left/)).toBeVisible();
-    expect(screen.getByText(/Next: Markets & channels/)).toBeVisible();
-    fireEvent.click(screen.getByRole('link', { name: 'Resume setup' }));
+    expect(screen.getByRole('heading', { name: 'Sales setup' })).toBeVisible();
+    fireEvent.click(setupOption('Continue workspace details'));
     expect(screen.getByRole('heading', { name: 'Where do you sell?' })).toBeVisible();
     expect(screen.getByLabelText('Shopee')).toBeChecked();
     click('Connect demo store');
@@ -170,7 +173,7 @@ describe('Seller first-time demo', () => {
     first.unmount();
     mount(undefined, '/admin/dashboard');
     expect(screen.getByRole('heading', { name: 'Home: Omnichannel Overview' })).toBeVisible();
-    expect(screen.getByText(/4 setup steps left/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sales setup' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Confirm your workspace' })).not.toBeInTheDocument();
     expect(fetchGrowthOsSnapshot).not.toHaveBeenCalled();
   });
@@ -203,7 +206,7 @@ describe('Seller first-time demo', () => {
     expect(screen.getByRole('button', { name: 'Remove Singapore' })).toBeVisible();
     click('Set up later');
     click('Go to workspace');
-    fireEvent.click(screen.getByRole('link', { name: 'Resume setup' }));
+    fireEvent.click(setupOption('Continue workspace details'));
     expect(screen.getByRole('button', { name: 'Remove Japan' })).toBeVisible();
     click('Remove Japan');
     expect(readSellerDemo().additionalMarkets).toEqual(['Singapore']);

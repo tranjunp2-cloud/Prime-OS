@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample shipping label</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px 16px; background: #f3f4f6; color: #171717; font: 14px/1.5 system-ui, sans-serif; }
+    main { max-width: 420px; margin: auto; }
+    article { background: white; border: 2px solid #171717; padding: 24px; }
+    h1 { font-size: 24px; margin: 8px 0 20px; }
+    .sample { border: 2px solid #171717; padding: 6px; text-align: center; font-weight: 700; }
+    dt { color: #525252; font-size: 12px; margin-top: 16px; }
+    dd { margin: 4px 0; font-weight: 600; overflow-wrap: anywhere; }
+    .tracking { margin-top: 24px; padding: 16px 0; border-block: 1px solid #171717; font: 700 16px/1.5 monospace; overflow-wrap: anywhere; }
+    button { display: block; margin: 20px auto; padding: 10px 20px; border: 0; border-radius: 6px; background: #4f46e5; color: white; font: inherit; cursor: pointer; }
+    @media print { body { padding: 0; background: white; } button { display: none; } }
+  </style>
+</head>
+<body><main>
+  <article>
+    <div class="sample">SAMPLE — NOT VALID FOR SHIPPING</div>
+    <h1>Shipping label preview</h1>
+    <dl><dt>Order reference</dt><dd id="order">Demo order</dd><dt>From</dt><dd>Demo warehouse</dd><dt>To</dt><dd>Demo recipient<br>Sample delivery address, Vietnam</dd></dl>
+    <div class="tracking" id="tracking">Demo tracking reference</div>
+    <p>This document is for testing label preview and printing only.</p>
+  </article>
+  <button type="button" id="print">Print sample label</button>
+</main>
+<script>
+  const params = new URLSearchParams(location.search);
+  for (const key of ['order', 'tracking']) {
+    const value = params.get(key);
+    if (value) document.getElementById(key).textContent = value.slice(0, 120);
+  }
+  document.getElementById('print').addEventListener('click', () => window.print());
+</script></body>
+</html>

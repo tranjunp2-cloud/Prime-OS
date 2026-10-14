@@ -33,6 +33,10 @@ const scenarios = [
   {key: 'REFUND-PARTIAL', stage: 'closed', title: 'Partial refund after delivery', payment: 'Partially refunded', returnStatus: 'refunded', label: true},
   {key: 'CANCEL-UNPAID', stage: 'canceled', title: 'Unpaid order cancelled', payment: 'Unpaid'},
   {key: 'CANCEL-PAID', stage: 'canceled', title: 'Cancelled order awaiting refund'},
+  {key: 'RANK-BRONZE', stage: 'closed', title: 'Customer rank demo — Bronze qualifying purchase', unitPrice: 150000, label: true, settled: true},
+  {key: 'RANK-SILVER', stage: 'closed', title: 'Customer rank demo — Silver qualifying purchase', unitPrice: 1250000, label: true, settled: true},
+  {key: 'RANK-GOLD', stage: 'closed', title: 'Customer rank demo — Gold qualifying purchase', unitPrice: 6250000, label: true, settled: true},
+  {key: 'RANK-VIP', stage: 'closed', title: 'Customer rank demo — VIP qualifying purchase', unitPrice: 12500000, label: true, settled: true},
 ];
 
 export function demoOrderScenarios(templates) {
@@ -53,8 +57,8 @@ export function demoOrderScenarios(templates) {
     const warehouse = scenario.pickup ? 'District 1 Branch' : index % 2 ? 'Hanoi Warehouse' : 'HCM Central Warehouse';
     const paymentState = scenario.payment || 'Paid';
     const lines = order.lines.map((line, lineIndex) => {
-      const quantity = lineIndex === 0 ? 1 + index % 3 : 1;
-      const unitPrice = lineIndex === 0 ? 125000 : 240000;
+      const quantity = lineIndex === 0 && !scenario.unitPrice ? 1 + index % 3 : 1;
+      const unitPrice = lineIndex === 0 ? scenario.unitPrice || 125000 : 240000;
       return {...line, id: `${id}-line-${lineIndex + 1}`, quantity, unitPrice, lineTotal: quantity * unitPrice,
         inventory: {...line.inventory, warehouse, checkedAt: at, onHand: scenario.stockFailure ? 0 : lineIndex === 0 ? 45 : 12, committed: scenario.stockFailure ? 0 : 3, reservedForOrder: !scenario.stockFailure && prepared && !shipped ? quantity : 0}};
     });
@@ -64,9 +68,10 @@ export function demoOrderScenarios(templates) {
     const transitions = progress.slice(1).map((toStatus, step) => ({fromStatus: progress[step], toStatus, reason: toStatus === 'canceled' ? 'Customer requested cancellation.' : '', transitionedAt: after(step * 60)}));
     Object.assign(order, {
       id, orderKey: id, requestKey: `demo-${id}`, canonicalStatus: stage, orderedAt: at, version: 1, demoVersion: 4,
-      buyerSnapshot: {...example.buyerSnapshot, phone: `090001${String(index + 1).padStart(4, '0')}`, email: `ordercase${index + 1}@example.com`},
+      // A shared buyer phone across three channels demonstrates grouping and separation.
+      buyerSnapshot: {...example.buyerSnapshot, phone: [28, 29, 30].includes(index) ? (index === 29 ? '+84 900 000 001' : '0900000001') : `090001${String(index + 1).padStart(4, '0')}`, email: `ordercase${index + 1}@example.com`},
       lines, totals: {subtotal, discount: 10000, shipping: scenario.pickup ? 0 : 20000, tax: 0, grandTotal: subtotal - 10000 + (scenario.pickup ? 0 : 20000)},
-      payment: {state: paymentState, method: scenario.method || 'Card', reference: scenario.evidence ? `BANK-REVIEW-${index + 1}` : paymentState === 'Paid' || /refunded/i.test(paymentState) ? `DEMO-PAY-${scenario.key}` : ''},
+      payment: {state: paymentState, method: scenario.method || 'Card', reference: scenario.evidence ? `BANK-REVIEW-${index + 1}` : paymentState === 'Paid' || /refunded/i.test(paymentState) ? `DEMO-PAY-${scenario.key}` : '', ...(paymentState === 'Partially refunded' ? {refundedMerchandiseAmount: lines[0].unitPrice} : {})},
       metadata: {...order.metadata, store, warehouse, handlingType: scenario.marketplace ? 'marketplace' : 'self', shippingMode: scenario.marketplace ? 'platform' : 'seller', assignee: index % 3 === 0 ? 'PrimeOS Admin' : example.metadata.assignee, tags: ['Demo cases', scenario.key], notes: `Test case: ${scenario.title}.`},
       reservation: scenario.stockFailure ? 'Allocation failed' : returned || stage === 'canceled' ? 'Released' : shipped ? 'Dispatched' : prepared ? 'Reserved' : 'Not reserved',
       needsPaymentVerification: Boolean(scenario.evidence), readyForPickup: stage === 'fulfillment_in_progress' && packed, pickupOverdue: Boolean(scenario.overdue), syncError: Boolean(scenario.sync),

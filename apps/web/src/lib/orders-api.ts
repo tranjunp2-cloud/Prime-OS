@@ -7,10 +7,10 @@ export interface ShipmentTrackingEvent { id: string; status: ShipmentTrackingSta
 export interface OrderLine { inventory?: { onHand: number; committed: number; reservedForOrder?: number; checkedAt: string; warehouse: string }; imageUrl?: string; variant?: string; id?: string; sku: string; name: string; quantity: number; unitPrice: number; lineTotal?: number }
 export interface ManualOrderInput {
   orderKey: string; requestKey: string; canonicalStatus: 'draft' | 'created'; currencyCode: string;
-  buyerSnapshot: { name: string; phone: string; email: string };
+  buyerSnapshot: { name: string; phone: string; email: string; phoneCountry?: string };
   shippingAddressSnapshot: { address: string; city: string; country: string; postalCode: string };
   lines: OrderLine[]; totals: { discount: number; shipping: number; tax: number };
-  payment: { state: string; method: string; reference: string };
+  payment: { state: string; method: string; reference: string; refundedMerchandiseAmount?: number };
   metadata: { handlingType?: 'self' | 'marketplace'; shippingMode?: 'seller' | 'platform'; store: string; warehouse: string; assignee: string; notes: string; tags: string };
 }
 export interface OrderRecord extends Omit<ManualOrderInput, 'metadata' | 'canonicalStatus' | 'totals'> {
@@ -25,7 +25,7 @@ export interface OrderRecord extends Omit<ManualOrderInput, 'metadata' | 'canoni
     invoice?: { requested: boolean; company?: string; taxId?: string; address?: string };
   };
   totals: { subtotal?: number; discount?: number; shipping?: number; tax?: number; grandTotal: number };
-  metadata: Omit<ManualOrderInput['metadata'], 'tags'> & { tags: string[] };
+  metadata: Omit<ManualOrderInput['metadata'], 'tags'> & { tags: string[]; platform?: string; storeName?: string };
   transitions: { fromStatus: string; toStatus: string; reason: string; transitionedAt: string }[];
   shipments: { id?: string; source?: string; service?: string; deliveryMethod?: 'carrier' | 'store_pickup'; collectionMethod?: 'pickup' | 'dropoff'; collectionAt?: string; pickedUpAt?: string; pickupReference?: string; deliveredAt?: string; deliveryReference?: string; deliveryOutcome?: 'in_transit' | 'failed' | 'returning' | 'returned' | 'delivered'; carrier: string; tracking: string; status: string; labelUrl?: string; trackingEvents?: ShipmentTrackingEvent[] }[];
   returnRequests: { id: string; status: string; reason: string; items: unknown[] }[];

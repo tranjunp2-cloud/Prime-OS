@@ -4,9 +4,56 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createOrderStore, validateManualOrder } from '../src/orders.js';
-import { demoOrders, hydrateDemoShipmentHistory } from '../../../packages/order-workflow/demo-orders.js';
+import { demoOrders, hydrateDemoShipmentHistory, hydrateDemoBuyerSnapshot, hydrateDemoRefundAmount } from '../../../packages/order-workflow/demo-orders.js';
 
 const input = () => ({ orderKey: 'MAN-TEST', requestKey: 'request-test', canonicalStatus: 'created', currencyCode: 'VND', buyerSnapshot: { name: 'Test customer', phone: '0900123456', email: '' }, shippingAddressSnapshot: { address: '123 Test', city: 'HCM', country: 'VN' }, lines: [{ sku: 'SKU-A', name: 'Test product', quantity: 2, unitPrice: 50000 }], totals: { discount: 10000, shipping: 20000, tax: 0, grandTotal: 1 }, payment: { state: 'Unpaid', method: 'COD' }, metadata: { store: 'Manual' } });
+test('customer demo contacts upgrade exact legacy samples without replacing operator edits', () => {
+  const sample = demoOrders().find(order => order.buyerSnapshot.email === 'ordercase30@example.com');
+  const old = {...sample, version: 7, buyerSnapshot: {...sample.buyerSnapshot, phone: '0900010030', phoneCountry: undefined}, metadata: {...sample.metadata, notes: 'Keep my note'}};
+  const upgraded = hydrateDemoBuyerSnapshot(old, sample);
+  assert.equal(upgraded.buyerSnapshot.phone, '+84 900 000 001');
+  assert.equal(upgraded.buyerSnapshot.phoneCountry, 'VN');
+  assert.equal(upgraded.version, 7);
+  assert.equal(upgraded.metadata.notes, 'Keep my note');
+  for (const changed of [
+    {...old, source: 'manual'},
+    {...old, buyerSnapshot: {...old.buyerSnapshot, name: 'Changed name'}},
+    {...old, buyerSnapshot: {...old.buyerSnapshot, phone: '0908888888'}},
+    {...old, buyerSnapshot: {...old.buyerSnapshot, email: 'changed@example.com'}},
+    {...old, buyerSnapshot: {...old.buyerSnapshot, phoneCountry: 'JP'}},
+  ]) assert.deepEqual(hydrateDemoBuyerSnapshot(changed, sample), changed);
+});
+test('only the untouched legacy demo refund gains its explicit merchandise amount', () => {
+  const sample = demoOrders().find(order => order.id === 'DEMO-REFUND-PARTIAL');
+  const old = structuredClone(sample);
+  delete old.payment.refundedMerchandiseAmount;
+  old.metadata.notes = 'Keep edited note';
+  old.version = 7;
+  const upgraded = hydrateDemoRefundAmount(old, sample);
+  assert.equal(upgraded.payment.refundedMerchandiseAmount, sample.lines[0].unitPrice);
+  assert.equal(upgraded.metadata.notes, 'Keep edited note');
+  assert.equal(upgraded.version, 7);
+  for (const changed of [
+    {...old, source: 'manual'}, {...old, canonicalStatus: 'created'},
+    {...old, totals: {...old.totals, subtotal: 999999}},
+    {...old, currencyCode: 'USD'}, {...old, orderedAt: '2026-10-13T00:00:00Z'},
+    {...old, payment: {...old.payment, refundedMerchandiseAmount: 0}},
+    {...old, payment: {...old.payment, reference: 'Edited reference'}},
+    {...old, lines: old.lines.map(line => ({...line, quantity: line.quantity + 1}))},
+  ]) assert.deepEqual(hydrateDemoRefundAmount(changed, sample), changed);
+  const dir = mkdtempSync(path.join(tmpdir(), 'prime-demo-ranks-'));
+  try {
+    const file = path.join(dir, 'orders.json');
+    writeFileSync(file, JSON.stringify({orders: [old]}));
+    const store = createOrderStore(file);
+    const refreshed = store.list();
+    assert.deepEqual(refreshed.find(order => order.id === old.id), JSON.parse(JSON.stringify(upgraded)));
+    assert.ok(refreshed.some(order => order.id.startsWith('DEMO-PURCHASE-')));
+    assert.equal(new Set(refreshed.map(order => order.id)).size, refreshed.length);
+    assert.deepEqual(store.list(), refreshed);
+  } finally { rmSync(dir, {recursive: true, force: true}); }
+});
+
 test('combined confirmation saves payment and status atomically and safely replays a lost response', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'prime-payment-confirm-'));
   try {

@@ -7,6 +7,7 @@ import { editListingSection, applyListingSection, completeListingDetails, confir
 import { ListingMasterReview } from './ListingMasterReview';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
 import { addProduct, deleteProduct, getProductById, getProducts, updateProduct, type Product } from '@/lib/product-store';
+import { pendingMappingReviews } from '@/lib/product-listing-intake';
 
 let original: CatalogImportItem[];
 let originalIds: Set<string>;
@@ -361,7 +362,8 @@ describe('Fast evidence-based Master review', () => {
     expect(screen.getByRole('rowheader', { name: /Needs matching/ }).closest('tr')).toHaveTextContent('1 of 2 SKU records loaded');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Differences & missing data' }));
     acknowledgeGroup();
-    expect(screen.getByRole('button', { name: 'Link all 5 listings' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link all 5 listings' })).toBeEnabled();
+    expect(screen.getByRole('group', { name: 'Review actions' })).toHaveTextContent('Unresolved details will be kept in a review draft');
     expect(screen.getByRole('button', { name: 'Link all & finish later' })).toBeEnabled();
     expect(onSaved).not.toHaveBeenCalled();
     expect(getProductById(target.id)?.channels).toEqual([]);
@@ -563,7 +565,8 @@ describe('Fast evidence-based Master review', () => {
     const check = screen.getByRole('checkbox', { name: /^I checked the source SKU structure/ });
     expect(check).not.toBeChecked();
     acknowledgeGroup();
-    expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeEnabled();
+    expect(screen.getByRole('group', { name: 'Review actions' })).toHaveTextContent('Unresolved details will be kept in a review draft');
     fireEvent.click(check);
     expect(screen.getByRole('checkbox', { name: /^I reviewed all/ })).not.toBeChecked();
     acknowledgeGroup();
@@ -601,7 +604,7 @@ describe('Fast evidence-based Master review', () => {
     fireEvent.change(skuSelect(skus[1].sku_code, sources[0]), { target: { value: 'SHOP-RED' } });
     expect(screen.getByRole('rowheader', { name: /Needs matching/ }).closest('tr')).toHaveTextContent('SHOP-BLUE');
     acknowledgeGroup();
-    expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeEnabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Differences & missing data' }));
     expect(skuSelect(skus[1].sku_code, sources[0])).toHaveValue('SHOP-RED');
     fireEvent.change(screen.getByLabelText(`Shop SKU for ${skus[1].sku_code} · Shop a · COMPARE-12`), { target: { value: 'SHOP-BLUE' } });
@@ -841,14 +844,83 @@ describe('Fast evidence-based Master review', () => {
     expect(getProductById(target.id)).toEqual(before);
     expect(screen.getByRole('button', { name: 'Link all & finish later' })).toBeEnabled();
   });
-  it('does not turn source verification into permission to collapse multiple SKUs into a single Master', () => {
+  it('saves a reviewed unresolved group without collapsing multiple SKUs into a single Master', () => {
     const unknown = { ...listings[0], variants: 0, variantItems: [{ sku: 'RED', label: 'Red' }, { sku: 'BLUE', label: 'Blue' }] };
-    mount([unknown, listings[1]]);
+    const { onSaved } = mount([unknown, listings[1]]);
     fireEvent.click(screen.getByRole('checkbox', { name: /^I checked the source SKU structure/ }));
     acknowledgeGroup();
-    expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeEnabled();
     expect(screen.getByRole('rowheader', { name: /Needs matching/ }).closest('tr')).toHaveTextContent('BLUE');
     expect(screen.getByRole('button', { name: 'Link all & finish later' })).toBeEnabled();
+    confirmListingSave('Link all 2 listings');
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ deferred: true }), false);
+    const saved = getProductById(target.id)!;
+    expect(saved.has_variants).toBe(false);
+    expect(saved.status).toBe('draft');
+    expect(saved.channels).toHaveLength(2);
+    expect(saved.channels.find(link => link.external_id === unknown.listingId)?.review_pending?.sku_mapping_pending).toBe(true);
+    expect(saved.channels.every(link => link.review_pending && !link.variant_mappings)).toBe(true);
+  });
+  it('enables saving after consent despite the preserved single-SKU collision, retaining proposals and stock safely', () => {
+    const existingSku = { id: 'preserved-single', sku_code: target.sku_code, variation_name: 'Original set', status: 'active' as const, weight_g: 10, units_per_carton: 1, stock_by_location: { wh_crjp: 17 } };
+    updateProduct(target.id, { status: 'published', skus: [existingSku] });
+    const before = structuredClone(getProductById(target.id)!);
+    const sources = [{ ...listings[0], variants: 3, variantItems: ['RED', 'BLUE', 'GREEN'].map(sku => ({ sku, label: sku, price: { amount: 2000, currency: 'JPY' } })),
+      requirements: { channel: listings[0].channel, category: listings[0].channelCategory, revision: 'test', origin: 'prototype' as const, fields: [{ key: 'channel_settings.attribute_material', label: 'Material', kind: 'text' as const }] } }, listings[1]];
+    const { onSaved } = mount(sources);
+    const primary = () => screen.getByRole('button', { name: 'Save Master changes & link' });
+    expect(primary()).toBeDisabled();
+    acknowledgeGroup();
+    expect(primary()).toBeEnabled();
+    expect(screen.getByRole('group', { name: 'Review actions' })).toHaveTextContent('You can save now');
+    expect(screen.getByRole('region', { name: 'Listing sync readiness' })).toHaveTextContent('Missing: Material');
+    acknowledgeGroup();
+    expect(primary()).toBeDisabled();
+    acknowledgeGroup();
+    click('Save Master changes & link');
+    const summary = within(screen.getByRole('dialog', { name: 'Review before saving' }));
+    expect(summary.getByRole('region', { name: 'Saved for follow-up' })).toHaveTextContent('Existing Master details, SKU codes and warehouse stock stay unchanged');
+    expect(summary.getByText('Master · Active after saving')).toBeVisible();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(getProductById(target.id)).toEqual(before);
+    fireEvent.click(summary.getByRole('button', { name: 'Save Master changes & link' }));
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ deferred: true, masterUpdated: false }), false);
+    const saved = getProductById(target.id)!;
+    expect(saved.status).toBe('published');
+    expect(saved.skus).toEqual(before.skus);
+    expect(saved.inventory).toEqual(before.inventory);
+    expect(saved.channels).toHaveLength(2);
+    for (const link of saved.channels) {
+      expect(link.review_pending?.master_draft?.skus?.length).toBeGreaterThan(1);
+      expect(link.review_pending?.draft_mappings?.every(row => row.master_sku_id)).toBe(true);
+      expect(link.review_pending?.sku_mapping_pending).toBe(true);
+      expect(link.variant_mappings).toBeUndefined();
+      expect(link.master_data_sync?.enabled).not.toBe(true);
+    }
+    cleanup();
+    const resumed = pendingMappingReviews(getProducts(), getCatalogImportItems({ requireConfirmation: true }))
+      .filter(source => source.existingLinkReview?.productId === target.id);
+    const onResaved = vi.fn();
+    render(<ListingMasterReview listings={resumed} initialMode="existing" onSaved={onResaved} onBack={vi.fn()} />);
+    expect(screen.getByRole('region', { name: 'Variant setup' })).toHaveTextContent('RED');
+    screen.getAllByAltText(/^Master image /).forEach(image => fireEvent.load(image));
+    acknowledgeGroup();
+    expect(screen.getByRole('button', { name: 'Save Master changes' })).toBeEnabled();
+    confirmListingSave('Save Master changes');
+    expect(onResaved).toHaveBeenCalledWith(expect.objectContaining({ deferred: true }), false);
+    expect(getProductById(target.id)?.channels).toHaveLength(2);
+    expect(getProductById(target.id)?.skus).toEqual(before.skus);
+  });
+  it('keeps stale-data protection when saving an acknowledged pending proposal', () => {
+    updateProduct(target.id, { status: 'published', skus: [{ id: 'preserved-single', sku_code: target.sku_code, variation_name: 'Original', status: 'active', weight_g: 10, units_per_carton: 1 }] });
+    const sources = [{ ...listings[0], variants: 2, variantItems: [{ sku: 'RED', label: 'Red' }, { sku: 'BLUE', label: 'Blue' }] }, listings[1]];
+    const { onSaved } = mount(sources);
+    acknowledgeGroup();
+    updateProduct(target.id, { brand: 'Updated elsewhere' });
+    confirmListingSave('Save Master changes & link');
+    expect(screen.getByRole('alert')).toHaveTextContent('changed during review');
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(getProductById(target.id)?.channels).toEqual([]);
   });
   it('validates inline SKU proposal identity, supports cancel, and makes no stored changes', () => {
     const sources = [{ ...listings[0], variants: 2, variantItems: [{ sku: 'RED', label: 'Red' }, { sku: 'BLUE', label: 'Blue' }] }, listings[1]];

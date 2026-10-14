@@ -37,11 +37,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { DiscountTypeBadge, type DiscountType } from '@/components/promotions/DiscountTypeBadge';
+import { PromotionSummaryCard } from '@/components/promotions/PromotionSummaryCard';
+import { PromotionChannelLogos, type PromoChannel } from '@/components/promotions/PromotionChannelLogos';
+import { PromotionColumnHelp } from '@/components/promotions/PromotionColumnHelp';
 import { cn } from '@/lib/utils';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
+import { EmptyState } from '@/components/system/EmptyState';
 
 type PromoStatus = 'Active' | 'Scheduled' | 'Paused' | 'Expired';
-type PromoChannel = 'POS' | 'WebStore' | 'Inbox';
 type StatusFilter = 'All' | PromoStatus;
 
 type Promotion = {
@@ -49,6 +55,7 @@ type Promotion = {
   title: string;
   code: string;
   discount: string;
+  discountType: DiscountType;
   channels: PromoChannel[];
   used: number;
   limit: number;
@@ -60,11 +67,11 @@ type Promotion = {
 };
 
 const initialPromotions: Promotion[] = [
-  { id: 'promo-1', title: 'Welcome to PrimeWeb', code: 'WELCOME15', discount: '15% OFF up to ₫250,000', channels: ['WebStore', 'Inbox'], used: 450, limit: 1000, startDate: '01 Aug 2026', endDate: '31 Aug 2026', status: 'Active', revenue: 428000000, discountValue: 49600000 },
-  { id: 'promo-2', title: 'POS Weekend Bundle', code: 'WEEKEND-B2G1', discount: 'Buy 2 Get 1', channels: ['POS'], used: 286, limit: 500, startDate: '08 Aug 2026', endDate: '30 Aug 2026', status: 'Active', revenue: 196000000, discountValue: 32200000 },
-  { id: 'promo-3', title: 'Payday Member Voucher', code: 'PAYDAY200', discount: '₫200,000 OFF', channels: ['POS', 'WebStore'], used: 0, limit: 1500, startDate: '25 Aug 2026', endDate: '31 Aug 2026', status: 'Scheduled', revenue: 0, discountValue: 0 },
-  { id: 'promo-4', title: 'Inbox Conversion Offer', code: 'CHAT10', discount: '10% OFF up to ₫100,000', channels: ['Inbox'], used: 318, limit: 800, startDate: '15 Jul 2026', endDate: '15 Sep 2026', status: 'Paused', revenue: 174000000, discountValue: 21800000 },
-  { id: 'promo-5', title: 'Mid-Year Clearance', code: 'MIDYEAR30', discount: '30% OFF up to ₫500,000', channels: ['POS', 'WebStore', 'Inbox'], used: 1200, limit: 1200, startDate: '15 Jun 2026', endDate: '30 Jun 2026', status: 'Expired', revenue: 842000000, discountValue: 168000000 },
+  { id: 'promo-1', title: 'Welcome to PrimeWeb', code: 'WELCOME15', discountType: 'percentage', discount: '15% OFF up to ₫250,000', channels: ['WebStore', 'Inbox'], used: 450, limit: 1000, startDate: '01 Aug 2026', endDate: '31 Aug 2026', status: 'Active', revenue: 428000000, discountValue: 49600000 },
+  { id: 'promo-2', title: 'POS Weekend Bundle', code: 'WEEKEND-B2G1', discountType: 'buy_x_get_y', discount: 'Buy 2 Get 1', channels: ['POS'], used: 286, limit: 500, startDate: '08 Aug 2026', endDate: '30 Aug 2026', status: 'Active', revenue: 196000000, discountValue: 32200000 },
+  { id: 'promo-3', title: 'Payday Member Voucher', code: 'PAYDAY200', discountType: 'fixed', discount: '₫200,000 OFF', channels: ['POS', 'WebStore'], used: 0, limit: 1500, startDate: '25 Aug 2026', endDate: '31 Aug 2026', status: 'Scheduled', revenue: 0, discountValue: 0 },
+  { id: 'promo-4', title: 'Inbox Conversion Offer', code: 'CHAT10', discountType: 'percentage', discount: '10% OFF up to ₫100,000', channels: ['Inbox'], used: 318, limit: 800, startDate: '15 Jul 2026', endDate: '15 Sep 2026', status: 'Paused', revenue: 174000000, discountValue: 21800000 },
+  { id: 'promo-5', title: 'Mid-Year Clearance', code: 'MIDYEAR30', discountType: 'percentage', discount: '30% OFF up to ₫500,000', channels: ['POS', 'WebStore', 'Inbox'], used: 1200, limit: 1200, startDate: '15 Jun 2026', endDate: '30 Jun 2026', status: 'Expired', revenue: 842000000, discountValue: 168000000 },
 ];
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
@@ -87,15 +94,6 @@ function Field({ label, children, hint }: { label: string; children: React.React
   return <div className="space-y-2"><Label>{label}</Label>{children}{hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}</div>;
 }
 
-function ChannelIcons({ channels }: { channels: PromoChannel[] }) {
-  const definitions: Record<PromoChannel, { icon: LucideIcon; label: string }> = {
-    POS: { icon: MonitorSmartphone, label: 'POS' },
-    WebStore: { icon: Globe2, label: 'WebStore' },
-    Inbox: { icon: MessageSquare, label: 'Inbox' },
-  };
-  return <div className="flex items-center gap-1.5">{channels.map((channel) => { const Icon = definitions[channel].icon; return <span key={channel} title={definitions[channel].label} aria-label={definitions[channel].label} className="grid size-8 place-items-center rounded-lg border border-border bg-muted/30 text-muted-foreground"><Icon className="size-4" /></span>; })}</div>;
-}
-
 export default function PromotionsManagement() {
   const { pathname } = useLocation();
   const page = pathname.split('/').filter(Boolean).at(-1) ?? 'discount-codes';
@@ -104,11 +102,14 @@ export default function PromotionsManagement() {
 }
 
 function DiscountCodesPage() {
+  const { noData, setMode } = useDemoDataMode();
   const [promotions, setPromotions] = useState(initialPromotions);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
   const [channelFilter, setChannelFilter] = useState<'All' | PromoChannel>('All');
   const [search, setSearch] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [activeSummary, setActiveSummary] = useState<string | null>(null);
+  const [activeColumnHelp, setActiveColumnHelp] = useState<string | null>(null);
 
   const filteredPromotions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -135,36 +136,73 @@ function DiscountCodesPage() {
   };
 
   const addPromotion = (promotion: Promotion) => {
+    if (noData) setMode('with-data');
     setPromotions((current) => [promotion, ...current]);
     setStatusFilter('All');
     toast.success(`${promotion.title} created`);
   };
 
   const summaryCards = [
-    { label: 'Active Campaigns', value: String(totals.active), detail: 'Currently accepting redemptions', icon: Megaphone, tone: 'bg-emerald-500/10 text-emerald-600' },
-    { label: 'Revenue Driven by Promos', value: currency.format(totals.revenue), detail: 'Attributed gross revenue', icon: CircleDollarSign, tone: 'bg-primary/10 text-primary' },
-    { label: 'Total Usage Count', value: totals.usage.toLocaleString('en-US'), detail: 'Redemptions across all channels', icon: TicketPercent, tone: 'bg-violet-500/10 text-violet-600' },
-    { label: 'Discount Value Issued', value: currency.format(totals.discounts), detail: 'Total promotional investment', icon: BadgePercent, tone: 'bg-amber-500/10 text-amber-600' },
+    { label: 'Active Promotions', value: String(totals.active), description: 'Promotions marked Active and enabled for use. Scheduled, paused and expired promotions are not included.', icon: Megaphone, tone: 'text-emerald-700 dark:text-emerald-300' },
+    { label: 'Promo Revenue', value: currency.format(totals.revenue), description: 'Total recorded gross revenue from orders using these promotions, including past promotions. This is not profit or the extra revenue caused by a promotion.', icon: CircleDollarSign, tone: 'text-primary dark:text-violet-300' },
+    { label: 'Total Uses', value: totals.usage.toLocaleString('en-US'), description: 'Total times these promotions have been redeemed, including past promotions. Repeat uses by the same customer count separately; this is not a unique-customer count.', icon: TicketPercent, tone: 'text-violet-700 dark:text-violet-300' },
+    { label: 'Discounts Given', value: currency.format(totals.discounts), description: 'Total recorded value of discounts redeemed by customers, including past promotions. This is the amount discounted, not revenue or the value of unused codes.', icon: BadgePercent, tone: 'text-amber-700 dark:text-amber-300' },
   ];
 
   return <main className="min-h-full space-y-5 bg-[hsl(var(--surface-stage))] p-4 pb-24 md:p-6">
     <WorkspacePageHeader title="Discount Codes" description="Create and manage manual vouchers across POS, WebStore, and Inbox." icon={TicketPercent} actions={<Button onClick={() => setWizardOpen(true)}><BadgePercent />Create Promotion</Button>} />
 
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Promotion summary">{summaryCards.map(({ label, value, detail, icon: Icon, tone }) => <Card key={label} className="shadow-none"><CardContent className="flex gap-4 p-5"><span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', tone)}><Icon className="size-5" /></span><div className="min-w-0"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-1 truncate text-2xl font-bold tracking-tight tabular-nums">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div></CardContent></Card>)}</section>
+    {noData ? <EmptyState className="min-h-80" icon={<TicketPercent aria-hidden="true" />} title="No promotions yet" description="Create your first discount code, choose where it can be used, and set its schedule. Usage and performance will appear after customers redeem it." action={<Button onClick={() => setWizardOpen(true)}><BadgePercent className="size-4" />Create promotion</Button>} /> : <>
+    <TooltipProvider delayDuration={200}>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Promotion summary">
+        {summaryCards.map(card => <PromotionSummaryCard key={card.label} {...card} open={activeSummary === card.label} onOpenChange={open => setActiveSummary(current => open ? card.label : current === card.label ? null : current)} />)}
+      </section>
+    </TooltipProvider>
 
     <Card className="overflow-hidden shadow-none">
       <div className="border-b border-border">
         <div className="overflow-x-auto px-4"><div className="flex min-w-max gap-1" role="tablist" aria-label="Promotion status">{(['All', 'Active', 'Scheduled', 'Paused', 'Expired'] as StatusFilter[]).map((status) => <button key={status} type="button" role="tab" aria-selected={statusFilter === status} onClick={() => setStatusFilter(status)} className={cn('relative min-h-11 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', statusFilter === status ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary' : 'text-muted-foreground hover:text-foreground')}>{status}</button>)}</div></div>
-        <div className="grid gap-3 border-t border-border p-4 md:grid-cols-[minmax(260px,1fr)_220px_auto]">
+        <div className="grid gap-3 border-t border-border p-4 md:grid-cols-[minmax(260px,1fr)_220px]">
           <label className="relative block"><span className="sr-only">Search promotions</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 pl-9" placeholder="Search promotion name or code" /></label>
           <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as 'All' | PromoChannel)}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Channels</SelectItem><SelectItem value="POS">POS</SelectItem><SelectItem value="WebStore">WebStore</SelectItem><SelectItem value="Inbox">Inbox</SelectItem></SelectContent></Select>
-          <Button variant="ghost" className="h-10" onClick={() => { setSearch(''); setStatusFilter('All'); setChannelFilter('All'); }}>Clear</Button>
         </div>
       </div>
 
-      <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm"><thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-[0.08em] text-muted-foreground"><tr><th className="px-4 py-3">Promotion</th><th className="px-4 py-3">Discount Type</th><th className="px-4 py-3">Channels</th><th className="px-4 py-3">Usage</th><th className="px-4 py-3">Schedule</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Pause / Resume</th></tr></thead><tbody className="divide-y divide-border">{filteredPromotions.map((promotion) => { const usagePercent = Math.min(100, Math.round((promotion.used / promotion.limit) * 100)); return <tr key={promotion.id} className="bg-card transition-colors hover:bg-muted/40"><td className="px-4 py-4"><p className="font-semibold">{promotion.title}</p><button type="button" onClick={() => { navigator.clipboard?.writeText(promotion.code); toast.success(`${promotion.code} copied`); }} className="mt-1 inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{promotion.code}<Copy className="size-3" /></button></td><td className="px-4 py-4 font-medium">{promotion.discount}</td><td className="px-4 py-4"><ChannelIcons channels={promotion.channels} /></td><td className="w-52 px-4 py-4"><div className="flex justify-between text-xs"><span className="font-semibold tabular-nums">{promotion.used.toLocaleString()} / {promotion.limit.toLocaleString()}</span><span className="text-muted-foreground">{usagePercent}%</span></div><Progress value={usagePercent} aria-label={`${promotion.title} usage`} className="mt-2 h-1.5" /></td><td className="px-4 py-4"><p className="font-medium">{promotion.startDate}</p><p className="mt-1 text-xs text-muted-foreground">to {promotion.endDate}</p></td><td className="px-4 py-4"><Badge variant="outline" className={cn('font-semibold', statusStyle[promotion.status])}>{promotion.status}</Badge></td><td className="px-4 py-4 text-right"><div className="inline-flex items-center gap-3"><span className="text-xs text-muted-foreground">{promotion.status === 'Active' ? 'Live' : promotion.status === 'Paused' ? 'Paused' : promotion.status}</span><Switch aria-label={`${promotion.status === 'Active' ? 'Pause' : 'Resume'} ${promotion.title}`} checked={promotion.status === 'Active'} disabled={promotion.status === 'Expired' || promotion.status === 'Scheduled'} onCheckedChange={(checked) => togglePromotion(promotion, checked)} /></div></td></tr>; })}</tbody></table>{!filteredPromotions.length ? <div className="grid min-h-56 place-items-center p-8 text-center"><div><TicketPercent className="mx-auto size-8 text-muted-foreground" /><h2 className="mt-3 font-semibold">No promotions found</h2><p className="mt-1 text-sm text-muted-foreground">Try another status, channel, or search term.</p></div></div> : null}</div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1120px] text-left text-sm">
+          <thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            <tr>
+              <th scope="col" className="px-4 py-3">Promotion</th>
+              <th scope="col" className="px-4 py-0"><PromotionColumnHelp title="Discount Type" open={activeColumnHelp === 'Discount Type'} onOpenChange={open => setActiveColumnHelp(current => open ? 'Discount Type' : current === 'Discount Type' ? null : current)} /></th>
+              <th scope="col" className="px-4 py-3">Channels</th>
+              <th scope="col" className="px-4 py-3">Usage</th>
+              <th scope="col" className="px-4 py-3">Schedule</th>
+              <th scope="col" className="px-4 py-0"><PromotionColumnHelp title="Status" open={activeColumnHelp === 'Status'} onOpenChange={open => setActiveColumnHelp(current => open ? 'Status' : current === 'Status' ? null : current)} /></th>
+              <th scope="col" className="px-4 py-3 text-right">Pause / Resume</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">{filteredPromotions.map((promotion) => {
+            const usagePercent = Math.min(100, Math.round((promotion.used / promotion.limit) * 100));
+            return <tr key={promotion.id} className="bg-card transition-colors hover:bg-muted/40">
+              <td className="px-4 py-4">
+                <p className="font-semibold">{promotion.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{promotion.discount}</p>
+                <button type="button" onClick={() => { navigator.clipboard?.writeText(promotion.code); toast.success(`${promotion.code} copied`); }} className="mt-1 inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{promotion.code}<Copy className="size-3" /></button>
+              </td>
+              <td className="px-4 py-4"><DiscountTypeBadge type={promotion.discountType} /></td>
+              <td className="px-4 py-4"><PromotionChannelLogos channels={promotion.channels} /></td>
+              <td className="w-52 px-4 py-4"><div className="flex justify-between text-xs"><span className="font-semibold tabular-nums">{promotion.used.toLocaleString()} / {promotion.limit.toLocaleString()}</span><span className="text-muted-foreground">{usagePercent}%</span></div><Progress value={usagePercent} aria-label={`${promotion.title} usage`} className="mt-2 h-1.5" /></td>
+              <td className="px-4 py-4"><p className="font-medium">{promotion.startDate}</p><p className="mt-1 text-xs text-muted-foreground">to {promotion.endDate}</p></td>
+              <td className="px-4 py-4"><Badge variant="outline" className={cn('font-semibold', statusStyle[promotion.status])}>{promotion.status}</Badge></td>
+              <td className="px-4 py-4 text-right"><div className="inline-flex items-center gap-3"><span className="text-xs text-muted-foreground">{promotion.status === 'Active' ? 'Live' : promotion.status === 'Paused' ? 'Paused' : promotion.status}</span><Switch aria-label={`${promotion.status === 'Active' ? 'Pause' : 'Resume'} ${promotion.title}`} checked={promotion.status === 'Active'} disabled={promotion.status === 'Expired' || promotion.status === 'Scheduled'} onCheckedChange={(checked) => togglePromotion(promotion, checked)} /></div></td>
+            </tr>;
+          })}</tbody>
+        </table>
+        {!filteredPromotions.length ? <div className="grid min-h-56 place-items-center p-8 text-center"><div><TicketPercent className="mx-auto size-8 text-muted-foreground" /><h2 className="mt-3 font-semibold">No promotions found</h2><p className="mt-1 text-sm text-muted-foreground">Try another status, channel, or search term.</p></div></div> : null}
+      </div>
     </Card>
 
+    </>}
     <PromotionWizard open={wizardOpen} onOpenChange={setWizardOpen} onCreate={addPromotion} />
   </main>;
 }
@@ -197,7 +235,7 @@ function PromotionWizard({ open, onOpenChange, onCreate }: { open: boolean; onOp
   const create = () => {
     if (!channels.length) { toast.error('Select at least one eligible channel'); return; }
     const finalCode = codeType === 'auto' ? `AUTO-${Date.now().toString().slice(-5)}` : code.trim().toUpperCase() || name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 12);
-    onCreate({ id: `promo-${Date.now()}`, title: name.trim(), code: finalCode, discount: discountType === 'percentage' ? `${discountValue}% OFF` : `${currency.format(Number(discountValue))} OFF`, channels, used: 0, limit: Number(usageLimit), startDate, endDate, status: startDate > '2026-08-13' ? 'Scheduled' : 'Active', revenue: 0, discountValue: 0 });
+    onCreate({ id: `promo-${Date.now()}`, title: name.trim(), code: finalCode, discountType, discount: discountType === 'percentage' ? `${discountValue}% OFF` : `${currency.format(Number(discountValue))} OFF`, channels, used: 0, limit: Number(usageLimit), startDate, endDate, status: startDate > '2026-08-13' ? 'Scheduled' : 'Active', revenue: 0, discountValue: 0 });
     close(false);
   };
 

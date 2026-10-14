@@ -19,3 +19,14 @@ it('opens Warehouses directly without the four-item warehouse submenu', () => {
     expect(screen.queryByText(label)).not.toBeInTheDocument();
   }
 });
+
+it('opens Sales Channels directly without a submenu', () => {
+  render(<MemoryRouter initialEntries={['/sales-channels/connected-channels']}><TooltipProvider><AppSidebar /></TooltipProvider></MemoryRouter>);
+  const link = screen.getByRole('link', { name: 'Sales Channels' });
+  expect(link).toHaveAttribute('href', '/sales-channels/connected-channels');
+  expect(link).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: 'Open Sales Channels' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Connected Channels')).not.toBeInTheDocument();
+  expect(screen.queryByText('Live Commerce')).not.toBeInTheDocument();
+  expect(screen.queryByText('Conversation Channels')).not.toBeInTheDocument();
+});

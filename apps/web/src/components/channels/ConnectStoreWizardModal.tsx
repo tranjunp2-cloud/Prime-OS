@@ -34,12 +34,13 @@ export function ConnectStoreWizardModal({ open, onOpenChange, onConnected }: { o
   const [authorizing, setAuthorizing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [demoMode, setDemoMode] = useState(false);
   const index = order.indexOf(step);
 
   useEffect(() => {
     if (!open) return;
     Promise.all([channelIntegrationsApi.platforms(), channelIntegrationsApi.warehouses()])
-      .then(([platformResponse, warehouseResponse]) => { setPlatforms(platformResponse.data); setWarehouses(connectionWarehouseChoices(warehouseResponse.data)); })
+      .then(([platformResponse, warehouseResponse]) => { setPlatforms(platformResponse.data); setWarehouses(connectionWarehouseChoices(warehouseResponse.data)); setDemoMode(Boolean(platformResponse.demo || warehouseResponse.demo)); setError(''); })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Unable to load channel setup data.'));
   }, [open]);
 
@@ -53,13 +54,17 @@ export function ConnectStoreWizardModal({ open, onOpenChange, onConnected }: { o
     return () => window.removeEventListener('message', handleMessage);
   }, [open, step, selected]);
 
-  const reset = () => { setStep('CHANNEL_SELECTION'); setSelected(null); setQuery(''); setCategory('All'); setStoreName(''); setRegion('VN'); setAuthCode(''); setWarehouseId(''); setServices({ price: true, stock: true, orders: true }); setPickup(true); setReturns(true); setStrategy('AUTO_MATCH_SKU'); setAuthorizing(false); setSubmitting(false); setError(''); };
+  const reset = () => { setStep('CHANNEL_SELECTION'); setSelected(null); setQuery(''); setCategory('All'); setStoreName(''); setRegion('VN'); setAuthCode(''); setWarehouseId(''); setServices({ price: true, stock: true, orders: true }); setPickup(true); setReturns(true); setStrategy('AUTO_MATCH_SKU'); setAuthorizing(false); setSubmitting(false); setError(''); setDemoMode(false); };
   const handleOpenChange = (next: boolean) => { onOpenChange(next); if (!next) window.setTimeout(reset, 200); };
   const title = useMemo(() => selected ? `Connect ${selected.name}` : 'Connect a store', [selected]);
 
   const authorize = () => {
     if (!selected || !storeName.trim()) return;
     setError(''); setAuthorizing(true);
+    if (demoMode) {
+      window.setTimeout(() => { setAuthCode(`demo-${selected.id}`); setAuthorizing(false); setStep('WAREHOUSE_MAPPING'); }, 450);
+      return;
+    }
     const popup = window.open(channelIntegrationsApi.authorizationUrl(selected.id, region), 'prime-channel-oauth', 'popup=yes,width=620,height=720');
     if (!popup) { setAuthorizing(false); setError('Your browser blocked the authorization window. Allow pop-ups and try again.'); return; }
     popup.focus();

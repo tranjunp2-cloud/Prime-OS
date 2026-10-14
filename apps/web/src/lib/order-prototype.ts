@@ -2,7 +2,7 @@ import { completionBlocker, confirmationBlocker, paymentAndConfirmationBlocker, 
 import type { CanonicalStatus, OrderRecord, ShipmentTrackingStatus } from './orders-api';
 import { prototypeTrackingOptions, shipmentTrackingLabels } from './order-shipment-history';
 import { preparationPackageError, preparationPaymentKind, prototypePreparation } from './order-preparation';
-import { hydrateDemoShipmentHistory } from '../../../../packages/order-workflow/demo-orders.js';
+import { hydrateDemoShipmentHistory, hydrateDemoBuyerSnapshot, hydrateDemoRefundAmount } from '../../../../packages/order-workflow/demo-orders.js';
 import { hydrateDemoStock, moveDemoStockWarehouse, reserveDemoStock, settleDemoStock } from '../../../../packages/order-workflow/demo-stock.js';
 
 const storageKey = 'prime.order-prototype.v1';
@@ -25,8 +25,8 @@ export function restoreOrderPrototype(order: OrderRecord): OrderRecord {
   if (order.source !== 'demo') return order;
   const session = sessions()[order.id];
   const saved = session?.initial.source === 'demo' && session.current.source === 'demo' && session.initial.version === order.version;
-  const restored = saved ? hydrateDemoShipmentHistory(copy(session.current), order) : order;
-  const current = hydrateDemoStock(restored);
+  const restored = saved ? hydrateDemoBuyerSnapshot(hydrateDemoShipmentHistory(copy(session.current), order), order) : order;
+  const current = hydrateDemoStock(hydrateDemoRefundAmount(restored, order));
   if (saved && current !== restored) save({initial: session.initial, current});
   return current;
 }

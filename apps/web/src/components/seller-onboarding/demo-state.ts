@@ -1,5 +1,5 @@
+import { demoDataModeFromParams, readDemoDataMode, writeDemoDataMode } from '@/lib/demo-data-mode';
 export const SELLER_DEMO_KEY = 'prime:seller-onboarding-demo:v1';
-const OVERVIEW_DEMO_MODE_KEY = 'prime:overview-demo-mode';
 export const steps = ['Workspace', 'Markets & channels', 'Selling profiles', 'Stock location', 'Your catalog'];
 export interface SellerDemo {
   step: number;
@@ -56,20 +56,24 @@ export function firstIncompleteStep(data: SellerDemo): number {
 }
 
 export function rememberOverviewDemoMode(noData: boolean) {
-  try { localStorage.setItem(OVERVIEW_DEMO_MODE_KEY, noData ? 'no-data' : 'with-data'); }
-  catch { /* The current URL still works when browser storage is unavailable. */ }
+  writeDemoDataMode(noData ? 'no-data' : 'with-data');
 }
 
 export function isNoDataOverview(params: URLSearchParams): boolean {
-  const explicitMode = params.get('demo');
-  if (explicitMode) return explicitMode === 'no-data';
-  try { return localStorage.getItem(OVERVIEW_DEMO_MODE_KEY) === 'no-data'; }
-  catch { return false; }
+  return (demoDataModeFromParams(params) ?? readDemoDataMode()) === 'no-data';
 }
 
 export function defaultHomePath(): string {
   return isNoDataOverview(new URLSearchParams()) ? '/admin/dashboard?demo=no-data' : '/overview';
 }
+
+export function sessionEntryPath(): string {
+  const setup = readSellerDemo();
+  // Optional profile details never block a seller who confirmed their workspace.
+  if (!setup.name.trim() || !setup.completed.includes(0)) return '/demo/no-data';
+  return setup.view === 'home' ? defaultHomePath() : '/admin/dashboard?demo=no-data';
+}
+
 export function stepError(data: SellerDemo): string {
   if (data.step === 0 && !data.name.trim()) return 'Enter a workspace name to continue.';
   if (data.step === 1 && data.channels.some(channel => !data.connected.includes(channel))) return 'Connect each selected channel, or deselect it to set up later.';

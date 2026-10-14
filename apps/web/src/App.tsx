@@ -11,7 +11,8 @@ import Auth from "./pages/Auth";
 import SellerOnboardingDemo from "./pages/SellerOnboardingDemo";
 import { AppLayout } from "./components/layout/AppLayout";
 import { PrimeRoutes } from "./routes/PrimeRoutes";
-import { defaultHomePath } from "./components/seller-onboarding/demo-state";
+import { sessionEntryPath } from "./components/seller-onboarding/demo-state";
+import { DemoDataModeProvider } from "./components/shared/DemoDataModeProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +43,10 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function EntryRedirect() {
+  return <Navigate to={sessionEntryPath()} replace />;
+}
+
 const App = () => {
   const Router = import.meta.env.VITE_PRIME_PROTOTYPE === "true" ? HashRouter : BrowserRouter;
 
@@ -53,10 +58,11 @@ const App = () => {
             <TooltipProvider>
               <Sonner position="bottom-right" offset={{ right: 16, bottom: 16 }} mobileOffset={{ right: 12, bottom: 96 }} />
               <Router>
+                <DemoDataModeProvider>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/demo/no-data" element={<RequireAuth><SellerOnboardingDemo /></RequireAuth>} />
-                  <Route path="/" element={<Navigate to={defaultHomePath()} replace />} />
+                  <Route path="/" element={<EntryRedirect />} />
                   <Route path="/__ui-regression" element={<UIRegressionReview />} />
                   <Route
                     element={
@@ -69,6 +75,7 @@ const App = () => {
                   </Route>
                   <Route path="*" element={<Navigate to="/overview" replace />} />
                 </Routes>
+                </DemoDataModeProvider>
               </Router>
             </TooltipProvider>
           </AuthProvider>

@@ -23,9 +23,15 @@ if (cssMatch) {
 const scriptMatch = html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"[^>]*><\/script>/);
 if (!scriptMatch) throw new Error('Prototype JavaScript bundle was not found.');
 const scriptPath = resolve(buildRoot, scriptMatch[1].replace(/^\.\//, ''));
-const script = (await readFile(scriptPath, 'utf8')).replace(/<\/script/gi, '<\\/script');
+let script = (await readFile(scriptPath, 'utf8')).replace(/<\/script/gi, '<\\/script');
+// The app shell uses a public URL, which otherwise points to /product-logo.png
+// on the user's filesystem instead of travelling with the standalone HTML.
+const logo = await readFile(resolve(buildRoot, 'product-logo.png'));
+script = script.replaceAll('"/product-logo.png"', JSON.stringify(`data:image/png;base64,${logo.toString('base64')}`));
 html = html.replace(scriptMatch[0], '');
-html = html.replace('</body>', () => `<script>${script}</script></body>`);
+// Keep module semantics: Vite dependencies may retain import.meta.url even
+// when all imports are bundled. A classic script would make the HTML blank.
+html = html.replace('</body>', () => `<script type="module">${script}</script></body>`);
 html = html
   .replace(/<link rel="icon"[^>]*>/g, '')
   .replace(/<link rel="modulepreload"[^>]*>/g, '')

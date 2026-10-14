@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n/I18nContext';
 import { getShellDictionary } from '@/lib/i18n/shell-dictionaries';
 import { cn } from '@/lib/utils';
 import { PrimeRoutes } from '@/routes/PrimeRoutes';
+import { WorkspaceDemoBoundary } from '@/components/shared/WorkspaceDemoBoundary';
 
 export function AppLayout() {
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -86,10 +87,6 @@ export function AppLayout() {
     );
   }
 
-  if (isInboxWorkspace) {
-    return <div className="h-screen overflow-hidden"><Routes>{PrimeRoutes()}</Routes></div>;
-  }
-
   return (
     <div className={cn('prime-stage flex h-screen overflow-hidden', workspaceTheme)}>
       <a
@@ -98,14 +95,14 @@ export function AppLayout() {
       >
         {shellCopy.skipToMainContent}
       </a>
-      <AppSidebar />
+      {!isInboxWorkspace && <AppSidebar />}
       <div className="min-w-0 flex-1 overflow-hidden">
         <GlobalCopilotWorkspace>
           <PrimeCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
           <div className="flex h-full min-h-0 flex-col">
-            <AppHeader />
-            <main id="main-content" className={cn('scrollbar-visible flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto bg-background', isProductEditor && '[scrollbar-gutter:stable]')}>
-              <div className="relative min-h-full min-w-0 flex-1">
+            <AppHeader showBackToMain={isInboxWorkspace} />
+            <main id="main-content" className={cn('flex min-h-0 min-w-0 flex-1 bg-background', isInboxWorkspace ? 'overflow-hidden' : 'scrollbar-visible overflow-y-auto overflow-x-auto', isProductEditor && '[scrollbar-gutter:stable]')}>
+              <div className={cn('relative min-w-0 flex-1', isInboxWorkspace ? 'h-full overflow-hidden' : 'min-h-full')}>
                 {workspaceSwitching ? (
                   <div className="absolute inset-0 z-20 grid content-start gap-5 bg-background p-6" aria-label="Loading workspace">
                     <Skeleton className="h-12 w-72" />
@@ -113,7 +110,7 @@ export function AppLayout() {
                     <Skeleton className="h-80 w-full" />
                   </div>
                 ) : null}
-                <Routes>{PrimeRoutes()}</Routes>
+                <WorkspaceDemoBoundary><Routes>{PrimeRoutes()}</Routes></WorkspaceDemoBoundary>
               </div>
             </main>
           </div>

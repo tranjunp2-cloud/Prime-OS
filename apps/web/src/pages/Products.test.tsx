@@ -20,6 +20,10 @@ function Harness() {
 }
 
 afterEach(cleanup);
+beforeEach(() => {
+  localStorage.removeItem('prime:demo-data-mode:v1');
+  localStorage.removeItem('prime:overview-demo-mode');
+});
 
 describe('Product Master list default tab', () => {
   it('does not reopen onboarding after connecting a shop when Masters already exist', () => {
@@ -39,7 +43,7 @@ describe('Product Master list default tab', () => {
     expect(screen.getByRole('button', { name: 'Create a new product' })).toBeEnabled();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Catalog status' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Review \d+ listings?$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review listings', exact: true }));
     expect(screen.getByRole('region', { name: 'Listings waiting for confirmation' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Start your product catalog' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -61,13 +65,13 @@ describe('Product Master list default tab', () => {
   it('switches header demo modes repeatedly, resets filters, and keeps saved products intact', async () => {
     const productsBefore = JSON.stringify(getProducts());
     render(<MemoryRouter initialEntries={['/products/master-catalog?q=no-such-demo-product']}><Products /></MemoryRouter>);
-    const demo = within(screen.getByRole('group', { name: 'Product demo mode' }));
+    const demo = within(screen.getByRole('group', { name: 'Demo mode' }));
     expect(screen.getByRole('heading', { name: 'Product Master' })).toBeVisible();
     expect(demo.getByRole('button', { name: 'With data' })).toHaveAttribute('aria-pressed', 'true');
     for (let count = 0; count < 2; count++) {
-      fireEvent.click(demo.getByRole('button', { name: 'No products' }));
-      expect(demo.getByRole('button', { name: 'No products' })).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByRole('heading', { name: 'Start your product catalog' })).toBeVisible();
+      fireEvent.click(demo.getByRole('button', { name: 'No data' }));
+      expect(demo.getByRole('button', { name: 'No data' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('heading', { name: 'Connect your first channel' })).toBeVisible();
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Import products' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Create Product Master' })).not.toBeInTheDocument();
@@ -85,14 +89,15 @@ describe('Product Master list default tab', () => {
     expect(JSON.stringify(getProducts())).toBe(productsBefore);
   });
 
-  it('switches all three demos without changing products, imports or connections', () => {
+  it('switches the global demo without changing products, imports or connections', () => {
     const productsBefore = JSON.stringify(getProducts());
     const importsBefore = JSON.stringify(getCatalogImportItems());
     const connect = vi.spyOn(channelIntegrationsApi, 'connect');
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>);
-    const demo = within(screen.getByRole('group', { name: 'Product demo mode' }));
-    fireEvent.click(demo.getByRole('button', { name: 'No channels' }));
-    expect(demo.getByRole('button', { name: 'No channels' })).toHaveAttribute('aria-pressed', 'true');
+    const demo = within(screen.getByRole('group', { name: 'Demo mode' }));
+    expect(demo.getAllByRole('button')).toHaveLength(2);
+    fireEvent.click(demo.getByRole('button', { name: 'No data' }));
+    expect(demo.getByRole('button', { name: 'No data' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('heading', { name: 'Connect your first channel' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Review \d/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
@@ -104,9 +109,6 @@ describe('Product Master list default tab', () => {
       expect(dialog).toBeVisible();
       fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     }
-    fireEvent.click(demo.getByRole('button', { name: 'No products' }));
-    expect(screen.getByRole('button', { name: /^Review \d+ listings?$/ })).toBeEnabled();
-    expect(screen.queryByRole('heading', { name: 'Connect your first channel' })).not.toBeInTheDocument();
     fireEvent.click(demo.getByRole('button', { name: 'With data' }));
     expect(screen.getByRole('navigation', { name: 'Catalog status' })).toBeVisible();
     expect(JSON.stringify(getProducts())).toBe(productsBefore);
@@ -228,7 +230,7 @@ describe('SKU discovery from Product Master list', () => {
       fireEvent.click(await screen.findByRole('link', { name: `Manage 2 variants for ${product.name}` }));
     } else {
       fireEvent.click(await screen.findByRole('link', { name: `Open Product Master details for ${product.name}` }));
-      fireEvent.click(screen.getByRole('button', { name: 'Manage pricing & stock' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Pricing & Inventory/ }));
     }
     expect(screen.getByTestId('sku-path')).toHaveTextContent(`/products/${product.id}/edit?section=commerce`);
     expect(screen.getByRole('button', { name: /^Pricing & Inventory/ })).toHaveAttribute('aria-current', 'page');

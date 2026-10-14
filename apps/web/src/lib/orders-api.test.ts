@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ManualOrderInput, OrderRecord } from './orders-api';
+import { demoOrders } from '../../../../packages/order-workflow/demo-orders.js';
 
 const input: ManualOrderInput = {
   orderKey: 'MAN-PROTOTYPE', requestKey: 'request-prototype', canonicalStatus: 'draft', currencyCode: 'VND',
@@ -22,7 +23,7 @@ describe('Orders API environment routing', () => {
   it('loads the complete sample set without a backend or login in standalone prototype mode', async () => {
     const {ordersApi} = await import('./orders-api');
     const result = await ordersApi.list();
-    expect(result.data).toHaveLength(46);
+    expect(result.data).toHaveLength(demoOrders().length);
     expect(result.data.filter(order => order.canonicalStatus === 'draft')).toHaveLength(3);
     expect(result.data.every(order => order.source === 'demo')).toBe(true);
     expect(result.canWrite).toBe(true);
@@ -52,7 +53,7 @@ describe('Orders API environment routing', () => {
     vi.resetModules();
     const {ordersApi: reloaded} = await import('./orders-api');
     const result = await reloaded.list();
-    expect(result.data).toHaveLength(47);
+    expect(result.data).toHaveLength(demoOrders().length + 1);
     expect(result.data.find(order => order.id === draft.id)).toEqual(confirmed.data);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -69,6 +70,23 @@ describe('Orders API environment routing', () => {
     const worked = {...current, shipments: [{...current.shipments[0], id: 'my-shipment', trackingEvents: [{id:'my-event', status:'delivered', occurredAt: '2026-10-12T10:00:00Z', source:'prototype'}]}]};
     sessionStorage.setItem('prime.order-prototype.v1', JSON.stringify({[old.id]: {initial: old, current: worked}}));
     expect((await ordersApi.list()).data.find(order => order.id === old.id)).toEqual(worked);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('hydrates the exact old refund fixture in saved prototype sessions without losing notes', async () => {
+    const {ordersApi} = await import('./orders-api');
+    const sample = (await ordersApi.list()).data.find(order => order.id === 'DEMO-REFUND-PARTIAL')!;
+    const old = structuredClone(sample);
+    delete old.payment.refundedMerchandiseAmount;
+    const current = {...old, version: 5, metadata: {...old.metadata, notes: 'Saved customer demo note'}};
+    sessionStorage.setItem('prime.order-prototype.v1', JSON.stringify({[old.id]: {initial: old, current}}));
+    const restored = (await ordersApi.list()).data.find(order => order.id === old.id)!;
+    expect(restored.payment.refundedMerchandiseAmount).toBe(sample.payment.refundedMerchandiseAmount);
+    expect(restored.metadata.notes).toBe(current.metadata.notes);
+    expect(restored.version).toBe(5);
+    const explicit = {...current, payment: {...current.payment, refundedMerchandiseAmount: 100}};
+    sessionStorage.setItem('prime.order-prototype.v1', JSON.stringify({[old.id]: {initial: old, current: explicit}}));
+    expect((await ordersApi.list()).data.find(order => order.id === old.id)?.payment.refundedMerchandiseAmount).toBe(100);
     expect(fetch).not.toHaveBeenCalled();
   });
 

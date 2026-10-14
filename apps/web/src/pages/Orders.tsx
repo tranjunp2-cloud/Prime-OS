@@ -1,10 +1,13 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { OrderToolbar } from '@/components/orders/OrderToolbar';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
+import { writeDemoDataMode } from '@/lib/demo-data-mode';
 import { batchBlocker, actionFilterLabels, matchesActionFilter, type ActionFilter, type BatchAction } from '@/lib/order-bulk';
 import { OrderBatchDialog } from '@/components/orders/OrderBatchDialog';
 import { orderNextAction, orderDeadline, deadlineLabel } from '@/lib/order-processing';
 import { OrderShippingLabelsDialog } from '@/components/orders/OrderShippingLabelsDialog';
 import { OrderNavigation } from '@/components/orders/OrderNavigation';
+import { OrderReviewFilter } from '@/components/orders/OrderReviewFilter';
 import { OrderLifecycleBadge } from '@/components/orders/OrderLifecycleBadge';
 import { workQueues, matchesOrderQueue, hasReturnHistory, getQueueFilters, matchesQueueFilter, type OrderQueue } from '@/lib/order-work-queues';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
@@ -20,13 +23,14 @@ import {
   ShoppingBag,
   X,
 } from 'lucide-react';
-import { useSearchParams, useParams } from 'react-router-dom';
+import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { EmptyState } from '@/components/system/EmptyState';
 import { cn } from '@/lib/utils';
 import { ordersApi, orderRow, orderLabels, orderStockStatusLabel, exportOrders, getOrderAttentionReasons, type OrderRecord } from '@/lib/orders-api';
 import { ManualOrderDialog } from '@/components/orders/ManualOrderDialog';
@@ -113,13 +117,18 @@ export default function Orders() {
   function updated(order: OrderRecord) { setRecords((items) => items.map((o) => o.id === order.id ? order : o)); }
 
   const [params, setParams] = useSearchParams();
+  const noDataDemo = useDemoDataMode().noData;
+  const showEmptyState = noDataDemo || (hasLoaded && !loading && !loadError && records.length === 0);
   const workflowParam = params.get('module') === 'cos' ? 'orderView' : 'view';
   const viewParam = params.get(workflowParam);
   const view: OrderView = viewParam === 'fulfillment' || viewParam === 'returns' ? viewParam : 'all';
   const statusParam = params.get('status');
   const status: StatusFilter = statusParam === 'draft' || statusDefinitions.some(item => item.key === statusParam) ? statusParam as StatusFilter : 'all';
-  const subStatus = getQueueFilters(status).some(item => item.key === params.get('orderStage')) ? params.get('orderStage')! : 'all';
-  const setSubStatus = (value: string) => { const next = new URLSearchParams(params); if (value === 'all') next.delete('orderStage'); else next.set('orderStage', value); setParams(next, { replace: true }); };
+  const subStatus = getQueueFilters(status).some(item => item.key !== 'review' && item.key === params.get('orderStage')) ? params.get('orderStage')! : 'all';
+  // Keep links from the former review sub-tab working while allowing review + stage filters.
+  const reviewOnly = params.get('needsReview') === 'true' || params.get('orderStage') === 'review';
+  const setSubStatus = (value: string) => { const next = new URLSearchParams(params); if (reviewOnly) next.set('needsReview', 'true'); if (value === 'all') next.delete('orderStage'); else next.set('orderStage', value); setParams(next, { replace: true }); };
+  const setReviewOnly = (active: boolean) => { const next = new URLSearchParams(params); if (next.get('orderStage') === 'review') next.delete('orderStage'); if (active) next.set('needsReview', 'true'); else next.delete('needsReview'); setParams(next, { replace: true }); };
   const [heldOnly,setHeldOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
@@ -154,11 +163,10 @@ export default function Orders() {
   const draftCount = orders.filter(order => order.canonicalStatus === 'draft').length;
   const stageTotals = orders.filter(order => matchesOrderQueue(order, status));
   const stageOrders = scoped.filter(order => matchesOrderQueue(order, status));
-  const subFilters = getQueueFilters(status).map(item => ({ ...item, count: stageTotals.filter(order => matchesQueueFilter(order, item.key)).length }));
-  const filtered = stageOrders.filter(order => matchesQueueFilter(order, subStatus)).sort((a, b) => sort === 'deadline' ? ((orderDeadline(a) ?? Infinity) - (orderDeadline(b) ?? Infinity)) || a.orderedAt.localeCompare(b.orderedAt) : sort === 'oldest' ? a.orderedAt.localeCompare(b.orderedAt) : b.orderedAt.localeCompare(a.orderedAt));
-  const currentScope = scopeOrders.filter(order => matchesOrderQueue(order, status) && matchesQueueFilter(order, subStatus));
-  const holdCount = currentScope.filter(order => order.hold?.active).length;
-  useEffect(() => { setPage(0); setSelected([]); }, [activeView, channel, search, paymentFilter, subStatus, heldOnly, status, view, canonical, settlementFilter, warehouseFilter, carrierFilter, tagFilter, notesFilter, dateFrom, dateTo, sort, actionFilter]);
+  const subFilters = getQueueFilters(status).filter(item => item.key !== 'review').map(item => ({ ...item, count: stageTotals.filter(order => matchesQueueFilter(order, item.key)).length }));
+  const reviewCount = stageTotals.filter(order => matchesQueueFilter(order, 'review')).length;
+  const filtered = stageOrders.filter(order => matchesQueueFilter(order, subStatus) && (!reviewOnly || matchesQueueFilter(order, 'review'))).sort((a, b) => sort === 'deadline' ? ((orderDeadline(a) ?? Infinity) - (orderDeadline(b) ?? Infinity)) || a.orderedAt.localeCompare(b.orderedAt) : sort === 'oldest' ? a.orderedAt.localeCompare(b.orderedAt) : b.orderedAt.localeCompare(a.orderedAt));
+  useEffect(() => { setPage(0); setSelected([]); }, [activeView, channel, search, paymentFilter, subStatus, reviewOnly, heldOnly, status, view, canonical, settlementFilter, warehouseFilter, carrierFilter, tagFilter, notesFilter, dateFrom, dateTo, sort, actionFilter]);
   useEffect(() => { setPage(current => Math.min(current, Math.max(0, Math.ceil(filtered.length / 20) - 1))); }, [filtered.length]);
   const queue = (detailQueue.length ? detailQueue : filtered.map(order => order.id)).filter(id => records.some(order => order.id === id));
   const detailIndex = detail ? queue.indexOf(detail) : -1;
@@ -174,6 +182,7 @@ export default function Orders() {
     setCanonical('all');
     const next = new URLSearchParams(params);
     next.delete('orderStage');
+    next.delete('needsReview');
     if (nextStatus === 'all') next.delete('status'); else next.set('status', nextStatus);
     setParams(next, { replace: true });
   };
@@ -183,6 +192,7 @@ export default function Orders() {
     setCanonical('all');
     const next = new URLSearchParams(params);
     next.delete('orderStage');
+    next.delete('needsReview');
     if (value === 'preparing' || value === 'pickup') { next.set('status', 'ready'); next.set('orderStage', value); }
     else if (value === 'all') next.delete('status');
     else next.set('status', value);
@@ -210,9 +220,23 @@ export default function Orders() {
     setLabelOrders(filtered.map(order => byId.get(order.id)!));
   };
   const resetDetailedFilters = () => { setPaymentFilter('all'); setHeldOnly(false); setCanonical('all'); setSettlementFilter('all'); setWarehouseFilter('all'); setCarrierFilter('all'); setDateFrom(''); setDateTo(''); setTagFilter(''); setNotesFilter(''); setActiveView(null); const next = new URLSearchParams(params); next.delete(workflowParam); setParams(next, { replace: true }); };
-  const clearFilters = () => {
+  const resetFilterState = () => {
     setActionFilter('all'); setActiveView(null); setPaymentFilter('all'); setHeldOnly(false); setChannel('all'); setSearch(''); setCanonical('all'); setSettlementFilter('all'); setWarehouseFilter('all'); setCarrierFilter('all'); setDateFrom(''); setDateTo(''); setTagFilter(''); setNotesFilter('');
-    const next = new URLSearchParams(params); next.delete(workflowParam); next.delete('orderStage'); setParams(next, { replace: true });
+  };
+  const clearFilters = () => {
+    resetFilterState();
+    const next = new URLSearchParams(params); next.delete(workflowParam); next.delete('orderStage'); next.delete('needsReview'); setParams(next, { replace: true });
+  };
+  const setDemoState = (value: 'data' | 'no-data') => {
+    writeDemoDataMode(value === 'no-data' ? 'no-data' : 'with-data');
+    resetFilterState();
+    setSelected([]); setPage(0); setNotice(''); setDetailQueue([]); setStartProcessing(false);
+    setCreateOpen(false); setEditingDraft(undefined); setFiltersOpen(false); setColumnsOpen(false);
+    setBatchOrders(null); setLabelOrders(null); setBulkOpen(false);
+    const next = new URLSearchParams(params);
+    for (const key of ['order', 'status', 'orderStage', 'needsReview', workflowParam]) next.delete(key);
+    if (value === 'no-data') next.set('demo', 'no-data'); else next.delete('demo');
+    setParams(next);
   };
   const filterChips = [
     search && { label: `Search: ${search}`, clear: () => setSearch('') },
@@ -234,32 +258,44 @@ export default function Orders() {
   const detailedCount = [canonical !== 'all', settlementFilter !== 'all', warehouseFilter !== 'all', carrierFilter !== 'all', Boolean(dateFrom), Boolean(dateTo), Boolean(tagFilter), Boolean(notesFilter), Boolean(activeView), view !== 'all', heldOnly].filter(Boolean).length;
 
   return <div className="min-w-0 space-y-4 p-4 pb-28 md:p-6">
-    <WorkspacePageHeader title={pageCopy.title} description={pageCopy.description} icon={pageCopy.icon} className="[&>div:first-child]:pb-4" actions={<div className="flex flex-wrap items-center gap-2">
+    <WorkspacePageHeader title={pageCopy.title} description={pageCopy.description} icon={pageCopy.icon} className="[&>div:first-child]:pb-4" titleAccessory={(
+      <div className="flex flex-wrap items-center gap-2 sm:ml-3" role="group" aria-label="Orders demo mode">
+        <span className="text-xs font-medium text-muted-foreground">Demo</span>
+        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+          {([{ value: 'data', label: 'With data' }, { value: 'no-data', label: 'No data' }] as const).map(({ value, label }) => (
+            <Button key={value} type="button" size="sm" variant="ghost" aria-pressed={noDataDemo === (value === 'no-data')} onClick={() => setDemoState(value)}
+              className={cn('h-8 border px-3 text-xs motion-reduce:transition-none', noDataDemo === (value === 'no-data') ? 'border-primary/50 bg-primary/10 text-foreground hover:bg-primary/15' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
+    )} actions={!showEmptyState ? <div className="flex flex-wrap items-center gap-2">
       {lastLoadedAt && <span className="mr-1 text-xs text-muted-foreground" title="Time this page last loaded orders, not the last marketplace sync">Updated {lastLoadedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
       <Button variant={status === 'draft' ? 'secondary' : 'outline'} aria-pressed={status === 'draft'} onClick={() => setLifecycleStatus('draft')}>Draft orders ({hasLoaded ? draftCount : '—'})</Button>
-      <Button variant="outline" onClick={() => void refresh()} disabled={loading}>Refresh</Button>
       <Button disabled={!canWrite || loading} onClick={() => setCreateOpen(true)}>Create order</Button>
-    </div>} />
+    </div> : undefined} />
 
-    {loading && <p role="status">Loading orders…</p>}
-    {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4"><div><p className="text-sm font-semibold">{hasLoaded ? 'Could not refresh orders. Showing the last loaded data.' : 'Orders could not be loaded.'}</p><p className="mt-1 text-sm text-muted-foreground">{loadError.includes('Unknown resource') ? 'The order service needs to be updated. Retry after the service is available.' : loadError}</p></div><Button variant="outline" disabled={loading} onClick={() => void refresh()}>Retry</Button></div>}
+    {loading && !noDataDemo && <p role="status">Loading orders…</p>}
+    {loadError && !noDataDemo && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4"><div><p className="text-sm font-semibold">{hasLoaded ? 'Could not refresh orders. Showing the last loaded data.' : 'Orders could not be loaded.'}</p><p className="mt-1 text-sm text-muted-foreground">{loadError.includes('Unknown resource') ? 'The order service needs to be updated. Retry after the service is available.' : loadError}</p></div><Button variant="outline" disabled={loading} onClick={() => void refresh()}>Retry</Button></div>}
     {notice && <p role="status" className="rounded-lg border p-3 text-sm">{notice}</p>}
 
+    {showEmptyState ? <section aria-label="Get started with orders">
+      <EmptyState className="min-h-[360px] border-0 bg-transparent shadow-none sm:min-h-[420px]" icon={<ShoppingBag aria-hidden="true" />} title="No orders yet"
+        description="Create an order manually or connect a sales channel to start receiving orders here."
+        action={<div className="flex flex-col gap-3 sm:flex-row">
+          <Button className="min-h-11" disabled={!canWrite || loading} onClick={() => setCreateOpen(true)}>Create order</Button>
+          <Button variant="outline" className="min-h-11" asChild><Link to="/sales-channels/connected-channels">Connect sales channel</Link></Button>
+        </div>} />
+    </section> : <>
     <OrderNavigation items={statuses} value={status} loaded={hasLoaded} onChange={setLifecycleStatus} />
-    {status === 'draft' && <div className="flex flex-wrap items-center gap-2 text-sm"><strong>Draft orders</strong><span className="text-muted-foreground">Not submitted yet. Drafts are kept separate from All.</span><Button variant="ghost" size="sm" onClick={() => setLifecycleStatus('all')}>Back to all orders</Button></div>}
-    <div role="group" aria-label="Order stage filters" className="flex flex-wrap items-center gap-2">
-      {[{ key: 'all', label: 'All', count: stageTotals.length }, ...subFilters].map(item => {
-        const button = <button key={item.key} type="button" aria-pressed={subStatus === item.key} onClick={() => setSubStatus(item.key)} className={cn('inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring', subStatus === item.key ? 'border-primary/30 bg-primary/10 font-medium text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>{item.label}{' '}<span className="text-xs tabular-nums">{hasLoaded ? item.count : '—'}</span>{item.key === 'review' && <Info aria-hidden="true" className="size-3.5 shrink-0" />}</button>;
-        return item.key === 'review' ? <TooltipProvider key={item.key} delayDuration={150}><Tooltip>
-          <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="bottom" align="start" className="w-80 max-w-[calc(100vw-1.5rem)] space-y-2 whitespace-normal p-3 text-xs leading-relaxed">
-            <p>Orders needing attention: payment verification, stock issues, holds, overdue processing or pickup, failed deliveries, sync errors, or unresolved issues.</p>
-            <p>Some warnings only flag urgency. Blocking issues must be resolved before the affected action can continue.</p>
-            <p className="text-muted-foreground">Each order is counted once within the current status tab.</p>
-          </TooltipContent>
-        </Tooltip></TooltipProvider> : button;
-      })}
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Quick order filters">
+      <OrderReviewFilter count={reviewCount} active={reviewOnly} loaded={hasLoaded} onChange={setReviewOnly} />
     </div>
+    {status === 'draft' && <div className="flex flex-wrap items-center gap-2 text-sm"><strong>Draft orders</strong><span className="text-muted-foreground">Not submitted yet. Drafts are kept separate from All.</span><Button variant="ghost" size="sm" onClick={() => setLifecycleStatus('all')}>Back to all orders</Button></div>}
+    {status !== 'ready' && subFilters.length > 0 && <div role="group" aria-label="Order stage filters" className="flex flex-wrap items-center gap-2">
+      {[{ key: 'all', label: 'All stages', count: stageTotals.length }, ...subFilters].map(item => <button key={item.key} type="button" aria-pressed={subStatus === item.key} onClick={() => setSubStatus(item.key)} className={cn('inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring', subStatus === item.key ? 'border-primary/30 bg-primary/10 font-medium text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>{item.label}{' '}<span className="text-xs tabular-nums">{hasLoaded ? item.count : '—'}</span></button>)}
+    </div>}
     {status === 'delivered' && <p className="text-xs text-muted-foreground">Delivered to the customer. Waiting for the order to be completed.</p>}
     {status === 'completed' && <p className="text-xs text-muted-foreground">Completed orders. Settlement is tracked separately in the payment details.</p>}
 
@@ -291,9 +327,6 @@ export default function Orders() {
           </div></div>
           <Button variant="outline" onClick={resetDetailedFilters}>Reset detailed filters</Button>
         </div>}/>
-      {(holdCount > 0 || heldOnly) && <div className="flex flex-wrap items-center gap-2" aria-label="Orders on hold">
-        <Button size="sm" variant={heldOnly ? 'secondary' : 'outline'} aria-pressed={heldOnly} onClick={() => setHeldOnly(value => !value)}>On hold ({holdCount})</Button>
-      </div>}
       {filterChips.length > 0 && <div className="flex flex-wrap items-center gap-2" aria-label="Active order filters">
         {filterChips.map(chip => <button key={chip.label} type="button" aria-label={`Remove ${chip.label} filter`} onClick={chip.clear} className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-md border bg-muted/40 px-2.5 text-xs hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"><span className="truncate">{chip.label}</span><X aria-hidden="true" className="size-3 shrink-0" /></button>)}
         <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>
@@ -342,7 +375,7 @@ export default function Orders() {
                 </tr>;
               })}</tbody>
             </table>
-          </div>{hasLoaded && !loading && !loadError && filtered.length === 0 ? <div className="grid min-h-48 place-items-center border-t border-border p-6 text-center"><div><Search className="mx-auto size-5 text-muted-foreground" /><p className="mt-2 text-sm font-semibold text-foreground">{records.length ? 'No matching orders' : 'No orders yet'}</p><p className="mt-1 text-xs text-muted-foreground">{records.length ? 'Adjust the active view, status, or search query.' : 'Create your first order to get started.'}</p></div></div> : null}</div>
+          </div>{hasLoaded && !loading && !loadError && filtered.length === 0 ? <EmptyState variant="filtered" className="min-h-48 rounded-none border-0 border-t shadow-none" icon={<Search aria-hidden="true" />} title="No matching orders" description="Try a different search or adjust your filters to find the orders you need." action={<Button variant="outline" onClick={() => setDemoState('data')}>View all orders</Button>} /> : null}</div>
     </div>
 
     {hasLoaded && <div className="flex items-center justify-between text-sm"><span>{filtered.length} orders · Page {page + 1} of {Math.max(1, Math.ceil(filtered.length / 20))}</span><div className="flex gap-2"><Button variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</Button><Button variant="outline" disabled={(page + 1) * 20 >= filtered.length} onClick={() => setPage(page + 1)}>Next</Button></div></div>}
@@ -360,8 +393,19 @@ export default function Orders() {
       </DropdownMenuContent></DropdownMenu>
     </div>}
 
-    {!createOpen && detail && records.find((o) => o.id === detail) && <OrderWorkspaceDetail key={detail} order={records.find((o) => o.id === detail)!} canWrite={canWrite} onClose={() => setDetail(null)} startProcessing={startProcessing} positionLabel={detailIndex >= 0 ? `Order ${detailIndex + 1} of ${queue.length}` : undefined} onPrevious={detailIndex > 0 ? () => setDetail(queue[detailIndex - 1], false, true) : undefined} onNext={detailIndex >= 0 && detailIndex < queue.length - 1 ? () => setDetail(queue[detailIndex + 1], false, true) : undefined} onUpdated={updated} onEditDraft={() => { setEditingDraft(records.find((o) => o.id === detail)); setCreateOpen(true); }} />}
-    {createOpen && <ManualOrderDialog initialOrder={editingDraft} warehouses={warehouses} onClose={() => { setCreateOpen(false); setEditingDraft(undefined); }} onCreated={(order) => { setRecords((items) => [order, ...items.filter((o) => o.id !== order.id)]); setCreateOpen(false); setEditingDraft(undefined); setDetail(order.id); setNotice(`Order ${order.orderKey} saved.`); }} />}
+    </>}
+    {!showEmptyState && !createOpen && detail && records.find((o) => o.id === detail) && <OrderWorkspaceDetail key={detail} order={records.find((o) => o.id === detail)!} canWrite={canWrite} onClose={() => setDetail(null)} startProcessing={startProcessing} positionLabel={detailIndex >= 0 ? `Order ${detailIndex + 1} of ${queue.length}` : undefined} onPrevious={detailIndex > 0 ? () => setDetail(queue[detailIndex - 1], false, true) : undefined} onNext={detailIndex >= 0 && detailIndex < queue.length - 1 ? () => setDetail(queue[detailIndex + 1], false, true) : undefined} onUpdated={updated} onEditDraft={() => { setEditingDraft(records.find((o) => o.id === detail)); setCreateOpen(true); }} />}
+    {createOpen && <ManualOrderDialog initialOrder={editingDraft} warehouses={warehouses} onClose={() => { setCreateOpen(false); setEditingDraft(undefined); }} onCreated={(order) => {
+      setRecords((items) => [order, ...items.filter((o) => o.id !== order.id)]); setCreateOpen(false); setEditingDraft(undefined);
+      if (noDataDemo) {
+        writeDemoDataMode('with-data');
+        resetFilterState(); setSelected([]); setStartProcessing(false); setDetailQueue([order.id]);
+        const next = new URLSearchParams(params);
+        for (const key of ['demo', 'status', 'orderStage', 'needsReview', workflowParam]) next.delete(key);
+        next.set('order', order.id); setParams(next, { replace: true });
+      } else setDetail(order.id);
+      setNotice(`Order ${order.orderKey} saved.`);
+    }} />}
 
     {batchOrders && <OrderBatchDialog orders={batchOrders} canWrite={canWrite} initialAction={batchAction} scope={batchScope} onClose={() => { setBatchOrders(null); setSelected([]); }} onUpdated={updated} />}
     {columnsOpen && <Sheet open onOpenChange={setColumnsOpen}><SheetContent><SheetHeader><SheetTitle>Visible columns</SheetTitle><SheetDescription>Choose the information shown in the orders table.</SheetDescription></SheetHeader><div className="mt-4 grid gap-1">{headers.map(header => <label key={header} className="flex min-h-11 items-center gap-2 text-sm"><Checkbox checked={!hiddenColumns.includes(header)} disabled={header === 'ORDER'} onCheckedChange={checked => setHiddenColumns(columns => checked ? columns.filter(column => column !== header) : [...columns, header])}/>{header === 'STATUS' ? 'ORDER STATUS' : header === 'PROCESSING DEADLINE' ? 'SHIP BY' : header === 'FULFILLMENT' ? 'FULFILLMENT / DELIVERY' : header}</label>)}</div><Button className="mt-4" variant="outline" onClick={() => setColumnsOpen(false)}>Done</Button></SheetContent></Sheet>}

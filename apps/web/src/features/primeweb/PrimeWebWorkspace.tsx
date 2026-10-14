@@ -8,9 +8,15 @@ import { CreateWebsite, Domains, Overview, PagesContent, SeoAnalytics, Storefron
 import { StorefrontPreview } from './StorefrontPreview';
 import { hasChanges, publishWebsite, resetPrimeWeb, selectWebsite, usePrimeWeb, websiteHref } from './store';
 import './primeweb.css';
+import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
+import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
+import { EmptyState } from '@/components/system/EmptyState';
+import { Button } from '@/components/ui/button';
+import { DemoDataModeToggle } from '@/components/shared/DemoDataModeToggle';
 
 const sections: Record<string, string> = { sites: 'My websites', overview: 'Overview', theme: 'Website editor', pages: 'Pages & blog', storefront: 'Storefront', domains: 'Domains & publishing', seo: 'SEO & analytics', settings: 'Website settings', preview: 'Website preview' };
 export default function PrimeWebWorkspace() {
+  const { noData, setMode } = useDemoDataMode();
   const state = usePrimeWeb(); const location = useLocation(); const navigate = useNavigate(); const [params] = useSearchParams();
   const rawSection = location.pathname.split('/')[2] || 'sites';
   const section = ({ navigation: 'theme', banners: 'theme', integrations: 'seo' } as Record<string, string>)[rawSection] ?? rawSection;
@@ -19,11 +25,12 @@ export default function PrimeWebWorkspace() {
   const [createOpen, setCreateOpen] = useState(false); const [publishOpen, setPublishOpen] = useState(false); const [resetOpen, setResetOpen] = useState(false); const [publishing, setPublishing] = useState(false);
   useEffect(() => { if (site && state.selectedId !== site.id) selectWebsite(site.id); }, [site, state.selectedId]);
   useEffect(() => { setPublishOpen(false); }, [siteId]);
+  if (noData) return <section className="space-y-5 p-4 md:p-6" data-testid="primeweb-no-data"><WorkspacePageHeader title={sections[section] ?? 'PrimeWeb'} description="Create and manage your storefront website." icon={Globe} /><EmptyState className="min-h-80" icon={<Globe aria-hidden="true" />} title="No websites yet" description="Create your first website, then add products, customize pages and connect a domain. Nothing is published automatically." action={<Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Create website</Button>} />{createOpen && <CreateWebsite onClose={() => setCreateOpen(false)} onCreated={created => { setCreateOpen(false); setMode('with-data'); navigate(websiteHref('theme', created.id)); toast.success('Your draft website is ready.'); }} />}</section>;
   if (!sections[section] || (!site && section !== 'sites')) return <div className="pw-page"><h1>{!site ? 'Website not found' : 'Page not found'}</h1><Link className="pw-button" to="/builder/sites">Back to websites</Link></div>;
   const current = site ?? state.sites[0];
   const live = params.get('version') === 'live';
   const canPublish = current.draft.name.trim() && current.draft.pages.some(p => p.blocks.some(b => b.visible));
-  return <div className="pw-workspace"><div className="pw-context-bar"><div className="pw-actions"><Globe size={18} /><Link to="/builder/sites">PrimeWeb</Link><span className="pw-context-divider">/</span>{section === 'sites' ? <span>My websites</span> : <><select aria-label="Selected website" value={current.id} onChange={e => { selectWebsite(e.target.value); navigate(websiteHref(section, e.target.value)); }}>{state.sites.map(s => <option key={s.id} value={s.id}>{s.draft.name}</option>)}</select><span className="pw-context-divider">/</span><span className="pw-context-section">{sections[section]}</span></>}</div><div className="pw-actions"><Pill>Prototype</Pill><Action aria-label="Reset PrimeWeb demo" onClick={() => setResetOpen(true)}><RotateCcw size={15} /><span className="pw-desktop-label">Reset demo</span></Action></div></div>
+  return <div className="pw-workspace"><div className="pw-context-bar"><div className="pw-actions"><Globe size={18} /><Link to="/builder/sites">PrimeWeb</Link><span className="pw-context-divider">/</span>{section === 'sites' ? <span>My websites</span> : <><select aria-label="Selected website" value={current.id} onChange={e => { selectWebsite(e.target.value); navigate(websiteHref(section, e.target.value)); }}>{state.sites.map(s => <option key={s.id} value={s.id}>{s.draft.name}</option>)}</select><span className="pw-context-divider">/</span><span className="pw-context-section">{sections[section]}</span></>}</div><div className="pw-actions"><DemoDataModeToggle /><Action aria-label="Reset PrimeWeb demo" onClick={() => setResetOpen(true)}><RotateCcw size={15} /><span className="pw-desktop-label">Reset demo</span></Action></div></div>
     {section === 'sites' && <Websites sites={state.sites} onCreate={() => setCreateOpen(true)} />}
     {section === 'overview' && <Overview key={current.id} site={current} />}
     {section === 'theme' && <Editor key={current.id} site={current} onPublish={() => setPublishOpen(true)} />}

@@ -9,8 +9,6 @@ import { paymentAllowsPreparation, workflowBlocker } from '@/lib/order-processin
 import { preparationPackageError, preparationPaymentKind } from '@/lib/order-preparation';
 
 type Props = { order: OrderRecord; onClose: () => void; onUpdated: (order: OrderRecord) => void };
-const emptyParcel = {weightKg: 0, lengthCm: 0, widthCm: 0, heightCm: 0};
-const parcelLabels = {weightKg: 'Weight (kg)', lengthCm: 'Length (cm)', widthCm: 'Width (cm)', heightCm: 'Height (cm)'};
 function localDate(value?: string) {
   const date = new Date(value || '');
   return Number.isFinite(date.getTime()) ? new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
@@ -43,8 +41,6 @@ export function OrderPreparationDialog({order, onClose, onUpdated}: Props) {
   const [trackingOpen] = useState(!tracking);
   const [collectionMethod, setCollectionMethod] = useState(shipment?.collectionMethod || 'pickup');
   const [shippingOpen, setShippingOpen] = useState(!shipment && !platform && (!carrier || !service));
-  const [parcel, setParcel] = useState(order.operations?.package || emptyParcel);
-  const [parcelOpen, setParcelOpen] = useState(false);
   const orderQuantities = () => Object.fromEntries(order.lines.map((line, index) => [line.id || String(index), line.quantity]));
   const [quantities, setQuantities] = useState<Record<string, number>>(orderQuantities);
   const [counting, setCounting] = useState(false);
@@ -59,13 +55,11 @@ export function OrderPreparationDialog({order, onClose, onUpdated}: Props) {
   const quantitiesMatch = order.lines.every((line, index) => quantities[line.id || String(index)] === line.quantity);
   const totalUnits = order.lines.reduce((sum, line) => sum + line.quantity, 0);
   const verifiedUnits = order.lines.reduce((sum, line, index) => sum + Math.min(line.quantity, quantities[line.id || String(index)] || 0), 0);
-  const hasParcel = Object.values(parcel).some(value => value !== 0);
-  const parcelError = preparationPackageError(hasParcel ? parcel : undefined);
   const paymentReady = !needsPayment || (gateway ? paymentSynced : paymentReceived && Boolean(paymentReference.trim()));
   const shippingReady = Boolean(shipment?.tracking) || (!shipment && (platform || Boolean(carrier.trim() && service.trim() && tracking.trim())));
   const remaining = blocker || (!paymentReady ? gateway ? 'Update the payment status to continue.' : 'Confirm the payment received to continue.'
     : !warehouse.trim() ? 'Choose a dispatch warehouse.' : !shippingReady ? 'Add the missing shipping details.'
-    : parcelError ? 'Complete the parcel measurements or leave them empty.' : !quantitiesMatch ? `Check all ${totalUnits} units to continue.`
+    : !quantitiesMatch ? `Check all ${totalUnits} units to continue.`
     : !labelAttached ? 'Confirm the items, packing and shipping label below.' : null);
 
   function changeDetails(update: () => void) {
@@ -92,7 +86,8 @@ export function OrderPreparationDialog({order, onClose, onUpdated}: Props) {
     const payload = {
       action: 'prepare-shipment', warehouse, carrier, service, tracking, collectionMethod,
       shipBy: !platform && shipBy ? new Date(shipBy).toISOString() : undefined,
-      package: hasParcel ? parcel : undefined, labelAttached,
+      // Keep complete saved measurements; optional, hidden fields must not block preparation.
+      package: preparationPackageError(order.operations?.package) ? undefined : order.operations?.package, labelAttached,
       ...(needsPayment && gateway ? {paymentUpdate: paymentSynced ? 'gateway-paid' : undefined}
         : needsPayment ? {paymentReceived, paymentReference} : {}),
       items: order.lines.map((line, index) => ({lineId: line.id || String(index), quantity: quantities[line.id || String(index)] || 0})),
@@ -146,10 +141,6 @@ export function OrderPreparationDialog({order, onClose, onUpdated}: Props) {
             <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-semibold">Items to pack</h3><span className="text-xs text-muted-foreground" aria-live="polite">{counting ? `${verifiedUnits} / ${totalUnits} units checked` : `${order.lines.length} ${order.lines.length === 1 ? 'product' : 'products'} · ${totalUnits} units from order`}</span></div><Button type="button" variant="ghost" size="sm" aria-expanded={counting} onClick={toggleCounting}>{counting ? 'Use order quantities' : 'Count or scan items'}</Button></div>
             <div className="divide-y rounded-lg border px-3">{order.lines.map((line, index) => <div key={line.id || index} className="flex items-center gap-3 py-2 text-sm">{line.imageUrl ? <img src={line.imageUrl} alt="" className="size-10 shrink-0 rounded border object-cover"/> : <Package aria-hidden="true" className="size-5 shrink-0 text-muted-foreground"/>}<span className="min-w-0 flex-1"><span className="block font-medium">{line.name}</span><span className="text-xs text-muted-foreground">{line.sku}{counting ? ` · Qty ${line.quantity}` : ''}</span></span>{counting ? <Input className="w-20 shrink-0" aria-label={`Verified quantity for ${line.sku}, line ${index + 1}`} required type="number" min={0} max={line.quantity} step={1} value={quantities[line.id || String(index)] || 0} onChange={event => changeDetails(() => setQuantities(current => ({...current, [line.id || String(index)]: Number(event.target.value)})))}/> : <span className="shrink-0 font-medium tabular-nums">Qty {line.quantity}</span>}</div>)}</div>
             {counting && <div><Field label="Scan or enter SKU"><div className="flex gap-2"><Input value={scan} onChange={event => setScan(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); verifySku(); } }}/><Button type="button" variant="outline" onClick={verifySku}>Verify unit</Button></div></Field>{scanFeedback && <p role="status" className="mt-2 text-xs">{scanFeedback}</p>}</div>}
-          </section>
-          <section aria-label="Parcel measurements" className="rounded-lg border px-3"><Summary label="Parcel measurements" action={editButton('Edit parcel measurements', parcelOpen, () => setParcelOpen(!parcelOpen))}>{hasParcel && !parcelError ? `${parcel.weightKg} kg · ${parcel.lengthCm} × ${parcel.widthCm} × ${parcel.heightCm} cm` : 'Optional for this prototype'}</Summary>
-            {parcelOpen && <div className="space-y-2 pb-3"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(Object.keys(parcelLabels) as (keyof typeof parcelLabels)[]).map(key => <Field key={key} label={parcelLabels[key]}><Input type="number" min={0.01} max={key === 'weightKg' ? 1000 : 500} step="any" value={parcel[key] || ''} onChange={event => changeDetails(() => setParcel(current => ({...current, [key]: Number(event.target.value)})))}/></Field>)}</div><p className="text-xs text-muted-foreground">Use the measured parcel size. Leave all fields empty if it is not available.</p></div>}
-            {parcelError && <p role="alert" className="pb-3 text-xs text-destructive">{parcelError}</p>}
           </section>
           <label className="flex items-start gap-2 rounded-md bg-muted/40 p-3 text-sm leading-5"><Checkbox className="mt-0.5" checked={labelAttached} onCheckedChange={value => setLabelAttached(value === true)}/>I checked all {totalUnits} units, packed the parcel and attached the shipping label.</label>
         </fieldset></div>
