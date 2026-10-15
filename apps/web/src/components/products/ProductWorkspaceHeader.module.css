@@ -1,0 +1,20 @@
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  min-width: 0;
+  padding: 0;
+  background: hsl(var(--background));
+}
+
+.identity { min-width: 0; max-width: 100%; }
+.titleRow { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; min-height: 2.75rem; }
+.title { font-size: 1.25rem; font-weight: 600; line-height: 1.75rem; overflow-wrap: anywhere; }
+.context { color: hsl(var(--muted-foreground)); font-size: .75rem; line-height: 1.25rem; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; min-width: 0; max-width: 100%; gap: .5rem; }
+
+@container product-data-workspace (max-width: 35rem) {
+  .actions { width: 100%; justify-content: flex-start; }
+}

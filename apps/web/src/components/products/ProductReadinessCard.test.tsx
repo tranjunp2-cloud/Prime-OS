@@ -37,4 +37,28 @@ describe('Shared Product readiness card', () => {
     render(<ProductReadinessCard checks={[]} isActive={false} onSelectCheck={vi.fn()} onViewAll={vi.fn()} />);
     expect(screen.queryByRole('region')).not.toBeInTheDocument();
   });
+  it('shows a compact progress trigger that opens the checks without repeating the checklist', () => {
+    const onViewAll = vi.fn();
+    const props = { checks, isActive: false, compact: true, onSelectCheck: vi.fn(), onViewAll };
+    const { rerender } = render(<ProductReadinessCard {...props} />);
+    const trigger = screen.getByRole('button', { name: 'Product readiness: 6 of 7 complete. View checks' });
+    expect(trigger).toHaveTextContent('Readiness6/7');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(onViewAll).toHaveBeenCalledOnce();
+    expect(props.onSelectCheck).not.toHaveBeenCalled();
+    rerender(<ProductReadinessCard {...props} expanded />);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+  it('updates compact progress and hides the trigger once all requirements are complete', () => {
+    const props = { isActive: true, compact: true, onSelectCheck: vi.fn(), onViewAll: vi.fn() };
+    const { rerender } = render(<ProductReadinessCard {...props} checks={checks} />);
+    rerender(<ProductReadinessCard {...props} checks={checks.map(check => ({ ...check, done: false }))} />);
+    expect(screen.getByRole('button', { name: 'Product readiness: 0 of 7 complete. View checks' })).toBeVisible();
+    rerender(<ProductReadinessCard {...props} checks={checks.map(check => ({ ...check, done: true }))} />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

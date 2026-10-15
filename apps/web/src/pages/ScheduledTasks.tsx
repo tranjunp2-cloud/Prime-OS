@@ -41,7 +41,7 @@ type DrawerMode = 'create' | 'edit';
 
 const owners = ['Customer Success AI', 'Inventory Agent', 'Sales Operations AI', 'Operations Agent'];
 const channelOptions = [
-  ['prime_inbox', 'Prime Inbox'], ['primeweb', 'WebStore'], ['pos', 'POS'], ['warehouse', 'Warehouse'], ['crm', 'CRM'], ['slack', 'Slack'], ['email', 'Email'],
+  ['prime_inbox', 'Prime CRM'], ['primeweb', 'WebStore'], ['pos', 'POS'], ['warehouse', 'Warehouse'], ['crm', 'CRM'], ['slack', 'Slack'], ['email', 'Email'],
 ] as const;
 
 const ownerIds: Record<string, string> = {

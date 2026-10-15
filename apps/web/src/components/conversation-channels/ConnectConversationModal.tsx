@@ -130,7 +130,7 @@ export default function ConnectConversationModal({ open, onOpenChange, onLinked 
     try {
       await conversationApi.connect(payload());
       await onLinked();
-      toast({ title: 'Channel successfully linked to Prime Inbox!' });
+      toast({ title: 'Channel successfully linked to Prime CRM!' });
       onOpenChange(false);
     } catch (error) {
       toast({ title: 'Channel could not be connected', description: error instanceof Error ? error.message : 'Please try again.', variant: 'destructive' });
@@ -147,7 +147,7 @@ export default function ConnectConversationModal({ open, onOpenChange, onLinked 
       <DialogContent className="max-h-[92vh] max-w-4xl overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-6 py-5 pr-12">
           <DialogTitle>Connect Conversation Channel</DialogTitle>
-          <DialogDescription>Link a messaging source to Prime Inbox, then define ownership, SLA, and automation.</DialogDescription>
+          <DialogDescription>Link a messaging source to Prime CRM, then define ownership, SLA, and automation.</DialogDescription>
         </DialogHeader>
 
         <div className="border-b border-border bg-muted/25 px-6 py-4">

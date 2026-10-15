@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import * as productStore from '@/lib/product-store';
 import Products from './Products';
+import { DemoDataModeProvider } from '@/components/shared/DemoDataModeProvider';
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/hooks/use-product-channel-setup', () => ({ useProductChannelSetup: () => ({ snapshot: { status: 'loaded', channels: [] }, retry: vi.fn() }) }));
@@ -31,6 +32,24 @@ afterEach(() => {
 });
 
 describe('First Product Master introduction', () => {
+  it('restores the connected-channels/no-products flow from the header, including after visiting no-channels', () => {
+    records = [{ ...sample }];
+    const before = structuredClone(records);
+    render(<MemoryRouter initialEntries={['/products/master-catalog']}><DemoDataModeProvider><Products /></DemoDataModeProvider></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'No channels' }));
+    expect(screen.getByRole('heading', { name: 'Connect your first channel' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'No products' }));
+    expect(screen.getByRole('button', { name: 'No products' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Review listings', exact: true }));
+    expect(screen.getByRole('region', { name: 'Listings waiting for confirmation' })).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: 'Product Master' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review suggestion' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create Master', exact: true })[0]);
+    expect(screen.getByRole('dialog', { name: 'Create one Master' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Use existing Master' })).not.toBeInTheDocument();
+    expect(records).toEqual(before);
+  });
+
   it('uses an empty review catalog throughout the no-products preview without changing saved records', () => {
     records = [{ ...sample }];
     const before = structuredClone(records);

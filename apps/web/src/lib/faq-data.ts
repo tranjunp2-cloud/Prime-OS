@@ -31,7 +31,7 @@ export const faqWorkspaceLabels: Record<FaqWorkspace, string> = {
   main: 'Main Back-office',
   pos: 'POS',
   primeweb: 'PrimeWeb',
-  inbox: 'Prime Inbox',
+  inbox: 'Prime CRM',
 };
 
 export const faqCategories: Array<{ id: FaqCategoryId; name: string; description: string }> = [
@@ -40,7 +40,7 @@ export const faqCategories: Array<{ id: FaqCategoryId; name: string; description
   { id: 'orders-fulfillment', name: 'Orders & fulfillment', description: 'Order lifecycle, warehouse allocation, shipping, and returns.' },
   { id: 'pos-hardware', name: 'POS & hardware', description: 'Registers, receipts, printers, shifts, and physical store operations.' },
   { id: 'storefront', name: 'PrimeWeb storefront', description: 'Themes, domains, content, navigation, and web publishing.' },
-  { id: 'customers-inbox', name: 'Customers & Prime Inbox', description: 'Customer profiles, social conversations, tickets, and quick replies.' },
+  { id: 'customers-inbox', name: 'Customers & Prime CRM', description: 'Customer profiles, social conversations, tickets, and quick replies.' },
   { id: 'account-settings', name: 'Account & settings', description: 'Users, permissions, integrations, billing, and business configuration.' },
 ];
 
@@ -132,11 +132,11 @@ Open version history and restore the last stable version. Rolling back the theme
   },
   {
     slug: 'recover-missing-social-messages',
-    title: 'Recover missing messages in Prime Inbox',
+    title: 'Recover missing messages in Prime CRM',
     summary: 'Diagnose disconnected pages, expired permissions, and delayed social message synchronization.',
     category: 'customers-inbox',
     workspaces: ['inbox', 'main'],
-    tags: ['Prime Inbox', 'Facebook', 'Zalo'],
+    tags: ['Prime CRM', 'Facebook', 'Zalo'],
     is_top_issue: true,
     read_time: 4,
     updated_at: 'August 11, 2026',
@@ -147,7 +147,7 @@ Open **Social Integrations** and confirm that the affected page is Connected. An
 
 ## Reconnect the page
 
-Select **Reconnect**, sign in with a page administrator account, and grant message and comment permissions. Prime Inbox resumes ingestion from the time the connection is restored.
+Select **Reconnect**, sign in with a page administrator account, and grant message and comment permissions. Prime CRM resumes ingestion from the time the connection is restored.
 
 ## Review conversation filters
 
@@ -258,7 +258,7 @@ Count each payment method, review differences, and submit the shift. A manager m
   {
     slug: 'manage-customer-tags-and-segments',
     title: 'Manage customer tags and dynamic segments',
-    summary: 'Use shared customer attributes across CRM, campaigns, orders, and Prime Inbox.',
+    summary: 'Use shared customer attributes across CRM, campaigns, orders, and Prime CRM.',
     category: 'customers-inbox',
     workspaces: ['main', 'inbox'],
     tags: ['CRM', 'Tags', 'Segments'],
@@ -268,7 +268,7 @@ Count each payment method, review differences, and submit the shift. A manager m
     related_settings_link: { label: 'Open Segments & Tags', href: '/crm/segments' },
     content: `## Apply a manual tag
 
-Open a customer profile and add a tag such as VIP, B2B, or High Return Risk. Manual tags are immediately visible in Orders and Prime Inbox.
+Open a customer profile and add a tag such as VIP, B2B, or High Return Risk. Manual tags are immediately visible in Orders and Prime CRM.
 
 ## Build a dynamic segment
 
@@ -303,7 +303,7 @@ Audit inactive users and privileged roles regularly. Removing a user ends future
   {
     slug: 'set-up-prime-os-workspaces',
     title: 'Understand the Prime OS workspace model',
-    summary: 'Know when to use Main Workspace, POS, PrimeWeb, or Prime Inbox.',
+    summary: 'Know when to use Main Workspace, POS, PrimeWeb, or Prime CRM.',
     category: 'getting-started',
     workspaces: ['main', 'pos', 'primeweb', 'inbox'],
     tags: ['Workspace', 'Navigation', 'Setup'],
@@ -315,7 +315,7 @@ Use Main Workspace for catalog, inventory, orders, fulfillment, customer managem
 
 ## Touchpoint workspaces
 
-PrimeWeb is the storefront design workspace. POS is the physical selling interface. Prime Inbox is the fullscreen customer conversation and social commerce desk.
+PrimeWeb is the storefront design workspace. POS is the physical selling interface. Prime CRM is the fullscreen customer conversation and social commerce desk.
 
 ## Switch workspaces
 

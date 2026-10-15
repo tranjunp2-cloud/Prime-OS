@@ -8,7 +8,7 @@ import { AdjustWarehouseStockDialog } from '@/components/inventory/AdjustWarehou
 import { ManageStockHoldsDialog } from '@/components/inventory/ManageStockHoldsDialog';
 import { StockActivityDrawer } from '@/components/inventory/StockActivityDrawer';
 import { TransferStockDrawer } from '@/components/inventory/TransferStockDrawer';
-import { AddWarehouseStockDrawer, CreateWarehouseDrawer } from '@/components/inventory/WarehouseSetup';
+import { AddWarehouseStockDrawer, CreateWarehouseDialog } from '@/components/inventory/WarehouseSetup';
 import { LinkWarehouseShopsDrawer } from '@/components/inventory/LinkWarehouseShopsDrawer';
 import type { StockAdjustmentTarget, StockLocation } from '@/components/inventory/WarehouseStockTable';
 import { getWarehouses } from '@/lib/warehouse-store';
@@ -83,7 +83,7 @@ function WarehouseWorkspace({ noDataDemo }: { noDataDemo: boolean }) {
       else if (action === 'adjustment') setAdjustmentTarget({ warehouse: warehouses.find(item => item.id === warehouseId) });
       else setHoldActionOpen(true);
     }} />}
-    {createOpen && <CreateWarehouseDrawer onClose={() => setCreateOpen(false)} onCreated={warehouse => { writeDemoDataMode('with-data'); setWarehouses(warehouseLocations()); setParams(current => { const next = new URLSearchParams(current); next.delete('demo'); next.delete('sku'); next.set('warehouse', warehouse.id); return next; }); setCreateOpen(false); setResult(''); setRecentId(null); }} />}
+    {createOpen && <CreateWarehouseDialog onClose={() => setCreateOpen(false)} onCreated={warehouse => { writeDemoDataMode('with-data'); setWarehouses(warehouseLocations()); setParams(current => { const next = new URLSearchParams(current); next.delete('demo'); next.delete('sku'); next.set('warehouse', warehouse.id); return next; }); setCreateOpen(false); setResult(''); setRecentId(null); }} />}
     {addStockWarehouse && <AddWarehouseStockDrawer warehouse={addStockWarehouse} products={products} onClose={() => setAddStockWarehouse(null)} onSaved={ids => { setAddStockWarehouse(null); finish(ids[0], `Opening stock saved for ${ids.length} ${ids.length === 1 ? 'SKU' : 'SKUs'}. You can now set this as a shop’s default warehouse or continue managing stock.`); }} />}
     {linkWarehouse && <LinkWarehouseShopsDrawer warehouse={linkWarehouse} onClose={() => setLinkWarehouse(null)} />}
     {adjustmentTarget && <AdjustWarehouseStockDialog lockProduct={Boolean(adjustmentTarget.product)} initializeLocation={adjustmentTarget.initializeLocation} target={adjustmentTarget} products={products} warehouses={warehouses} onClose={() => { setAdjustmentTarget(null); finish(); }} onSaved={id => {

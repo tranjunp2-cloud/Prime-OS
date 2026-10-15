@@ -18,11 +18,13 @@ export type SkuMatrixControls = {
   onReload: (id: string) => void;
 };
 type Props = SkuMatrixControls & {
+  id?: string;
   product: Product; baseline: Product; sources: CatalogImportItem[]; visible: CatalogImportItem[];
   disabled: boolean; editorWidth?: number; priceEditor?: ReactNode;
   onChange: (product: Product) => void; onEditPrices: () => void; onSetup: () => void;
   onUsePrice: (source: CatalogImportItem) => void; onUndoPrices: () => void;
   onEditingChange: (editing: boolean) => void;
+  creating?: boolean;
 };
 const headClass = 'border-b border-r bg-background p-3 align-top text-xs font-medium leading-5 md:sticky md:left-0 md:z-10';
 const cellClass = 'border-b border-r p-3 align-top';
@@ -30,7 +32,7 @@ const masterClass = 'border-b bg-muted p-3 align-top md:sticky md:right-0 md:z-1
 const warningClass = 'text-xs leading-5 text-amber-700 dark:text-amber-300';
 
 /** Same shop columns as the field comparison. One row means one Master SKU, not a source's array index. */
-export function ListingSkuMatrixRows({ product, baseline, sources, visible, mappings, verifiedSingles, disabled, editorWidth, priceEditor, onChange, onMappingsChange, onVerify, onReload, onEditPrices, onSetup, onEditingChange, onUsePrice, onUndoPrices }: Props) {
+export function ListingSkuMatrixRows({ id, product, baseline, sources, visible, mappings, verifiedSingles, disabled, editorWidth, priceEditor, onChange, onMappingsChange, onVerify, onReload, onEditPrices, onSetup, onEditingChange, onUsePrice, onUndoPrices, creating = false }: Props) {
   const prefix = useId();
   const [editingCell, setEditingCell] = useState('');
   const [adding, setAdding] = useState<{ sourceId: string; shopSku: string; code: string; label: string; price: string; editingId?: string } | null>(null);
@@ -80,13 +82,13 @@ export function ListingSkuMatrixRows({ product, baseline, sources, visible, mapp
       onChange(next); onMappingsChange(nextMappings); cancelAdding();
     } catch (problem) { setError(problem instanceof Error ? problem.message : 'Could not add this SKU.'); }
   };
-  return <tbody aria-label="SKU & variants">
+  return <tbody id={id} tabIndex={-1} aria-label="SKU & variants" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2">
     <tr><th colSpan={visible.length + 2} className="border-b bg-muted/40 p-0 text-left font-normal"><div className="sticky left-0 max-w-full space-y-2 p-3" style={{ width: editorWidth }}>
       <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><h4 className="text-sm font-semibold">SKU & variants</h4><span className="text-xs text-muted-foreground">{matched}/{total} shop SKUs paired · {masterSkus.length} Master SKU{masterSkus.length === 1 ? '' : 's'}</span><ListingReviewHelp label="SKU matching across shops">One row represents one Master SKU. Different shops may match the same row. Each SKU within a listing needs its own row. Moving a SKU leaves the replaced one in Needs matching. Pairs are proposals until you confirm; pending pairs cannot sync price or stock. Master SKU codes and prices are required for activation.</ListingReviewHelp></div><div className="flex flex-wrap gap-2">{pricesChanged && <Button variant="ghost" className="h-11 text-xs" disabled={locked} aria-label={`Undo Master ${variant ? 'Variant prices' : 'Price'} change`} onClick={onUndoPrices}>Undo price changes</Button>}<Button variant="ghost" className="h-11 text-xs" disabled={locked} onClick={onSetup}>Manage Master variants</Button></div></div>
-      <p className="text-xs text-muted-foreground">SKU pairs are filled for review. New rows are proposals to add to this Master — edit or remove only when needed.</p>
+      <p className="text-xs text-muted-foreground">{creating ? 'Shop SKUs and proposed Master SKUs are filled for review. Edit only what needs to change.' : 'SKU pairs are filled for review. New rows are proposals to add to this Master — edit or remove only when needed.'}</p>
     </div></th></tr>
     {masterSkus.map((sku, index) => {
-      const isNew = variant && !baseline.skus.some(old => old.id === sku.id);
+      const isNew = variant && (creating || !baseline.skus.some(old => old.id === sku.id));
       const origin = sources.find(source => states[source.id].valid.some(row => row.master_sku_id === sku.id));
       const originSku = origin && states[origin.id].valid.find(row => row.master_sku_id === sku.id)?.shop_sku;
       const priceHint = origin && originSku ? proposedSkuPrice(product, origin, originSku) : undefined;

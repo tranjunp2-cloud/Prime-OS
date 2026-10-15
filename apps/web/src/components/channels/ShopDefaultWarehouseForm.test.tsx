@@ -78,6 +78,36 @@ it('switches between populated and no-channel demo states with an onboarding CTA
   expect(screen.queryByRole('heading', { name: 'Connect your first sales channel' })).not.toBeInTheDocument();
 });
 
+it('explains the operational columns with keyboard-accessible tooltips', async () => {
+  render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ConnectedChannelsPage /></MemoryRouter></QueryClientProvider>);
+  await screen.findByRole('table');
+  const activeServicesHelp = screen.getByRole('button', { name: 'About Active Sync Services column' });
+  fireEvent.focus(activeServicesHelp);
+  expect(await screen.findByText(/automatic services currently enabled/i)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'About Connection column' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'About Listings column' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'About Default warehouse column' })).toBeVisible();
+});
+
+it('confirms the channel-wide impact before turning off a sync rule', async () => {
+  render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ConnectedChannelsPage /></MemoryRouter></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Configure Amazon' }));
+  fireEvent.mouseDown(screen.getByRole('tab', { name: 'Sync Rules' }), { button: 0, ctrlKey: false });
+
+  const priceSync = screen.getByRole('switch', { name: 'Automatic price sync' });
+  expect(priceSync).toBeChecked();
+  fireEvent.click(priceSync);
+
+  expect(screen.getByRole('alertdialog')).toBeVisible();
+  expect(screen.getByText(/every Product Master linked to Amazon/i)).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Keep sync on' }));
+  expect(priceSync).toBeChecked();
+
+  fireEvent.click(priceSync);
+  fireEvent.click(screen.getByRole('button', { name: 'Turn off price sync' }));
+  expect(priceSync).not.toBeChecked();
+});
+
 it('lets a listing choose inheritance or an explicit warehouse without leaving the editor', async () => {
   const listing: ChannelListing = { channel: 'shopee', store_name: 'Prime Beauty Official', external_id: 'a', status: 'active', listing_url: null, last_synced_at: null };
   function Editor() {

@@ -1,5 +1,6 @@
+import { libraryCategories } from './library-demo';
 import { describe, expect, it } from 'vitest';
-import { createWebsite, hasChanges, publishSnapshot } from './store';
+import { completeLibraryDemo, createWebsite, hasChanges, publishSnapshot } from './store';
 describe('PrimeWeb publication boundary', () => {
   it('isolates live pages, products and posts from draft edits until publication', () => {
     const site = publishSnapshot(createWebsite('My store', 'essential', ['p1']));
@@ -22,4 +23,18 @@ describe('PrimeWeb publication boundary', () => {
     expect(b.published).toBeNull();
     expect(a.id).not.toBe(b.id);
   });
+});
+
+it('covers every library category and preserves existing edits when demos are refreshed', () => {
+  const custom = createWebsite('Seller custom website');
+  const sites = completeLibraryDemo([custom]);
+  expect(new Set(sites.map(site => site.category).filter(Boolean))).toEqual(new Set(libraryCategories));
+  expect(sites).toHaveLength(15);
+  sites[1].draft.name = 'Edited restaurant';
+  const refreshed = completeLibraryDemo(sites);
+  expect(refreshed).toHaveLength(15);
+  expect(refreshed[0]).toBe(custom);
+  expect(refreshed[1].draft.name).toBe('Edited restaurant');
+  expect(sites.some(site => site.status === 'draft')).toBe(true);
+  expect(sites.some(site => site.published && hasChanges(site))).toBe(true);
 });

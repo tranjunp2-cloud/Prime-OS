@@ -22,11 +22,11 @@ import { ConnectedChannelsPage } from "@/pages/SalesChannels";
 import LiveCommercePage from "@/pages/LiveCommerce";
 import { ChannelAuthCallback } from "@/pages/ChannelAuthCallback";
 import BusinessSettings from "@/pages/BusinessSettings";
-import PricingRules from "@/pages/PricingRules";
 import InvoiceManagement from "@/pages/InvoiceManagement";
 import PromotionsManagement from "@/pages/PromotionsManagement";
 import PrimeWebWorkspace from "@/features/primeweb/PrimeWebWorkspace";
-import { TouchpointWorkspace } from "@/pages/TouchpointWorkspace";
+import PosWorkspace from "@/features/primepos/PosWorkspace";
+import MainPosControl from "@/features/primepos/MainPosControl";
 import ScheduledTasksPage from "@/pages/ScheduledTasks";
 import FinanceOps from "@/pages/FinanceOps";
 import PrimeAiWorkspacePage from "@/pages/prime/PrimeAiWorkspacePage";
@@ -97,7 +97,7 @@ export function PrimeRoutes() {
     <Route path="/builder" element={<Navigate to="/builder/sites" replace />} />
     <Route path="/builder/*" element={<PrimeWebWorkspace />} />
     <Route path="/pos" element={<Navigate to="/pos/register" replace />} />
-    <Route path="/pos/*" element={<TouchpointWorkspace kind="pos" />} />
+    <Route path="/pos/*" element={<PosWorkspace />} />
     <Route path="/workspaces/primeweb" element={<Navigate to="/builder/sites" replace />} />
     <Route path="/workspaces/pos" element={<Navigate to="/pos/register" replace />} />
     <Route path="/client-reports" element={<PrimeClientReportsPage />} />
@@ -113,7 +113,7 @@ export function PrimeRoutes() {
     <Route path="/promotions" element={<Navigate to="/promotions/discount-codes" replace />} />
     <Route path="/promotions/*" element={<PromotionsManagement />} />
     <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
-    <Route path="/settings/stores" element={<Navigate to="/warehouses" replace />} />
+    <Route path="/settings/stores" element={<MainPosControl />} />
     <Route path="/settings/channels" element={<Navigate to="/sales-channels/connected-channels" replace />} />
     <Route path="/settings/payments-pos" element={<Navigate to="/settings/payments" replace />} />
     <Route path="/settings/shipping" element={<Navigate to="/settings/shipping-delivery" replace />} />
@@ -121,15 +121,15 @@ export function PrimeRoutes() {
     <Route path="/settings/team-permissions" element={<Navigate to="/settings/team-access" replace />} />
     <Route path="/settings/crm-communications" element={<Navigate to="/settings/customer-data" replace />} />
     <Route path="/settings/templates-hardware" element={<Navigate to="/settings/templates-notifications" replace />} />
-    <Route path="/settings/pricing-rules" element={<PricingRules />} />
+    <Route path="/settings/pricing-rules" element={<Navigate to="/sales-channels/connected-channels" replace />} />
     <Route path="/settings/*" element={<BusinessSettings />} />
     
     <Route path="/customers" element={<PrimeCrmCustomersPage />} />
     <Route path="/marketing" element={<PrimeMarketingPage />} />
-    <Route path="/crm" element={<Navigate to="/marketing" replace />} />
+    <Route path="/crm" element={<Navigate to="/inbox/conversation" replace />} />
     <Route path="/crm/overview" element={<Navigate to="/marketing?view=overview" replace />} />
-    <Route path="/crm/hub" element={<Navigate to="/customer/service" replace />} />
-    <Route path="/crm/chat" element={<Navigate to="/customer/service" replace />} />
+    <Route path="/crm/hub" element={<Navigate to="/inbox/conversation" replace />} />
+    <Route path="/crm/chat" element={<Navigate to="/inbox/conversation" replace />} />
     <Route path="/crm/operator" element={<PrimeCrmOperatorDashboard />} />
     <Route path="/crm/mdec" element={<PrimeMdecPage />} />
     <Route path="/crm/sources" element={<Navigate to="/marketing?view=sources" replace />} />
@@ -139,8 +139,8 @@ export function PrimeRoutes() {
     <Route path="/crm/contact-leads" element={<Navigate to="/marketing?view=campaigns" replace />} />
     <Route path="/crm/customers" element={<Navigate to="/customers" replace />} />
     <Route path="/crm/segments" element={<Navigate to="/customers" replace />} />
-    <Route path="/crm/quick-replies" element={<Navigate to="/customer/service" replace />} />
-    <Route path="/crm/cs-analytics" element={<Navigate to="/marketing?view=analytics" replace />} />
+    <Route path="/crm/quick-replies" element={<Navigate to="/inbox/settings?section=templates" replace />} />
+    <Route path="/crm/cs-analytics" element={<Navigate to="/inbox/analytics" replace />} />
     <Route path="/sales-channels" element={<Navigate to="/sales-channels/connected-channels" replace />} />
     <Route path="/sales-channels/connected-channels" element={<ConnectedChannelsPage />} />
     <Route path="/channels" element={<ConnectedChannelsPage />} />
@@ -150,7 +150,7 @@ export function PrimeRoutes() {
     <Route path="/settings/conversation-channels" element={<Navigate to="/sales-channels/conversation-channels" replace />} />
     <Route path="/channels/:channel/connect" element={<ConnectedChannelsPage />} />
     <Route path="/channels/social-integrations" element={<Navigate to="/sales-channels/conversation-channels" replace />} />
-    <Route path="/inbox/conversation" element={<PrimeInboxWorkspace />} />
+    <Route path="/inbox/*" element={<PrimeInboxWorkspace />} />
     <Route path="/faq" element={<FaqHub />} />
     <Route path="/faq/:slug" element={<FaqArticle />} />
     <Route path="/crm/re-engage" element={<Navigate to="/marketing?view=audiences" replace />} />

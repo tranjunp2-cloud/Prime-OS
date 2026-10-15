@@ -7,7 +7,7 @@ export type PromoChannel = 'POS' | 'WebStore' | 'Inbox';
 const channelBrands = {
   POS: { key: 'primepos', label: 'PrimePOS' },
   WebStore: { key: 'primeweb', label: 'PrimeWeb' },
-  Inbox: { key: 'primeinbox', label: 'Prime Inbox' },
+  Inbox: { key: 'primeinbox', label: 'Prime CRM' },
 } satisfies Record<PromoChannel, { key: string; label: string }>;
 
 function ChannelTrigger({ channel, open, onOpenChange }: {

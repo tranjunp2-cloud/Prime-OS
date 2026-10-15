@@ -7,9 +7,13 @@ import { ordersApi, orderMoney, type ManualOrderInput, type OrderRecord } from '
 
 const fieldClass = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm';
 export function OrderField({ label, children }: { label: string; children: React.ReactNode }) { return <label className="grid gap-1.5 text-sm font-medium">{label}{children}</label>; }
-export function ManualOrderDialog({ onClose, onCreated, warehouses, initialOrder }: { onClose: () => void; onCreated: (order: OrderRecord) => void; warehouses: string[]; initialOrder?: OrderRecord }) {
+export function ManualOrderDialog({ onClose, onCreated, warehouses, initialOrder, prefill }: { onClose: () => void; onCreated: (order: OrderRecord) => void; warehouses: string[]; initialOrder?: OrderRecord; prefill?: Pick<ManualOrderInput, 'buyerSnapshot'> & { store: string; notes: string } }) {
   const [form, setForm] = useState<ManualOrderInput>(() => ({ orderKey: `MAN-${Date.now()}`, requestKey: crypto.randomUUID(), canonicalStatus: 'created', currencyCode: 'VND', buyerSnapshot: { name: '', phone: '', email: '' }, shippingAddressSnapshot: { address: '', city: '', country: 'VN', postalCode: '' }, lines: [{ sku: '', name: '', quantity: 1, unitPrice: 0 }], totals: { discount: 0, shipping: 0, tax: 0 }, payment: { state: 'Unpaid', method: 'COD', reference: '' }, metadata: { handlingType: 'self', shippingMode: 'seller', store: 'Manual', warehouse: 'Unassigned', assignee: 'Unassigned', notes: '', tags: '' } }));
   const [initialized, setInitialized] = useState(false);
+  if (prefill && !initialOrder && !initialized) {
+    setForm(current => ({ ...current, buyerSnapshot: prefill.buyerSnapshot, metadata: { ...current.metadata, store: prefill.store, notes: prefill.notes } }));
+    setInitialized(true);
+  }
   if (initialOrder && !initialized) {
     setForm({ ...initialOrder, canonicalStatus: 'draft', totals: { discount: initialOrder.totals.discount || 0, shipping: initialOrder.totals.shipping || 0, tax: initialOrder.totals.tax || 0 }, metadata: { ...initialOrder.metadata, tags: initialOrder.metadata.tags.join(', ') } });
     setInitialized(true);

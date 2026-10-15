@@ -1,0 +1,6 @@
+.root { container: product-structure / inline-size; }
+.options { display: grid; gap: .75rem; }
+
+@container product-structure (min-width: 32rem) {
+  .options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

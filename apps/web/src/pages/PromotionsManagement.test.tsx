@@ -49,11 +49,11 @@ describe('Promotion channel logos', () => {
   it('uses the correct embedded product logos without changing promotion eligibility', () => {
     mount();
     for (const [title, labels] of [
-      ['Welcome to PrimeWeb', ['PrimeWeb', 'Prime Inbox']],
+      ['Welcome to PrimeWeb', ['PrimeWeb', 'Prime CRM']],
       ['POS Weekend Bundle', ['PrimePOS']],
       ['Payday Member Voucher', ['PrimePOS', 'PrimeWeb']],
-      ['Inbox Conversion Offer', ['Prime Inbox']],
-      ['Mid-Year Clearance', ['PrimePOS', 'PrimeWeb', 'Prime Inbox']],
+      ['Inbox Conversion Offer', ['Prime CRM']],
+      ['Mid-Year Clearance', ['PrimePOS', 'PrimeWeb', 'Prime CRM']],
     ] as const) {
       const row = screen.getByRole('row', { name: new RegExp(title) });
       const cell = within(row).getAllByRole('cell')[2];
@@ -67,7 +67,7 @@ describe('Promotion channel logos', () => {
     }
   });
 
-  it.each(['PrimeWeb', 'PrimePOS', 'Prime Inbox'])('shows %s on hover, focus and touch', async label => {
+  it.each(['PrimeWeb', 'PrimePOS', 'Prime CRM'])('shows %s on hover, focus and touch', async label => {
     mount();
     const trigger = screen.getAllByRole('button', { name: label, exact: true })[0];
     fireEvent.pointerMove(trigger, { pointerType: 'mouse' });

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, ExternalLink, Info, Layers3, Package, Plus, Search, TriangleAlert, ZoomIn } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, Info, Package, Plus, Search, TriangleAlert, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -17,13 +17,12 @@ import { hydrateReviewSkuSources } from '@/lib/listing-review-source';
 import { proposeListingReview } from '@/lib/listing-auto-proposal';
 import { listingMappingRecovery } from '@/lib/listing-mapping-recovery';
 import { pendingReviewFor, prepareReviewVariants, resolvedReviewMappings } from '@/lib/listing-review-progress';
-import { evidenceSummary, groupEvidenceSummary, listingMatchEvidence, rankMasterCandidates, safeListingUrl, suggestedMasterForReview } from '@/lib/listing-match-evidence';
+import { evidenceSummary, groupEvidenceSummary, rankMasterCandidates, safeListingUrl, suggestedMasterForReview } from '@/lib/listing-match-evidence';
 import { SelectedListingsOverview } from './SelectedListingsOverview';
 import { ListingMappingContext } from './ListingMappingContext';
 
 import { ListingMasterCompletion } from './ListingMasterCompletion';
 import { ListingComparisonTable } from './ListingComparisonTable';
-import { ListingSkuMappings } from './ListingSkuMappings';
 import { ListingSaveSummary } from './ListingSaveSummary';
 import { ListingReviewHelp } from './ListingReviewHelp';
 import { assertMasterComplete, completionFields, newListingMasterPreview, reviewMasterSignature, variantMappingError, type VariantMappings } from '@/lib/listing-master-completion';
@@ -78,6 +77,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   // Keep the creation proposal separate so visiting the existing-Master finder never discards it.
   const [creationProposal] = useState(() => creationPreview(sources[0], catalog.products(), undefined, sources.some(source => source.variants > 1), sources));
   const [newProduct, setNewProduct] = useState(creationProposal.product);
+  const [creationBaseline, setCreationBaseline] = useState(creationProposal.product);
   const [creationDirty, setCreationDirty] = useState(false);
   const [replacementSourceId, setReplacementSourceId] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
@@ -85,9 +85,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const [verifiedStructure, setVerifiedStructure] = useState(false);
   const [error, setError] = useState('');
   const [reloadNotice, setReloadNotice] = useState('');
-  const [mappingFocusRequest, setMappingFocusRequest] = useState(0);
   const recoveryId = useId();
-  const structureCheck = useRef<HTMLButtonElement>(null);
   const [initialProposal] = useState(() => master && !pending ? proposeListingReview(master, sources, catalog.products()) : null);
   const [completion, setCompletion] = useState<Product | null>(() => master && pending
     ? savedDraftCurrent ? { ...structuredClone(master), ...structuredClone(pending.master_draft) }
@@ -132,13 +130,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   }, [stage, onStageChange]);
   const current = sources[sourceIndex];
   const candidates = rankMasterCandidates(sources, catalog.products(), query);
-  const compareRows = master && current ? listingMatchEvidence(current, master) : [];
-  const differences = compareRows.filter(row => row.state === 'different' && row.key !== 'sku');
-  const skuDifference = compareRows.find(row => row.key === 'sku' && row.state === 'different');
-  const missing = compareRows.filter(row => row.state === 'missing');
-  const matches = compareRows.filter(row => row.state === 'match');
   const comparisonMaster = completion ?? master;
-  const proposedSkuCount = completion?.skus.filter(sku => !master?.skus.some(previous => previous.id === sku.id)).length ?? 0;
   const comparisonSources = groupedComparison ? sources : [current];
   const blocked = Boolean(comparisonMaster && comparisonSources.some(item => (item.variants === 0 && !verifiedSingles.includes(item.id))
     || (item.variants > 1 && !comparisonMaster.has_variants && comparisonMaster.product_type !== 'variant')));
@@ -179,7 +171,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     : editingDetails ? completeLabel : confirmLabel;
   const completionFeedback = completionError.startsWith('Complete required details before activating:')
     ? stage === 'compare' ? `${completionError.replace('Complete required details before activating:', 'Complete these Master fields:')} Or save progress and finish later.`
-      : master?.status === 'published' ? 'Complete the highlighted sections before saving these changes, or save progress.' : 'Complete the highlighted sections to activate, or save a draft.'
+      : stage === 'create' ? 'Complete the highlighted Master fields to activate, or save a draft.' : master?.status === 'published' ? 'Complete the highlighted sections before saving these changes, or save progress.' : 'Complete the highlighted sections to activate, or save a draft.'
     : completionError;
   const title = stage === 'complete' ? 'Complete Product Master' : stage === 'create' ? 'Create one Master' : stage === 'compare' ? 'Compare product details' : 'Find a Product Master';
   const openImage = (src: string, imageName: string) => setZoom({ src, name: imageName });
@@ -204,13 +196,14 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     const source = sources[index];
     setSourceId(id); setSourceIndex(index); setAcknowledged(false); setVerifiedStructure(false); setError('');
     const proposal = creationPreview(source, catalog.products(), newProduct, sources.some(item => item.variants > 1), sources);
-    setCreationMappings(proposal.mappings); setMediaReady(false); setReplacementSourceId('');
+    setCreationMappings(proposal.mappings); setMediaReady(true); setReplacementSourceId('');
     setNewProduct(proposal.product);
+    setCreationBaseline(proposal.product);
     setCreationDirty(false); setDirty(true);
   };
   const updateNewProduct = (product: Product) => {
     if (product.has_variants !== newProduct.has_variants) { setVerifiedStructure(false); setAcknowledged(false); }
-    setNewProduct(product); setCreationDirty(true); setDirty(true); setError('');
+    setNewProduct(product); setCreationDirty(true); setAcknowledged(false); setDirty(true); setError('');
   };
   const compare = (product: Product) => {
     const proposal = proposeListingReview(product, sources, catalog.products());
@@ -226,7 +219,6 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   };
   const changeSource = (index: number) => {
     if (groupEditing || index < 0 || index >= sources.length) return;
-    setMappingFocusRequest(0);
     setSourceIndex(index); setError(''); setReloadNotice('');
     if (scrollArea.current) scrollArea.current.scrollTop = 0;
     heading.current?.focus();
@@ -242,7 +234,10 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     const nextSources = sources.map(source => source.id === id ? structuredClone(latest) : source);
     const keptMappings = Object.fromEntries(Object.entries(mappings).filter(([key]) => key !== id));
     setSources(nextSources);
-    if (comparisonMaster) {
+    if (mode === 'new') {
+      const proposal = proposeListingReview(newProduct, nextSources, catalog.products(), keptMappings);
+      setNewProduct(proposal.product); setCreationMappings(proposal.mappings); setCreationDirty(true); setDirty(true); setMediaReady(true);
+    } else if (comparisonMaster) {
       const proposal = proposeListingReview(comparisonMaster, nextSources, catalog.products(), keptMappings);
       setCompletion(master && reviewMasterSignature(proposal.product) === reviewMasterSignature(master) ? null : proposal.product);
       setMappings(proposal.mappings); setMediaReady(true);
@@ -296,7 +291,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   };
   const sourceCard = (item: CatalogImportItem) => {
     const href = safeListingUrl(item.listingUrl);
-    if (stage !== 'compare') return <div className="flex min-w-0 items-center gap-3">
+    return <div className="flex min-w-0 items-center gap-3">
       <Photo src={item.image || item.images?.[0]} name={item.title} onZoom={openImage} small />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
@@ -309,16 +304,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
         </div>
       </div>
     </div>;
-    return <div className="flex min-w-0 items-start gap-4">
-      <Photo src={item.image || item.images?.[0]} name={item.title} onZoom={openImage} small={stage === 'compare'} />
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><ChannelLogo channel={{ key: item.channel }} /><span>{item.storeName}</span><span className="capitalize">· {item.channel}</span></div>
-        <p className="break-words text-sm font-semibold leading-5">{item.title}</p>
-        <p className="break-words font-mono text-xs text-muted-foreground">{item.channelSku}</p>
-        <p className="text-xs text-muted-foreground">{item.brand || 'Brand not provided'} · {item.variants === 0 ? 'SKU structure not recorded' : item.variants === 1 ? 'Single product' : `${item.variants} SKUs`}</p>
-        {href && <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 text-xs underline underline-offset-4">Open source listing <ExternalLink className="size-3" /></a>}
-      </div>
-    </div>;
+
   };
 
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
@@ -334,12 +320,9 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {stage !== 'complete' && existingLinks.length > 0 && <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><p className="font-medium">Review an existing link</p><p>{[...new Set(existingLinks.flatMap(item => item.existingLinkReview!.issues))].join(' · ')}</p><p className="text-muted-foreground">The current link is unchanged until you confirm. Choosing another Master or creating a new Master moves only the selected links; Master stock is not transferred.</p></div>}
 
       {sources.length > 1 && stage === 'choose' && <SelectedListingsOverview listings={sources} />}
-      {groupedComparison && master && <ListingMappingContext layout="matrix" disabled={groupEditing} listings={sources} activeIndex={sourceIndex} reviewedIds={reviewedIds} needsSkuReviewIds={needsSkuReviewIds} proposed={Boolean(completion)} master={comparisonMaster!} masterImage={<Photo src={comparisonMaster!.images[0]} name={comparisonMaster!.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={() => changeDestination('existing')} onCreateMaster={() => changeDestination('new')} />}
+      {stage === 'compare' && master && <ListingMappingContext layout="matrix" destinationLabel={current.existingLinkReview?.productId === master.id ? 'Current Product Master' : isSuggestedMaster ? 'Suggested Product Master' : 'Selected Product Master'} disabled={groupEditing} listings={sources} activeIndex={sourceIndex} reviewedIds={reviewedIds} needsSkuReviewIds={needsSkuReviewIds} proposed={Boolean(completion)} master={comparisonMaster!} masterImage={<Photo src={comparisonMaster!.images[0]} name={comparisonMaster!.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={() => changeDestination('existing')} onCreateMaster={() => changeDestination('new')} />}
 
-      {current && stage !== 'complete' && !groupedComparison && !(stage === 'choose' && sources.length > 1) && <div className={master && mode === 'existing' ? 'grid gap-3 sm:grid-cols-2' : ''}>
-        <div role="group" aria-label="Source listing" className="min-w-0 rounded-xl border bg-muted/20 p-3">{stage === 'compare' && <p className="mb-2 text-xs font-medium text-muted-foreground">Source listing</p>}{sourceCard(current)}</div>
-        {master && mode === 'existing' && <div className="min-w-0 rounded-xl border border-primary/30 bg-primary/[0.025] p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs"><p className="font-medium text-muted-foreground">{current.existingLinkReview?.productId === master.id ? 'Current Product Master' : isSuggestedMaster ? 'Suggested Product Master' : 'Selected Product Master'}</p><span className="text-muted-foreground">{current.existingLinkReview?.productId === master.id ? 'Existing link · review required' : 'Not confirmed'}</span></div><div className="flex items-start gap-4"><Photo src={master.images[0]} name={master.name} onZoom={openImage} small /><div className="min-w-0 space-y-1.5"><p className="break-words text-sm font-semibold leading-5">{master.name}</p><p className="break-words font-mono text-xs text-muted-foreground">{master.sku_code}</p><p className="text-xs text-muted-foreground">{master.brand || 'Brand not provided'}</p><p className="text-xs text-muted-foreground">{master.category || 'No category'} · Master {master.status === 'published' ? 'Active' : 'Draft'}</p></div></div>{stage === 'compare' && <div className="mt-3 flex flex-wrap gap-1 border-t pt-1"><Button variant="ghost" className="h-9 px-2 text-xs" disabled={groupEditing} onClick={() => changeDestination('existing')}>Choose another Master</Button><Button variant="ghost" className="h-9 px-2 text-xs text-muted-foreground" disabled={groupEditing} onClick={() => changeDestination('new')}><Plus className="size-3.5" />Create new Master</Button></div>}</div>}
-      </div>}
+      {current && (stage === 'choose' || stage === 'create') && sources.length === 1 && <div role="group" aria-label="Source listing" className="min-w-0 rounded-xl border bg-muted/20 p-3">{sourceCard(current)}</div>}
 
       {stage === 'choose' && <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end" role="group" aria-label="Find or create a Master">
@@ -373,26 +356,8 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       </div>}
 
       {stage === 'compare' && master && <>
-        {proposedSkuCount > 0 && <div role="note" aria-label="Automatic SKU proposals" className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5"><Plus className="mt-0.5 size-4 shrink-0 text-primary" /><div><p className="text-xs font-medium">{proposedSkuCount} new Master SKU{proposedSkuCount === 1 ? '' : 's'} proposed · Not saved</p><p className="mt-1 text-xs text-muted-foreground">Review the filled pairs and prices below. Confirm these listings belong to the same product; edit or remove any incorrect proposal.</p>{!master.has_variants && <p className="mt-1 text-xs text-muted-foreground">Saving adds variants to this Master. Existing stock is preserved, not split.</p>}</div><ListingReviewHelp label="Automatic mapping proposals">Existing matches are selected first. Unmatched source SKUs get separate proposed Master rows. A new row is not proof that two products match. Same-currency source prices are copied; otherwise the current Master base price is suggested and labelled. Nothing is saved, published or synced until you confirm.</ListingReviewHelp></div>}
-        {mappingRecovery && <div role="note" aria-label="SKU mapping needs review" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-          <div className="min-w-0 flex-1"><p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300"><TriangleAlert className="size-4 shrink-0" />{mappingRecovery.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{mappingRecovery.detail}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">You can link and finish later. Unconfirmed mappings cannot be used for price or stock sync.</p></div>
-          <Button variant="outline" className="h-11" disabled={groupEditing} onClick={() => {
-            if (mappingRecovery.action === 'setup') completeHere();
-            else if (mappingRecovery.action === 'reload') reloadSource(current.id);
-            else if (mappingRecovery.action === 'matches') setMappingFocusRequest(value => value + 1);
-            else { structureCheck.current?.focus({ preventScroll: true }); structureCheck.current?.scrollIntoView?.({ block: 'center', behavior: 'auto' }); }
-          }}>{mappingRecovery.actionLabel}<ArrowRight className="size-4" /></Button>
-        </div>}
-        {!groupedComparison && current.variants === 0 && <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm leading-6"><Checkbox ref={structureCheck} disabled={groupEditing} className="mt-1 shrink-0" checked={verifiedSingles.includes(current.id)} onCheckedChange={checked => { setVerifiedSingles(ids => checked === true ? [...ids, current.id] : ids.filter(id => id !== current.id)); setReviewedIds([]); setDirty(true); }} /><span>Source structure is not recorded. I checked the shop listing: its product, pack quantity and SKU structure match this Master. I will map any variant SKUs below.</span></label>}
-        {!groupedComparison && differences.length > 0 && <div role="group" aria-label="Differences to check" className="overflow-hidden rounded-lg border border-amber-500/30">
-          <div className="flex items-center gap-2 bg-amber-500/5 px-3 py-2.5"><TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-amber-700 dark:text-amber-300" /><h3 className="text-xs font-semibold">Check product identity</h3><ListingReviewHelp label="Product differences">Different values do not automatically mean a different product. Check brand, model and pack size before linking. No Master value is overwritten by linking.</ListingReviewHelp></div>
-          {differences.map(row => <div key={row.key} className="grid gap-x-3 gap-y-1 px-3 py-2 text-xs sm:grid-cols-[120px_1fr_1fr]"><p className="font-medium text-amber-700 dark:text-amber-300">{row.label} differs</p><p className="min-w-0 break-words"><span className="text-muted-foreground">Listing: </span>{row.listing}</p><p className="min-w-0 break-words"><span className="text-muted-foreground">Master: </span>{row.master}</p></div>)}
-        </div>}
-        {!groupedComparison && (comparisonMaster!.has_variants || comparisonMaster!.product_type === 'variant') && <ListingSkuMappings key={`${current.id}:${master.id}`} compact focusRequest={mappingFocusRequest} verifiedSingles={verifiedSingles} product={comparisonMaster!} sources={[current]} mappings={mappings} onReload={mappingRecovery?.action === 'reload' ? undefined : reloadSource} onChange={value => { setMappings(value); setReviewedIds(ids => ids.filter(id => id !== current.id)); setDirty(true); setError(''); }} />}
-        <div className="space-y-2">
-          {!groupedComparison && (skuDifference || missing.length > 0) && <p className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" /><span>{skuDifference && 'Shop and Master SKU codes differ; this can be normal. '}{missing.length > 0 && `${missing.length} identity fields unverified.`}</span><ListingReviewHelp label="Unverified product fields">{missing.length ? `Not provided: ${missing.map(row => row.label).join(', ')}. Missing data is not evidence of a match. Check the actual product before linking.` : 'Shop identifiers do not have to use the same code as the Master.'}</ListingReviewHelp></p>}
-          {!groupedComparison && matches.length > 0 && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Check className="size-3.5" />Matches: {matches.map(row => row.label).join(', ')}.</p>}
-          <ListingComparisonTable key={`${current.id}:${master.id}`} baseline={master} product={comparisonMaster!} current={current} sources={sources}
+        <div className="min-w-0">
+          <ListingComparisonTable key={`${current.id}:${master.id}`} baseline={master} product={comparisonMaster!} current={current} sources={sources} onImagePreview={openImage}
             skuMatrix={{ mappings, verifiedSingles, onReload: reloadSource,
               onVerify: (id, checked) => { setVerifiedSingles(ids => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id)); setAcknowledged(false); setDirty(true); setError(''); },
               onMappingsChange: value => { setMappings(value); setAcknowledged(false); setDirty(true); setError(''); } }}
@@ -410,11 +375,12 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       </>}
       {stage === 'create' && <div className="space-y-3">
         {sources.length > 1 && <div className="space-y-2"><div className="flex items-center gap-1"><Label htmlFor="intake-source">Starting data from</Label><ListingReviewHelp label="Starting listing data">This sets the starting data. In Edit, use Change source for an individual field to take a value from another selected listing. Replacing the starting listing resets the proposal after confirmation.</ListingReviewHelp></div><select id="intake-source" disabled={groupEditing} className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={sourceId} onChange={event => { if (creationDirty) setReplacementSourceId(event.target.value); else changeDraftSource(event.target.value); }}>{sources.map(item => <option key={item.id} value={item.id}>{item.storeName} · {item.channel} · {item.channelSku}</option>)}</select></div>}
-        <ListingMasterCompletion verifiedSingles={mode === 'new' && verifiedStructure ? sources.map(source => source.id) : verifiedSingles} key={sourceId} product={newProduct} sources={sources} onChange={updateNewProduct} mappings={mappings} onMappingsChange={value => { setMappings(value); setCreationDirty(true); setDirty(true); }} onMediaReady={setMediaReady} onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }} creationSetup={(editingProduct, editProduct) => <section className="space-y-3 border-t pt-3" aria-label="Master SKU and product structure">
-          <div className="grid gap-4 sm:grid-cols-[1fr_2fr]"><div className="space-y-2"><div className="flex items-center gap-1"><Label htmlFor="intake-sku">Master SKU <span aria-hidden="true">*</span></Label><ListingReviewHelp label="Master SKU">Unique internal code. Shop SKUs stay unchanged.</ListingReviewHelp></div><Input id="intake-sku" required className="h-11 font-mono" value={editingProduct.sku_code} onChange={event => editProduct({ ...editingProduct, sku_code: event.target.value.toUpperCase() })} /></div><fieldset className="space-y-2"><legend className="text-sm font-medium">Product type *</legend><div className="flex flex-wrap gap-2">{[{ type: 'single', label: 'Single product', Icon: Package }, { type: 'variant', label: 'With variants', Icon: Layers3 }].map(option => <label key={option.type} className={`flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm ${editingProduct.product_type === option.type ? 'border-primary bg-primary/5' : ''} ${option.type === 'single' && sources.some(source => source.variants > 1) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}><input type="radio" name="intake-product-type" value={option.type} checked={editingProduct.product_type === option.type} disabled={option.type === 'single' && sources.some(source => source.variants > 1)} onChange={() => editProduct({ ...editingProduct, has_variants: option.type === 'variant', product_type: option.type === 'variant' ? 'variant' : 'single' })} className="size-4 accent-primary" /><option.Icon className="size-4" />{option.label}</label>)}</div><p className="text-xs text-muted-foreground">{current.variants > 1 ? `${current.variants} shop SKUs detected. Review prefilled variants and SKU mapping below.` : unknownStructure ? 'Check the source SKU structure before confirming the product type.' : 'Review variant options and SKU mapping below when using variants.'}</p></fieldset></div>
-        </section>} />
+        <ListingComparisonTable creating key={sourceId} baseline={creationBaseline} product={newProduct} current={current} sources={sources} onChange={updateNewProduct}
+          onMediaReady={setMediaReady} onSetupSkus={() => {}} onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }}
+          skuMatrix={{ mappings, verifiedSingles: verifiedStructure ? sources.map(source => source.id) : verifiedSingles, onReload: reloadSource,
+            onVerify: (id, checked) => { const next = checked ? [...new Set([...verifiedSingles, id])] : verifiedSingles.filter(value => value !== id); setVerifiedSingles(next); setVerifiedStructure(sources.filter(source => source.variants === 0).every(source => next.includes(source.id))); setAcknowledged(false); setDirty(true); },
+            onMappingsChange: value => { setMappings(value); setCreationDirty(true); setAcknowledged(false); setDirty(true); setError(''); } }} />
         {unknownStructure && <label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><Checkbox className="mt-1 shrink-0" checked={verifiedStructure} onCheckedChange={checked => setVerifiedStructure(checked === true)} />Source structure is not recorded. I checked the shop listing(s) and selected the correct product structure above.</label>}
-        {sources.length > 1 && <details className="rounded-lg border px-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Listings to group into this Master · {sources.length}</summary>{sources.map(item => <p key={item.id} className="border-b py-2 text-sm last:border-0">{item.title}<span className="mt-1 block text-xs text-muted-foreground">{item.storeName} · {item.channelSku} · {item.brand || 'Brand not provided'}</span></p>)}</details>}
         {sources.length > 1 && <label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><Checkbox checked={acknowledged} onCheckedChange={checked => setAcknowledged(checked === true)} className="mt-1 shrink-0" />I checked that the selected listings represent this product, including model and pack size.</label>}
       </div>}
       {stage !== 'choose' && (reviewProduct || master) && <ListingChannelReadiness product={(reviewProduct || master)!} activateMaster={editingDetails} sources={sources} mappings={mappings} drafts={listingDrafts} disabled={groupEditing} onChange={value => { setListingDrafts(value); setDirty(true); }} />}

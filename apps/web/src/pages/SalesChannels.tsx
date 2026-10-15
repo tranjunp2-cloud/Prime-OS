@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,6 +51,7 @@ type ChannelType = 'E-Commerce/Web' | 'Marketplace' | 'Retail POS';
 type ConnectionStatus = 'Connected' | 'Expired' | 'Sync Error' | 'Initial Syncing';
 type DirectoryFilter = 'All' | ChannelType;
 type DrawerTab = 'connection' | 'warehouse' | 'pricing' | 'rules' | 'logs';
+type SyncRuleField = 'priceSync' | 'inventorySync' | 'orderSync';
 
 type StoreChannel = {
   id: string;
@@ -78,6 +80,12 @@ const syncLogs = [
 ];
 
 const filterTabs: DirectoryFilter[] = ['All', 'E-Commerce/Web', 'Marketplace', 'Retail POS'];
+
+const syncRuleDefinitions: Array<{ field: SyncRuleField; title: string; detail: string; impact: string; actionLabel: string }> = [
+  { field: 'priceSync', title: 'Automatic price sync', detail: 'Push approved catalog price changes to this channel.', impact: 'New approved prices from Product Masters will no longer be pushed to this channel. Current channel prices will remain unchanged.', actionLabel: 'Turn off price sync' },
+  { field: 'inventorySync', title: 'Automatic inventory sync', detail: 'Publish available-to-promise stock from the mapped warehouse.', impact: 'Stock will stop updating from the mapped warehouse. The last published quantities will remain on the channel and may become outdated.', actionLabel: 'Turn off inventory sync' },
+  { field: 'orderSync', title: 'Automatic order import', detail: 'Import new channel orders into Order Management.', impact: 'New channel orders will no longer be imported into Order Management. Orders imported previously will remain available.', actionLabel: 'Turn off order import' },
+];
 
 const statusStyles: Record<ConnectionStatus, string> = {
   Connected: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -137,6 +145,10 @@ function SyncServices({ channel }: { channel: StoreChannel }) {
   })}</div>;
 }
 
+function ColumnHelp({ label, children, align = 'left' }: { label: string; children: string; align?: 'left' | 'right' }) {
+  return <Tooltip><TooltipTrigger asChild><button type="button" className={cn('inline-flex min-h-8 items-center gap-1 rounded-sm text-left uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', align === 'right' && 'ml-auto')} aria-label={`About ${label} column`}>{label}<Info className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" /></button></TooltipTrigger><TooltipContent side="bottom" className="max-w-xs text-xs font-normal normal-case leading-5 tracking-normal">{children}</TooltipContent></Tooltip>;
+}
+
 export function ConnectedChannelsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -154,6 +166,7 @@ export function ConnectedChannelsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [newlyConnected, setNewlyConnected] = useState<ConnectedChannelRecord | null>(null);
+  const [pendingRuleDisable, setPendingRuleDisable] = useState<(typeof syncRuleDefinitions)[number] | null>(null);
   useEffect(() => {
     if (demoState !== 'no-data') return;
     setSelectedChannel(null); setSelectedIds([]); setNewlyConnected(null); setWizardOpen(false);
@@ -264,9 +277,9 @@ export function ConnectedChannelsPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <TooltipProvider><div className="overflow-x-auto">
             <table className="w-full min-w-[1100px] text-left">
-              <thead className="bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="w-10 px-4 py-3"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => toggleAllVisible(checked === true)} aria-label="Select all visible stores" /></th><th className="px-3 py-3">Channel</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Connection</th><th className="px-4 py-3 text-right">Listings</th><th className="px-4 py-3">Default warehouse</th><th className="px-4 py-3">Active Sync Services</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
+              <thead className="bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="w-10 px-4 py-3"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => toggleAllVisible(checked === true)} aria-label="Select all visible stores" /></th><th className="px-3 py-3">Channel</th><th className="px-4 py-3">Type</th><th className="px-4 py-3"><ColumnHelp label="Connection">Shows the channel authorization and sync health, plus when it last synchronized successfully.</ColumnHelp></th><th className="px-4 py-3 text-right"><ColumnHelp label="Listings" align="right">The number of channel listings linked and synchronized. This is not the number of unique Product Masters.</ColumnHelp></th><th className="px-4 py-3"><ColumnHelp label="Default warehouse">The warehouse used as the stock source when inventory sync is enabled for this channel.</ColumnHelp></th><th className="px-4 py-3"><ColumnHelp label="Active Sync Services">The automatic services currently enabled for the channel: price updates, stock updates, and order imports.</ColumnHelp></th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {visibleChannels.map((channel) => {
                   const StatusIcon = statusIcons[channel.status];
@@ -275,7 +288,7 @@ export function ConnectedChannelsPage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </div></TooltipProvider>
           {!visibleChannels.length ? <div className="border-t border-slate-200 px-6 py-14 text-center"><p className="font-semibold text-slate-900">No matching channels</p><p className="mt-1 text-sm text-slate-500">Clear the search or choose another channel type.</p></div> : null}
         </section>
         </>}
@@ -293,13 +306,33 @@ export function ConnectedChannelsPage() {
                 <TabsContent value="connection" className="mt-0 space-y-5"><section className="rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">Authorization token</p><p className="mt-1 text-xs text-slate-500">{selectedChannel.token}</p></div><span className={cn('rounded-md border px-2 py-1 text-xs font-semibold', statusStyles[selectedChannel.status])}>{selectedChannel.status}</span></div><div className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-500">Last successful sync: {selectedChannel.lastSync}</div></section><Button type="button" onClick={reconnect}><RefreshCw className="size-4" />Reconnect account</Button><div className="border-t border-slate-200 pt-5"><p className="text-sm font-semibold text-slate-900">Disconnect channel</p><p className="mt-1 text-xs leading-5 text-slate-500">Stops new order, inventory, and price synchronization. Existing Prime OS data is retained.</p><Button type="button" variant="outline" className="mt-3 border-rose-200 text-rose-700 hover:bg-rose-50"><Unplug className="size-4" />Disconnect</Button></div></TabsContent>
                 <TabsContent value="warehouse" className="mt-0 space-y-5">{connections.status === 'ready' && selectedShop ? <ShopDefaultWarehouseForm key={selectedShop.id} shop={selectedShop} shops={connections.shops} onBusyChange={setWarehouseSaving} onReload={loadChannels} /> : <div role="alert" className="space-y-3 text-sm"><p>{connections.error || 'Loading warehouse settings…'}</p><Button variant="outline" onClick={loadChannels}>Reload shops</Button></div>}</TabsContent>
                 <TabsContent value="pricing" className="mt-0"><ShopPricingSettings key={selectedChannel.id} shopId={shopPricingId(selectedChannel.platform || selectedChannel.name, selectedChannel.account)} label={`${selectedChannel.name} · ${selectedChannel.account}`} /></TabsContent>
-                <TabsContent value="rules" className="mt-0 space-y-6">{[['priceSync', 'Automatic price sync', 'Push approved catalog price changes to this channel.'], ['inventorySync', 'Automatic inventory sync', 'Publish available-to-promise stock from the mapped warehouse.'], ['orderSync', 'Automatic order import', 'Import new channel orders into Order Management.']].map(([field, title, detail]) => <div key={field} className="flex items-start justify-between gap-4 border-t border-slate-200 pt-5"><div><p className="text-sm font-semibold text-slate-900">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p></div><Switch checked={selectedChannel[field as 'priceSync' | 'inventorySync' | 'orderSync']} onCheckedChange={(checked) => updateChannel(selectedChannel.id, { [field]: checked })} aria-label={title} /></div>)}<Button type="button" onClick={() => toast.success('Sync rules saved')}>Save sync rules</Button></TabsContent>
+                <TabsContent value="rules" className="mt-0 space-y-6">{syncRuleDefinitions.map((rule) => <div key={rule.field} className="flex items-start justify-between gap-4 border-t border-slate-200 pt-5"><div><p className="text-sm font-semibold text-slate-900">{rule.title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{rule.detail}</p></div><Switch checked={selectedChannel[rule.field]} onCheckedChange={(checked) => { if (checked) updateChannel(selectedChannel.id, { [rule.field]: true }); else setPendingRuleDisable(rule); }} aria-label={rule.title} /></div>)}<Button type="button" onClick={() => toast.success('Sync rules saved')}>Save sync rules</Button></TabsContent>
                 <TabsContent value="logs" className="mt-0 space-y-4"><div className="flex items-center justify-between gap-4"><div><h3 className="text-sm font-semibold text-slate-900">Recent API activity</h3><p className="mt-1 text-xs text-slate-500">Retry failed operations after fixing their source issue.</p></div><Button type="button" size="sm" variant="outline" onClick={() => toast.success('All eligible sync operations queued')}><ListRestart className="size-4" />Retry all</Button></div><div className="overflow-hidden rounded-xl border border-slate-200"><div className="divide-y divide-slate-100">{syncLogs.map((log) => <div key={log.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{log.operation} · {log.item}</p><p className="mt-1 text-xs text-slate-500">{log.id} · {log.time}</p></div><span className={cn('text-xs font-semibold', log.status === 'Failed' ? 'text-rose-700' : 'text-emerald-700')}>{log.status}</span></div><p className="mt-2 text-xs leading-5 text-slate-600">{log.error}</p>{log.status === 'Failed' ? <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => toast.success(`${log.id} queued for retry`)}><RefreshCw className="size-4" />Retry Sync</Button> : null}</div>)}</div></div></TabsContent>
               </div>
             </Tabs>
           </> : null}
         </SheetContent>
       </Sheet>
+      <AlertDialog open={Boolean(pendingRuleDisable)} onOpenChange={(open) => { if (!open) setPendingRuleDisable(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Turn off {pendingRuleDisable?.title.toLowerCase()}?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <span className="block">{pendingRuleDisable?.impact}</span>
+              <span className="block font-medium text-foreground">This applies to every Product Master linked to {selectedChannel?.name}. Existing links and previously synced data will not be deleted.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep sync on</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => {
+              if (!selectedChannel || !pendingRuleDisable) return;
+              updateChannel(selectedChannel.id, { [pendingRuleDisable.field]: false });
+              toast.success(`${pendingRuleDisable.title} turned off for ${selectedChannel.name}`);
+              setPendingRuleDisable(null);
+            }}>{pendingRuleDisable?.actionLabel}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ConnectStoreWizardModal open={wizardOpen} onOpenChange={setWizardOpen} onConnected={handleConnected} />
       {selectedIds.length ? <div className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-white shadow-2xl"><span className="px-2 text-xs font-semibold tabular-nums">{selectedIds.length} selected</span><span className="h-6 w-px bg-slate-700" /><Button type="button" size="sm" variant="ghost" className="text-white hover:bg-slate-800 hover:text-white" onClick={() => toast.success(`${selectedIds.length} stores queued for re-sync`)}><RefreshCw className="size-4" />Bulk Re-sync</Button><Button type="button" size="sm" variant="ghost" className="text-white hover:bg-slate-800 hover:text-white" onClick={() => toast.success(`${selectedIds.length} stores queued for reconnect`)}><Link2 className="size-4" />Bulk Reconnect</Button><Button type="button" size="sm" variant="ghost" className="text-white hover:bg-slate-800 hover:text-white" onClick={() => toast.success('Store logs export prepared')}><Download className="size-4" />Export Store Logs</Button><button type="button" className="grid size-8 place-items-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white" onClick={() => setSelectedIds([])} aria-label="Clear store selection"><XCircle className="size-4" /></button></div> : null}
     </div>

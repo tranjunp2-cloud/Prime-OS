@@ -36,7 +36,7 @@ describe('shared workspace header', () => {
     ['/admin/dashboard', 'Main Workspace'],
     ['/builder/sites', 'PrimeWeb Workspace'],
     ['/pos/register', 'POS Workspace'],
-    ['/inbox/conversation', 'Prime Inbox Workspace'],
+    ['/inbox/conversation', 'Prime CRM Workspace'],
   ])('renders the same application toolbar and assistant shell at %s', async (path, name) => {
     mount(path);
     const header = await screen.findByRole('banner', { name: 'Application scope toolbar' });
@@ -52,6 +52,8 @@ describe('shared workspace header', () => {
     mount('/inbox/conversation?demo=no-data');
     const header = await screen.findByRole('banner', { name: 'Application scope toolbar' });
     const back = within(header).getByRole('link', { name: 'Back to Main Workspace' });
+    const switcher = within(header).getByRole('button', { name: 'Switch workspace. Current workspace: Prime CRM Workspace' });
+    expect(back.compareDocumentPosition(switcher) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(back).toHaveAttribute('href', '/admin/dashboard');
     expect(within(header).queryByRole('button', { name: 'No data' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'With data' }));
@@ -68,7 +70,7 @@ describe('shared workspace header', () => {
     const header = await screen.findByRole('banner', { name: 'Application scope toolbar' });
     fireEvent.click(screen.getByRole('link', { name: 'Open Inbox' }));
     expect(screen.getByRole('banner', { name: 'Application scope toolbar' })).toBe(header);
-    expect(within(header).getByRole('button', { name: 'Switch workspace. Current workspace: Prime Inbox Workspace' })).toBeVisible();
+    expect(within(header).getByRole('button', { name: 'Switch workspace. Current workspace: Prime CRM Workspace' })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Primary navigation' })).not.toBeInTheDocument();
   });
   it('dispatches the shared Prime AI action in Inbox', async () => {

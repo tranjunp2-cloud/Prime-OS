@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronUp, Package, Plus, TriangleAlert } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronUp, Package, Plus, TriangleAlert, ZoomIn } from 'lucide-react';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { Button } from '@/components/ui/button';
 import type { CatalogImportItem } from '@/lib/catalog-import-store';
@@ -14,6 +14,7 @@ type Props = {
   reviewedIds: string[];
   needsSkuReviewIds?: string[];
   proposed?: boolean;
+  destinationLabel?: string;
   master: Product;
   masterImage: ReactNode;
   onView: (index: number) => void;
@@ -21,18 +22,17 @@ type Props = {
   onCreateMaster: () => void;
 };
 
-function ListingThumbnail({ listing }: { listing: CatalogImportItem }) {
+export function ListingThumbnail({ listing, onZoom }: { listing: CatalogImportItem; onZoom?: (src: string, name: string) => void }) {
   const src = listing.image || listing.images?.[0];
   const [failedSrc, setFailedSrc] = useState<string>();
-  return <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border bg-background">
-    {src && src !== failedSrc
-      ? <img src={src} alt="" className="size-full object-contain" onError={() => setFailedSrc(src)} />
-      : <Package className="size-4 text-muted-foreground" aria-hidden="true" />}
-  </span>;
+  const valid = src && src !== failedSrc;
+  const content = valid ? <img src={src} alt={onZoom ? listing.title : ''} className="size-full object-contain" onError={() => setFailedSrc(src)} /> : <Package className="size-4 text-muted-foreground" aria-hidden="true" />;
+  const style = 'relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-md border bg-background';
+  return valid && onZoom ? <button type="button" aria-label={`Enlarge image of ${listing.title}`} onClick={() => onZoom(src, listing.title)} className={`${style} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}>{content}<ZoomIn className="absolute bottom-0.5 right-0.5 size-3.5 rounded bg-background" aria-hidden="true" /></button> : <span className={style}>{content}</span>;
 }
 
 /** Review navigation and the shared destination, not a preview of already-saved links. */
-export function ListingMappingContext({ layout = 'queue', listings, activeIndex, reviewedIds, needsSkuReviewIds = [], proposed = false, master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
+export function ListingMappingContext({ layout = 'queue', listings, activeIndex, reviewedIds, needsSkuReviewIds = [], proposed = false, destinationLabel = 'Destination Master', master, masterImage, onView, onChangeMaster, onCreateMaster, disabled = false }: Props) {
   const headingId = useId();
   const listId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -54,12 +54,12 @@ export function ListingMappingContext({ layout = 'queue', listings, activeIndex,
   }, [activeIndex, expanded]);
 
   if (layout === 'matrix') return <section aria-labelledby={headingId} className="space-y-3">
-    <div className="flex flex-wrap items-center gap-2"><h3 id={headingId} className="flex items-center gap-2 text-sm font-semibold">{listings.length} listings <ArrowRight aria-hidden="true" className="size-4 text-muted-foreground" /><span className="sr-only">to </span>1 Product Master</h3><ListingReviewHelp label="Linking multiple listings">Compare all selected listings together. Each row selects one shared Master value; it does not make shop values identical. Nothing is saved until you confirm. Linking does not enable sync.</ListingReviewHelp></div>
-    <p className="text-xs text-muted-foreground">All selected listings will link to this Master. Check that they represent the same product.</p>
+    <div className="flex flex-wrap items-center gap-2"><h3 id={headingId} className="flex items-center gap-2 text-sm font-semibold">{listings.length} listing{listings.length === 1 ? '' : 's'} <ArrowRight aria-hidden="true" className="size-4 text-muted-foreground" /><span className="sr-only">to </span>1 Product Master</h3><ListingReviewHelp label="Linking listings">Each row selects one Master value; it does not make shop values identical. Nothing is saved until you confirm. Linking does not enable sync.</ListingReviewHelp></div>
+    <p className="text-xs text-muted-foreground">{listings.length === 1 ? 'Check that this listing and the Master represent the same product.' : 'All selected listings will link to this Master. Different products? Go back and change your selection.'}</p>
     <div role="group" aria-label="Shared destination Master" className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-3">
       {masterImage}
-      <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">Destination Master · For all {listings.length} listings</p><p className="mt-1 break-words text-sm font-semibold">{master.name}</p><p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{master.sku_code}</span> · {hasVariants ? `${master.skus.length} variant SKUs` : 'Single product · 1 SKU'} · {proposed ? 'Proposed changes · not saved' : `Master ${master.status === 'published' ? 'Active' : 'Draft'}`}</p></div>
-      <div className="flex flex-wrap gap-1"><Button variant="outline" className="h-11 text-xs" disabled={disabled} onClick={onChangeMaster}>Change Master for all</Button><Button variant="ghost" className="h-11 text-xs" disabled={disabled} onClick={onCreateMaster}><Plus className="size-3.5" />Create a new Master for all</Button></div>
+      <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{listings.length === 1 ? destinationLabel : `Destination Master · For all ${listings.length} listings`}<span className="ml-2 rounded border px-1.5 py-0.5 text-[11px]">{destinationLabel === 'Current Product Master' ? 'Existing link · review required' : 'Not confirmed'}</span></p><p className="mt-1 break-words text-sm font-semibold">{master.name}</p><p className="mt-1 break-words text-xs text-muted-foreground"><span className="font-mono">{master.sku_code}</span> · {hasVariants ? `${master.skus.length} variant SKUs` : 'Single product · 1 SKU'} · Master {master.status === 'published' ? 'Active' : 'Draft'}</p>{proposed && <p className="mt-1 text-xs text-primary">Proposed changes · not saved</p>}</div>
+      <div className="flex flex-wrap gap-1"><Button variant="outline" className="h-11 text-xs" disabled={disabled} onClick={onChangeMaster}>{listings.length === 1 ? 'Choose another Master' : 'Change Master for all'}</Button><Button variant="ghost" className="h-11 text-xs" disabled={disabled} onClick={onCreateMaster}><Plus className="size-3.5" />{listings.length === 1 ? 'Create new Master' : 'Create a new Master for all'}</Button></div>
     </div>
   </section>;
 

@@ -34,8 +34,6 @@ describe('empty workspace coverage', () => {
     ['/finance/fin-support', 'No financial assessment yet'],
     ['/crm/mdec', 'No business activity yet'],
     ['/ecom/commerce-surface', 'No commerce activity yet'],
-    ['/billing', 'No billing activity yet'],
-    ['/billing?tab=requests', 'No plan requests yet'],
     ['/pos/register', 'No products available for checkout'],
     ['/pos/shifts', 'No shifts yet'],
     ['/pos/transactions', 'No transactions yet'],
@@ -54,7 +52,7 @@ describe('empty workspace coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'With data' }));
     expect(screen.getByText('Populated child')).toBeVisible();
   });
-  it.each(['/settings/general', '/settings/team-access', '/settings/pricing-rules', '/faq', '/docs', '/billing?tab=plans', '/pos/hardware', '/products/new', '/customers', '/orders', '/marketing', '/promotions/discount-codes', '/builder/sites', '/inbox/conversation'])('retains configuration, creation flows, or native empty UI at %s', path => {
+  it.each(['/settings/general', '/settings/team-access', '/settings/pricing-rules', '/faq', '/docs', '/billing', '/billing?tab=plans', '/billing?tab=requests', '/pos/hardware', '/products/new', '/customers', '/orders', '/marketing', '/promotions/discount-codes', '/builder/sites', '/inbox/conversation'])('retains configuration, creation flows, or native empty UI at %s', path => {
     mount(path);
     expect(screen.getByText('Populated child')).toBeVisible();
     expect(screen.queryByTestId('workspace-no-data')).not.toBeInTheDocument();

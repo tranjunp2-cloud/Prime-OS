@@ -25,15 +25,15 @@ export function ProductChannelListings({ rows }: { rows: ProductChannelListingRo
       </tr></thead>
       <tbody role="rowgroup">{rows.map(row => <tr role="row" key={row.id} data-newly-linked={row.newlyLinked || undefined}>
         <td role="cell" className={styles.identity}>
-          <div className="flex items-start gap-2.5">
+          <div className={styles.identityContent}>
             <ChannelLogo channel={{ key: row.channelKey === 'webstore' ? 'primeweb' : row.channelKey, label: row.channelLabel }} size="sm" />
-            <div className="min-w-0"><p className="break-words text-sm font-semibold">{row.shop}{' '}<span className="ml-1 text-xs font-normal text-muted-foreground">{row.channelLabel}</span>{row.newlyLinked && <span className="sr-only"> · Newly linked</span>}</p><p className="mt-1 break-all text-xs text-muted-foreground">SKU: <span className="font-mono">{row.sku}</span></p>{row.context && <div className="mt-1 text-xs text-muted-foreground">{row.context}</div>}</div>
+            <div className="min-w-0"><p className={styles.shop}>{row.shop}{' '}<span className={styles.channel}>{row.channelLabel}</span>{row.newlyLinked && <span className="sr-only"> · Newly linked</span>}</p><p className={styles.sku}>SKU: <span className="font-mono">{row.sku}</span></p>{row.context && <div className={styles.context}>{row.context}</div>}</div>
           </div>
         </td>
-        <td role="cell"><span className={styles.mobileLabel}>Listing price</span>{row.price}</td>
-        <td role="cell"><span className={styles.mobileLabel}>Shop stock</span>{row.stock}</td>
-        <td role="cell" className={styles.status}><span className={styles.mobileLabel}>Master data sync</span>{row.status}</td>
-        <td role="cell" className={styles.actions}><div className="flex items-center justify-end gap-2">{row.actions}</div></td>
+        <td role="cell" className={styles.price}><span className={styles.mobileLabel} aria-hidden="true">Listing price</span>{row.price}</td>
+        <td role="cell" className={styles.stock}><span className={styles.mobileLabel} aria-hidden="true">Shop stock</span>{row.stock}</td>
+        <td role="cell" className={styles.status}><span className={styles.mobileLabel} aria-hidden="true">Master data sync</span>{row.status}</td>
+        <td role="cell" className={styles.actions}><div className={styles.actionsInner}>{row.actions}</div></td>
       </tr>)}</tbody>
     </table>
   </div>;

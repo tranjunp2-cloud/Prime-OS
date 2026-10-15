@@ -31,7 +31,7 @@ const workspaceTabs: Array<{ id: WorkspaceFilter; label: string; icon?: LucideIc
   { id: 'main', label: 'Main Back-office', icon: Boxes },
   { id: 'pos', label: 'POS', icon: Store },
   { id: 'primeweb', label: 'PrimeWeb', icon: Globe2 },
-  { id: 'inbox', label: 'Prime Inbox', icon: MessageCircle },
+  { id: 'inbox', label: 'Prime CRM', icon: MessageCircle },
 ];
 
 const categoryIcons: Record<FaqCategoryId, LucideIcon> = {

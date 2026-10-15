@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 
 type Action = 'hold' | 'release-hold' | 'submit' | 'confirm' | 'confirm-payment-order' | 'cancel' | 'close' | 'payment' | 'assign' | 'warehouse' | 'note';
 const actionCopy: Record<Action, { title: string; description: string; label?: string; submit: string }> = {
-  hold: {title:'Hold Order',description:'Pause processing until the issue is resolved.',label:'Hold reason',submit:'Put on hold'},
+  hold: {title:'Hold order',description:'Pause processing until the issue is resolved.',label:'Hold reason',submit:'Put on hold'},
   'release-hold':{title:'Release hold',description:'Resume the order at its existing lifecycle step.',label:'Release reason',submit:'Release hold'},
   submit: { title: 'Submit draft order', description: 'Move this draft to the confirmation queue. This does not reserve stock.', submit: 'Submit order' },
   confirm: { title: 'Confirm Order', description: 'Confirm the customer details and items, then prepare the order at your dispatch warehouse.', submit: 'Confirm Order' },
@@ -65,13 +65,16 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   const [success, setSuccess] = useState('');
   const flow = getOrderDetailFlow(order);
   const permissions = getOrderDetailPermissions(order, canWrite);
-  const hasPackingSlip = order.lines.length > 0;
-  const showPackingSlipInHeader = hasPackingSlip && order.metadata.handlingType === 'self'
+  const hasPackingSlip = order.lines.length > 0 && order.metadata.handlingType === 'self';
+  const showPackingSlipInHeader = hasPackingSlip
     && ['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus);
-  const packingSlipMenuLabel = hasPrintedPackingSlip(order) || ['partially_shipped', 'shipped', 'delivered', 'closed'].includes(order.canonicalStatus)
+  const showPackingSlipInMenu = hasPackingSlip && ['partially_shipped', 'shipped', 'delivered', 'closed'].includes(order.canonicalStatus);
+  const packingSlipMenuLabel = hasPrintedPackingSlip(order) || showPackingSlipInMenu
     ? 'Reprint packing slip' : 'Print packing slip';
   const packingSlipDisabled = pending || Boolean(order.hold?.active);
   const packingSlipDisabledReason = order.hold?.active ? 'Release the hold before printing packing slips.' : undefined;
+  const canHold = permissions.editable && !order.hold?.active && ['created', 'acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus);
+  const showMoreActions = canHold || permissions.cancel || showPackingSlipInMenu;
   const openExceptions = order.exceptions.filter((issue) => issue.status === 'open');
   const history = getOrderActivity(order);
   // Read-only real orders still show the next step without enabling it.
@@ -139,12 +142,17 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
           <div className="flex flex-wrap items-center gap-2">
             {order.source === 'demo' && <Button variant="outline" disabled={pending || Boolean(action) || Boolean(processingAction)} onClick={() => { onUpdated(restartOrderPrototype(order)); setError(''); setSuccess('Prototype restarted. Confirm the order to try the flow again.'); }}>Restart prototype</Button>}
             {showPackingSlipInHeader && <Button variant="outline" disabled={packingSlipDisabled} title={packingSlipDisabledReason} onClick={print}><Printer aria-hidden="true" className="size-4" />{packingSlipMenuLabel}</Button>}
-              {(permissions.editable || order.lines.length > 0) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" disabled={pending}>More<ChevronDown className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{permissions.editable && !order.hold?.active && ['created','acknowledged','allocated','fulfillment_in_progress'].includes(order.canonicalStatus) && <DropdownMenuItem onSelect={()=>begin('hold')}>Hold Order</DropdownMenuItem>}<DropdownMenuItem onSelect={() => setTab('activity')}>View audit log</DropdownMenuItem>
-                {hasPackingSlip && !showPackingSlipInHeader && <DropdownMenuItem disabled={packingSlipDisabled} title={packingSlipDisabledReason} onSelect={print}><Printer aria-hidden="true" className="mr-2 size-4" />{packingSlipMenuLabel}</DropdownMenuItem>}
-                {permissions.editable && <><DropdownMenuItem onSelect={() => begin('assign', order.metadata.assignee)}>Assign owner</DropdownMenuItem><DropdownMenuItem onSelect={() => begin('note', order.metadata.notes)}>Edit notes</DropdownMenuItem></>}
-                {permissions.warehouse && <DropdownMenuItem onSelect={() => begin('warehouse', order.metadata.warehouse)}>Change preferred warehouse</DropdownMenuItem>}
-                {permissions.cancel && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => begin('cancel')}>Cancel order</DropdownMenuItem></>}
-              </DropdownMenuContent></DropdownMenu>}
+            {showMoreActions && <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline" disabled={pending}>More<ChevronDown aria-hidden="true" className="size-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                {canHold && <DropdownMenuItem className="min-h-11" onSelect={() => begin('hold')}>Hold order</DropdownMenuItem>}
+                {showPackingSlipInMenu && <DropdownMenuItem className="min-h-11" disabled={packingSlipDisabled} title={packingSlipDisabledReason} onSelect={print}><Printer aria-hidden="true" className="mr-2 size-4" />Reprint packing slip</DropdownMenuItem>}
+                {permissions.cancel && <>
+                  {(canHold || showPackingSlipInMenu) && <DropdownMenuSeparator />}
+                  <DropdownMenuItem className="min-h-11 text-destructive focus:text-destructive" onSelect={() => begin('cancel')}>Cancel order</DropdownMenuItem>
+                </>}
+              </DropdownMenuContent>
+            </DropdownMenu>}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">

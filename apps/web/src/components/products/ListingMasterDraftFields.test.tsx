@@ -35,92 +35,95 @@ afterEach(() => {
   saveCatalogImportItems(original); saveProductCatalogSettings(initialSettings);
 });
 function mount(items = sources.slice(0, 1)) {
+  // This fixture describes single-SKU sources; do not inherit child records from the demo seed.
+  items = items.map(item => ({ ...item, variantItems: undefined }));
   saveCatalogImportItems(items);
   const onSaved = vi.fn();
   render(<ListingMasterReview listings={items} initialMode="new" onBack={vi.fn()} onSaved={onSaved} />);
   editListingSection('Product essentials');
   return onSaved;
 }
-const submit = () => { completeListingDetails(); confirmListingSave('Create, activate & link'); };
+const submit = () => { completeListingDetails(); if (screen.getByRole('button', { name: 'Create, activate & link' }).hasAttribute('disabled')) throw new Error(screen.getByRole('group', { name: 'Review actions' }).textContent ?? 'Activation unavailable'); confirmListingSave('Create, activate & link'); };
+function editField(label: string) {
+  applyListingSection();
+  fireEvent.click(screen.getByRole('button', { name: `Edit Master ${label}` }));
+}
+function resultCell(label: string) {
+  const row = screen.getByRole('rowheader', { name: new RegExp('^' + label) }).closest('tr')!;
+  return row.querySelector('td:last-child')!;
+}
 function chooseCategory() {
-  editListingSection('Product essentials');
+  editField('Category');
   expect(screen.queryByRole('option', { name: 'Hidden category' })).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Master category'), { target: { value: 'draft-tools' } });
+  applyListingSection();
 }
-
 describe('Draft creation fields from a shop listing', () => {
-  it('prefills identity, catalog brand and source-currency price for review', () => {
+  it('prefills identity, catalog brand and source-currency price in the shared comparison layout', () => {
     const onSaved = mount();
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(sources[0].title);
-    expect(screen.getByText('Product essentials')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Review data for the new Master' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Continue to details' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Back to review' })).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Single product' })).toBeChecked();
-    expect(screen.getByRole('combobox', { name: 'Brand' })).toHaveValue('draft-brand');
-    expect(screen.getByLabelText('Base price *')).toHaveValue(34);
-    expect(screen.getByLabelText('Currency *')).toHaveValue('USD');
+    expect(resultCell('Brand')).toHaveTextContent('Catalog Brand');
+    expect(resultCell('Single SKU')).toHaveTextContent('34 USD');
+    expect(resultCell('Barcode')).toHaveTextContent('00123');
+    expect(resultCell('Pack quantity')).toHaveTextContent('Not provided');
     chooseCategory();
-    editListingSection('Model, barcode & pack details');
-    expect(screen.getByLabelText('Barcode (GTIN)')).toHaveValue('00123');
-    expect(screen.getByLabelText('Pack quantity')).toHaveValue(null);
     submit();
     expect(onSaved).toHaveBeenCalledOnce();
     expect(getProductById(onSaved.mock.calls[0][0].productId)).toMatchObject({ brandId: 'draft-brand', brand: 'Catalog Brand', categoryId: 'draft-tools', category: 'Tools', retail_price: 34, price_currency: 'USD', model_number: 'M-12', gtin: '00123', mpn: 'P-12', inventory: {}, status: 'published' });
   });
-  it('allows an unassigned optional brand but requires category and price before activation', () => {
+  it('allows unassigned optional brand and category while retaining the valid source price', () => {
     const onSaved = mount();
+    editField('Brand');
     fireEvent.change(screen.getByRole('combobox', { name: 'Brand' }), { target: { value: '' } });
     submit();
-    expect(getProductById(onSaved.mock.calls[0][0].productId)).toMatchObject({ brand: '', category: 'Art', retail_price: 34, price_currency: 'USD' });
+    expect(getProductById(onSaved.mock.calls[0][0].productId)).toMatchObject({ brand: '', category: '', retail_price: 34, price_currency: 'USD' });
   });
-  it('prefills the newly chosen source price without currency conversion, retaining category and SKU', () => {
+  it('compares all selected sources and replaces starting price without currency conversion, retaining category and SKU', () => {
     const onSaved = mount(sources);
     chooseCategory();
-    const sku = (screen.getByRole('textbox', { name: 'Master SKU' }) as HTMLInputElement).value;
-    editListingSection('Pricing');
+    const sku = resultCell('Master SKU').textContent;
+    const table = within(screen.getByRole('table', { name: 'Product identity comparison' }));
+    expect(table.getByRole('columnheader', { name: /Shop a/ })).toBeVisible();
+    expect(table.getByRole('columnheader', { name: /Shop b/ })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /^Edit Master price for/ }));
     fireEvent.change(screen.getByLabelText('Base price *'), { target: { value: '90' } });
     applyListingSection();
     fireEvent.change(screen.getByLabelText('Starting data from'), { target: { value: sources[1].id } });
     expect(screen.getByRole('alertdialog', { name: 'Replace the starting listing data?' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
-    expect(screen.getByLabelText('Base price *')).toHaveValue(90);
+    expect(resultCell('Single SKU')).toHaveTextContent('90 USD');
     fireEvent.change(screen.getByLabelText('Starting data from'), { target: { value: sources[1].id } });
     fireEvent.click(screen.getByRole('button', { name: 'Replace draft data' }));
-    expect(screen.getByRole('group', { name: 'Source listing' })).toHaveTextContent('Shop b');
-    editListingSection('Product essentials');
-    expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(sources[1].title);
-    expect(screen.getByRole('textbox', { name: 'Master SKU' })).toHaveValue(sku);
-    expect(screen.getByLabelText('Master category')).toHaveValue('draft-tools');
-    expect(screen.getByRole('combobox', { name: 'Brand' })).toHaveValue('');
-    expect(screen.getByLabelText('Base price *')).toHaveValue(2500);
-    expect(screen.getByLabelText('Currency *')).toHaveValue('JPY');
-    expect(screen.getByRole('radio', { name: 'With variants' })).toBeEnabled();
+    expect(resultCell('Title')).toHaveTextContent(sources[1].title);
+    expect(resultCell('Master SKU').textContent).toBe(sku);
+    expect(resultCell('Category')).toHaveTextContent('Tools');
+    expect(resultCell('Single SKU')).toHaveTextContent('2,500 JPY');
+    completeListingDetails();
     fireEvent.click(screen.getByRole('checkbox', { name: /I checked/ }));
-    submit();
+    confirmListingSave('Create, activate & link');
     const product = getProductById(onSaved.mock.calls[0][0].productId)!;
     expect(product.channels).toHaveLength(2);
     expect(product.retail_price).toBe(2500);
+    expect(product.price_currency).toBe('JPY');
   });
-  it('preserves a multiple-SKU listing as a variant draft with pending child SKU setup', () => {
+  it('preserves a multiple-SKU listing and exposes variant configuration inside the table', () => {
     const onSaved = mount([{ ...sources[0], variants: 3 }]);
+    editField('Product structure');
     expect(screen.getByRole('radio', { name: 'Single product' })).toBeDisabled();
     expect(screen.getByRole('radio', { name: 'With variants' })).toBeChecked();
-    expect(screen.getByText(/3 shop SKUs detected/)).toBeVisible();
     expect(screen.getByRole('region', { name: 'Variant setup' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     expect(onSaved).not.toHaveBeenCalled();
   });
-  it('blocks unavailable categories, preserves the form and rejects changed source data at final confirmation', () => {
+  it('keeps edits staged and rejects changed source data at final confirmation', () => {
     const onSaved = mount();
     chooseCategory();
-    saveProductCatalogSettings({ ...settings, categories: [] });
-    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Edited while catalog unavailable' } });
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
-    expect(screen.getByLabelText('Master category')).toBeVisible();
-    expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Edited while catalog unavailable');
-    saveProductCatalogSettings(settings);
+    editField('Title');
     fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Refreshed source product' } });
-    chooseCategory();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Refreshed source product');
     completeListingDetails();
     saveCatalogImportItems([{ ...sources[0], price: 900 }]);
     confirmListingSave('Create, activate & link');
@@ -128,19 +131,20 @@ describe('Draft creation fields from a shop listing', () => {
     expect(onSaved).not.toHaveBeenCalled();
     expect(getProducts()).toHaveLength(ids.size);
   });
-
-  it('explains unavailable catalogs and prevents incomplete activation', () => {
+  it('keeps unavailable catalogs optional and prevents activation with an invalid price', () => {
     saveProductCatalogSettings({ ...settings, categories: [], brands: [] });
     const onSaved = mount([{ ...sources[0], price: -1, currency: '' }]);
-    expect(screen.getByText(/No active categories\./)).toBeVisible();
-    expect(screen.getByLabelText('Base price *')).toHaveValue(0);
+    editField('Category');
+    expect(screen.getByLabelText('Master category').querySelectorAll('option')).toHaveLength(1);
+    applyListingSection();
+    expect(resultCell('Category')).toHaveTextContent('Not provided');
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
     expect(onSaved).not.toHaveBeenCalled();
   });
-  it('changes a field source immediately and saves the reviewed proposal as a Draft without activating', () => {
+  it('changes a field source and saves the reviewed proposal as a Draft without activating', () => {
     const onSaved = mount();
     const row = within(screen.getByRole('group', { name: 'Mapping for Product name' }));
-    expect(row.getByText(/Listing title/)).toBeVisible();
     fireEvent.click(row.getByRole('button', { name: 'Change source for Product name' }));
     fireEvent.change(row.getByRole('textbox', { name: 'Search source fields' }), { target: { value: 'M-12' } });
     fireEvent.click(row.getByRole('radio'));

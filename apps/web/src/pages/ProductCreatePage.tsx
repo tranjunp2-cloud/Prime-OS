@@ -1,10 +1,10 @@
 import { useConnectedShops } from '@/hooks/use-connected-shops';
 import { listingStockWarehouseId } from '@/lib/warehouse-shop-sources';
-import { Fragment, useState, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
+import { Fragment, useState, useMemo, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Archive, RotateCcw, Info, History, Image, Package, Truck, Layers, Check, Lock,
-  Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes, PackageCheck,
+  Plus, X, Trash2, AlertTriangle, Upload, Loader2, Boxes,
   Globe2, Circle, CircleCheck, CircleAlert, CloudUpload, Search, ChevronDown, ChevronRight, ExternalLink,
   ShoppingBag, Store, MonitorSmartphone, MessageSquare, Radio, Tags, Star, MoreHorizontal,
   Bold, Italic, Underline, Strikethrough, Code2, List, ListOrdered, Quote, Minus, AlignLeft, AlignCenter, AlignRight, AlignJustify, Link2, Undo2, Redo2, RefreshCw,
@@ -30,10 +30,12 @@ import { useToast } from '@/hooks/use-toast';
 import { addProduct, updateProduct, getProductById, getAllSkus, getProducts, isDemoProduct, type Product, type ChannelListing, type ProductType, type ProductAssociation } from '@/lib/product-store';
 import { writeDemoDataMode } from '@/lib/demo-data-mode';
 import { ProductActivityHistory } from '@/components/products/ProductActivityHistory';
-import { ProductWorkspaceHelp } from '@/components/products/ProductWorkspaceHelp';
 import { ProductSalesPerformance } from '@/components/products/ProductSalesPerformance';
 import { ProductOverviewSnapshot } from '@/components/products/ProductOverviewSnapshot';
 import { ProductReadinessCard } from '@/components/products/ProductReadinessCard';
+import { ProductStructureEditor } from '@/components/products/ProductStructure';
+import { ProductContentLanguage } from '@/components/products/ProductContentLanguage';
+import { ProductWorkspaceHeader } from '@/components/products/ProductWorkspaceHeader';
 import { ProductChannelListings, type ProductChannelListingRow } from '@/components/products/ProductChannelListings';
 import { ListingRequirementNotice } from '@/components/products/ListingRequirementNotice';
 import { LinkedListingDetails, type LinkedListingDetail } from '@/components/products/LinkedListingDetails';
@@ -43,6 +45,7 @@ import { ListingMappingReviewDialog } from '@/components/products/ListingMapping
 import { pendingMappingReviews } from '@/lib/product-listing-intake';
 import { legacyReviewKey } from '@/lib/legacy-listing-review';
 import { ListingRowActions } from '@/components/products/ListingRowActions';
+import editorStyles from './ProductEditorLayout.module.css';
 import { listingDraftTableData, listingEditSnapshot, saveListingLocalDraft } from '@/lib/listing-local-draft';
 import { unlinkListingFromMaster } from '@/lib/listing-unlink';
 import { listingActivityKey } from '@/lib/product-activity';
@@ -292,11 +295,6 @@ function buildCategoryTree() {
     };
   });
 }
-const PRODUCT_TYPE_ICONS = {
-  single: Package,
-  variant: Layers,
-} satisfies Record<ProductType, typeof PackageCheck>;
-
 const EMPTY_FORM: FormState = {
   gtin: '', mpn: '', model_number: '', brand: '', brandId: '',
   asin: '', manufacturer: '',
@@ -2095,6 +2093,11 @@ export default function ProductCreatePage() {
   const categoryTree = useMemo(() => buildCategoryTree(), [catalogSettingsVersion]);
   const [dirtyTrackingReady, setDirtyTrackingReady] = useState(false);
   const [hasScrolledFromTop, setHasScrolledFromTop] = useState(false);
+  const editorPageRef = useRef<HTMLDivElement>(null);
+  const editorHeaderRef = useRef<HTMLDivElement>(null);
+  const editorNavigationRef = useRef<HTMLElement>(null);
+  const compactReadinessRef = useRef<HTMLDivElement>(null);
+  const readinessTriggerRef = useRef<HTMLElement | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(existingProduct?.updated_at ? new Date(existingProduct.updated_at) : null);
   const baselineSnapshotRef = useRef('');
   const latestSnapshotRef = useRef('');
@@ -2263,7 +2266,7 @@ export default function ProductCreatePage() {
       return;
     }
     const localized = localizedContent[canonical];
-    const firstMissingField = canonical === primaryLocale
+    const firstMissingField = canonical === primaryLocale || !canWrite
       ? null
       : !localized?.name?.trim()
         ? 'name'
@@ -2517,8 +2520,8 @@ export default function ProductCreatePage() {
         toast({
           title: currentValue ? `${suggestedAttribute.name} moved to variants` : `${suggestedAttribute.name} added to variants`,
           description: currentValue
-            ? `${currentValue} is now the first variant value. Add more values in Commerce.`
-            : `Choose one or more ${suggestedAttribute.name.toLowerCase()} values in Commerce.`,
+            ? `${currentValue} is now the first variant value. Add more values below.`
+            : `Choose one or more ${suggestedAttribute.name.toLowerCase()} values below.`,
         });
       }
       setForm(current => ({ ...current, product_type: 'variant', has_variants: true }));
@@ -2947,6 +2950,9 @@ export default function ProductCreatePage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const allRequirementsComplete = completionChecks.every(check => check.done);
+  const showReadinessPanel = !isArchived && !isHistorical && activeSection !== 'activity' && !allRequirementsComplete;
+
   useEffect(() => {
     const scrollContainer = document.getElementById('main-content');
     const updateScrollState = () => setHasScrolledFromTop((scrollContainer?.scrollTop ?? window.scrollY) > 64);
@@ -2955,6 +2961,26 @@ export default function ProductCreatePage() {
     target.addEventListener('scroll', updateScrollState, { passive: true });
     return () => target.removeEventListener('scroll', updateScrollState);
   }, []);
+
+  useLayoutEffect(() => {
+    const page = editorPageRef.current;
+    const header = editorHeaderRef.current;
+    if (!page || !header) return;
+    const scrollContainer = document.getElementById('main-content');
+    const measure = () => {
+      page.style.setProperty('--editor-header-height', `${header.offsetHeight}px`);
+      page.style.setProperty('--editor-viewport-height', `${scrollContainer?.clientHeight || window.innerHeight}px`);
+      page.style.setProperty('--editor-mobile-navigation-height', `${Math.max(editorNavigationRef.current?.offsetHeight ?? 0, compactReadinessRef.current?.offsetHeight ?? 0)}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+    observer?.observe(header);
+    if (editorNavigationRef.current) observer?.observe(editorNavigationRef.current);
+    if (compactReadinessRef.current) observer?.observe(compactReadinessRef.current);
+    if (scrollContainer) observer?.observe(scrollContainer);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [editId, showReadinessPanel]);
 
   useEffect(() => {
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -2987,15 +3013,17 @@ export default function ProductCreatePage() {
   }
 
 
-  const allRequirementsComplete = completionChecks.every(check => check.done);
-  const showReadinessPanel = !isArchived && !isHistorical && activeSection !== 'activity' && !allRequirementsComplete;
   const hasPublishedRevision = readinessStatus === 'published' || existingProduct?.status === 'published';
-  const readinessCard = showReadinessPanel ? <ProductReadinessCard
-    checks={completionChecks.map(check => ({ ...check, workspace: completionWorkspaceFor(check.id).label }))}
-    isActive={hasPublishedRevision}
-    onSelectCheck={openCompletionItem}
-    onViewAll={() => setReadinessReviewOpen(true)}
-  /> : null;
+  const readinessProps = {
+    checks: completionChecks.map(check => ({ ...check, workspace: completionWorkspaceFor(check.id).label })),
+    isActive: hasPublishedRevision,
+    onSelectCheck: openCompletionItem,
+    onViewAll: () => {
+      readinessTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setReadinessReviewOpen(true);
+    },
+  };
+  const readinessCard = showReadinessPanel ? <ProductReadinessCard {...readinessProps} /> : null;
   const primaryAction = hasPublishedRevision && !isDirty
     ? 'published'
     : !allRequirementsComplete
@@ -3091,107 +3119,19 @@ export default function ProductCreatePage() {
     );
   }
 
-  // ─── LocaleSwitcher Component ───────────────────────────────────────────────
-  function LocaleSwitcher({
-    locales,
-    current,
-    getStatus,
-    onSelect,
-  }: {
-    locales: OrgLocaleConfig[];
-    current: string;
-    getStatus: (locale: OrgLocaleConfig) => 'primary' | 'complete' | 'partial' | 'missing';
-    onSelect: (locale: string) => void;
-  }) {
-    const secondaryLocales = locales.filter(l => !l.isPrimary);
-    const completedCount = secondaryLocales.filter(l => getStatus(l) === 'complete').length;
-    const allComplete = secondaryLocales.length > 0 && completedCount === secondaryLocales.length;
-    const currentConfig = locales.find(l => l.locale === current);
-
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-9 gap-2 px-3 text-xs font-semibold" title="Content language for Product Name, Description and localizable attributes">
-            <Globe2 className="size-3.5 shrink-0" />
-            <span><span className="hidden font-normal text-muted-foreground xl:inline">Content: </span>{currentConfig?.nativeLabel ?? current}</span>
-            {secondaryLocales.length > 0 && (
-              <span className={cn(
-                'inline-flex min-w-7 items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                allComplete
-                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
-                  : 'border-border/70 bg-muted/60 text-muted-foreground',
-              )}>
-                {completedCount}/{secondaryLocales.length}
-              </span>
-            )}
-            <ChevronDown className="size-3 opacity-60" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <div className="px-2 pt-2 pb-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Content language</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {secondaryLocales.length === 0
-                ? 'Primary language only'
-                : allComplete
-                  ? '✓ All translations complete'
-                  : `${secondaryLocales.length - completedCount} translation${secondaryLocales.length - completedCount !== 1 ? 's' : ''} missing · Select a language to edit`}
-            </p>
-          </div>
-          <DropdownMenuSeparator />
-          {locales.map(loc => {
-            const st = getStatus(loc);
-            const isActive = loc.locale === current;
-            const statusIcon = st === 'complete'
-              ? <CircleCheck className="size-3.5 text-emerald-600 shrink-0" />
-              : st === 'partial'
-                ? <CircleAlert className="size-3.5 text-amber-500 shrink-0" />
-                : st === 'missing'
-                  ? <span className="size-2 rounded-full border-2 border-rose-400 inline-block shrink-0" />
-                  : <span className="size-2 rounded-full bg-primary inline-block shrink-0" />;
-            return (
-              <DropdownMenuItem
-                key={loc.locale}
-                onSelect={() => onSelect(loc.locale)}
-                className={cn('flex items-center gap-2 py-2', isActive && 'bg-primary/5')}
-              >
-                {statusIcon}
-                <span className="flex-1 text-sm">{loc.nativeLabel}</span>
-                {loc.isPrimary && <Badge variant="outline" className="text-[9px] px-1 py-0 h-auto">Primary</Badge>}
-                {!loc.isPrimary && st === 'partial' && <span className="text-[10px] text-amber-500">Partial</span>}
-                {!loc.isPrimary && st === 'missing' && <span className="text-[10px] text-rose-500">Missing</span>}
-                {isActive && <span className="text-[10px] font-medium text-primary">Editing</span>}
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <div className="px-3 py-2 text-[10px] leading-4 text-muted-foreground">
-            Applies to Product Name, Description and localizable attributes. Languages are managed by your organization.
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  }
-
   return (
-    <div data-testid="product-editor-page" className="flex min-h-full flex-col bg-background">
+    <div ref={editorPageRef} data-testid="product-editor-page" className={cn(editorStyles.page, 'flex min-h-full flex-col bg-background')}>
       {/* Top Bar */}
-      <div data-testid="product-editor-header" className={cn('sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b bg-card/95 px-4 py-4 backdrop-blur transition-shadow duration-200 motion-reduce:transition-none sm:px-6', hasScrolledFromTop && 'shadow-sm')}>
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button onClick={() => navigate('/products/master-catalog')} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Back to Product Master"><ArrowLeft className="size-4" /></button>
+      <div ref={editorHeaderRef} data-testid="product-editor-header" className={cn(editorStyles.header, 'sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b bg-card/95 px-4 py-4 backdrop-blur transition-shadow duration-200 motion-reduce:transition-none sm:px-6', hasScrolledFromTop && 'shadow-sm')}>
+        <div className={cn(editorStyles.headerIdentity, 'flex min-w-0 items-center gap-3')}>
+          <button onClick={() => navigate('/products/master-catalog')} className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Back to Product Master"><ArrowLeft className="size-4" /></button>
           <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted/30">{images[0] ? <img src={images[0]} alt="" className="size-full object-cover" /> : <Package className="size-4 text-muted-foreground" />}</div>
           <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2"><h1 className="truncate text-sm font-semibold sm:text-base">{form.name || (existingProduct ? 'Untitled Product Master' : 'New Product Master')}</h1><Badge variant="outline" className="hidden shrink-0 capitalize sm:inline-flex">{existingProduct?.status === 'published' ? 'Active' : existingProduct?.status ?? 'draft'}</Badge></div>
+            <div className="flex min-w-0 items-center gap-2"><h1 className={cn(editorStyles.productTitle, 'truncate text-sm font-semibold sm:text-base')} title={form.name || undefined}>{form.name || (existingProduct ? 'Untitled Product Master' : 'New Product Master')}</h1><Badge variant="outline" className="hidden shrink-0 items-center gap-1.5 capitalize sm:inline-flex">{existingProduct?.status === 'published' && <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400" />}{existingProduct?.status === 'published' ? 'Active' : existingProduct?.status ?? 'draft'}</Badge></div>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="truncate font-mono">{form.sku_code || 'SKU not assigned'}</span><span className="hidden sm:inline">· {form.has_variants ? `${selectedVariantItems.length || 0} variants` : 'Single product'}</span><span className={cn('hidden font-medium md:inline', isDirty ? 'text-amber-500' : 'text-muted-foreground')}>· {isDirty ? 'Unsaved changes' : lastSavedAt ? 'Saved' : 'Not saved'}</span></div>
           </div>
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <LocaleSwitcher
-            locales={activeOrgLocales}
-            current={contentLocale}
-            getStatus={getLocaleCompletionStatus}
-            onSelect={selectContentLocale}
-          />
+        <div className={editorStyles.headerActions}>
           {!canManageProduct && !isHistorical ? <Badge variant="outline">View only</Badge> : null}
           {canWrite && isDirty && !hasPublishedRevision && <Button type="button" variant="outline" disabled={uploadingImageCount > 0 || publishOpen} onClick={() => handleSave(undefined, { navigateAfter: false })}>Save draft</Button>}
           {isHistorical ? <Button type="button" variant="outline" onClick={returnToCurrentDraft}><ArrowLeft className="size-4" />Return to current draft</Button> : isArchived && canManageProduct ? <Button type="button" onClick={() => lifecycle.requestAction(existingProduct!, 'restore')}><RotateCcw className="size-4" />Restore product</Button> : canWrite ? <Button
@@ -3202,7 +3142,7 @@ export default function ProductCreatePage() {
             {uploadingImageCount > 0 ? 'Saving images…' : primaryAction === 'complete' ? 'Complete product' : primaryAction === 'publish-updates' ? 'Update Master' : primaryAction === 'published' ? 'Master active' : 'Activate Master'}
           </Button> : null}
           {existingProduct && canManageProduct && <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" aria-label="Product actions"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label="Product actions"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72">
               {!isArchived && !isHistorical && <><DropdownMenuItem onSelect={() => setReadinessReviewOpen(true)}><CircleCheck className="mr-2 size-4" />View readiness checks</DropdownMenuItem><DropdownMenuSeparator /></>}
               <ProductLifecycleMenuItems product={existingProduct} onAction={lifecycle.requestAction} disabled={uploadingImageCount > 0 || publishOpen} />
@@ -3241,62 +3181,50 @@ export default function ProductCreatePage() {
 
       {/* Content */}
       <div data-testid="product-editor-content">
-        <div data-testid="product-editor-layout" className={cn('grid w-full grid-cols-1 gap-6 px-4 py-6 sm:px-6', showReadinessPanel ? 'xl:grid-cols-[220px_minmax(0,1fr)_300px]' : 'xl:grid-cols-[220px_minmax(0,1fr)]')}>
+        <div data-testid="product-editor-layout" data-has-readiness={showReadinessPanel} className={cn(editorStyles.layout, 'grid w-full grid-cols-1 gap-6 px-4 py-6 sm:px-6')}>
 
-          <nav className="h-fit overflow-x-auto xl:sticky xl:top-20" aria-label="Product editor workspaces">
-            <div className="flex min-w-max gap-1 xl:min-w-0 xl:flex-col">
+          <nav ref={editorNavigationRef} className={editorStyles.navigation} aria-label="Product editor workspaces">
+            <label className={editorStyles.mobileNavigation}>
+              <span className="text-xs font-medium text-muted-foreground">Section</span>
+              <select aria-label="Product editor section" value={activeSection} onChange={event => selectWorkspace(event.target.value as ProductWorkspace)} className="min-h-11 min-w-0 flex-1 rounded-md border bg-card px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {PRODUCT_WORKSPACES.map(workspace => <option key={workspace.id} value={workspace.id} disabled={isHistorical && workspace.id !== 'activity'}>{workspace.label}</option>)}
+              </select>
+            </label>
+            <div className={editorStyles.navigationItems}>
               {PRODUCT_WORKSPACES.map(workspace => {
                 const WorkspaceIcon = workspace.icon;
                 const active = activeSection === workspace.id;
-                return <Fragment key={workspace.id}>
-                  {workspace.id === 'product-data' && <div className="hidden items-center gap-2 px-3 pb-1 pt-4 xl:flex"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product Master</p><ProductWorkspaceHelp scope="master" /></div>}
-                  {workspace.id === 'distribution' && <div className="hidden items-center gap-2 px-3 pb-1 pt-4 xl:flex"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Shop listings</p><ProductWorkspaceHelp scope="listings" /></div>}
-                  {workspace.id === 'activity' && <div className="mx-3 my-3 hidden border-t xl:block" />}
-                  <button type="button" disabled={isHistorical && workspace.id !== 'activity'} onClick={() => selectWorkspace(workspace.id)} aria-current={active ? 'page' : undefined} className={cn('flex min-h-12 items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 xl:w-full', active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground')}>
-                  <WorkspaceIcon className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{workspace.label}</span></span>
-                </button></Fragment>;
+                return <button key={workspace.id} type="button" disabled={isHistorical && workspace.id !== 'activity'} onClick={() => selectWorkspace(workspace.id)} aria-current={active ? 'page' : undefined} className={cn(editorStyles.navigationItem, 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40')}>
+                  <WorkspaceIcon className="size-[18px] shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">{workspace.label}</span>
+                </button>;
               })}
             </div>
           </nav>
 
+          {showReadinessPanel && <div ref={compactReadinessRef} data-testid="product-editor-readiness-compact" className={editorStyles.compactReadiness}>
+            <ProductReadinessCard {...readinessProps} compact expanded={readinessReviewOpen} />
+          </div>}
+
           {/* Left Column */}
-          <fieldset data-testid="product-editor-main" data-editor-fields disabled={!canWrite && activeSection !== 'activity' && activeSection !== 'overview'} className="flex min-w-0 flex-col gap-5">
-
-            {/* Locale Context Banner — shown when editing a secondary locale */}
-            {contentLocale !== primaryLocale && activeSection === 'product-data' && (() => {
-              const localeConfig = activeOrgLocales.find(l => l.locale === contentLocale);
-              const nameOk = Boolean(displayedProductName);
-              const descOk = Boolean(richTextPlainText(displayedProductDescription));
-              return (
-                <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-primary/5 px-4 py-2.5 text-sm">
-                  <Globe2 className="size-4 text-primary shrink-0" />
-                  <span className="font-medium">
-                    Editing {localeConfig?.label ?? contentLocale} translation
-                  </span>
-                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className={nameOk ? 'text-emerald-600' : 'text-amber-600'}>
-                      {nameOk ? '✓' : '○'} Name
-                    </span>
-                    <span className="opacity-40">·</span>
-                    <span className={descOk ? 'text-emerald-600' : 'text-amber-600'}>
-                      {descOk ? '✓' : '○'} Description
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => selectContentLocale(primaryLocale)}
-                    className="ml-auto flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <ArrowLeft className="size-3" /> Back to {primaryLocaleConfig?.nativeLabel ?? 'primary'}
-                  </button>
-                  <button type="button" onClick={() => setMobileReferenceOpen(open => !open)} className="w-full text-left text-xs font-medium text-primary sm:hidden">
-                    {mobileReferenceOpen ? 'Hide primary-language reference' : 'Show primary-language reference'}
-                  </button>
-                </div>
-              );
-            })()}
-
+          <div data-testid="product-editor-main" className={cn(editorStyles.main, 'flex min-w-0 flex-col gap-4')}>
+            <div className={editorStyles.workspaceHeader}>
+              {activeSection === 'product-data' ? <ProductContentLanguage locales={activeOrgLocales} current={contentLocale} getStatus={getLocaleCompletionStatus} onSelect={selectContentLocale} readOnly={!canWrite} /> : <ProductWorkspaceHeader
+                title={PRODUCT_WORKSPACES.find(workspace => workspace.id === activeSection)?.label ?? 'Overview'}
+                help={activeSection === 'commerce' ? 'Manage the product structure, variant SKUs, prices and stock. Shop-specific prices and sync settings are managed in Channel listings.'
+                  : activeSection === 'distribution' ? 'Manage data sync between this Master and your shop listings. Linking a listing does not automatically turn on sync.'
+                    : activeSection === 'activity' ? 'Master changes and related listing activity, in one place. Filter the timeline by Master, listings or shop.' : undefined}
+                badge={activeSection === 'distribution' && hasDemoListingData ? <Badge variant="outline" className="font-normal text-muted-foreground">Demo data</Badge> : undefined}
+                actions={activeSection === 'distribution' && canWrite ? <div className={editorStyles.channelActions}>
+                  {hasAvailableChannelToCreate ? <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><span className={cn('inline-flex', !masterReadyForListings && 'cursor-not-allowed')} tabIndex={!masterReadyForListings ? 0 : undefined}><Button type="button" variant="outline" aria-disabled={!masterReadyForListings} tabIndex={!masterReadyForListings ? -1 : undefined} className={cn(!masterReadyForListings && 'pointer-events-none !border-border !bg-muted !text-muted-foreground !shadow-none')} disabled={!masterReadyForListings} onClick={!existingProduct || isDirty ? saveAndOpenChannelListingSetup : openChannelListingSetup}><Plus className="size-4" />Create listing</Button></span></TooltipTrigger>{!masterReadyForListings ? <TooltipContent side="bottom" className="max-w-72"><p className="font-medium">Cannot create a listing yet</p><p className="mt-1 text-xs text-muted-foreground">Complete the required Master data first: {firstMissingMasterListingCheck?.label ?? 'required product information'}.</p></TooltipContent> : null}</Tooltip></TooltipProvider> : null}
+                  <Button ref={linkExistingTrigger} type="button" disabled={!storedProduct} onClick={() => storedProduct && setLinkExistingMaster(structuredClone(storedProduct))}><Link2 className="size-4" />Link existing listings</Button>
+                </div> : undefined}
+              />}
+            </div>
+            {activeSection === 'product-data' && contentLocale !== primaryLocale && <Button type="button" variant="ghost" className="min-h-11 h-auto justify-start whitespace-normal text-left text-xs text-primary sm:hidden" aria-expanded={mobileReferenceOpen} onClick={() => setMobileReferenceOpen(open => !open)}>
+              {mobileReferenceOpen ? 'Hide primary-language reference' : 'Show primary-language reference'}
+            </Button>}
+          <fieldset data-editor-fields disabled={!canWrite && activeSection !== 'activity' && activeSection !== 'overview'} className="flex min-w-0 flex-col gap-5">
 
             {activeSection === 'overview' ? <>
               <ProductOverviewSnapshot key={`snapshot-${existingProduct?.id ?? 'new-master'}`}
@@ -3317,10 +3245,10 @@ export default function ProductCreatePage() {
 
             {/* Product media belongs to the canonical master and is prepared before channel distribution. */}
             {activeSection === 'product-data' ? <Card id="product-media-panel" tabIndex={-1} className="order-20">
-              <CardHeader className="pb-3">
+              <CardHeader className="p-5 pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-sm"><Image className="size-4 text-primary" />{copy.media}</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">First image is the main image. Used by channel listings.</p></div><Badge variant="outline" className={cn(masterMedia.ready && 'border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300')}>{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · optional for activation · 9 max</Badge></div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 px-5 pb-5">
                 {images.length === 0 ? <label className="flex min-h-28 cursor-pointer items-center justify-center gap-3 rounded-lg border-2 border-dashed bg-muted/20 px-4 py-5 transition-colors hover:border-primary/40 hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring">
                   <input type="file" accept="image/*" multiple className="sr-only" aria-label="Upload product images" onChange={async event => { const files = Array.from(event.target.files ?? []).slice(0, 9); for (const [index, file] of files.entries()) await handleImageUpload(file, index === 0 ? 'primary' : 'gallery'); event.target.value = ''; }} />
                   <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"><Upload className="size-5" /></span>
@@ -3342,17 +3270,7 @@ export default function ProductCreatePage() {
 
             {/* Sales Channels */}
             <Card id="product-section-channels" tabIndex={-1} className={cn('border-primary/20', activeSection !== 'distribution' && 'hidden')}>
-              <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><CardTitle className="flex items-center gap-2 text-sm"><Globe2 className="size-4 text-primary" />Channel listings{hasDemoListingData && <Badge variant="outline" className="font-normal text-muted-foreground">Demo data</Badge>}</CardTitle><p className="mt-1.5 text-xs leading-5 text-muted-foreground">Manage data sync between this Master and your shop listings.</p></div>
-                  <div className="flex flex-wrap gap-2">
-                    {canWrite && hasAvailableChannelToCreate ? <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><span className={cn('inline-flex', !masterReadyForListings && 'cursor-not-allowed')} tabIndex={!masterReadyForListings ? 0 : undefined}><Button type="button" variant="outline" aria-disabled={!masterReadyForListings} tabIndex={!masterReadyForListings ? -1 : undefined} className={cn(!masterReadyForListings && 'pointer-events-none !border-border !bg-muted !text-muted-foreground !shadow-none')} disabled={!masterReadyForListings} onClick={!existingProduct || isDirty ? saveAndOpenChannelListingSetup : openChannelListingSetup}><Plus className="size-4" />Create listing</Button></span></TooltipTrigger>{!masterReadyForListings ? <TooltipContent side="bottom" className="max-w-72"><p className="font-medium">Cannot create a listing yet</p><p className="mt-1 text-xs text-muted-foreground">Complete the required Master data first: {firstMissingMasterListingCheck?.label ?? 'required product information'}.</p></TooltipContent> : null}</Tooltip></TooltipProvider> : null}
-                    {canWrite && <Button ref={linkExistingTrigger} type="button" disabled={!storedProduct} onClick={() => storedProduct && setLinkExistingMaster(structuredClone(storedProduct))}><Link2 className="size-4" />Link existing listings</Button>}
-                  </div>
-                </div>
-
-              </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 {mappingReviews.length > 0 && <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" /><div><p className="font-medium">{mappingReviews.length} listing mapping{mappingReviews.length === 1 ? ' needs' : 's need'} review</p><p className="text-muted-foreground">Check that the flagged listings belong to this Master. Shop data is unchanged. Unconfirmed SKU mappings cannot be used for price or stock sync.{isArchived ? ' Restore this Master to review its mappings.' : ''}</p></div></div>}
                 {!isArchived && channelListingCount === 0 && !masterReadyForListings ? <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3 text-sm"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" /><div className="min-w-0 flex-1"><p className="font-semibold">Complete required Master data before creating or publishing listings</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Next required item: {firstMissingMasterListingCheck?.label ?? 'Complete Product Master data'}.</p><Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0 text-amber-600" onClick={() => firstMissingMasterListingCheck && openCompletionItem(firstMissingMasterListingCheck.id)}>Fix this requirement<ChevronRight className="size-3.5" /></Button></div></div> : null}
                 {canWrite && !storedProduct ? <p className="mb-4 text-xs text-muted-foreground">Save this Master before linking existing listings.</p> : null}
@@ -3379,7 +3297,7 @@ export default function ProductCreatePage() {
                         stock: <ListingShopValue data={data} field="stock" />,
                         status: <ListingMasterSyncControl preference={preference} shop={shop} disabled={!canWrite || !listing} disabledReason={!listing ? 'Save the listing first' : isArchived ? 'Archived Master' : undefined} onOpen={() => listing && openListingSyncSettings(listing, shop, data.sku || override.listing_sku || 'Not recorded', preference)} />,
                         actions: listing ? listingActions(listing, channel.label, shop, data.sku || override.listing_sku || 'Not recorded')
-                          : <Button type="button" variant="outline" size="sm" className="mr-[52px] h-11 w-28" disabled={!canWrite} onClick={() => setEditingChannel(channel.key)}>Continue setup</Button>,
+                          : <Button type="button" variant="outline" size="sm" className="h-11 w-28" disabled={!canWrite} onClick={() => setEditingChannel(channel.key)}>Continue setup</Button>,
                       };
                     }),
                     ...linkedOnlyListings.map((listing, index): ProductChannelListingRow => {
@@ -3406,8 +3324,8 @@ export default function ProductCreatePage() {
             </Card>
 
             {SHOW_PRODUCT_ASSOCIATIONS && activeSection === 'distribution' ? <Card id="product-associations">
-              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-sm"><Boxes className="size-4 text-primary" />Associations</CardTitle><p className="text-xs leading-5 text-muted-foreground">Connect related, accessory, replacement or upsell Product Masters.</p></CardHeader>
-              <CardContent className="space-y-4">
+              <CardHeader className="p-5 pb-3"><CardTitle className="flex items-center gap-2 text-sm"><Boxes className="size-4 text-primary" />Associations</CardTitle><p className="text-xs leading-5 text-muted-foreground">Connect related, accessory, replacement or upsell Product Masters.</p></CardHeader>
+              <CardContent className="space-y-4 px-5 pb-5">
                 <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
                   <select aria-label="Association type" value={associationType} onChange={event => setAssociationType(event.target.value as ProductAssociation['type'])} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="related">Related</option><option value="accessory">Accessory</option><option value="replacement">Replacement</option><option value="upsell">Upsell</option></select>
                   <select aria-label="Product to associate" value={associationProductId} onChange={event => setAssociationProductId(event.target.value)} className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm"><option value="">Select Product Master</option>{associationCandidates.filter(product => !associations.some(item => item.productId === product.id)).map(product => <option key={product.id} value={product.id}>{product.name} · {product.sku_code}</option>)}</select>
@@ -3417,34 +3335,13 @@ export default function ProductCreatePage() {
               </CardContent>
             </Card> : null}
 
-            {activeSection === 'product-data' ? <Card id="product-structure-choice">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm"><Boxes className="size-4 text-primary" />Product structure</CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">Choose whether this Product Master represents one sellable SKU or a family of variant SKUs before completing its attributes.</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Product structure">
-                  {([
-                    { type: 'single', title: 'Single product', description: 'One SKU with one price, stock record and attribute value.' },
-                    { type: 'variant', title: 'Product with variants', description: 'Multiple SKUs by Color, Size or another option.' },
-                  ] as const).map(option => {
-                    const TypeIcon = PRODUCT_TYPE_ICONS[option.type];
-                    const selected = form.product_type === option.type;
-                    return <button key={option.type} type="button" role="radio" aria-checked={selected} onClick={() => handleProductTypeChange(option.type)} className={`min-h-20 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary/5' : 'hover:border-primary/30 hover:bg-muted/30'}`}>
-                      <span className="flex items-start gap-3"><span className={`grid size-8 shrink-0 place-items-center rounded-md ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}><TypeIcon className="size-4" /></span><span><span className="flex items-center gap-2 text-sm font-semibold">{option.title}{selected ? <Check className="size-4 text-primary" /> : null}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span></span></span>
-                    </button>;
-                  })}
-                </div>
-              </CardContent>
-            </Card> : null}
-
             {/* Basic information */}
             <Card id="product-section-basic" tabIndex={-1} className={cn(activeSection !== 'product-data' && 'hidden')}>
-              <CardHeader className="pb-3">
+              <CardHeader className="p-5 pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm"><Package className="size-4 text-primary" />Basic information</CardTitle>
                 <p className="text-xs leading-5 text-muted-foreground">Core identity, category and customer-facing product information.</p>
               </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-5 px-5 pb-5">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
                   <div className="sm:col-span-6">
                     <Field label={copy.skuCode} required error={errors.sku_code}>
@@ -3638,11 +3535,12 @@ export default function ProductCreatePage() {
 
             {/* Variant setup and pricing */}
             <Card id="product-section-pricing" tabIndex={-1} className={cn('order-1', activeSection !== 'commerce' && 'hidden')}>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm"><Layers className="size-4 text-primary" />Pricing &amp; Inventory</CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">{form.has_variants ? 'Manage variants, pricing and stock for this product.' : <>Manage pricing and stock for SKU <span className="break-all font-mono text-foreground">{form.sku_code || 'Not assigned'}</span>.</>}</p>
-              </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-5 p-5">
+                <ProductStructureEditor type={form.product_type} skuCount={selectedVariantItems.length}
+                  onChange={handleProductTypeChange} disabled={!canWrite} defaultExpanded={!existingProduct}
+                  hasRecordedStock={Boolean(existingProduct && (Object.keys(existingProduct.inventory ?? {}).length || existingProduct.skus.some(sku => Object.keys(sku.stock_by_location ?? {}).length || (sku.stock ?? 0) > 0)))}
+                  linkedListingCount={existingProduct?.channels.length ?? 0}
+                  changed={Boolean(existingProduct && form.product_type !== existingProduct.product_type)} />
                 {form.has_variants ? <section className="space-y-4" aria-labelledby="variant-attributes-title">
                   <div className="flex items-start justify-between gap-3"><div><h3 id="variant-attributes-title" className="text-sm font-semibold">Variants</h3><p className="mt-1 text-xs text-muted-foreground">Select the Color, Size or other category values that create sellable SKUs.</p></div><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{variantGroups.length} of 2</span></div>
                   <VariantSection
@@ -3749,10 +3647,10 @@ export default function ProductCreatePage() {
 
             {/* Shipping & Logistics */}
             <Card id="product-section-shipping" tabIndex={-1} className={cn('order-30', activeSection !== 'product-data' && 'hidden')}>
-              <CardHeader className="pb-3">
+              <CardHeader className="p-5 pb-3">
                 <CardTitle className="text-sm flex items-center gap-2"><Truck className="size-4 text-primary" />Shipping & Logistics</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-5 pb-5">
                 <RowField label="Product measurements · Optional" fields={[
                   { label: 'Product length', value: form.prod_length, onChange: v => setField('prod_length', v), placeholder: '0', suffix: 'cm' },
                   { label: 'Product width', value: form.prod_width, onChange: v => setField('prod_width', v), placeholder: '0', suffix: 'cm' },
@@ -3774,13 +3672,13 @@ export default function ProductCreatePage() {
 
             {/* Trade & Compliance */}
             <Card id="product-section-more" className={cn('order-40', activeSection !== 'product-data' && 'hidden')}>
-              <button type="button" aria-expanded={complianceOpen} onClick={() => setComplianceOpen(open => !open)} className="flex min-h-16 w-full items-center gap-3 px-6 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+              <button type="button" aria-expanded={complianceOpen} onClick={() => setComplianceOpen(open => !open)} className="flex min-h-16 w-full items-center gap-3 px-5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Info className="size-4" /></span>
                 <span className="min-w-0"><span className="block text-sm font-semibold">Trade &amp; Compliance</span><span className="mt-0.5 block text-xs text-muted-foreground">Country of origin and customs data for cross-border listings.</span></span>
                 {(form.country_of_origin || form.hs_code) ? <span className="ml-auto shrink-0 text-xs font-medium text-emerald-600">Configured</span> : <span className="ml-auto shrink-0 text-xs text-muted-foreground">Optional</span>}
                 <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', complianceOpen && 'rotate-180')} />
               </button>
-              {complianceOpen ? <CardContent className="space-y-4 border-t pt-5">
+              {complianceOpen ? <CardContent className="space-y-4 border-t p-5">
                 <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs leading-5 text-muted-foreground">Complete these fields when publishing internationally. Channel readiness will request them only when a destination or category requires customs information.</div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label={copy.countryOfOrigin}>
@@ -3804,11 +3702,12 @@ export default function ProductCreatePage() {
               </CardContent> : null}
             </Card>
 
-            {activeSection === 'activity' && (existingProduct ? <ProductActivityHistory key={`${existingProduct.id}:${searchParams.get('historyChannel') ?? ''}:${searchParams.get('historyListing') ?? ''}:${selectedRevisionId ?? ''}`} product={existingProduct} showDemoInitially={isDemoProduct(existingProduct.id)} initialListingChannel={searchParams.get('historyChannel')} initialListingKey={searchParams.get('historyListing')} initialRevisionId={selectedRevisionId} /> : <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Save this Product Master to start recording activity.</CardContent></Card>)}
+            {activeSection === 'activity' && (existingProduct ? <ProductActivityHistory key={`${existingProduct.id}:${searchParams.get('historyChannel') ?? ''}:${searchParams.get('historyListing') ?? ''}:${selectedRevisionId ?? ''}`} product={existingProduct} showDemoInitially={isDemoProduct(existingProduct.id)} initialListingChannel={searchParams.get('historyChannel')} initialListingKey={searchParams.get('historyListing')} initialRevisionId={selectedRevisionId} /> : <Card><CardContent className="px-5 py-10 text-center text-sm text-muted-foreground">Save this Product Master to start recording activity.</CardContent></Card>)}
           </fieldset>
+          </div>
 
           {/* Right Column */}
-          {showReadinessPanel && <fieldset data-testid="product-editor-readiness" data-editor-fields disabled={!canWrite} className="min-w-0 space-y-5 xl:sticky xl:top-20 xl:h-fit">
+          {showReadinessPanel && <fieldset data-testid="product-editor-readiness" data-editor-fields disabled={!canWrite} className={cn(editorStyles.readiness, 'space-y-5')}>
 
 
             {readinessCard}
@@ -4144,13 +4043,17 @@ export default function ProductCreatePage() {
         onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
         onConfirm={handleConfirmSwitch}
         title={copy.convertTitle}
-        description={copy.convertDescription}
+        description={<><span className="block">{copy.convertDescription}</span><span className="mt-3 block">{selectedVariantItems.length} variant SKU{selectedVariantItems.length === 1 ? '' : 's'} in this setup. Stock will not be merged into the single SKU.{existingProduct?.channels.length ? ` Review SKU mappings for ${existingProduct.channels.length} linked listing${existingProduct.channels.length === 1 ? '' : 's'} before saving.` : ''} Nothing is sent to shops by this action.</span></>}
         confirmText={copy.convertConfirm}
         cancelText={copy.keepVariants}
         variant="destructive"
       />
       <Sheet open={!isArchived && readinessReviewOpen} onOpenChange={setReadinessReviewOpen}>
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
+        <SheetContent side="right" className="flex h-dvh w-full flex-col sm:max-w-md [&>button:last-child]:size-11 [&>button:last-child]:right-2 [&>button:last-child]:top-2" onCloseAutoFocus={event => {
+          const trigger = readinessTriggerRef.current;
+          if (trigger?.isConnected && trigger.getClientRects().length) { event.preventDefault(); trigger.focus(); }
+          readinessTriggerRef.current = null;
+        }}>
           <SheetHeader className="border-b pb-4">
             <SheetTitle>{allRequirementsComplete ? 'Product readiness checks' : 'Complete this product'}</SheetTitle>
             <SheetDescription>{allRequirementsComplete ? 'All required Master details are complete. Master activation and shop listings are managed separately.' : 'Readiness updates automatically as you complete each requirement. Your valid changes are saved as a draft.'}</SheetDescription>
@@ -4160,7 +4063,7 @@ export default function ProductCreatePage() {
               <button
                 key={check.id}
                 type="button"
-                onClick={() => { setReadinessReviewOpen(false); openCompletionItem(check.id); }}
+                onClick={() => { readinessTriggerRef.current = null; setReadinessReviewOpen(false); openCompletionItem(check.id); }}
                 className="flex min-h-12 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-150 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
               >
                 {check.done ? <CircleCheck className="size-5 shrink-0 text-emerald-600" /> : <CircleAlert className="size-5 shrink-0 text-amber-600" />}

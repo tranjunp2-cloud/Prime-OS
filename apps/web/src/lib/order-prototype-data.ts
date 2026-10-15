@@ -2,6 +2,7 @@ import { demoOrders } from '../../../../packages/order-workflow/demo-orders.js';
 import { validateManualOrder } from '../../../../packages/order-workflow/manual-order.js';
 import { restoreOrderPrototype } from './order-prototype';
 import type { ManualOrderInput, OrderRecord } from './orders-api';
+import { posDemoOrders } from '@/features/primepos/order-adapter';
 
 // Separate from API records. Existing per-order prototype progress keeps its original key.
 const createdKey = 'prime.order-prototype.created.v1';
@@ -14,7 +15,7 @@ function createdOrders(): OrderRecord[] {
 }
 
 export function listPrototypeOrders(): OrderRecord[] {
-  return [...createdOrders(), ...demoOrders() as OrderRecord[]].map(restoreOrderPrototype);
+  return [...posDemoOrders(), ...createdOrders(), ...demoOrders() as OrderRecord[]].map(restoreOrderPrototype);
 }
 
 export function createPrototypeOrder(input: ManualOrderInput): OrderRecord {

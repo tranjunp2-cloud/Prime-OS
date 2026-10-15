@@ -38,6 +38,16 @@ describe('ProductOverviewSnapshot', () => {
     rerender(<ProductOverviewSnapshot {...props} name="   " />);
     expect(screen.getByRole('heading', { level: 2, name: 'Untitled Product Master' })).toBeVisible();
   });
+  it('keeps the three operational metrics connected to their workspaces', () => {
+    const onCommerce = vi.fn();
+    const onListings = vi.fn();
+    mount({ onCommerce, onListings });
+    fireEvent.click(screen.getByRole('button', { name: 'View Master stock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View base price' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View linked listings' }));
+    expect(onCommerce).toHaveBeenCalledTimes(2);
+    expect(onListings).toHaveBeenCalledOnce();
+  });
   it('supports click and keyboard image navigation and restores focus without modifying media', async () => {
     const before = JSON.stringify(props.images);
     mount();

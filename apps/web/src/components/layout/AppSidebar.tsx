@@ -41,6 +41,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { SidebarUserFooter } from './SidebarUserFooter';
+import { currentStore, usePos } from '@/features/primepos/store';
 
 const sidebarCollapsedStorageKey = 'primeos.sidebar.collapsed';
 
@@ -68,6 +69,7 @@ const mainNavigation: NavGroup[] = [
       { id: 'product-brands', label: 'Brands', href: '/products/brands', icon: Award },
     ] },
     { id: 'warehouse', label: 'Warehouses', href: '/warehouses', icon: Warehouse },
+    { id: 'stores-pos', label: 'Stores & POS', href: '/settings/stores', icon: MonitorSmartphone },
     { id: 'channels', label: 'Sales Channels', href: '/sales-channels/connected-channels', icon: Store },
   ] },
   { id: 'growth', label: 'Growth & Engagement', items: [
@@ -80,7 +82,6 @@ const mainNavigation: NavGroup[] = [
       { id: 'general-business-settings', label: 'General & Business', href: '/settings/general', icon: Building2 },
       { id: 'team-access-settings', label: 'Team & Access', href: '/settings/team-access', icon: UsersRound },
       { id: 'payment-settings', label: 'Payments', href: '/settings/payments', icon: CreditCard },
-      { id: 'pricing-rules-settings', label: 'Pricing rules', href: '/settings/pricing-rules', icon: BadgePercent },
       { id: 'shipping-delivery-settings', label: 'Shipping & Delivery', href: '/settings/shipping-delivery', icon: Truck },
       { id: 'customer-data-settings', label: 'Customer Data & Privacy', href: '/settings/customer-data', icon: UsersRound },
       { id: 'template-notification-settings', label: 'Templates & Notifications', href: '/settings/templates-notifications', icon: Printer },
@@ -91,26 +92,32 @@ const mainNavigation: NavGroup[] = [
 ];
 
 const primeWebNavigation: NavGroup[] = [
-  { id: 'primeweb-sites', label: 'PrimeWeb', items: [
+  { id: 'primeweb', label: 'Website', items: [
     { id: 'websites', label: 'My Websites', href: '/builder/sites', icon: Globe2 },
-  ] },
-  { id: 'primeweb', label: 'Your website', items: [
     { id: 'website-overview', label: 'Overview', href: '/builder/overview', icon: Home },
     { id: 'theme-editor', label: 'Website Editor', href: '/builder/theme', icon: LayoutGrid },
-    { id: 'pages-content', label: 'Pages & Blog', href: '/builder/pages', icon: FilePlus2 },
-    { id: 'storefront', label: 'Storefront', href: '/builder/storefront', icon: ShoppingBag },
-    { id: 'domains-seo', label: 'Domains & Publishing', href: '/builder/domains', icon: Globe2 },
-    { id: 'seo-analytics', label: 'SEO & Analytics', href: '/builder/seo', icon: BarChart3 },
+    { id: 'pages-content', label: 'Blogs', href: '/builder/pages', icon: FilePlus2 },
+    { id: 'seo-analytics', label: 'SEO', href: '/builder/seo', icon: BarChart3 },
+  ] },
+  { id: 'primeweb-settings', label: 'Settings', items: [
     { id: 'website-settings', label: 'Website Settings', href: '/builder/settings', icon: Settings2 },
+    { id: 'domains-seo', label: 'Domains', href: '/builder/domains', icon: Globe2 },
+  ] },
+  { id: 'primeweb-support', label: 'Support', items: [
+    { id: 'primeweb-help', label: 'Help Center', href: '/faq?from_workspace=primeweb', icon: CircleHelp },
   ] },
 ];
 
 const posNavigation: NavGroup[] = [{ id: 'pos', label: 'Point of Sale', items: [
-  { id: 'fast-checkout', label: 'Fast Checkout', href: '/pos/register', icon: MonitorSmartphone },
-  { id: 'shift-management', label: 'Shift Management', href: '/pos/shifts', icon: Store },
-  { id: 'today-transactions', label: 'Today Transactions', href: '/pos/transactions', icon: ShoppingBag },
+  { id: 'fast-checkout', label: 'Sell', href: '/pos/register', icon: MonitorSmartphone },
+  { id: 'shift-management', label: 'Shifts & Cash', href: '/pos/shifts', icon: Store },
+  { id: 'today-transactions', label: 'Transactions', href: '/pos/transactions', icon: ShoppingBag },
   { id: 'returns-refunds', label: 'Return / Refund', href: '/pos/returns', icon: Undo2 },
-  { id: 'hardware-setup', label: 'Hardware Setup', href: '/pos/hardware', icon: Settings2 },
+  { id: 'hardware-setup', label: 'Equipment', href: '/pos/hardware', icon: Settings2 },
+] }];
+const cafeNavigation: NavGroup[] = [...posNavigation, { id: 'cafe', label: 'Restaurant & café', items: [
+  { id: 'pos-tables', label: 'Tables & Orders', href: '/pos/tables', icon: LayoutGrid },
+  { id: 'pos-kitchen', label: 'Kitchen', href: '/pos/kitchen', icon: ClipboardCheck },
 ] }];
 
 function hrefIsActive(href: string | undefined, pathname: string, search: string) {
@@ -173,6 +180,7 @@ function getFirstChildHref(item: NavItem): string | undefined {
 }
 
 export function AppSidebar() {
+  const posState = usePos();
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.localStorage.getItem(sidebarCollapsedStorageKey) === 'true');
   const [levelPath, setLevelPath] = useState<string[]>([]);
   const [direction, setDirection] = useState(1);
@@ -185,7 +193,7 @@ export function AppSidebar() {
   const groups = workspace === 'primeweb'
     ? primeWebNavigation
     : workspace === 'pos'
-      ? posNavigation
+      ? (currentStore(posState).mode === 'cafe' ? cafeNavigation : posNavigation)
       : scope === 'commerce'
         ? mainNavigation.filter((group) => group.id !== 'growth')
         : scope === 'growth'
@@ -206,6 +214,7 @@ export function AppSidebar() {
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
+      if (workspace === 'primeweb') return;
       const target = event.target as HTMLElement | null;
       if (event.key.toLowerCase() !== 'f' || event.metaKey || event.ctrlKey || event.altKey || target?.matches('input, textarea, select, [contenteditable="true"]')) return;
       event.preventDefault();
@@ -214,7 +223,7 @@ export function AppSidebar() {
     };
     window.addEventListener('keydown', focusSearch);
     return () => window.removeEventListener('keydown', focusSearch);
-  }, [collapsed]);
+  }, [collapsed, workspace]);
 
   const toggleCollapsed = () => setCollapsed((value) => {
     window.localStorage.setItem(sidebarCollapsedStorageKey, String(!value));
@@ -265,13 +274,13 @@ export function AppSidebar() {
 
       <nav className="flex-1 overflow-hidden px-2 py-3 md:px-3" aria-label="Primary navigation">
         <div className="flex h-full flex-col">
-          <div className="mb-3 shrink-0">
+          {workspace !== 'primeweb' && <div className="mb-3 shrink-0">
             <div className={cn('relative', collapsed && 'flex justify-center')}>
               <Search className={cn('pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground', collapsed && 'left-1/2 -translate-x-1/2')} aria-hidden="true" />
               <input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find navigation" aria-label="Find navigation" className={cn('h-10 w-full rounded-md border border-sidebar-border bg-background pl-9 pr-11 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/15', collapsed && 'w-10 cursor-pointer px-0 text-transparent placeholder:text-transparent')} onFocus={() => { if (collapsed) toggleCollapsed(); }} />
               {!collapsed ? <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-sidebar-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">F</kbd> : null}
             </div>
-          </div>
+          </div>}
 
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <AnimatePresence initial={false} mode="wait" custom={direction}>
@@ -289,12 +298,13 @@ export function AppSidebar() {
                   </section>
                 ) : (
                   <div className={cn('grid', collapsed ? 'gap-2' : 'gap-4')}>
-                    {groups.map((group) => <section key={group.id} aria-labelledby={`nav-group-${group.id}`}><h2 id={`nav-group-${group.id}`} className={cn('mb-1.5 hidden px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground', !collapsed && 'md:block')}>{group.label}</h2><div className="grid gap-1">{group.items.map((item) => renderItem(item))}</div></section>)}
+                    {groups.filter(group => group.id !== 'primeweb-support').map((group) => <section key={group.id} aria-labelledby={`nav-group-${group.id}`}><h2 id={`nav-group-${group.id}`} className={cn('mb-1.5 hidden px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground', !collapsed && 'md:block')}>{group.label}</h2><div className="grid gap-1">{group.items.map((item) => renderItem(item))}</div></section>)}
                   </div>
                 )}
               </motion.div>
             </AnimatePresence>
           </div>
+          {workspace === 'primeweb' && !normalizedQuery && <div className="mt-3 shrink-0 border-t border-sidebar-border pt-3">{primeWebNavigation.find(group => group.id === 'primeweb-support')?.items.map(item => renderItem(item))}</div>}
         </div>
       </nav>
 

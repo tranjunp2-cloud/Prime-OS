@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { ordersApi, orderRow, orderLabels, orderStockStatusLabel, exportOrders, getOrderAttentionReasons, type OrderRecord } from '@/lib/orders-api';
 import { ManualOrderDialog } from '@/components/orders/ManualOrderDialog';
 import { OrderWorkspaceDetail } from '@/components/orders/OrderWorkspaceDetail';
+import { PosOrderReceipt } from '@/features/primepos/ui';
 
 type StatusFilter = OrderQueue;
 const statusDefinitions = workQueues;
@@ -394,7 +395,9 @@ export default function Orders() {
     </div>}
 
     </>}
-    {!showEmptyState && !createOpen && detail && records.find((o) => o.id === detail) && <OrderWorkspaceDetail key={detail} order={records.find((o) => o.id === detail)!} canWrite={canWrite} onClose={() => setDetail(null)} startProcessing={startProcessing} positionLabel={detailIndex >= 0 ? `Order ${detailIndex + 1} of ${queue.length}` : undefined} onPrevious={detailIndex > 0 ? () => setDetail(queue[detailIndex - 1], false, true) : undefined} onNext={detailIndex >= 0 && detailIndex < queue.length - 1 ? () => setDetail(queue[detailIndex + 1], false, true) : undefined} onUpdated={updated} onEditDraft={() => { setEditingDraft(records.find((o) => o.id === detail)); setCreateOpen(true); }} />}
+    {!showEmptyState && !createOpen && detail && records.find((o) => o.id === detail) && (records.find(o => o.id === detail)?.source === 'pos-demo'
+      ? <PosOrderReceipt id={detail} onClose={() => setDetail(null)} />
+      : <OrderWorkspaceDetail key={detail} order={records.find((o) => o.id === detail)!} canWrite={canWrite} onClose={() => setDetail(null)} startProcessing={startProcessing} positionLabel={detailIndex >= 0 ? `Order ${detailIndex + 1} of ${queue.length}` : undefined} onPrevious={detailIndex > 0 ? () => setDetail(queue[detailIndex - 1], false, true) : undefined} onNext={detailIndex >= 0 && detailIndex < queue.length - 1 ? () => setDetail(queue[detailIndex + 1], false, true) : undefined} onUpdated={updated} onEditDraft={() => { setEditingDraft(records.find((o) => o.id === detail)); setCreateOpen(true); }} />)}
     {createOpen && <ManualOrderDialog initialOrder={editingDraft} warehouses={warehouses} onClose={() => { setCreateOpen(false); setEditingDraft(undefined); }} onCreated={(order) => {
       setRecords((items) => [order, ...items.filter((o) => o.id !== order.id)]); setCreateOpen(false); setEditingDraft(undefined);
       if (noDataDemo) {

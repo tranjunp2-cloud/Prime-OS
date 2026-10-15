@@ -5,7 +5,7 @@
 .body {
   display: grid;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 20px;
 }
 
 .metrics {
@@ -14,8 +14,8 @@
 
 @container (min-width: 620px) {
   .body {
-    grid-template-columns: 112px minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: start;
   }
 }
 

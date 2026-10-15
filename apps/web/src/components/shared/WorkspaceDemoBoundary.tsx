@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CalendarClock, CreditCard, FileText, Globe2, Headphones, MessageSquare, MonitorSmartphone, Package, RadioTower, Sparkles, TicketPercent, WalletCards, type LucideIcon } from 'lucide-react';
+import { BarChart3, CalendarClock, FileText, Globe2, Headphones, MessageSquare, MonitorSmartphone, Package, RadioTower, Sparkles, TicketPercent, WalletCards, type LucideIcon } from 'lucide-react';
 import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { EmptyState } from '@/components/system/EmptyState';
@@ -37,7 +37,6 @@ function emptyDemoScreen(pathname: string, params: URLSearchParams): EmptyScreen
   if (pathname === '/finance/fin-support') return { title: 'Financial Support', description: 'Review business readiness and available financial support.', emptyTitle: 'No financial assessment yet', guidance: 'Sync your orders and payment history before reviewing funding readiness. No sample balances, risk scores or offers are shown.', icon: WalletCards, action: connect };
   if (pathname === '/crm/mdec') return { title: 'Business Growth', description: 'Review growth opportunities for your business.', emptyTitle: 'No business activity yet', guidance: 'Complete your business setup and connect your first channel to start building your growth overview.', icon: BarChart3, action: ['Set up business information', '/settings/general'] };
   if (pathname === '/ecom/commerce-surface') return { title: 'Commerce', description: 'Manage commerce activity across your channels.', emptyTitle: 'No commerce activity yet', guidance: 'Connect a sales channel and add products to start selling.', icon: Globe2, action: connect };
-  if (pathname === '/billing' && params.get('tab') !== 'plans') return { title: 'Plan & Billing', description: 'Manage your workspace plan and billing activity.', emptyTitle: params.get('tab') === 'requests' ? 'No plan requests yet' : 'No billing activity yet', guidance: 'There are no billing records to show in this demo state. Available plans remain accessible.', icon: CreditCard, action: ['View plans', '/billing?tab=plans'], tabs: [['Overview', '/billing'], ['Plans', '/billing?tab=plans'], ['Requests', '/billing?tab=requests']] };
   if (pathname.startsWith('/pos/')) {
     const section = pathname.split('/')[2];
     if (section === 'hardware') return undefined;
@@ -66,7 +65,7 @@ export function WorkspaceDemoBoundary({ children }: { children: ReactNode }) {
     {screen.tabs && <nav aria-label={`${screen.title} sections`} className="flex flex-wrap gap-2 border-b pb-3">
       {screen.tabs.map(([label, href]) => {
         const target = new URL(href, 'https://prototype.local');
-        const key = pathname === '/billing' ? 'tab' : 'view';
+        const key = 'view';
         const active = (params.get(key) ?? 'overview') === (target.searchParams.get(key) ?? 'overview');
         return <Link key={href} to={href} aria-current={active ? 'page' : undefined} className={cn('inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', active ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-muted')}>{label}</Link>;
       })}

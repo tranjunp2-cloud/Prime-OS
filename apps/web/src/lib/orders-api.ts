@@ -56,6 +56,7 @@ export const ordersApi = {
     return request<{ data: OrderRecord }>('', { method: 'POST', body: JSON.stringify(input) });
   },
   command: async (order: OrderRecord, action: Record<string, unknown>): Promise<{data: OrderRecord}> => {
+    if (order.source === 'pos-demo') throw new Error('Manage this counter sale in Prime POS.');
     if (order.source === 'demo') return {data: runOrderPrototype(order, action)};
     if (import.meta.env.VITE_PRIME_PROTOTYPE === 'true') throw new Error('Only sample orders can be changed in the prototype.');
     return request<{ data: OrderRecord }>(`/${encodeURIComponent(order.id)}/actions`, { method: 'POST', body: JSON.stringify({ ...action, version: order.version }) });

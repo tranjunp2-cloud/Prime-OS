@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, History, Package, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ACTIVITY_CHANNEL_LABELS, demoProductActivity, getProductActivity, groupRoutineSyncActivity, type ProductActivity } from '@/lib/product-activity';
 import type { Product, ProductRevision } from '@/lib/product-store';
@@ -41,23 +41,19 @@ export function ProductActivityHistory({ product, showDemoInitially = false, ini
 
   return <>
     <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div><CardTitle className="flex items-center gap-2 text-base"><History className="size-4 text-primary" />Activity history</CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground">Master changes and related listing activity, in one place.</p></div>
-        <Button type="button" variant="outline" size="sm" aria-pressed={showDemo} onClick={() => { setShowDemo(!showDemo); setLimit(20); }}>
-          {showDemo ? 'Hide demo events' : 'Show demo events'}
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
           <div role="group" aria-label="Activity scope" className="flex flex-wrap gap-1 rounded-lg bg-muted/40 p-1">
             {([['all', 'All activity'], ['master', 'Master'], ['listing', 'Listings']] as const).map(([value, label]) =>
               <button key={value} type="button" aria-pressed={scope === value} onClick={() => selectScope(value)}
-                className={cn('min-h-10 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', scope === value ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>
+                className={cn('min-h-9 rounded-md px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', scope === value ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>
                 {label}
               </button>)}
           </div>
-          {scope === 'listing' && <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" className="min-h-9" aria-pressed={showDemo} onClick={() => { setShowDemo(!showDemo); setLimit(20); }}>
+            {showDemo ? 'Hide demo events' : 'Show demo events'}
+          </Button>
+          {scope === 'listing' && <div className="flex w-full flex-wrap items-center gap-2">
             {listingKey !== 'all' && <Button type="button" variant="ghost" size="sm" onClick={() => setListingKey('all')}>Selected listing · Clear filter</Button>}
             {channel !== 'all' && <Button type="button" variant="ghost" size="sm" onClick={() => setChannel('all')}>{ACTIVITY_CHANNEL_LABELS[channel as keyof typeof ACTIVITY_CHANNEL_LABELS] ?? channel} · Clear filter</Button>}
             <label htmlFor="activity-shop" className="text-xs text-muted-foreground">Shop</label>
@@ -66,29 +62,31 @@ export function ProductActivityHistory({ product, showDemoInitially = false, ini
             </select>
           </div>}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 py-4 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2 text-xs text-muted-foreground">
           <p aria-live="polite">{filtered.length} events · Newest first</p>
           <p>{showDemo ? 'Demo-labelled events are examples, not actual shop activity.' : 'Local prototype history · New saved changes are recorded here.'}</p>
         </div>
         {filtered.length ? <ol aria-label="Product activity timeline" className="divide-y">
           {groups.slice(0, limit).map(event => {
             const Icon = event.outcome === 'error' ? AlertCircle : event.scope === 'master' ? Package : Store;
-            return <li key={event.id} className="flex gap-3 py-4 first:pt-1">
-              <span className={cn('mt-1 grid size-9 shrink-0 place-items-center rounded-full border bg-background', event.outcome === 'error' ? 'text-destructive' : 'text-muted-foreground')}><Icon className="size-4" /></span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            return <li key={event.id} className="flex gap-2.5 py-2.5">
+              <span className={cn('mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border bg-background', event.outcome === 'error' ? 'text-destructive' : 'text-muted-foreground')}><Icon className="size-4" /></span>
+              <div className="relative min-w-0 flex-1">
+                <div className="sm:pr-28">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">{event.scope === 'master' ? 'Product Master' : 'Listing'}</span>
                   {event.listing && <span>{ACTIVITY_CHANNEL_LABELS[event.listing.channel]} · {event.listing.shop}</span>}
                   {event.demo && <span className="rounded border border-dashed px-1.5 py-0.5 text-xs">Demo</span>}
                 </div>
-                <p className="mt-1 font-medium">{event.title}{event.repeated && <span className="ml-2 text-xs font-normal text-muted-foreground">{event.repeated.length} updates</span>}</p>
-                <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs leading-5 text-muted-foreground">
+                <p className="mt-0.5 text-sm font-medium leading-5">{event.title}{event.repeated && <span className="ml-2 text-xs font-normal text-muted-foreground">{event.repeated.length} updates</span>}</p>
+                <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs leading-5 text-muted-foreground">
                   <span>{event.actor}</span><span aria-hidden="true">·</span><time dateTime={event.occurredAt}>{formatTime(event.occurredAt)}</time>
                   {event.listing && <><span aria-hidden="true">·</span><span className="break-all">{event.listing.sku}</span></>}
                 </div>
-                {event.revisionId ? <Button type="button" variant="link" size="sm" className="mt-1 px-0" onClick={() => viewVersion(event)}>View version</Button>
-                  : <details className="group mt-2">
-                    <summary className="flex min-h-9 w-fit cursor-pointer list-none items-center gap-1 rounded text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">View details<ChevronDown className="size-3.5 group-open:rotate-180" /></summary>
+                </div>
+                {event.revisionId ? <Button type="button" variant="link" size="sm" className="h-8 px-0 text-xs sm:absolute sm:right-0 sm:top-0" onClick={() => viewVersion(event)}>View version</Button>
+                  : <details className="group">
+                    <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1 rounded text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:absolute sm:right-0 sm:top-0 [&::-webkit-details-marker]:hidden">View details<ChevronDown className="size-3.5 group-open:rotate-180" /></summary>
                     <div className="mt-2 space-y-3 border-l-2 pl-4 text-sm">
                       <p className="max-w-2xl leading-6 text-muted-foreground">{event.detail}</p>
                       {event.listing?.externalId && <p className="break-all text-xs text-muted-foreground">Listing ID: {event.listing.externalId}</p>}
@@ -109,7 +107,7 @@ export function ProductActivityHistory({ product, showDemoInitially = false, ini
       <SheetContent className="overflow-y-auto sm:max-w-lg">
         <SheetHeader><SheetTitle>Master version {version ? `v${version.number}` : ''}</SheetTitle><SheetDescription>Version details for {product.sku_code}. Listing activity is not part of this version.</SheetDescription></SheetHeader>
         {version && <div className="mt-6 space-y-6"><dl className="space-y-4 text-sm">
-          <div><dt className="text-muted-foreground">Recorded by</dt><dd className="mt-1 font-medium">{version.createdBy}</dd></div>
+          <div><dt className="text-muted-foreground">Recorded by</dt><dd className="mt-0.5 text-sm font-medium leading-5">{version.createdBy}</dd></div>
           <div><dt className="text-muted-foreground">Recorded at</dt><dd className="mt-1">{formatTime(version.createdAt)}</dd></div>
           <div><dt className="text-muted-foreground">Summary</dt><dd className="mt-1 leading-6">{version.summary === 'Published canonical Product Master revision' ? 'Product Master version activated' : version.summary}</dd></div>
         </dl><p className="border-t pt-4 text-sm leading-6 text-muted-foreground">This prototype retains version metadata, not a complete field-level snapshot. Viewing a version does not restore data or publish listings.</p></div>}

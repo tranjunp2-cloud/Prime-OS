@@ -11,6 +11,7 @@ interface WorkspacePageHeaderProps {
   titleAccessory?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  showDemoModeToggle?: boolean;
 }
 
 export function WorkspacePageHeader({
@@ -20,6 +21,7 @@ export function WorkspacePageHeader({
   titleAccessory,
   actions,
   className,
+  showDemoModeToggle = true,
 }: WorkspacePageHeaderProps) {
   const inRouter = useInRouterContext();
   return (
@@ -27,7 +29,7 @@ export function WorkspacePageHeader({
       title={title}
       description={description}
       icon={Icon}
-      status={titleAccessory ?? (inRouter ? <DemoDataModeToggle /> : undefined)}
+      status={titleAccessory ?? (inRouter && showDemoModeToggle ? <DemoDataModeToggle /> : undefined)}
       secondaryActions={actions}
       variant="workspace"
       className={className}

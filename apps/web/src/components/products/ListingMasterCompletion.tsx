@@ -26,10 +26,11 @@ type Props = {
   creationSetup?: (product: Product, onChange: (product: Product) => void) => ReactNode;
   onEditingChange?: (editing: boolean, dirty: boolean) => void;
   readFirst?: boolean;
+  embeddedGroup?: 'variants' | 'content';
 };
 
 /** One review surface; collapsed groups preserve drafts and image validation. */
-export function ListingMasterCompletion({ product: proposal, sources, onChange: applyProduct, mappings: proposalMappings, onMappingsChange: applyMappings, verifiedSingles = [], onMediaReady, preservedSkuIds, baseline, creationSetup, onEditingChange, readFirst }: Props) {
+export function ListingMasterCompletion({ product: proposal, sources, onChange: applyProduct, mappings: proposalMappings, onMappingsChange: applyMappings, verifiedSingles = [], onMediaReady, preservedSkuIds, baseline, creationSetup, onEditingChange, readFirst, embeddedGroup }: Props) {
   const prefix = useId();
   const reviewFirst = readFirst ?? Boolean(creationSetup);
   const [editor, setEditor] = useState<{ group: string; product: Product; mappings: VariantMappings } | null>(null);
@@ -123,6 +124,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
     });
   };
   const section = (id: string, body: ReactNode) => {
+    if (embeddedGroup) return id === embeddedGroup ? <section key={id} aria-label={id === 'variants' ? 'Variant setup' : 'Image setup'} className="space-y-3">{body}</section> : null;
     const group = groups.find(item => item.id === id)!;
     const issues = issuesFor(group);
     if (reviewFirst) {
@@ -172,13 +174,14 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
   const mappingRow = (key: string) => <ListingFieldMappingRow key={key} product={product} baseline={baseline} sources={sources} target={MASTER_MAPPING_TARGETS.find(target => target.key === key)!} onChange={onChange} multiline={key === 'description'} />;
   const changes = baseline ? MASTER_MAPPING_TARGETS.filter(target => String(fieldValue(product, target.key)) !== String(fieldValue(baseline, target.key))) : [];
   return <div className={reviewFirst ? 'grid items-start gap-3 md:grid-cols-2' : 'space-y-3'} aria-label="Complete Master details">
-    {!creationSetup && <div className="md:col-span-2"><h3 className="break-words text-base font-semibold">{product.name || 'Complete product details'}</h3><p className="mt-1 break-words text-xs text-muted-foreground">Master SKU: <span className="break-all font-mono">{product.sku_code}</span> · {product.status === 'published' ? 'Active' : 'Draft'}</p></div>}
-    <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 rounded-lg bg-muted/40 px-3 py-1 md:col-span-2">
+    {!creationSetup && !embeddedGroup && <div className="md:col-span-2"><h3 className="break-words text-base font-semibold">{product.name || 'Complete product details'}</h3><p className="mt-1 break-words text-xs text-muted-foreground">Master SKU: <span className="break-all font-mono">{product.sku_code}</span> · {product.status === 'published' ? 'Active' : 'Draft'}</p></div>}
+    {!embeddedGroup && <><div className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 rounded-lg bg-muted/40 px-3 py-1 md:col-span-2">
       <p role="status" className="flex flex-wrap items-center gap-2 text-xs">{incomplete.length ? <><TriangleAlert className="size-4 text-amber-700 dark:text-amber-300" /><strong>{incomplete.length} section{incomplete.length === 1 ? '' : 's'} to complete</strong><span className="text-muted-foreground">{baseline?.status === 'published' ? 'before saving these changes' : 'before activation'}</span></> : <><CheckCircle2 className="size-4 text-emerald-600" />Master core data complete</>}</p>
       <div className="flex flex-wrap gap-2">{incomplete.length > 0 && <Button variant="ghost" disabled={reviewFirst && Boolean(editor)} className="h-11 px-2 text-xs" onClick={() => reveal(incomplete[0].id)}>Review missing details</Button>}{!reviewFirst && <Button variant="ghost" className="h-11 px-2 text-xs" onClick={() => setExpanded(Object.fromEntries(groups.map(group => [group.id, !allExpanded])))}>{allExpanded ? 'Collapse all sections' : 'Expand all sections'}</Button>}</div>
     </div>
     {!reviewFirst && <p className="text-xs text-muted-foreground">Check the source → edit the Master value. These import choices do not change sync settings.</p>}
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs md:col-span-2" aria-label="Master activation requirements">{checks.map(check => <span key={check.id} className={`flex items-center gap-1.5 ${check.done ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'}`}>{check.done ? <CheckCircle2 className="size-3.5" /> : <TriangleAlert className="size-3.5" />}{({ identity: 'Title', sku: 'SKU', content: 'Description', price: 'Price' })[check.id as 'identity']}</span>)}<ListingReviewHelp label="Master activation">Only title, unique SKU(s), description and valid price(s) are required to activate the Master. Channel-specific requirements do not block activation or other listings. SKU mapping confirmation is a separate linking step.</ListingReviewHelp></div>
+    </>}
     {section('identity', <>
       <div className="hidden grid-cols-[minmax(120px,.7fr)_minmax(180px,1fr)_minmax(220px,1.4fr)] gap-4 py-1 text-xs text-muted-foreground md:grid"><span>Master field</span><span>Source field &amp; value · change</span><span>{baseline ? 'Value after saving' : 'Value to create'} · editable</span></div>
       {mappingRow('name')}
@@ -200,7 +203,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
     })}{!attributes.some(attribute => attribute.required) && <p className="text-xs text-muted-foreground">No required category attributes.</p>}</>)}
 
     {section('content', <>
-      {mappingRow('description')}
+      {embeddedGroup !== 'content' && mappingRow('description')}
     <section className="space-y-2 border-t pt-3" aria-label="Product images"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold">Product images <span className="font-normal text-muted-foreground">{masterMedia.count} image{masterMedia.count === 1 ? '' : 's'} · optional for activation · 9 max</span></h4><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm focus-within:ring-2 focus-within:ring-ring"><ImagePlus className="size-4" />{uploading ? 'Adding images…' : 'Add images'}<input className="sr-only" type="file" aria-label="Upload product images" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} onChange={event => { void upload(event.target.files); event.target.value = ''; }} /></label></div>{!reviewFirst && <p className="text-xs text-muted-foreground">Choose the cover and remove unwanted images. Shop images stay unchanged.</p>}
       <div className="flex flex-wrap gap-3">{product.images.map((src, index) => <div key={src} className="w-32 min-w-0 space-y-1"><div className="relative aspect-square overflow-hidden rounded-lg border bg-muted/30"><img src={src} alt={`Master image ${index + 1}`} className="size-full object-contain" onLoad={() => imageStatus(src, true)} onError={() => imageStatus(src, false)} />{imageStates[src] === false && <div className="absolute inset-0 grid place-content-center bg-background/95 p-2 text-center text-xs text-destructive">Image unavailable. Remove or replace it.</div>}</div><p className="truncate text-xs text-muted-foreground" title={imageSources.get(src)}>{imageSources.has(src) ? `From ${imageSources.get(src)}` : src.startsWith('data:') ? 'Uploaded image' : 'Existing Master image'}</p><div className="flex gap-1"><Button variant="outline" className="h-11 flex-1 px-2 text-xs" disabled={index === 0} onClick={() => setImages([src, ...product.images.filter(image => image !== src)])}>{index === 0 ? 'Cover' : 'Set cover'}</Button><Button variant="ghost" className="size-11 p-0" aria-label={`Remove image ${index + 1}`} onClick={() => setImages(product.images.filter(image => image !== src))}><Trash2 className="size-4" /></Button></div></div>)}</div>
       {product.images.some(image => imageStates[image] === false) && <p role="alert" className="text-xs text-destructive">Image unavailable. Master activation is not blocked; review it before syncing images.</p>}
@@ -210,7 +213,7 @@ export function ListingMasterCompletion({ product: proposal, sources, onChange: 
     </>)}
     {section('shipping', <>{['pkg_length', 'pkg_width', 'pkg_height', 'pkg_weight'].map(mappingRow)}</>)}
     {section('identifiers', <>{['model_number', 'mpn', 'gtin', 'pack_quantity'].map(mappingRow)}</>)}
-    {baseline && <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-5" aria-label="Master change summary"><p className="font-medium">{changes.length ? `Master fields to update: ${changes.map(target => target.label).join(', ')}` : 'Existing Master fields are kept unless you change them.'}</p><p className="mt-1 text-muted-foreground">Images, attributes and SKU changes are reviewed above. {baseline.channels.length ? `${baseline.channels.length} existing linked listing(s) may use these values in a future sync. ` : ''}Saving here does not send updates to shops.</p></div>}
+    {baseline && !embeddedGroup && <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-5" aria-label="Master change summary"><p className="font-medium">{changes.length ? `Master fields to update: ${changes.map(target => target.label).join(', ')}` : 'Existing Master fields are kept unless you change them.'}</p><p className="mt-1 text-muted-foreground">Images, attributes and SKU changes are reviewed above. {baseline.channels.length ? `${baseline.channels.length} existing linked listing(s) may use these values in a future sync. ` : ''}Saving here does not send updates to shops.</p></div>}
 
   </div>;
 }

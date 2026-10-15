@@ -4,14 +4,15 @@ import { getProductCatalogSettings } from '@/lib/product-catalog-settings-store'
 
 export function loadMasterImages() {
   // Eager images stay mounted and load even when their review group is collapsed.
-  screen.getAllByAltText(/^Master image /).forEach(image => fireEvent.load(image));
+  screen.queryAllByAltText(/^Master image /).forEach(image => fireEvent.load(image));
 }
 export function applyListingSection() {
-  const apply = screen.queryByRole('button', { name: 'Apply changes' });
+  const apply = screen.queryByRole('button', { name: 'Apply changes' }) ?? screen.queryByRole('button', { name: 'Apply to review' });
   if (apply) fireEvent.click(apply);
 }
 export function editListingSection(title: string) {
-  const edit = screen.queryByRole('button', { name: `Edit ${title}` });
+  const field = ({ 'Product essentials': 'Title', 'Variants, pricing & SKU mapping': 'Product structure', 'Pricing': 'Price', 'Description & images': 'Description' } as Record<string, string>)[title];
+  const edit = screen.queryByRole('button', { name: `Edit ${title}` }) ?? (field ? screen.queryByRole('button', { name: `Edit Master ${field}` }) : null) ?? (title === 'Pricing' ? screen.queryByRole('button', { name: /^Edit Master price for/ }) : null);
   if (!edit) return;
   applyListingSection();
   fireEvent.click(edit);
@@ -28,6 +29,14 @@ export function chooseListingGroup(label: string) {
 }
 /** Enter required values via visible form controls, never bypass the production validation. */
 export function completeListingDetails() {
+  if (screen.queryByRole('heading', { name: 'Review data for the new Master' })) {
+    applyListingSection();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Master Description' }));
+    const description = screen.getByLabelText('Product description *') as HTMLTextAreaElement;
+    if (!description.value.trim()) fireEvent.change(description, { target: { value: readyMasterFields().description } });
+    applyListingSection();
+    return;
+  }
   if (screen.queryByRole('button', { name: 'Edit Product essentials' }) || screen.queryByRole('button', { name: 'Apply changes' })) {
     applyListingSection();
     const fields = readyMasterFields();

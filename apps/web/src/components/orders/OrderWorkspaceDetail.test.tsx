@@ -11,6 +11,58 @@ beforeEach(() => {vi.stubGlobal('ResizeObserver', class { observe() {} unobserve
 afterEach(()=>{cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals();});
 function mount(record=order) {return render(<OrderWorkspaceDetail order={record} canWrite onClose={()=>{}} onUpdated={()=>{}} onEditDraft={()=>{}}/>);}
 describe('Order detail workflows',()=>{
+  it('keeps only hold and cancel in More, with edits and history in their own sections', () => {
+    mount();
+    expect(screen.getByRole('button', {name:'Assign',exact:true})).toBeVisible();
+    expect(screen.getByRole('button', {name:'Edit note'})).toBeVisible();
+    expect(screen.getByRole('button', {name:'Change warehouse'})).toBeVisible();
+    expect(screen.getByRole('button', {name:'View activity'})).toBeVisible();
+    fireEvent.pointerDown(screen.getByRole('button', {name:'More',exact:true}), {button:0,ctrlKey:false});
+    const menu = within(screen.getByRole('menu'));
+    expect(menu.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Hold order', 'Cancel order']);
+    fireEvent.click(menu.getByRole('menuitem', {name:'Hold order'}));
+    expect(screen.getByRole('dialog', {name:'Hold order'})).toBeVisible();
+    expect(ordersApi.command).not.toHaveBeenCalled();
+  });
+  it.each(['acknowledged', 'allocated', 'fulfillment_in_progress'] as const)('shows packing slips directly during %s, without duplicating them in More', status => {
+    mount({...order, canonicalStatus:status, metadata:{...order.metadata,handlingType:'self'}});
+    expect(screen.getByRole('button', {name:'Print packing slip',exact:true})).toBeVisible();
+    fireEvent.pointerDown(screen.getByRole('button', {name:'More',exact:true}), {button:0,ctrlKey:false});
+    const menu = within(screen.getByRole('menu'));
+    expect(menu.getByRole('menuitem', {name:'Hold order'})).toBeVisible();
+    expect(menu.queryByRole('menuitem', {name:/packing slip/})).not.toBeInTheDocument();
+  });
+  it.each(['partially_shipped', 'shipped', 'delivered', 'closed'] as const)('retains only the historical reprint in More for %s seller orders', status => {
+    mount({...order, canonicalStatus:status, metadata:{...order.metadata,handlingType:'self'}});
+    fireEvent.pointerDown(screen.getByRole('button', {name:'More',exact:true}), {button:0,ctrlKey:false});
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Reprint packing slip']);
+  });
+  it('does not offer packing slips before confirmation, and still confirms cancellation explicitly', () => {
+    mount({...order, canonicalStatus:'draft', metadata:{...order.metadata,handlingType:'self'}});
+    expect(screen.queryByRole('button', {name:/^(Print|Reprint) packing slip$/})).not.toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByRole('button', {name:'More',exact:true}), {button:0,ctrlKey:false});
+    const menu = within(screen.getByRole('menu'));
+    expect(menu.getAllByRole('menuitem')).toHaveLength(1);
+    fireEvent.click(menu.getByRole('menuitem', {name:'Cancel order'}));
+    expect(screen.getByRole('dialog', {name:'Cancel order'})).toBeVisible();
+    expect(screen.getByLabelText('Cancellation reason')).toBeRequired();
+    expect(ordersApi.command).not.toHaveBeenCalled();
+  });
+  it.each([
+    {...order, canonicalStatus:'canceled' as const, metadata:{...order.metadata,handlingType:'self' as const}},
+    {...order, canonicalStatus:'closed' as const, metadata:{...order.metadata,handlingType:'marketplace' as const}},
+    {...order, canonicalStatus:'closed' as const, lines:[], metadata:{...order.metadata,handlingType:'self' as const}},
+    {...order, hold:{active:true,reason:'Check address',at:order.orderedAt,actor:'Seller'}},
+  ])('hides More when no relevant actions remain ($canonicalStatus)', record => {
+    mount(record);
+    expect(screen.queryByRole('button', {name:'More',exact:true})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name:'View activity'})).toBeVisible();
+  });
+  it('does not expose lifecycle actions to a read-only viewer', () => {
+    render(<OrderWorkspaceDetail order={order} canWrite={false} onClose={()=>{}} onUpdated={()=>{}} onEditDraft={()=>{}} />);
+    expect(screen.queryByRole('button', {name:'More',exact:true})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name:'View activity'})).toBeVisible();
+  });
   it('confirms an unpaid bank transfer and the order in one dialog, then shows Preparing', async () => {
     const bankOrder = {...order, needsPaymentVerification: true, payment: {state: 'Unpaid', method: 'Bank transfer', reference: 'BANK-123'}};
     const updated = {...bankOrder, canonicalStatus: 'acknowledged' as const, version: 2, needsPaymentVerification: false, payment: {...bankOrder.payment, state: 'Paid'}};

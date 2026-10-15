@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { createManagedWarehouse, getWarehouses, type Warehouse } from '@/lib/warehouse-store';
 import { type Product } from '@/lib/product-store';
@@ -9,7 +10,7 @@ import type { StockLocation } from './WarehouseStockTable';
 
 const control = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm';
 
-export function CreateWarehouseDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: (warehouse: Warehouse) => void }) {
+export function CreateWarehouseDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (warehouse: Warehouse) => void }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [country, setCountry] = useState('VN');
@@ -22,25 +23,25 @@ export function CreateWarehouseDrawer({ onClose, onCreated }: { onClose: () => v
   const existingCodes = new Set(getWarehouses().map(warehouse => warehouse.code.toUpperCase()));
   while (existingCodes.has(`WH-${country}-${String(codeSequence).padStart(2, '0')}`)) codeSequence++;
   const generatedCode = `WH-${country}-${String(codeSequence).padStart(2, '0')}`;
-  return <Sheet open onOpenChange={open => !open && onClose()}><SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
-    <SheetHeader className="border-b p-5"><SheetTitle>Add warehouse</SheetTitle><SheetDescription>Create a location you manage, then record opening stock for your existing Product Master SKUs.</SheetDescription></SheetHeader>
-    <form className="flex min-h-0 flex-1 flex-col" onSubmit={event => {
+  return <Dialog open onOpenChange={open => !open && onClose()}><DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+    <DialogHeader className="shrink-0 border-b p-5 pr-12 text-left sm:p-6 sm:pr-12"><DialogTitle>Add warehouse</DialogTitle><DialogDescription className="leading-6">Create a location you manage, then record opening stock for your existing Product Master SKUs.</DialogDescription></DialogHeader>
+    <form className="flex min-h-0 flex-1 flex-col overflow-hidden" onSubmit={event => {
       event.preventDefault(); if (saving.current) return; saving.current = true;
       try { onCreated(createManagedWarehouse({ name, code: code || generatedCode, country, address, manager, phone })); }
       catch (failure) { saving.current = false; setError(failure instanceof Error ? failure.message : 'Could not save the warehouse.'); }
     }}>
-      <div className="flex-1 space-y-4 overflow-auto p-5">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
         <label className="grid gap-2 text-sm">Warehouse name<Input required autoFocus value={name} onChange={event => setName(event.target.value)} placeholder="e.g. HCM Central" /></label>
-        <div className="grid grid-cols-2 gap-3"><label className="grid gap-2 text-sm">Country<select className={control} value={country} onChange={event => setCountry(event.target.value)}>{[['VN', 'Vietnam'], ['SG', 'Singapore'], ['JP', 'Japan'], ['MY', 'Malaysia'], ['TH', 'Thailand'], ['ID', 'Indonesia'], ['PH', 'Philippines'], ['US', 'United States'], ['GB', 'United Kingdom'], ['AU', 'Australia']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm">Country<select className={control} value={country} onChange={event => setCountry(event.target.value)}>{[['VN', 'Vietnam'], ['SG', 'Singapore'], ['JP', 'Japan'], ['MY', 'Malaysia'], ['TH', 'Thailand'], ['ID', 'Indonesia'], ['PH', 'Philippines'], ['US', 'United States'], ['GB', 'United Kingdom'], ['AU', 'Australia']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="grid gap-2 text-sm">Warehouse code<Input value={code || generatedCode} onChange={event => setCode(event.target.value.toUpperCase())} /></label></div>
         <label className="grid gap-2 text-sm">Address<Input required value={address} onChange={event => setAddress(event.target.value)} placeholder="Street, city, postal code" /></label>
-        <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm">Contact details (optional)</summary><div className="mt-3 grid gap-3"><label className="grid gap-2 text-sm">Manager<Input value={manager} onChange={event => setManager(event.target.value)} /></label><label className="grid gap-2 text-sm">Phone<Input type="tel" value={phone} onChange={event => setPhone(event.target.value)} /></label></div></details>
+        <details className="rounded-lg border p-4"><summary className="cursor-pointer text-sm">Contact details (optional)</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm">Manager<Input value={manager} onChange={event => setManager(event.target.value)} /></label><label className="grid gap-2 text-sm">Phone<Input type="tel" value={phone} onChange={event => setPhone(event.target.value)} /></label></div></details>
         <p className="text-xs leading-5 text-muted-foreground">You manage the counts at this location. Marketplace-managed warehouses are supplied by their connected provider.</p>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
-      <footer className="flex justify-end gap-2 border-t bg-background p-4"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!name.trim() || !address.trim()}>Create warehouse</Button></footer>
+      <footer className="flex shrink-0 justify-end gap-2 border-t bg-background p-4 sm:px-6"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!name.trim() || !address.trim()}>Create warehouse</Button></footer>
     </form>
-  </SheetContent></Sheet>;
+  </DialogContent></Dialog>;
 }
 
 export function AddWarehouseStockDrawer({ warehouse, products, onClose, onSaved }: { warehouse: StockLocation; products: Product[]; onClose: () => void; onSaved: (ids: string[]) => void }) {

@@ -39,6 +39,44 @@ beforeEach(() => {
 afterEach(() => { cleanup(); deleteProduct(id); localStorage.removeItem('prime-product-catalog-settings-v2'); vi.restoreAllMocks(); });
 
 describe('Publishing Product Master without channel listings', () => {
+  it('opens the compact readiness checklist and its field shortcut without saving or activating', async () => {
+    updateProduct(id, { id, description: '' });
+    await mount();
+    const before = JSON.stringify(getProductById(id));
+    const dock = screen.getByTestId('product-editor-readiness-compact');
+    const trigger = within(dock).getByRole('button', { name: /Product readiness:/ });
+    expect(dock.parentElement).toBe(screen.getByTestId('product-editor-layout'));
+    expect(screen.getByTestId('product-editor-main')).not.toContainElement(dock);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Complete this product' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add a product description', exact: true }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('combobox', { name: 'Product editor section' })).toHaveValue('product-data');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(JSON.stringify(getProductById(id))).toBe(before);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Product editor section' }), { target: { value: 'activity' } });
+    expect(screen.queryByTestId('product-editor-readiness-compact')).not.toBeInTheDocument();
+  });
+
+  it('uses the same workspace state for the compact section picker without saving product data', async () => {
+    updateProduct(id, { id, description: '' });
+    await mount();
+    const before = JSON.stringify(getProductById(id));
+    const picker = screen.getByRole('combobox', { name: 'Product editor section' });
+    expect(picker).toHaveValue('distribution');
+    expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'true');
+    fireEvent.change(picker, { target: { value: 'product-data' } });
+    expect(screen.getByRole('button', { name: 'Product data', exact: true })).toHaveAttribute('aria-current', 'page');
+    fireEvent.change(picker, { target: { value: 'activity' } });
+    expect(screen.queryByTestId('product-editor-readiness')).not.toBeInTheDocument();
+    fireEvent.change(picker, { target: { value: 'distribution' } });
+    expect(screen.getByRole('button', { name: 'Channel listings', exact: true })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('product-editor-readiness')).toBeVisible();
+    expect(JSON.stringify(getProductById(id))).toBe(before);
+  });
+
   it('saves an inline independent edit and sync opt-out together, then reopens the listing with the new mode', async () => {
     updateProduct(id, { id, channels: [{ channel: 'website', external_id: 'web', status: 'active', listing_url: null, last_synced_at: null }], channel_overrides: { webstore: { enabled: true, title: 'Shop title', description: 'Shop description', price_markup: 0, listing_sku: 'WEB-EDIT', listing_mode: 'master', media_scope: 'all' } } });
     await mount();
@@ -112,7 +150,7 @@ describe('Publishing Product Master without channel listings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     fireEvent.click(screen.getByRole('button', { name: /Master sync settings for/ }));
     const sync = within(screen.getByRole('dialog', { name: 'Master sync settings' }));
-    expect(sync.getByRole('radio', { name: /^Sync on/ })).toBeChecked();
+    expect(sync.getByRole('switch', { name: 'Sync from Master' })).toBeChecked();
     expect(sync.getByRole('checkbox', { name: 'Product content' })).toBeChecked();
     expect(sync.getByRole('checkbox', { name: 'Images' })).toBeChecked();
   });
@@ -161,7 +199,7 @@ describe('Publishing Product Master without channel listings', () => {
       const before = JSON.stringify(getProductById(id));
       const section = within(document.getElementById('product-section-channels')!);
       const table = within(section.getByRole('table', { name: 'Channel listings' }));
-      expect(section.getAllByText('Demo data')).toHaveLength(1);
+      expect(within(screen.getByTestId('product-workspace-header')).getAllByText('Demo data')).toHaveLength(1);
       for (const value of ['1 VND', '4,200 MYR', '4,200 JPY', '24 units', '13 units', '9 units']) expect(table.getByText(value)).toBeVisible();
       for (const text of ['Shop data not loaded', 'Not a listing requirement', 'Imported shop data', 'Keeps shop data', 'Product content, Images']) expect(table.queryByText(text)).not.toBeInTheDocument();
       expect(table.queryByText(/Saved listing price/)).not.toBeInTheDocument();
@@ -304,7 +342,7 @@ describe('Publishing Product Master without channel listings', () => {
     trigger.focus();
     fireEvent.click(trigger);
     const dialog = within(screen.getByRole('dialog', { name: 'Master sync settings' }));
-    fireEvent.click(dialog.getByRole('radio', { name: /^Sync on/ }));
+    fireEvent.click(dialog.getByRole('switch', { name: 'Sync from Master' }));
     expect(dialog.getByText('Local demo:', { exact: false })).toBeVisible();
     expect(dialog.getByRole('checkbox', { name: 'Product content' })).toBeChecked();
     expect(dialog.getByRole('checkbox', { name: 'Images' })).toBeChecked();
@@ -330,7 +368,7 @@ describe('Publishing Product Master without channel listings', () => {
     const before = JSON.stringify(getProductById(id));
     fireEvent.click(screen.getByRole('button', { name: /Master sync settings for Imported shop/ }));
     const dialog = within(screen.getByRole('dialog', { name: 'Master sync settings' }));
-    fireEvent.click(dialog.getByRole('radio', { name: /^Sync on/ }));
+    fireEvent.click(dialog.getByRole('switch', { name: 'Sync from Master' }));
     expect(dialog.getByRole('alert')).toHaveTextContent('at least one image');
     expect(dialog.getByRole('button', { name: 'Review settings' })).toBeDisabled();
     fireEvent.click(dialog.getByRole('checkbox', { name: 'Images' }));
@@ -405,8 +443,7 @@ describe('Publishing Product Master without channel listings', () => {
     expect(main).not.toContainElement(sidebar);
     expect(main.parentElement).toBe(layout);
     expect(sidebar.parentElement).toBe(layout);
-    expect(sidebar).toHaveClass('xl:sticky', 'xl:top-20');
-    expect(layout).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)_300px]');
+    expect(layout).toHaveAttribute('data-has-readiness', 'true');
     expect(screen.queryByRole('button', { name: 'Review missing details' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'View all readiness checks' }));
     const checks = within(screen.getByRole('dialog', { name: 'Complete this product' }));
@@ -437,7 +474,7 @@ describe('Publishing Product Master without channel listings', () => {
     fireEvent.click(navigation.getByRole('button', { name: 'Overview' }));
     expect(screen.queryByRole('region', { name: 'Product readiness' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('product-editor-readiness')).not.toBeInTheDocument();
-    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
+    expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'false');
     expect(JSON.stringify(getProductById(id))).toBe(before);
   });
   it('uses the operational metrics as shortcuts without persisting changes', async () => {
@@ -563,8 +600,7 @@ describe('Publishing Product Master without channel listings', () => {
       fireEvent.click(navigation.getByRole('button', { name }));
       expect(screen.queryByRole('heading', { name: /Product readiness/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'View all readiness checks' })).not.toBeInTheDocument();
-      expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
-      expect(screen.getByTestId('product-editor-layout')).not.toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)_300px]');
+      expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'false');
     }
     expect(screen.getByRole('button', { name: status === 'draft' ? 'Activate Master' : 'Master active' })).toBeVisible();
     expect(getProductById(id)?.status).toBe(status);
@@ -577,12 +613,12 @@ describe('Publishing Product Master without channel listings', () => {
     nameInput.focus();
     fireEvent.change(nameInput, { target: { value: 'X' } });
     expect(screen.getByRole('heading', { name: /Product readiness/ })).toBeVisible();
-    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)_300px]');
+    expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'true');
     expect(screen.getByRole('button', { name: /Add product name and master SKU/ })).toBeVisible();
     expect(nameInput).toHaveFocus();
     fireEvent.change(nameInput, { target: { value: 'Complete product name again' } });
     expect(screen.queryByRole('heading', { name: /Product readiness/ })).not.toBeInTheDocument();
-    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
+    expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'false');
     expect(nameInput).toHaveFocus();
     expect(nameInput).toHaveValue('Complete product name again');
     expect(getProductById(id)).toMatchObject({ name: product.name, status });
@@ -592,7 +628,7 @@ describe('Publishing Product Master without channel listings', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Product editor workspaces' })).getByRole('button', { name: /^Activity history/ }));
     expect(screen.getByRole('heading', { name: 'Activity history' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Activity scope' })).toBeVisible();
-    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
+    expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'false');
     expect(screen.queryByRole('heading', { name: /Product readiness/ })).not.toBeInTheDocument();
   });
   it('lets users reopen all checks from the menu without saving or activating', async () => {
@@ -711,7 +747,7 @@ describe('Publishing Product Master without channel listings', () => {
       channel_overrides: { shopee: { enabled: true, title: '', description: '', price_markup: 0, listing_sku: 'SHO-STANDALONE', category: '', shipping_option: '' } } });
     await mount();
     expect(screen.queryByRole('heading', { name: /Product readiness/ })).not.toBeInTheDocument();
-    expect(screen.getByTestId('product-editor-layout')).toHaveClass('xl:grid-cols-[220px_minmax(0,1fr)]');
+    expect(screen.getByTestId('product-editor-layout')).toHaveAttribute('data-has-readiness', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Continue setup' }));
     const listing = within(screen.getByRole('dialog', { name: 'Shopee listing' }));
     expect(listing.getByRole('button', { name: 'Complete next item' })).toBeEnabled();

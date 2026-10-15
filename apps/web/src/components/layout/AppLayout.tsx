@@ -71,6 +71,8 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', handleCommandShortcut);
   }, []);
 
+  if (location.pathname === "/builder/new") return <div className="workspace-theme-primeweb"><Routes>{PrimeRoutes()}</Routes></div>;
+
   if (bootstrapping && !isInboxWorkspace) {
     return (
       <div className="prime-stage flex h-screen overflow-hidden">

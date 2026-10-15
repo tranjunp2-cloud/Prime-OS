@@ -64,17 +64,15 @@ describe('Sales setup guidance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('0 of 2 completed')).toBeVisible();
   });
-  it('keeps the direct action accessible when collapsed and remembers the preference', async () => {
-    const first = mount();
-    await screen.findByRole('link', { name: 'Add product' });
-    await openOptions();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Collapse sales setup' }));
-    expect(screen.getByRole('link', { name: 'Add product' })).toBeVisible();
+  it('keeps the card compact without expand or collapse actions, including saved preferences', async () => {
+    localStorage.setItem('prime:sales-setup-guidance:v1', JSON.stringify({ collapsed: false, hidden: false }));
+    mount();
+    expect(await screen.findByRole('link', { name: 'Add product' })).toBeVisible();
     expect(screen.queryByText(/Create a Product Master/)).not.toBeInTheDocument();
-    first.unmount(); mount();
     await openOptions();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Expand sales setup' }));
-    expect(await screen.findByText(/Create a Product Master/)).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: 'Expand sales setup' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Collapse sales setup' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Continue workspace details' })).toBeVisible();
   });
   it('hides guidance from the secondary menu and restores it from Settings without clearing drafts', async () => {
     const saved = localStorage.getItem(SELLER_DEMO_KEY);

@@ -4,8 +4,8 @@
 
 .body {
   display: grid;
-  gap: 10px;
-  padding: 12px 16px 8px;
+  gap: 16px;
+  padding: 20px;
 }
 
 .summary {
@@ -129,11 +129,6 @@
 }
 
 @media (max-height: 800px) and (pointer: fine) {
-  .body {
-    gap: 6px;
-    padding: 8px 16px 6px;
-  }
-
   .identity {
     min-height: 44px;
     padding: 8px 0;

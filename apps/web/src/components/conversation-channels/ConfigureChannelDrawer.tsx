@@ -77,7 +77,7 @@ export default function ConfigureChannelDrawer({ channel, onClose, onChanged }: 
 
           <section className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 dark:border-rose-900 dark:bg-rose-950/20">
             <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300">Danger zone</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Pause message ingestion temporarily, or disconnect this source from Prime Inbox.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Pause message ingestion temporarily, or disconnect this source from Prime CRM.</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => run('pause', () => conversationApi.pause(channel.id), channel.status === 'PAUSED' ? 'Channel resumed' : 'Channel paused')} disabled={Boolean(busy)}><PauseCircle className="size-4" />{channel.status === 'PAUSED' ? 'Resume Sync' : 'Pause Sync'}</Button>
               <Button variant="destructive" size="sm" onClick={() => { if (window.confirm(`Disconnect ${channel.display_name}?`)) run('delete', () => conversationApi.remove(channel.id), 'Channel disconnected').then(onClose); }} disabled={Boolean(busy)}><Trash2 className="size-4" />Disconnect Channel</Button>

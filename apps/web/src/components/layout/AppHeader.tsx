@@ -7,7 +7,6 @@ export function AppHeader({ showBackToMain = false }: { showBackToMain?: boolean
   return (
     <header className="flex h-[var(--header-height)] shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 text-slate-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 sm:px-4 md:px-6" aria-label="Application scope toolbar">
       <div className="flex min-w-0 items-center gap-2">
-        <WorkspaceSwitcher />
         {showBackToMain && (
           <Button asChild variant="ghost" size="sm" className="min-h-11 shrink-0">
             <Link to="/admin/dashboard" aria-label="Back to Main Workspace">
@@ -16,6 +15,7 @@ export function AppHeader({ showBackToMain = false }: { showBackToMain?: boolean
             </Link>
           </Button>
         )}
+        <WorkspaceSwitcher />
       </div>
       <button
         type="button"

@@ -8,9 +8,10 @@ The scoped semantic palette and dashboard/editor tokens in `primeweb.css` are po
 
 ## Demo flows
 
-- Create a site using a template or simulated AI, choose products from Main, edit, preview and publish.
+- The empty My websites screen combines the welcome and first-site CTA. Its single AI button opens `/builder/new` directly: business name, industry, products/services and short description → simulated AI generation → desktop/mobile preview. Cancel returns to the form; completion saves a draft and restores the preview on reload. Open Editor, return to the dashboard or explicitly publish a local snapshot. Manage catalog products in Main.
+- Onboarding layout and builder logo follow the source AIBuilderPageClient/BusinessInfoForm references. AI content uses deterministic local templates; source backend generation and public slug reservation are not connected.
 - Select one of three example sites; change a draft without changing its published snapshot.
-- Manage pages/blog, product selection and ordering, media, domains, SEO, appearance and website contact details.
+- Manage blog posts, media, domains, SEO, appearance and website contact details; edit website pages in the editor.
 - Preview product details, cart, checkout and contact submission without real orders or payments.
 - Switch back to Main through shared-business settings links.
 
@@ -27,3 +28,10 @@ For a presentation without backend authentication, use the existing app prototyp
 `VITE_PRIME_PROTOTYPE=true npm run dev --workspace @primeos/web -- --host 127.0.0.1 --port 5178`
 
 Open `http://127.0.0.1:5178/#/builder/sites` (prototype mode uses HashRouter).
+
+## Settings ownership
+
+- PrimeWeb owns website identity, public contact details, language, branding, domains and publishing.
+- Main owns payments, shipping, transactional email templates and notifications, team/account access and billing. Website Settings links to those existing Main screens without duplicating configuration.
+- Help Center is shared; PrimeWeb opens it with `from_workspace=primeweb` to filter relevant guidance.
+- Website-only notification settings are not exposed until a dedicated form notification configuration exists.

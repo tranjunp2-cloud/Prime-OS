@@ -37,6 +37,7 @@ function mount(mode: 'existing' | 'new' = 'existing') {
   return { onSaved, onBack, onDirtyChange };
 }
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+const masterCell = (field: string) => within(screen.getByRole('rowheader', { name: new RegExp('^' + field) }).closest('tr')!).getAllByRole('cell').at(-1)!;
 describe('Required details inside the listing drawer', () => {
   it('activates from core fields while leaving missing channel requirements on the listing', () => {
     source = { ...source, image: '', images: [], description: 'A short, valid description.', channelCategory: 'Paper',
@@ -75,23 +76,22 @@ describe('Required details inside the listing drawer', () => {
     expect(getProducts()).toEqual(before);
     fireEvent.click(summary.getByRole('button', { name: 'Back to review' }));
     expect(screen.queryByRole('dialog', { name: 'Review before saving' })).not.toBeInTheDocument();
-    expect(screen.getByText(source.title, { selector: 'dd' })).toBeVisible();
+    expect(within(masterCell('Title')).getByText(source.title)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
     confirmListingSave('Create, activate & link');
     expect(onSaved).toHaveBeenCalledOnce();
   });
-  it('shows ordered read-only values, with explicit Edit actions and visible missing details', () => {
+  it('shows source-to-Master field rows, core fields first, with inline edits and visible missing data', () => {
     mount('new');
-    const controls = screen.getAllByRole('button', { name: /^Edit / });
-    expect(controls.map(button => button.getAttribute('aria-label'))).toEqual([
-      expect.stringContaining('Product essentials'), expect.stringContaining('Pricing'),
-      expect.stringContaining('Category attributes'), expect.stringContaining('Description & images'),
-      expect.stringContaining('Shipping package'), expect.stringContaining('Model, barcode & pack details'),
-    ]);
+    const table = within(screen.getByRole('table', { name: 'Product identity comparison' }));
+    expect(table.getByRole('columnheader', { name: /Test shop/ })).toBeVisible();
+    expect(table.getByRole('columnheader', { name: /New Master · value to create/ })).toBeVisible();
+    expect(table.getAllByRole('rowheader').slice(0, 3).map(cell => cell.textContent)).toEqual(['TitleRequired', 'Master SKURequired', 'DescriptionRequired']);
     expect(screen.queryByRole('textbox', { name: 'Product name *' })).not.toBeInTheDocument();
-    expect(screen.getByText(source.title, { selector: 'dd' })).toBeVisible();
-    expect(screen.getByLabelText('Product description *')).not.toBeVisible();
-    expect(screen.getByRole('region', { name: 'Description & images' })).toHaveTextContent('Add a product description');
+    expect(masterCell('Title')).toHaveTextContent(source.title);
+    expect(screen.queryByLabelText('Product description *')).not.toBeInTheDocument();
+    expect(masterCell('Description')).toHaveTextContent('Master data missing');
+    expect(screen.queryByText('Keep current Master value')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
   });
@@ -103,10 +103,10 @@ describe('Required details inside the listing drawer', () => {
     fireEvent.change(input, { target: { value: 'Unapplied product name' } });
     expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Use existing Master' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Edit Shipping package' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit Master Package weight (g)' })).toBeDisabled();
     expect(screen.getByText('Apply or cancel your edits before saving this Master.')).toBeVisible();
     expect(onDirtyChange).toHaveBeenLastCalledWith(true);
-    click('Cancel edits');
+    click('Cancel edit');
     expect(screen.queryByRole('textbox', { name: 'Product name *' })).not.toBeInTheDocument();
     expect(screen.queryByText('Unapplied product name')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
@@ -120,11 +120,11 @@ describe('Required details inside the listing drawer', () => {
     editListingSection('Product essentials');
     fireEvent.change(screen.getByRole('textbox', { name: 'Product name *' }), { target: { value: 'Reviewed name' } });
     applyListingSection();
-    expect(screen.getByText('Reviewed name', { selector: 'dd' })).toBeVisible();
-    expect(within(screen.getByRole('region', { name: 'Product essentials' })).getByText('Updated')).toBeVisible();
+    expect(within(masterCell('Title')).getByText('Reviewed name')).toBeVisible();
+    expect(masterCell('Title')).toHaveTextContent('Edited in this review · Not saved');
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: 'Product name *' })).toHaveValue('Reviewed name');
-    click('Cancel edits');
+    click('Cancel edit');
     expect(getProducts()).toEqual(before);
     expect(onSaved).not.toHaveBeenCalled();
   });
@@ -138,28 +138,28 @@ describe('Required details inside the listing drawer', () => {
     fireEvent.click(picker.getByRole('radio'));
     click('Use this source');
     expect(screen.getByRole('textbox', { name: 'Product name *' })).toHaveValue('MODEL-123');
-    click('Cancel edits');
-    expect(screen.getByText(source.title, { selector: 'dd' })).toBeVisible();
+    click('Cancel edit');
+    expect(within(masterCell('Title')).getByText(source.title)).toBeVisible();
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: 'Product name *' })).toHaveValue(source.title);
     click('Change source for Product name');
     fireEvent.change(screen.getByRole('textbox', { name: 'Search source fields' }), { target: { value: 'unfinished query' } });
-    click('Cancel edits');
+    click('Cancel edit');
     editListingSection('Product essentials');
     expect(screen.queryByRole('region', { name: 'Choose source for Product name' })).not.toBeInTheDocument();
-    click('Cancel edits');
+    click('Cancel edit');
   });
   it('restores SKU mappings and prices when a variant edit is cancelled', () => {
     source = { ...source, variants: 2, variantItems: [{ sku: 'RED', label: 'Red', price: { amount: 12, currency: 'JPY' } }, { sku: 'BLUE', label: 'Blue', price: { amount: 14, currency: 'JPY' } }] };
     mount('new');
-    expect(screen.getAllByText('Suggested · review before saving')).toHaveLength(2);
+    expect(screen.getAllByText('Suggested pair')).toHaveLength(2);
     editListingSection('Variants, pricing & SKU mapping');
     const select = screen.getByLabelText('Master SKU for shop SKU 1');
     const original = (select as HTMLSelectElement).value;
     fireEvent.change(select, { target: { value: '' } });
     fireEvent.change(screen.getAllByLabelText('Price (JPY)')[0], { target: { value: '900' } });
-    click('Cancel edits');
-    expect(screen.getAllByText('Suggested · review before saving')).toHaveLength(2);
+    click('Cancel edit');
+    expect(screen.getAllByText('Suggested pair')).toHaveLength(2);
     editListingSection('Variants, pricing & SKU mapping');
     expect(screen.getByLabelText('Master SKU for shop SKU 1')).toHaveValue(original);
     expect(screen.getAllByLabelText('Price (JPY)')[0]).toHaveValue(12);
@@ -174,31 +174,30 @@ describe('Required details inside the listing drawer', () => {
     expect(screen.getByRole('textbox', { name: 'Product name *' })).toHaveValue('Still editing');
     expect(onBack).not.toHaveBeenCalled();
   });
-  it('retains applied field edits and validates images in read mode', () => {
+  it('retains applied field edits and warns about unavailable images in the inline image editor', () => {
     mount('new');
     completeListingDetails();
-    const description = screen.getByLabelText('Product description *');
-    const value = (description as HTMLTextAreaElement).value;
-    applyListingSection();
-    expect(description).not.toBeVisible();
+    expect(masterCell('Description')).toHaveTextContent(readyMasterFields().description);
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
+    click('Edit Master Images');
     fireEvent.error(screen.getByAltText('Master image 1'));
+    expect(within(screen.getByRole('region', { name: 'Product images' })).getByRole('alert')).toHaveTextContent('Master activation is not blocked');
+    applyListingSection();
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
     editListingSection('Description & images');
-    expect(screen.getByLabelText('Product description *')).toBeVisible();
-    expect(screen.getByLabelText('Product description *')).toHaveValue(value);
-    expect(within(screen.getByRole('region', { name: 'Product images' })).getByRole('alert')).toHaveTextContent('Master activation is not blocked');
+    expect(screen.getByLabelText('Product description *')).toHaveValue(readyMasterFields().description);
   });
-  it('opens and focuses the first incomplete group from the summary', async () => {
+  it('keeps incomplete data as a proposal and focuses a missing field directly from the table', async () => {
     mount('new');
     completeListingDetails();
     editListingSection('Description & images');
     fireEvent.change(screen.getByLabelText('Product description *'), { target: { value: '' } });
     applyListingSection();
-    click('Review missing details');
-    const input = screen.getByLabelText('Product description *');
-    await waitFor(() => expect(input.closest('[tabindex="-1"]')).toHaveFocus());
-    expect(screen.getByLabelText('Product description *')).toBeVisible();
+    expect(masterCell('Description')).toHaveTextContent('Master data missing');
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
+    click('Edit Master Description');
+    await waitFor(() => expect(screen.getByLabelText('Product description *')).toHaveFocus());
   });
   it('creates an Active Master with just one image automatically copied from the source listing', () => {
     source = { ...source, images: [] };
@@ -206,7 +205,7 @@ describe('Required details inside the listing drawer', () => {
 
     expect(screen.queryByRole('textbox', { name: 'Product description *' })).not.toBeInTheDocument();
     completeListingDetails();
-    expect(within(screen.getByRole('region', { name: 'Description & images' })).getByText('1 image')).toBeVisible();
+    expect(masterCell('Images')).toHaveTextContent('1 image');
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
     confirmListingSave('Create, activate & link');
     expect(onSaved).toHaveBeenCalledOnce();
@@ -216,7 +215,7 @@ describe('Required details inside the listing drawer', () => {
     source = { ...source, images: [] };
     const { onSaved } = mount('new');
     completeListingDetails();
-    editListingSection('Description & images');
+    click('Edit Master Images');
     click('Remove image 1');
     expect(screen.getByText('0 images · optional for activation · 9 max')).toBeVisible();
     expect(screen.getByText(/Images are optional for Master activation/)).toBeVisible();
@@ -236,7 +235,7 @@ describe('Required details inside the listing drawer', () => {
   it('warns about broken images and confirms before discarding unsaved edits', () => {
     const { onBack, onSaved, onDirtyChange } = mount('new');
     completeListingDetails();
-    editListingSection('Description & images');
+    click('Edit Master Images');
     fireEvent.error(screen.getByRole('img', { name: 'Master image 4' }));
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('Master activation is not blocked');
@@ -247,7 +246,7 @@ describe('Required details inside the listing drawer', () => {
     expect(screen.getByRole('alertdialog', { name: 'Discard unsaved details?' })).toBeVisible();
     expect(onBack).not.toHaveBeenCalled();
     click('Keep editing');
-    expect(screen.getByLabelText('Product description *')).toHaveValue(readyMasterFields().description);
+    expect(masterCell('Description')).toHaveTextContent(readyMasterFields().description);
     click('Back to listings'); click('Discard & go back');
     expect(onBack).toHaveBeenCalledOnce();
     expect(onSaved).not.toHaveBeenCalled();
@@ -259,7 +258,7 @@ describe('Required details inside the listing drawer', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('Storage full'); });
     confirmListingSave('Create, activate & link');
     expect(screen.getByRole('alert')).toHaveTextContent('Storage full');
-    expect(screen.getByLabelText('Product description *')).toHaveValue(readyMasterFields().description);
+    expect(masterCell('Description')).toHaveTextContent(readyMasterFields().description);
     expect(onSaved).not.toHaveBeenCalled();
     expect(getProductById(master.id)).toMatchObject({ status: 'draft', channels: [] });
   });

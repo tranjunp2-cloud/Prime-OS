@@ -12,7 +12,7 @@ export const scheduledTaskTemplates = [
   {
     id: 'daily-customer-follow-up',
     title: 'Daily Customer Follow-up Agent',
-    description: 'Scan unanswered Prime Inbox conversations older than 12 hours and draft contextual responses.',
+    description: 'Scan unanswered Prime CRM conversations older than 12 hours and draft contextual responses.',
     cron_expression: '0 10 * * *',
     human_schedule: 'Daily at 10:00 AM',
     owner_id: 'agent_customer_success',
@@ -274,4 +274,3 @@ export function stopScheduledTaskScheduler() {
   if (schedulerTimer) clearInterval(schedulerTimer);
   schedulerTimer = null;
 }
-

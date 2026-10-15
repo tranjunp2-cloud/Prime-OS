@@ -179,7 +179,7 @@ export default function FaqArticle() {
             <div className="rounded-xl border border-border bg-card p-5">
               <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary"><MessageCircle className="size-4" /></span>
               <h2 className="mt-4 font-bold text-foreground">Still need help?</h2>
-              <p className="mt-2 text-sm leading-5 text-muted-foreground">Continue with a customer support agent in Prime Inbox.</p>
+              <p className="mt-2 text-sm leading-5 text-muted-foreground">Continue with a customer support agent in Prime CRM.</p>
               <Button asChild variant="outline" className="mt-4 w-full justify-between bg-background"><Link to="/inbox/conversation">Open Live Support Chat<ExternalLink className="size-4" /></Link></Button>
             </div>
 

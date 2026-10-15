@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({ testDir:'./tests', testMatch:'primepos-workspace.spec.ts', timeout:45000, use:{channel:'chrome',baseURL:'http://127.0.0.1:5181',viewport:{width:1440,height:1000},trace:'retain-on-failure'}, outputDir:'/private/tmp/primepos-test-results', webServer:{command:'VITE_PRIME_PROTOTYPE=true npm run dev -- --host 127.0.0.1 --port 5181 --strictPort',url:'http://127.0.0.1:5181',reuseExistingServer:true}, workers:1 });

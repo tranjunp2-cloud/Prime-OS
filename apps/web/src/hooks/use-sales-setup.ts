@@ -10,8 +10,8 @@ import { useDemoDataMode } from './use-demo-data-mode';
 
 const preferencesKey = 'prime:sales-setup-guidance:v1';
 const preferencesEvent = 'prime:sales-setup-guidance-change';
-type Preferences = { collapsed: boolean; hidden: boolean };
-const defaults: Preferences = { collapsed: false, hidden: false };
+type Preferences = { hidden: boolean };
+const defaults: Preferences = { hidden: false };
 function readPreferences() {
   try { return localStorage.getItem(preferencesKey) ?? ''; } catch { return ''; }
 }
@@ -23,7 +23,7 @@ function subscribe(listener: () => void) {
 function parsePreferences(raw: string): Preferences {
   try {
     const parsed = JSON.parse(raw);
-    return { collapsed: parsed?.collapsed === true, hidden: parsed?.hidden === true };
+    return { hidden: parsed?.hidden === true };
   } catch { return defaults; }
 }
 

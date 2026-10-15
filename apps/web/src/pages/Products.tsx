@@ -1,6 +1,7 @@
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
 import { DemoDataModeToggle } from '@/components/shared/DemoDataModeToggle';
+import { ProductDemoModeToggle } from '@/components/products/ProductDemoModeToggle';
 import { writeDemoDataMode } from '@/lib/demo-data-mode';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, AlertTriangle, Archive, Boxes, CheckCircle2, ChevronDown, CircleDot, Columns3, Copy, Download, ExternalLink, FileSpreadsheet, Info, Layers3, Link2, MoreHorizontal, PackageX, Pencil, Plus, RotateCcw, Search, Send, ShoppingBag, SlidersHorizontal, Store, Tags, Trash2, Unplug, Upload, Warehouse, X } from 'lucide-react';
@@ -331,15 +332,16 @@ export default function Products() {
     setIntakeOpen(true);
   };
   const { noData } = useDemoDataMode();
-  const previousNoData = useRef(noData);
+  const previewMode: ProductOnboardingPreview | undefined = workspaceMode !== 'master' ? undefined : noData ? (queryParams.get('preview') === 'first-product' ? 'no-products' : 'no-channels') : undefined;
+  const demoScenario = previewMode ?? (noData ? 'no-data' : 'with-data');
+  const previousDemoScenario = useRef(demoScenario);
   useEffect(() => {
-    if (previousNoData.current === noData) return;
-    previousNoData.current = noData;
+    if (previousDemoScenario.current === demoScenario) return;
+    previousDemoScenario.current = demoScenario;
     setIntakeOpen(false); setCreateOpen(false); setConnectOpen(false); setImportOpen(false);
     setSelectedIds([]); setCatalogView('all'); clearCatalogFilters();
     // Each preview starts from the unfiltered list, including cross-tab mode changes.
-  }, [noData]);
-  const previewMode: ProductOnboardingPreview | undefined = workspaceMode !== 'master' ? undefined : noData ? (queryParams.get('preview') === 'first-product' ? 'no-products' : 'no-channels') : undefined;
+  }, [demoScenario]);
   const previewIntro = Boolean(previewMode);
   const previewCatalogRef = useRef<ListingIntakeCatalog | null>(null);
   if (previewMode === 'no-products' && !previewCatalogRef.current) previewCatalogRef.current = createEmptyListingCatalog(pendingListingReviews().map(withFirstMasterDemoData));
@@ -610,7 +612,7 @@ export default function Products() {
       title={workspaceMode === 'master' ? 'Product Master' : 'Channel Listings'}
       description={workspaceMode === 'master' ? 'Manage shared product data across your shops.' : `Manage ${selectedListingChannel.label} content, readiness and sync without changing Product Master.`}
       icon={workspaceMode === 'master' ? ShoppingBag : Layers3}
-      titleAccessory={<DemoDataModeToggle />}
+      titleAccessory={workspaceMode === 'master' ? <ProductDemoModeToggle /> : <DemoDataModeToggle />}
       actions={workspaceMode === 'master' && !showingIntro ? <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="outline" className="h-11" onClick={() => setImportOpen(true)}><Upload className="size-4" />Import products</Button><Button className="h-11" onClick={() => setCreateOpen(true)}><Plus className="size-4" />Create Product Master</Button></div> : undefined}
     />
 

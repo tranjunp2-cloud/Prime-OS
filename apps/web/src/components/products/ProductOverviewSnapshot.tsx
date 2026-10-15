@@ -59,7 +59,7 @@ export function ProductOverviewSnapshot({ name, images, imageAltTexts, brand, ca
   return <section className={cn('rounded-xl border bg-card', styles.root)} aria-labelledby={`${id}-title`} data-testid="product-overview-snapshot">
     <div className={styles.body}>
       {media.length ? <Dialog>
-        <DialogTrigger asChild><button type="button" onClick={() => setSelectedImage(0)} className="group relative size-28 shrink-0 overflow-hidden rounded-lg border bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={`View product images (${media.length})`}>
+        <DialogTrigger asChild><button type="button" onClick={() => setSelectedImage(0)} className="group relative size-24 shrink-0 overflow-hidden rounded-lg border bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={`View product images (${media.length})`}>
           <PreviewImage key={media[0].src} src={media[0].src} alt={media[0].alt} />
           <span aria-hidden="true" className="absolute right-1.5 top-1.5 rounded bg-background/90 p-1 text-foreground shadow-sm"><ZoomIn className="size-3.5" /></span>
           <span className="absolute inset-x-0 bottom-0 bg-background/90 px-1 py-1 text-center text-xs font-medium">{media.length} {media.length === 1 ? 'image' : 'images'}</span>
@@ -73,13 +73,13 @@ export function ProductOverviewSnapshot({ name, images, imageAltTexts, brand, ca
           <div className="flex items-center justify-between gap-3"><Button type="button" variant="outline" size="icon" className="size-11" aria-label="Previous image" disabled={imageIndex === 0} onClick={() => goToImage(imageIndex - 1)}><ArrowLeft /></Button><p className="text-xs text-muted-foreground" aria-live="polite">Image {imageIndex + 1} of {media.length}{imageIndex === 0 ? ' · Main image' : ''}</p><Button type="button" variant="outline" size="icon" className="size-11" aria-label="Next image" disabled={imageIndex === media.length - 1} onClick={() => goToImage(imageIndex + 1)}><ArrowRight /></Button></div>
           {media.length > 1 && <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Image thumbnails">{media.map((item, index) => <button key={`${item.src}:${index}`} type="button" aria-label={`Show image ${index + 1}`} aria-pressed={imageIndex === index} onClick={() => setSelectedImage(index)} className={cn('size-14 overflow-hidden rounded-md border-2 bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', imageIndex === index ? 'border-primary' : 'border-transparent hover:border-muted-foreground')}><PreviewImage src={item.src} alt="" /></button>)}</div>}
         </DialogContent>
-      </Dialog> : <button type="button" onClick={onProductData} aria-label="View product media — no images" className="flex size-28 shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20 text-xs text-muted-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Package aria-hidden="true" className="size-6" /><span>No images</span></button>}
+      </Dialog> : <button type="button" onClick={onProductData} aria-label="View product media — no images" className="flex size-24 shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20 text-xs text-muted-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Package aria-hidden="true" className="size-6" /><span>No images</span></button>}
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <h2 id={`${id}-title`} className="min-w-0 max-w-full break-words text-sm font-semibold">{name.trim() || 'Untitled Product Master'}</h2>
-          <p className="min-w-0 truncate text-xs text-muted-foreground" title={`${brand || 'Brand not set'} · ${category || 'Category not set'}`}>{brand || 'Brand not set'} · {category || 'Category not set'}</p>
+        <div className="min-w-0 space-y-1">
+          <h2 id={`${id}-title`} className="min-w-0 max-w-full break-words text-base font-semibold">{name.trim() || 'Untitled Product Master'}</h2>
+          <p className="break-words text-xs leading-5 text-muted-foreground">{brand || 'Brand not set'} · {category || 'Category not set'}</p>
         </div>
-        <div className={cn('my-1 grid divide-x', styles.metrics)} role="group" aria-label="Product essentials">
+        <div className={cn('my-2 grid divide-x', styles.metrics)} role="group" aria-label="Product essentials">
           <Metric label="Master stock" accessibleName="View Master stock" value={stock} suffix="units" onClick={onCommerce} />
           <Metric label="Base price" accessibleName="View base price" value={price} onClick={onCommerce} />
           <Metric label="Linked listings" accessibleName="View linked listings" value={listingCount} suffix={`· ${channelCount} ${channelCount === 1 ? 'channel' : 'channels'}`} onClick={onListings} />

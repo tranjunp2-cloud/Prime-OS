@@ -22,7 +22,7 @@ describe('Five-group sync dialog', () => {
     const master = { ...getProducts()[0], name: 'Canonical title', description: 'Canonical description', images: ['/master.jpg'], channels: [target], channel_overrides: {}, import_sources: [] };
     const onSave = vi.fn(), onClose = vi.fn();
     render(<ListingMasterSyncDialog master={master} listing={target} preference={{ enabled: false, fields: ['content', 'media'] }} shop="Shop" sku="SHOP" onSave={onSave} onClose={onClose} restoreFocus={vi.fn()} />);
-    fireEvent.click(screen.getByRole('radio', { name: /^Sync on/ }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Sync from Master' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review settings' }));
     const review = within(screen.getByRole('region', { name: 'Review sync settings' }));
     expect(review.getByRole('note')).toHaveTextContent('Master values replace the independent values');
@@ -34,9 +34,29 @@ describe('Five-group sync dialog', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ enabled: true, fields: ['content', 'media'] }), expect.any(String));
     expect(target.local_draft.values.title).toBe('Independent title');
   });
+  it('shows comparison values and images immediately, including when sync is off', () => {
+    mount({ description: 'Visible Master description' });
+    expect(screen.getByText('Shop title')).toBeVisible();
+    expect(screen.getByText('Master name')).toBeVisible();
+    expect(screen.getByText('Visible Master description')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'View Images' }));
+    expect(screen.getByRole('img', { name: 'Master image 1' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'View Product content' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Sync from Master' }));
+    expect(screen.getByText('Shop title')).toBeVisible();
+    expect(screen.getByText('Master name')).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Product content' })).toBeDisabled();
+  });
+  it('consolidates the same channel requirement blocker across selected groups', () => {
+    const target = { ...listing, shop_snapshot: undefined };
+    render(<ListingMasterSyncDialog master={{ ...getProducts()[0], name: 'Master title', images: ['/one.jpg'] }} listing={target} preference={{ enabled: true, fields: ['content', 'media'] }} shop="Shop" sku="SHOP" onSave={vi.fn()} onClose={vi.fn()} restoreFocus={vi.fn()} />);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('Product content, Images');
+    expect(screen.getByRole('button', { name: 'Review settings' })).toBeDisabled();
+  });
   it('shows all groups but does not preselect price, stock or shipping', () => {
     mount();
-    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+    expect(within(screen.getByRole('navigation', { name: 'Sync data groups' })).getAllByRole('checkbox')).toHaveLength(5);
     for (const name of ['Selling price', 'Stock', 'Shipping & compliance']) expect(screen.getByRole('checkbox', { name })).not.toBeChecked();
     expect(screen.queryByRole('button', { name: 'Save sync settings' })).not.toBeInTheDocument();
   });
@@ -44,8 +64,10 @@ describe('Five-group sync dialog', () => {
     const { onSave } = mount();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Selling price' }));
     expect(screen.getByRole('button', { name: 'Review settings' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'View Selling price' }));
     fireEvent.change(screen.getByLabelText('Listing currency'), { target: { value: 'JPY' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Stock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View Stock' }));
     fireEvent.change(screen.getByLabelText('Stock source'), { target: { value: 'wh_crjp' } });
     fireEvent.change(screen.getByLabelText('Safety buffer'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Allocation cap (optional)'), { target: { value: '10' } });
@@ -58,9 +80,26 @@ describe('Five-group sync dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save sync settings' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ fields: ['content', 'media', 'price', 'inventory', 'shipping'], pricing: { currency: 'JPY' }, inventory: { warehouse_id: 'wh_crjp', safety_buffer: 2, allocation_cap: 10 } }), expect.any(String));
   });
+  it('keeps viewing independent from selection and retains settings across groups', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'View Selling price' }));
+    expect(screen.getByRole('checkbox', { name: 'Selling price' })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selling price' }));
+    fireEvent.change(screen.getByLabelText('Listing currency'), { target: { value: 'JPY' } });
+    fireEvent.change(screen.getByLabelText('Data group'), { target: { value: 'inventory' } });
+    expect(screen.getByRole('checkbox', { name: 'Stock' })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sync current group' }));
+    fireEvent.change(screen.getByLabelText('Stock source'), { target: { value: 'wh_crjp' } });
+    fireEvent.change(screen.getByLabelText('Safety buffer'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'View Selling price' }));
+    expect(screen.getByLabelText('Listing currency')).toHaveValue('JPY');
+    fireEvent.click(screen.getByRole('button', { name: 'View Stock' }));
+    expect(screen.getByLabelText('Safety buffer')).toHaveValue(3);
+    expect(screen.queryByLabelText('Listing currency')).not.toBeInTheDocument();
+  });
   it('can turn everything off despite missing data', () => {
     const { onSave } = mount({ images: [], inventory: {}, retail_price: 0 });
-    fireEvent.click(screen.getByRole('radio', { name: /^Sync off/ }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Sync from Master' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review settings' }));
     expect(screen.getAllByText('Keep shop data')).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: 'Save sync settings' }));
@@ -69,6 +108,7 @@ describe('Five-group sync dialog', () => {
   it('keeps shipping errors scoped to that group and cancel writes nothing', () => {
     const { onSave, onClose } = mount({ pkg_weight: 0 });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Shipping & compliance' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View Shipping & compliance' }));
     expect(screen.getByRole('alert')).toHaveTextContent('dimensions and weight');
     expect(screen.getByRole('button', { name: 'Review settings' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Shipping & compliance' }));

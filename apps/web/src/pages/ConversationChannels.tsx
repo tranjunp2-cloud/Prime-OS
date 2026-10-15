@@ -45,7 +45,7 @@ export default function ConversationChannelsPage() {
     <div className="space-y-5 p-4 md:p-6">
       <WorkspacePageHeader
         title="Conversation Channels"
-        description="Connect chat and comment sources used by Prime Inbox. Commerce store synchronization remains in Connected Channels."
+        description="Connect chat and comment sources used by Prime CRM. Commerce store synchronization remains in Connected Channels."
         icon={MessageCircle}
         actions={<Button onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Connect Conversation Channel</Button>}
       />
@@ -57,7 +57,7 @@ export default function ConversationChannelsPage() {
       </section>
 
       <section className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="border-b border-border px-5 py-4"><h2 className="font-semibold text-foreground">Prime Inbox sources</h2><p className="mt-1 text-xs text-muted-foreground">Message ingestion, assignment, and webhook health for every active source.</p></div>
+        <div className="border-b border-border px-5 py-4"><h2 className="font-semibold text-foreground">Prime CRM sources</h2><p className="mt-1 text-xs text-muted-foreground">Message ingestion, assignment, and webhook health for every active source.</p></div>
         {loading ? <div className="grid min-h-40 place-items-center"><Loader2 className="size-5 animate-spin text-indigo-500" /></div> : (
           <div className="divide-y divide-border">
             {channels.map((channel) => (

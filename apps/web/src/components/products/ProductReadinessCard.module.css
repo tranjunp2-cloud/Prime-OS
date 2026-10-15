@@ -1,0 +1,9 @@
+.root { container: product-readiness / inline-size; }
+.checks { display: grid; gap: .25rem; }
+
+.compactButton { display: flex; flex-direction: column; gap: .125rem; width: 100%; height: auto; min-height: 3rem; padding: .375rem .5rem; }
+
+@container product-readiness (max-width: 16rem) {
+  .root > div { padding-inline: .75rem; }
+  .root h3 { font-size: .8125rem; }
+}

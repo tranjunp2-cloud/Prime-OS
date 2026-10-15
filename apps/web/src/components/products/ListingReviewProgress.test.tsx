@@ -52,7 +52,7 @@ describe('Review progress recovery UI', () => {
     const saved = vi.fn();
     render(<ListingMasterReview catalog={catalog} listings={[item]} initialMode="existing" onBack={vi.fn()} onSaved={saved} />);
     expect(screen.getByRole('button', { name: 'Save Master changes & link' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Set up SKUs & details' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Manage Master variants' })).toBeEnabled();
     click('Link now, finish later'); click('Keep reviewing');
     expect(catalog.products()[0].channels).toHaveLength(0);
     click('Link now, finish later'); click('Link & save progress');
@@ -68,7 +68,7 @@ describe('Review progress recovery UI', () => {
     const item = { ...source, variants: 2, variantItems: [{ sku: 'ACTUAL-RED', label: 'Red' }, { sku: 'ACTUAL-BLUE', label: 'Blue' }], suggestedProductId: master.id };
     catalog.saveListings([item]);
     render(<ListingMasterReview catalog={catalog} listings={[item]} initialMode="existing" onBack={vi.fn()} onSaved={vi.fn()} />);
-    click('Set up SKUs & details');
+    click('Manage Master variants');
     expect(screen.getByRole('region', { name: 'Complete Product Master' })).toBeVisible();
     expect(screen.getAllByLabelText('Master variant SKU').map(input => (input as HTMLInputElement).value)).toEqual(['ACTUAL-RED', 'ACTUAL-BLUE']);
     expect(catalog.products()[0].skus).toEqual([]);
@@ -83,7 +83,7 @@ describe('Review progress recovery UI', () => {
     const onBack = vi.fn();
     const onSaved = vi.fn();
     render(<ListingMasterReview catalog={catalog} listings={[item]} initialMode="existing" onBack={onBack} onSaved={onSaved} />);
-    click('Set up SKUs & details');
+    click('Manage Master variants');
     const complete = screen.getByRole('region', { name: 'Complete Product Master' });
     const back = screen.getByRole('button', { name: 'Back to review' });
     expect(within(complete).getAllByRole('button')[0]).toBe(back);
@@ -101,7 +101,7 @@ describe('Review progress recovery UI', () => {
     expect(onBack).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
     expect(catalog.products()[0]).toMatchObject({ name: master.name, has_variants: false, skus: [], channels: [] });
-    click('Set up SKUs & details');
+    click('Manage Master variants');
     editListingSection('Product essentials');
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Unsaved reviewed name');
     expect(screen.getAllByLabelText('Master variant SKU').map(input => (input as HTMLInputElement).value)).toEqual(['BACK-RED', 'BACK-BLUE']);

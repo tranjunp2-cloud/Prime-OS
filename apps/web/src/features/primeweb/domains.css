@@ -1,0 +1,14 @@
+.pw-domain-row { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.pw-domains h2 { display:flex; align-items:center; gap:12px; overflow-wrap:anywhere; }
+.pw-domain-dns { margin-top:24px; padding:24px; border:1px solid var(--dash-border); border-radius:12px; }
+.pw-domain-records { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin:20px 0; }
+.pw-domain-records > div > div { display:flex; align-items:center; gap:12px; margin-top:8px; }
+.pw-domain-records code { flex:1; overflow-wrap:anywhere; padding:12px; background:var(--dash-bg); border-radius:8px; }
+.pw-domain-drawer { position:fixed; z-index:101; top:0; right:0; bottom:0; width:min(448px,100%); background:var(--dash-surface); color:var(--dash-text); padding:32px; display:flex; flex-direction:column; gap:24px; overflow:auto; box-shadow:-16px 0 50px #0004; }
+.pw-domain-drawer h2 { font-size:20px; font-weight:600; }
+.pw-domain-drawer p { color:var(--dash-text-muted); font-size:14px; }
+.pw-domain-drawer > .pw-actions { margin-top:auto; }
+.pw-domain-options { display:grid; gap:12px; }
+.pw-domain-options label { display:flex; gap:12px; align-items:center; padding:16px; border:1px solid var(--dash-border); border-radius:10px; cursor:pointer; overflow-wrap:anywhere; }
+.pw-domain-options label:has(input:checked) { border-color:#2dd4bf; background:#2dd4bf10; }
+@media(max-width:640px) { .pw-domain-records { grid-template-columns:1fr; } .pw-domain-dns { padding:16px; } }
