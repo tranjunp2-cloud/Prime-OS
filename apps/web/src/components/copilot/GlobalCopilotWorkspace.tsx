@@ -58,32 +58,13 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
     navigate('/prime-ai');
   };
 
-  if (!isDesktopAssistant) {
-    return (
-      <>
-        {children}
-        <GlobalCopilotDrawer
-          open={mobileOpen}
-          onOpenChange={setMobileOpen}
-          context={currentContext}
-          messages={messages}
-          isProcessing={isProcessing}
-          quickPrompts={quickPrompts}
-          onPromptSelect={sendMessage}
-          onSend={sendMessage}
-          onClear={clearMessages}
-          onExpand={expandToWorkspace}
-        />
-      </>
-    );
-  }
-
+  // Keep the page subtree stable across breakpoints so unsaved editor state survives resizing.
   return (
     <div className="flex h-full min-w-0">
       <div className="h-full min-w-0 flex-1 overflow-hidden">
         {children}
       </div>
-      {isAssistantOpen ? (
+      {isDesktopAssistant && isAssistantOpen ? (
         <aside className="hidden h-full w-[420px] shrink-0 overflow-hidden border-l border-border bg-card xl:block" aria-label="Prime AI panel">
           <GlobalCopilotSurface
             context={currentContext}
@@ -98,6 +79,18 @@ export function GlobalCopilotWorkspace({ children }: GlobalCopilotWorkspaceProps
           />
         </aside>
       ) : null}
+      {!isDesktopAssistant && <GlobalCopilotDrawer
+        open={mobileOpen}
+        onOpenChange={setMobileOpen}
+        context={currentContext}
+        messages={messages}
+        isProcessing={isProcessing}
+        quickPrompts={quickPrompts}
+        onPromptSelect={sendMessage}
+        onSend={sendMessage}
+        onClear={clearMessages}
+        onExpand={expandToWorkspace}
+      />}
     </div>
   );
 }

@@ -151,12 +151,13 @@ export function masterSyncPlan(product: Product, listing: ChannelListing, prefer
   groups.push({ field: 'shipping', current: currentShipping.length ? currentShipping : [unknown], proposed: shipping, error: shippingError });
   const selected = preference.enabled ? groups.filter(group => preference.fields.includes(group.field)) : [];
   const readiness = listingSyncReadiness(product, listing, getCatalogImportItems({ requireConfirmation: true }), { ...preference, updated_at: '' }, proposedValues);
-  const requirementError = preference.enabled && readiness.requirements.state !== 'complete'
-    ? `${readiness.requirements.message}. Complete this listing’s requirements before enabling sync.` : undefined;
+  const requirementError = !preference.enabled ? undefined : readiness.incompleteSource
+    ? `${readiness.sourceData.message}. Re-import the complete listing before enabling sync.`
+    : readiness.requirements.state !== 'complete' ? `${readiness.requirements.message}. Complete this listing’s requirements before enabling sync.` : undefined;
   const groupError = selected.find(group => group.error)?.error;
   for (const group of groups) if (preference.fields.includes(group.field) && requirementError && !group.error) group.error = requirementError;
   const error = masterSyncValidation(product, preference) || groupError || requirementError;
-  return { groups, stockRows, error, signature: JSON.stringify([preference, selected, local, readiness.requirements, quotes.map(quote => quote.signature), stockRows, syncsField(preference, 'inventory') && config?.source === 'shop_default' ? [connections.status, resolveListingShop(product, listing, connections.shops, getCatalogImportItems({ requireConfirmation: true }))?.id, warehouseId] : undefined]) };
+  return { groups, stockRows, error, signature: JSON.stringify([preference, selected, local, readiness.requirements, readiness.sourceData, quotes.map(quote => quote.signature), stockRows, syncsField(preference, 'inventory') && config?.source === 'shop_default' ? [connections.status, resolveListingShop(product, listing, connections.shops, getCatalogImportItems({ requireConfirmation: true }))?.id, warehouseId] : undefined]) };
 }
 
 /** Re-read shared settings before saving a reviewed inherited source, including edits from another tab. */

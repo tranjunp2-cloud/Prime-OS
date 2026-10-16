@@ -8,6 +8,19 @@ import { DEFAULT_ORG_LOCALES } from '@/lib/product-catalog-settings-store';
 afterEach(cleanup);
 
 describe('ProductContentLanguage', () => {
+  it('keeps the full language accessible while displaying a fixed-height single-line selector', () => {
+    render(<ProductContentLanguage locales={DEFAULT_ORG_LOCALES} current="ms-MY" getStatus={() => 'missing'} onSelect={vi.fn()} />);
+    const selector = screen.getByRole('button', { name: 'Content: Bahasa Melayu' });
+    expect(selector).toHaveClass('h-11', 'whitespace-nowrap');
+    expect(selector).not.toHaveClass('h-auto', 'whitespace-normal');
+    expect(selector).toHaveClass('w-auto', 'max-w-full');
+    expect(selector).not.toHaveClass('flex-1', 'w-full');
+    expect(selector).toHaveAttribute('title', 'Content: Bahasa Melayu');
+    expect(screen.getByText('Bahasa Melayu')).toHaveAttribute('lang', 'ms-MY');
+    expect(screen.getByText('Editing Malay translation')).toHaveClass('truncate');
+    expect(screen.getByRole('button', { name: 'About product data' }).parentElement).toContainElement(screen.getByRole('heading', { name: 'Product data' }));
+  });
+
   it('uses explicit, neutral statuses and a single selected language', async () => {
     const onSelect = vi.fn();
     render(<ProductContentLanguage locales={DEFAULT_ORG_LOCALES} current="en-US" getStatus={item => item.isPrimary ? 'primary' : item.locale === 'ja-JP' ? 'complete' : item.locale === 'vi-VN' ? 'partial' : 'missing'} onSelect={onSelect} />);

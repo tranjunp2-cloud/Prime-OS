@@ -1,8 +1,7 @@
-import { ChevronDown, Globe2, Info } from 'lucide-react';
+import { ChevronDown, Globe2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { OrgLocaleConfig } from '@/lib/product-catalog-settings-store';
 import { cn } from '@/lib/utils';
 import { ProductWorkspaceHeader } from './ProductWorkspaceHeader';
@@ -10,43 +9,36 @@ import styles from './ProductContentLanguage.module.css';
 
 type LocaleStatus = 'primary' | 'complete' | 'partial' | 'missing';
 
-export function ProductContentLanguage({ locales, current, getStatus, onSelect, readOnly = false }: {
+export function ProductContentLanguage({ locales, current, getStatus, onSelect, readOnly = false, title = "Product data" }: {
   locales: OrgLocaleConfig[];
   current: string;
   getStatus: (locale: OrgLocaleConfig) => LocaleStatus;
   onSelect: (locale: string) => void;
   readOnly?: boolean;
+  title?: string;
 }) {
   const currentConfig = locales.find(item => item.locale === current);
   const translations = locales.filter(item => !item.isPrimary);
   const completeCount = translations.filter(item => getStatus(item) === 'complete').length;
   const completion = translations.length ? `Translations: ${completeCount}/${translations.length} complete` : 'Primary language only';
   const languageLabel = currentConfig?.label ?? current;
+  const nativeLabel = currentConfig?.nativeLabel ?? current;
+  const editingContext = `${readOnly ? 'Viewing' : 'Editing'} ${languageLabel}${currentConfig?.isPrimary ? ' · Primary content' : ' translation'}`;
 
   return (
     <ProductWorkspaceHeader
-      title="Product data"
+      title={title}
       accessibleName="Product content language"
-      context={<p aria-live="polite">{readOnly ? 'Viewing' : 'Editing'} {languageLabel}{currentConfig?.isPrimary ? ' · Primary content' : ' translation'}</p>}
+      className={styles.header}
+      help="Changes the language of the product name, description and translatable attributes only — not the interface, prices or currency. Missing translations do not block Master activation. Languages are managed by your organization."
+      context={<p aria-live="polite" className="truncate" title={editingContext}>{editingContext}</p>}
       actions={<div className={styles.controls}>
         <div className={styles.selector}>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground" aria-label="About content language">
-                  <Info className="size-4" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-72 text-xs leading-5">
-                Changes the language of the product name, description and translatable attributes only — not the interface, prices or currency. Missing translations do not block Master activation. Languages are managed by your organization.
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" className="min-h-11 h-auto min-w-0 flex-1 gap-2 whitespace-normal px-3 py-2 text-sm">
+              <Button type="button" variant="outline" aria-label={`Content: ${nativeLabel}`} title={`Content: ${nativeLabel}`} className="h-11 min-h-11 w-auto min-w-0 max-w-full gap-2 whitespace-nowrap px-3 py-2 text-sm">
                 <Globe2 className="size-4 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 flex-1 text-left"><span className="font-normal text-muted-foreground">Content:</span>{' '}<span lang={current}>{currentConfig?.nativeLabel ?? current}</span></span>
+                <span className="min-w-0 truncate text-left"><span className={cn(styles.prefix, 'font-normal text-muted-foreground')}>Content: </span><span lang={current}>{nativeLabel}</span></span>
                 <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
@@ -73,7 +65,7 @@ export function ProductContentLanguage({ locales, current, getStatus, onSelect, 
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">{completion}</p>
+        <p className="max-w-full truncate text-xs leading-5 text-muted-foreground" title={completion}>{completion}</p>
       </div>}
     />
   );

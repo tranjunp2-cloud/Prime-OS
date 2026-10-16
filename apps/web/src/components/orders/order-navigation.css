@@ -1,8 +1,6 @@
-.order-navigation { container: order-navigation / inline-size; }
-.order-navigation__tabs { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 4px; }
-.order-navigation__tab { white-space: nowrap; }
-@container order-navigation (max-width: 460px) {
-  .order-navigation__tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  .order-navigation__tab { min-width: 0; min-height: 58px; justify-content: space-between; padding: 8px; white-space: normal; text-align: left; border-radius: 6px; }
-  .order-navigation__tab[aria-current="page"] { background: hsl(var(--primary) / .1); }
-}
+.order-navigation { position: relative; min-width: 0; }
+.order-navigation__tabs { display: flex; flex-wrap: nowrap; gap: 4px; overflow: hidden; }
+.order-navigation__tab { flex-shrink: 0; white-space: nowrap; }
+.order-navigation__more { min-width: 0; flex-shrink: 1; }
+.order-navigation__measure { position: absolute; inset: 0 0 auto; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
+.order-navigation__measure-row { display: flex; width: max-content; }

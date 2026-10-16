@@ -52,12 +52,16 @@ describe('stock adjustments without leaving Product Master', () => {
     const details = within(panel);
     expect(details.getByText('CyberRecord Japan HQ')).toBeInTheDocument();
     expect(details.getByText('0 units')).toBeInTheDocument();
-    expect(details.getByText('Channel-managed stock · read only')).toBeInTheDocument();
+    expect(details.getByText(/Channel-managed/)).toBeInTheDocument();
     expect(details.getByText('Fulfillment By Amazon Japan')).toBeInTheDocument();
     expect(details.queryByText('Reseller Singapore')).not.toBeInTheDocument();
     expect(details.queryByText('Vietnam 3PL Partner')).not.toBeInTheDocument();
     expect(details.queryByRole('button', { name: /Adjust stock at Fulfillment/ })).not.toBeInTheDocument();
-    expect(details.getByText('Not verified')).toBeInTheDocument();
+    expect(details.queryByText('Not verified')).not.toBeInTheDocument();
+    expect(details.queryByText('Available to sell')).not.toBeInTheDocument();
+    expect(details.getByText('Total recorded stock')).toBeInTheDocument();
+    const add = details.getByRole('button', { name: 'Add stock location for Blue' });
+    expect(details.getByText('Total recorded stock').compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
   it('explicitly adds stock to only the chosen variant and location while retaining unsaved edits', async () => {
     seedVariants();
@@ -78,28 +82,71 @@ describe('stock adjustments without leaving Product Master', () => {
     expect(getProductById(id)?.skus.map(sku => sku.stock_by_location)).toEqual([{ wh_crjp: 0 }, { wh_rslsg: 7 }]);
     expect(getProductById(id)?.inventory_adjustments?.[0]).toMatchObject({ sku: 'STOCK-DETAIL-BLUE', warehouseId: 'wh_crjp', before: null, after: 0, kind: 'opening' });
     expect(screen.getByDisplayValue('Unsaved variant name')).toBeInTheDocument();
-    expect(panel.getByText('0 units')).toBeInTheDocument();
+    expect(panel.getAllByText('0 units')).toHaveLength(2);
     saveMetadata();
     expect(getProductById(id)?.skus.map(sku => sku.stock_by_location)).toEqual([{ wh_crjp: 0 }, { wh_rslsg: 7 }]);
   });
-  it('does not assign warehouses when saving a newly generated variant', async () => {
+  it('adds a second warehouse to one variant without changing the first warehouse or sibling stock', async () => {
+    seedVariants({ wh_crjp: 20 }, { wh_crjp: 10 });
+    mount(); await ready();
+    const trigger = screen.getByRole('button', { name: 'View inventory for Blue' });
+    expect(trigger).toHaveTextContent('1 warehouse');
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Add stock location for Blue' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Record opening stock' }));
+    expect(within(dialog.getByLabelText('Warehouse')).getAllByRole('option').map(option => option.textContent)).toEqual(['Select a warehouse', 'Reseller Singapore', 'Vietnam 3PL Partner']);
+    fireEvent.change(dialog.getByLabelText('Warehouse'), { target: { value: 'wh_3plvn' } });
+    fireEvent.change(dialog.getByLabelText('Opening stock'), { target: { value: '8' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Save opening stock' }));
+    expect(trigger).toHaveTextContent('28 units');
+    expect(trigger).toHaveTextContent('2 warehouses');
+    expect(getProductById(id)?.skus.map(sku => sku.stock_by_location)).toEqual([{ wh_crjp: 20, wh_3plvn: 8 }, { wh_crjp: 10 }]);
+    expect(getProductById(id)?.inventory_adjustments).toHaveLength(1);
+  });
+  it('lets the retained single SKU add and adjust stock during conversion without saving the structure early', async () => {
+    updateProduct(id, { id, category: 'Art Supplies', specifications: [{ attributeKey: 'color', name: 'Color', value: 'White' }], inventory: { wh_crjp: 20 } });
+    mount(); await ready();
+    const material = screen.queryByRole('button', { name: 'Remove Material attribute' });
+    if (material) fireEvent.click(material);
+    fireEvent.click(screen.getByRole('radio', { name: 'Product with variants' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View inventory for White' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add stock location for White' }));
+    fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: 'wh_3plvn' } });
+    fireEvent.change(screen.getByLabelText('Opening stock'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save opening stock' }));
+    expect(getProductById(id)?.has_variants).toBe(false);
+    expect(screen.getByRole('radio', { name: 'Product with variants' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'View inventory for White' })).toHaveTextContent('28 units');
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust stock at CyberRecord Japan HQ for White' }));
+    record('22');
+    expect(getProductById(id)?.inventory).toEqual({ wh_crjp: 22, wh_3plvn: 8 });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(getProductById(id)?.has_variants).toBe(true);
+    expect(getProductById(id)?.skus[0].stock_by_location).toEqual({ wh_crjp: 22, wh_3plvn: 8 });
+  });
+  it('stages a new variant opening count and commits it with the product, retaining saved stock', async () => {
     seedVariants({ wh_crjp: 5 });
     updateProduct(id, { id, skus: [product.skus[0]] });
     mount(); await ready();
-    expect(screen.getByRole('button', { name: 'View inventory for Red' })).toHaveTextContent('Not saved');
+    // Select an additional value in the single attributes editor.
+    fireEvent.click(screen.getByRole('button', { name: 'Add Color value' }));
+    fireEvent.change(screen.getByLabelText('New color value'), { target: { value: 'Green' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }));
+    fireEvent.click(screen.getByLabelText('Include Red'));
     fireEvent.click(screen.getByRole('button', { name: 'View inventory for Red' }));
-    const panel = within(screen.getByRole('region', { name: 'Inventory for Red' }));
-    expect(panel.getByText('Save this variant before setting up stock')).toBeInTheDocument();
-    expect(panel.queryByRole('button', { name: /Add stock location/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Add warehouse for Red'), { target: { value: 'wh_crjp' } });
+    fireEvent.change(screen.getByLabelText('Opening stock for Red at CyberRecord Japan HQ'), { target: { value: '9' } });
+    expect(getProductById(id)?.skus).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText('Include Green'));
     fireEvent.change(screen.getByLabelText('Price for Red'), { target: { value: '20' } });
     saveMetadata();
     const saved = getProductById(id)!;
     expect(saved.skus).toHaveLength(2);
     expect(saved.skus[0].stock_by_location).toEqual({ wh_crjp: 5 });
-    expect(saved.skus[1].stock_by_location).toEqual({});
-    expect(saved.skus[1].stock).toBeUndefined();
+    expect(saved.skus[1].stock_by_location).toEqual({ wh_crjp: 9 });
+    expect(saved.skus[1].stock).toBe(9);
     expect(saved.inventory).toEqual(product.inventory);
-    expect(saved.inventory_adjustments).toHaveLength(0);
+    expect(saved.inventory_adjustments?.[0]).toMatchObject({ kind: 'opening', before: null, after: 9, sku: saved.skus[1].sku_code });
   });
   it('cancels new variant stock without creating a count and hides stock writes from viewers', async () => {
     seedVariants();
@@ -269,7 +316,7 @@ describe('stock adjustments without leaving Product Master', () => {
   });
   it('updates stock inside the product list drawer without navigating to Warehouse', async () => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Path /><Products /></MemoryRouter>);
-    fireEvent.click(await screen.findByRole('button', { name: `${product.name}: 10 master stock available. Manage master stock.` }));
+    fireEvent.click(await screen.findByRole('button', { name: `${product.name}: 10 recorded stock. Manage master stock.` }));
     fireEvent.click(screen.getByRole('button', { name: 'Adjust stock at CyberRecord Japan HQ' }));
     record('11');
     expect(screen.getByTestId('current-path')).toHaveTextContent('/products/master-catalog');

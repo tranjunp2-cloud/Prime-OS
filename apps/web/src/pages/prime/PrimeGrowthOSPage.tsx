@@ -786,7 +786,7 @@ function LegacyOverviewView({
     ['Problems', snapshot.problemCards.length, 'Risks'],
     ['Journey loop', snapshot.journeyLoop.length, 'Lifecycle'],
     ['Competitors', snapshot.competitors.length, 'Positioning'],
-    ['Leads', snapshot.leads.length, 'CRM'],
+    ['Unlinked Contacts', snapshot.leads.length, 'CRM'],
     ['Orders', snapshot.commerceOrders.length, currency.format(orderValue)],
     ['Service bookings', snapshot.serviceBookings.length, currency.format(serviceValue)],
     ['AI actions', snapshot.aiActions.length, `${openAiActions} open`],
@@ -1162,16 +1162,16 @@ function LegacyOverviewView({
 
 function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: (module: PrimeModuleId) => void }) {
   const pipelineGroups = [
-    { title: 'Orders', icon: ShoppingBag, href: '/orders?status=pending', tone: 'bg-indigo-50 text-indigo-600', items: [{ value: '124', label: 'Pending Confirmation' }, { value: '45', label: 'Ready to Pack' }] },
-    { title: 'Fulfillment', icon: Truck, href: '/fulfillment?status=exception', tone: 'bg-amber-50 text-amber-600', items: [{ value: '12', label: 'Delivery Exceptions' }, { value: '111', label: 'Returned Orders' }] },
-    { title: 'Inventory', icon: Warehouse, href: '/inventory?status=low-stock', tone: 'bg-rose-50 text-rose-600', items: [{ value: '15', label: 'Low Stock Items' }, { value: '3', label: 'Out of Stock' }] },
-    { title: 'CRM', icon: UsersRound, href: '/crm/leads-rfqs', tone: 'bg-emerald-50 text-emerald-600', items: [{ value: '8', label: 'New Leads' }, { value: '5', label: 'Unassigned Tickets' }] },
+    { title: 'Orders', icon: ShoppingBag, href: '/orders', tone: 'bg-indigo-50 text-indigo-600', items: [{ value: '124', label: 'Pending Confirmation', href: '/orders?status=pending' }, { value: '45', label: 'Ready to Pack', href: '/orders?status=ready&orderStage=preparing' }] },
+    { title: 'Fulfillment', icon: Truck, href: '/orders?view=fulfillment', tone: 'bg-amber-50 text-amber-600', items: [{ value: '12', label: 'Delivery Exceptions', href: '/orders?view=fulfillment&status=shipping&orderStage=failed' }, { value: '111', label: 'Returned Orders', href: '/orders?view=returns&status=returns&orderStage=received' }] },
+    { title: 'Inventory', icon: Warehouse, href: '/warehouses', tone: 'bg-rose-50 text-rose-600', items: [{ value: '15', label: 'Low Stock Items', href: '/warehouses?stock=low' }, { value: '3', label: 'Out of Stock', href: '/warehouses?stock=empty' }] },
+    { title: 'CRM', icon: UsersRound, href: '/inbox/conversation', tone: 'bg-emerald-50 text-emerald-600', items: [{ value: '8', label: 'Unlinked Contacts', href: '/inbox/guests?linked=unlinked' }, { value: '5', label: 'Unassigned Conversations', href: '/inbox/conversation?assignee=unassigned' }] },
   ];
   const channels = [
     { name: 'Shopee', revenue: 48600, share: 34, color: '#635bff' },
     { name: 'Lazada', revenue: 32900, share: 23, color: '#818cf8' },
     { name: 'Tiki', revenue: 17200, share: 12, color: '#38bdf8' },
-    { name: 'Prime Web', revenue: 24300, share: 17, color: '#10b981', launch: 'Switch to PrimeWeb', href: '/builder/theme' },
+    { name: 'Prime Web', revenue: 24300, share: 17, color: '#10b981', launch: 'Switch to PrimeWeb', href: '/builder/sites' },
     { name: 'Prime POS', revenue: 14300, share: 10, color: '#f59e0b', launch: 'Switch to POS', href: '/pos/register' },
     { name: 'Prime CRM', revenue: 5700, share: 4, color: '#f43f5e' },
   ];
@@ -1198,8 +1198,8 @@ function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {pipelineGroups.map((group) => { const Icon = group.icon; return (
             <article key={group.title} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><span className={`grid size-9 place-items-center rounded-lg ${group.tone}`}><Icon className="size-4" /></span><h3 className="font-semibold text-slate-900">{group.title}</h3><ArrowRight className="ml-auto size-4 text-slate-400" /></div>
-              <div className="divide-y divide-slate-100">{group.items.map((item, index) => <Link key={item.label} to={index === 0 ? group.href : group.href} className="flex min-h-16 items-center gap-3 px-4 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className="min-w-10 text-2xl font-semibold text-slate-900">{item.value}</span><span className="text-sm font-medium text-slate-500">{item.label}</span><ChevronRight className="ml-auto size-4 text-slate-300" /></Link>)}</div>
+              <Link to={group.href} aria-label={`Open ${group.title}`} className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`grid size-9 place-items-center rounded-lg ${group.tone}`}><Icon className="size-4" /></span><h3 className="font-semibold text-slate-900">{group.title}</h3><ArrowRight className="ml-auto size-4 text-slate-400" /></Link>
+              <div className="divide-y divide-slate-100">{group.items.map((item) => <Link key={item.label} to={item.href} className="flex min-h-16 items-center gap-3 px-4 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className="min-w-10 text-2xl font-semibold text-slate-900">{item.value}</span><span className="text-sm font-medium text-slate-500">{item.label}</span><ChevronRight className="ml-auto size-4 text-slate-300" /></Link>)}</div>
             </article>
           ); })}
         </div>
@@ -1217,7 +1217,7 @@ function OverviewView({ snapshot }: { snapshot: GrowthOsSnapshot; onOpenModule: 
 
       <section aria-label="Operational health" className="grid gap-4 xl:grid-cols-2">
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Top Selling Products</h2><p className="mt-1 text-xs font-medium text-slate-500">Highest unit sales across all channels</p></div><div className="divide-y divide-slate-100">{products.map((product, index) => <div key={product.name} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50"><span className="w-5 text-xs font-semibold text-slate-400">{index + 1}</span><img src={product.image} alt="" className="size-11 rounded-lg border border-slate-200 object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{product.name}</span><span className="shrink-0 text-sm font-semibold text-slate-900">{product.units} <span className="font-medium text-slate-400">units</span></span></div>)}</div></div>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Channel Connection Health</h2><p className="mt-1 text-xs font-medium text-slate-500">Realtime marketplace API and webhook status</p></div><div className="divide-y divide-slate-100">{connectionHealth.map((connection) => <div key={connection.channel} className="flex min-h-[68px] items-center gap-3 px-5 transition-colors hover:bg-slate-50"><span className={`size-2.5 rounded-full ${connection.status === 'Error' ? 'bg-rose-500' : 'bg-emerald-500'}`} /><div className="min-w-0 flex-1"><div className="text-sm font-semibold text-slate-800">{connection.channel}</div><div className="mt-0.5 truncate text-xs font-medium text-slate-500">{connection.detail}</div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${connection.status === 'Error' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>{connection.status}</span>{connection.status === 'Error' ? <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toast.success(`${connection.channel} reconnect requested`)}><RefreshCcw className="size-3" />Reconnect</Button> : null}</div>)}</div></div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Channel Connection Health</h2><p className="mt-1 text-xs font-medium text-slate-500">Realtime marketplace API and webhook status</p></div><div className="divide-y divide-slate-100">{connectionHealth.map((connection) => <div key={connection.channel} className="flex min-h-[68px] items-center gap-3 px-5 transition-colors hover:bg-slate-50"><span className={`size-2.5 rounded-full ${connection.status === 'Error' ? 'bg-rose-500' : 'bg-emerald-500'}`} /><div className="min-w-0 flex-1"><div className="text-sm font-semibold text-slate-800">{connection.channel}</div><div className="mt-0.5 truncate text-xs font-medium text-slate-500">{connection.detail}</div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${connection.status === 'Error' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>{connection.status}</span>{connection.status === 'Error' ? <Button variant="outline" size="sm" className="h-8 text-xs" asChild><Link to="/sales-channels/connected-channels"><RefreshCcw className="size-3" />Reconnect</Link></Button> : null}</div>)}</div></div>
       </section>
     </div>
   );

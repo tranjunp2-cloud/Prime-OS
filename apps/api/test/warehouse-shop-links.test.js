@@ -27,3 +27,17 @@ test('invalid warehouse and missing shop do not modify a connection', () => {
   assert.throws(() => updateChannelWarehouse('missing', { warehouse: {} }), /not found/);
   assert.deepEqual(listConnectedChannels(), before);
 });
+
+test('seeded channel catalog uses the same unique shops as product and order demos', () => {
+  const channels = listConnectedChannels();
+  assert.deepEqual(channels.map(item => [item.platform, item.store_name]), [
+    ['primeweb', 'primebeauty.vn'],
+    ['shopee', 'Prime Beauty Official'],
+    ['lazada', 'Prime Flagship Store'],
+    ['amazon', 'Prime Beauty US'],
+    ['rakuten', 'Prime Beauty JP'],
+    ['primepos', 'District 1 Flagship'],
+    ['tiktok_shop', 'Prime Live Store'],
+  ]);
+  assert.equal(new Set(channels.map(item => item.platform)).size, channels.length);
+});

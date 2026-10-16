@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-test.beforeEach(async ({page})=>{await page.addInitScript(()=>{localStorage.setItem('prime-os-genesis-theme','light');localStorage.setItem('prime:demo-data-mode:v1','with-data');});});
-const go=async(page:import('@playwright/test').Page,path:string)=>{await page.goto(`/#${path}`);await expect(page.locator('#main-content')).toBeVisible();if(path!=='/orders?status=completed') await expect(page.locator('.pos-page')).toBeVisible();};
+test.beforeEach(async ({page})=>{await page.addInitScript(()=>{localStorage.setItem('prime-os-genesis-theme','light');localStorage.setItem('prime:demo-data-mode:v1','with-data');});await page.goto('/#/pos/setup');await expect(page.locator('.pos-setup')).toBeVisible();await page.evaluate(async()=>{const path='/src/features/primepos/store.ts';const store=await import(path);store.savePos(store.seedPos());});});
+const go=async(page:import('@playwright/test').Page,path:string)=>{await page.goto(`/#${path}`);await expect(page.locator('#main-content')).toBeVisible();if(!path.startsWith('/orders') && !path.startsWith('/customers')) await expect(page.locator('.pos-page')).toBeVisible();};
 test('retail sale, shared Main record, partial refund and close shift',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await go(page,'/pos/shifts');await page.getByLabel('Opening cash (USD)').fill('100');await page.getByRole('button',{name:'Open shift',exact:true}).click();
@@ -9,18 +9,18 @@ test('retail sale, shared Main record, partial refund and close shift',async({pa
  await page.getByRole('button',{name:'Add discount',exact:true}).click();await page.getByLabel('Discount percentage').fill('10');await page.getByRole('button',{name:'Apply discount'}).click();
  await page.getByRole('button',{name:/Take payment/}).click();await page.getByLabel('Cash received').fill('50');await page.getByRole('button',{name:'Confirm demo payment'}).click();await expect(page.getByRole('dialog')).toContainText('$43.20');await expect(page.getByRole('dialog')).toContainText('$6.80');await page.getByRole('button',{name:'Done',exact:true}).click();
  await go(page,'/orders?status=completed');await page.getByLabel('Search orders', {exact:true}).fill('POS-1049');await expect(page.getByRole('row').filter({hasText:'POS-1049'})).toContainText('Seller Demo');
- await go(page,'/settings/stores?tab=transactions');await expect(page.getByRole('row').filter({hasText:'POS-1049'})).toContainText('Seller Demo');
- await go(page,'/settings/stores?tab=stock');await expect(page.getByRole('row').filter({hasText:'ESS-001'})).toContainText('22');
+ await go(page,'/customers');await page.getByLabel('Search customers').fill('Seller Demo');await expect(page.getByRole('row').filter({hasText:'Seller Demo'})).toContainText('+84991234567');
+ await go(page,'/warehouses/store-stock');await expect(page.getByRole('row').filter({hasText:'ESS-001'})).toContainText('22');
  await go(page,'/pos/transactions');await page.getByRole('link',{name:'Return',exact:true}).click();await page.getByLabel('Return quantity for Everyday canvas tote').fill('1');await page.getByRole('button',{name:'Review refund'}).click();await expect(page.getByRole('dialog')).toContainText('$21.60');await page.getByRole('button',{name:'Confirm demo refund'}).click();await page.getByRole('button',{name:'Done',exact:true}).click();
  await go(page,'/pos/shifts');await page.getByRole('button',{name:'Close shift',exact:true}).click();await page.getByLabel('Counted cash (USD)').fill('121.60');await page.getByRole('button',{name:'Confirm close'}).click();await expect(page.getByRole('table')).toContainText('Closed');
  await page.reload();await expect(page.getByRole('table')).toContainText('$121.60');expect(errors).toEqual([]);
 });
-test('Main assortment and incoming shipment affect the POS',async({page})=>{
- await go(page,'/settings/stores?tab=catalog');await page.getByRole('checkbox',{name:'Sell Everyday canvas tote at Central Flagship'}).uncheck();
+test('POS products and incoming shipment affect the register',async({page})=>{
+ await go(page,'/products/pos-assortment');await page.locator('.pos-legacy-catalog .pos-row').filter({hasText:'Everyday canvas tote'}).getByRole('button',{name:'Stop offering'}).click();
  await go(page,'/pos/register');await expect(page.getByRole('button',{name:'Add Everyday canvas tote',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Add Relaxed everyday hoodie'})).toBeDisabled();
  await go(page,'/pos/receiving');await page.getByRole('button',{name:'Receive stock',exact:true}).click();await page.getByLabel('Received quantity').fill('10');await page.getByLabel('Receiving note').fill('Two units missing');await page.getByRole('button',{name:'Confirm received'}).click();
  await go(page,'/pos/register');await expect(page.getByRole('button',{name:'Add Relaxed everyday hoodie'})).toBeEnabled();
- await go(page,'/settings/stores?tab=stock');await expect(page.getByRole('row').filter({hasText:'ESS-006'})).toContainText('10');
+ await go(page,'/warehouses/store-stock');await expect(page.getByRole('row').filter({hasText:'ESS-006'})).toContainText('10');
  await page.getByLabel('Demo role').selectOption('cashier');await expect(page.getByRole('button',{name:'Create shipment'})).toBeDisabled();
 });
 test('café floor, kitchen and payment share table state',async({page})=>{
@@ -40,4 +40,40 @@ test('desktop and mobile layouts in light and dark',async({page})=>{
  await page.evaluate(()=>{document.documentElement.classList.remove('light');document.documentElement.classList.add('dark');});await expect(page.locator('.pos-product').first()).toHaveCSS('background-color','rgb(28, 28, 38)');await page.screenshot({path:'/private/tmp/prime-pos-register-dark.png',fullPage:true});
  await page.setViewportSize({width:375,height:812});await page.emulateMedia({reducedMotion:'reduce'});await expect(page.locator('#main-content')).toBeVisible();await expect.poll(()=>page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);await page.screenshot({path:'/private/tmp/prime-pos-register-mobile.png',fullPage:true});
  await go(page,'/settings/stores');await expect.poll(()=>page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);await page.screenshot({path:'/private/tmp/prime-pos-main-mobile.png',fullPage:true});
+ for (const [path, name] of [['/products/pos-assortment', 'assortment'], ['/warehouses/store-stock', 'stock'], ['/client-reports/pos-shifts', 'review']]) {
+   await go(page, path);
+   await expect.poll(() => page.locator('#main-content').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+   await page.screenshot({ path: `/private/tmp/prime-pos-${name}-mobile.png`, fullPage: true });
+ }
+
+});
+
+test('POS owns setup and assortment while shared Main modules retain inventory and review', async ({ page }) => {
+ await go(page, '/settings/stores');
+ await expect(page.getByText('Stores & POS', { exact: true })).toHaveCount(0);
+ await expect(page).toHaveURL(/#\/pos\/settings$/);
+ await expect(page.getByRole('heading', { name: 'Store settings', exact: true })).toBeVisible();
+ await page.getByLabel('Maximum cashier discount (%)').fill('5');
+ await page.getByRole('button', { name: 'Save policies' }).click();
+ await page.reload();
+ await expect(page.getByLabel('Maximum cashier discount (%)')).toHaveValue('5');
+ await go(page, '/products/pos-assortment');
+ await expect(page).toHaveURL(/#\/pos\/products$/);
+ await expect(page.getByRole('heading', { name: 'Products at this store', exact: true })).toBeVisible();
+ await go(page, '/warehouses/store-stock');
+ await expect(page.getByRole('link', { name: 'Warehouses', exact: true })).toHaveAttribute('aria-current', 'page');
+ await page.getByRole('link', { name: 'All locations', exact: true }).click();
+ await expect(page.getByRole('heading', { name: 'My warehouses', exact: true })).toBeVisible();
+ await page.getByRole('link', { name: 'Store stock & purchasing', exact: true }).click();
+ await expect(page.getByRole('heading', { name: 'Store stock & purchasing', exact: true })).toBeVisible();
+ await go(page, '/client-reports/pos-shifts');
+ await expect(page.getByRole('link', { name: 'Analytics', exact: true })).toHaveAttribute('aria-current', 'page');
+ await page.getByRole('navigation', { name: 'Analytics sections' }).getByRole('link', { name: 'Overview', exact: true }).click();
+ await page.getByRole('link', { name: 'POS shift review', exact: true }).click();
+ await expect(page.getByRole('heading', { name: 'Shift reconciliation', exact: true })).toBeVisible();
+ await page.goto('/#/settings/stores?tab=catalog&demo=with-data');
+ await expect(page).toHaveURL(/#\/pos\/products\?demo=with-data$/);
+ await expect(page.locator('.pos-legacy-catalog')).toContainText('Everyday canvas tote');
+ await page.goto('/#/settings/stores?tab=transactions');
+ await expect(page).toHaveURL(/#\/orders\?status=completed$/);
 });

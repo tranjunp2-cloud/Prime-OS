@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render as renderComponent, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShopListingEditor } from './ShopListingEditor';
 import { getProducts, type ChannelListing } from '@/lib/product-store';
 
 afterEach(cleanup);
+const render = (ui: Parameters<typeof renderComponent>[0]) => renderComponent(ui, { wrapper: MemoryRouter });
 const listing: ChannelListing = { channel: 'amazon', external_id: 'one', store_name: 'Shop A', shop_sku: 'SKU-A', status: 'active', publication_unconfirmed: true, listing_url: null, last_synced_at: null,
   shop_snapshot: { channel: 'amazon', store_name: 'Shop A', listing_id: 'one', shop_sku: 'SKU-A', title: 'Listing title A', description: 'Shop description', brand: 'Shop brand', category: 'Shop category', images: ['/one.jpg'], price: { amount: 29, currency: 'USD' }, stock: 0, recorded_at: '',
-    requirements: { channel: 'amazon', category: 'Shop category', revision: 'test-v1', origin: 'prototype', fields: [] } } };
+    variant_count: 1, requirements: { channel: 'amazon', category: 'Shop category', revision: 'test-v1', origin: 'prototype', fields: [] } } };
 function mount(extra: Partial<ChannelListing> = {}, saveError?: string) {
   const target = { ...listing, ...extra };
   const product = { ...getProducts()[0], name: 'Never prefill me', status: 'draft' as const, images: ['/master.jpg'], channels: [target], channel_overrides: {}, import_sources: [] };

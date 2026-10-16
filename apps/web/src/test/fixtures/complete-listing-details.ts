@@ -24,8 +24,7 @@ export function confirmListingSave(label: string) {
   if (summary) fireEvent.click(within(summary).getByRole('button', { name: label }));
 }
 export function chooseListingGroup(label: string) {
-  fireEvent.keyDown(screen.getByRole('button', { name: 'Group as one product' }), { key: 'Enter' });
-  fireEvent.click(screen.getByRole('menuitem', { name: label }));
+  fireEvent.click(screen.getByRole('button', { name: label }));
 }
 /** Enter required values via visible form controls, never bypass the production validation. */
 export function completeListingDetails() {

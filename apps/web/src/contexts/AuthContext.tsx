@@ -137,3 +137,8 @@ export function useAuth() {
   }
   return context;
 }
+
+/** Optional consumers must deny privileged actions when no session is available. */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}

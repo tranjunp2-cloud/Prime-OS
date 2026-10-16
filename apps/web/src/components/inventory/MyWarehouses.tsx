@@ -14,12 +14,11 @@ import { stockAt, sumStock } from '@/lib/warehouse-stock-view';
 import { warehouseProductLocations } from '@/lib/warehouse-product-scope';
 import { cn } from '@/lib/utils';
 import { getInventoryPositions, type InventoryPosition } from '@/lib/inventory-store';
-import { StockGuide } from './StockAvailability';
 import { WarehouseStockTable, type StockLocation, type StockAdjustmentTarget } from './WarehouseStockTable';
 
 type Location = { id: string; name: string; code?: string; address?: string | null };
-type Props = { warehouses: Location[]; products: Product[]; positions?: InventoryPosition[]; initialSearch?: string; onAdjustStock?: (target: StockAdjustmentTarget) => void; warehouseId?: string; onSelectWarehouse?: (id: string) => void; onAddStock?: (warehouse: StockLocation) => void; onLinkShops?: (warehouse: StockLocation) => void; onTransferStock?: (target: Partial<StockAdjustmentTarget>) => void };
-export function MyWarehouses({ warehouses, products, onAdjustStock, positions = getInventoryPositions(), initialSearch = '', warehouseId: controlledWarehouse, onSelectWarehouse, onAddStock, onLinkShops, onTransferStock }: Props) {
+type Props = { warehouses: Location[]; products: Product[]; positions?: InventoryPosition[]; initialSearch?: string; stockFilter?: string; onStockFilterChange?: (value: string) => void; onAdjustStock?: (target: StockAdjustmentTarget) => void; warehouseId?: string; onSelectWarehouse?: (id: string) => void; onAddStock?: (warehouse: StockLocation) => void; onLinkShops?: (warehouse: StockLocation) => void; onTransferStock?: (target: Partial<StockAdjustmentTarget>) => void };
+export function MyWarehouses({ warehouses, products, onAdjustStock, positions = getInventoryPositions(), initialSearch = '', stockFilter, onStockFilterChange, warehouseId: controlledWarehouse, onSelectWarehouse, onAddStock, onLinkShops, onTransferStock }: Props) {
   const [localWarehouseId, setLocalWarehouseId] = useState('');
   const warehouseId = controlledWarehouse ?? localWarehouseId;
   const setWarehouseId = (id: string) => { setLocalWarehouseId(id); onSelectWarehouse?.(id); };
@@ -117,13 +116,12 @@ export function MyWarehouses({ warehouses, products, onAdjustStock, positions = 
             <Button variant="outline" size="sm" aria-label={selected ? 'Warehouse details' : 'Locations & shops'} onClick={() => openDetails(warehouseId)}>Details</Button>
             {editableSelected && hasCounts && onTransferStock && <Button variant="outline" size="sm" onClick={() => onTransferStock({ warehouse: selected })}>Transfer stock</Button>}
             {editableSelected && onLinkShops && <Button variant="outline" size="sm" onClick={() => onLinkShops(selected!)}>Set shop warehouse</Button>}
-            <StockGuide iconOnly />
           </div>
         </div>
         {status === 'loading' ? <p className="mt-1 text-xs text-muted-foreground" role="status">Loading shop links…</p> : status === 'error' ? <div role="status" className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>Shop links unavailable. Stock is still available.</span><Button variant="ghost" size="sm" onClick={() => reloadShops()}>Retry shop links</Button></div> : null}
         {selected?.unknown && <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">Stock is recorded against {selected.code}, but this location is not in the warehouse directory. These quantities remain included in totals.</p>}
       </header>
-      {editableSelected && !hasRelatedProducts && onAddStock ? <div className="px-6 py-12 text-center"><Warehouse className="mx-auto mb-4 size-8 text-muted-foreground" /><h3 className="text-base font-semibold">Set up opening stock</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">Select existing Product Master SKUs and record the quantities already in this warehouse.</p><Button className="mt-5" onClick={() => onAddStock(selected!)}>Record opening stock</Button></div> : <WarehouseStockTable onRecordOpeningStock={editableSelected && onAddStock ? () => onAddStock(selected!) : undefined} shops={shops} shopLinksState={status} onTransferStock={onTransferStock} positions={positions} onViewWarehouse={openDetails} onAdjustStock={onAdjustStock} products={products} warehouses={allWarehouses} warehouseId={warehouseId} onShowAll={() => setWarehouseId('')} initialSearch={initialSearch} />}
+      {editableSelected && !hasRelatedProducts && onAddStock ? <div className="px-6 py-12 text-center"><Warehouse className="mx-auto mb-4 size-8 text-muted-foreground" /><h3 className="text-base font-semibold">Set up opening stock</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">Select existing Product Master SKUs and record the quantities already in this warehouse.</p><Button className="mt-5" onClick={() => onAddStock(selected!)}>Record opening stock</Button></div> : <WarehouseStockTable stockFilter={stockFilter} onStockFilterChange={onStockFilterChange} onRecordOpeningStock={editableSelected && onAddStock ? () => onAddStock(selected!) : undefined} shops={shops} shopLinksState={status} onTransferStock={onTransferStock} positions={positions} onViewWarehouse={openDetails} onAdjustStock={onAdjustStock} products={products} warehouses={allWarehouses} warehouseId={warehouseId} onShowAll={() => setWarehouseId('')} initialSearch={initialSearch} />}
     </div>
     <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">

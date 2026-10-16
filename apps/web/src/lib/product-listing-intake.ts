@@ -9,6 +9,7 @@ import { suggestMasterSku } from './product-onboarding';
 import { getProductCatalogSettings } from './product-catalog-settings-store';
 import { snapshotShopListing } from './listing-shop-data';
 import { savedReviewProgress } from './listing-review-progress';
+import { assertListingDataComplete, importedListingDataReadiness } from './listing-data-readiness';
 
 import { applyMasterCompletion, assertMasterComplete, newListingMasterPreview, variantMappingError, type MasterCompletion, type VariantMappings } from './listing-master-completion';
 
@@ -84,6 +85,8 @@ export function getListingSuggestion(item: CatalogImportItem, products = getProd
   else if (!normalizedIdentity(item.channelSku) || normalizedIdentity(item.channelSku) !== normalizedIdentity(product.sku_code)) reason = 'SKU differs — review individually';
   else if (identityConflict) reason = `${identityConflict.label} differs — review individually`;
   else if (!Number.isFinite(item.confidence) || item.confidence < 95) reason = 'Check this suggestion individually';
+  const data = importedListingDataReadiness(item);
+  if (!data.ready) reason = data.message;
   return { product, suggested, eligible: suggested && !reason, reason };
 }
 
@@ -110,6 +113,7 @@ export function confirmSuggestedListingLinks(reviewed: ListingMatchReview[], cat
   });
   const identities = pairs.map(({ item }) => JSON.stringify([item.channel, item.storeName, item.listingId]));
   if (new Set(identities).size !== identities.length) throw new Error('The selection contains the same shop listing more than once.');
+  assertListingDataComplete(pairs.map(pair => pair.item));
   const changes = new Map<string, Product>();
   pairs.forEach(({ item, product }) => {
     const next = changes.get(product.id) ?? { ...product, listing_review_migrated: true, channels: [...product.channels], import_sources: [...(product.import_sources ?? [])], record_version: (product.record_version ?? 1) + 1 };
@@ -185,6 +189,8 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
   const verified = ('productId' in target ? target.verifiedSingleListingIds : target.verifiedSourceStructure ? selected.map(item => item.id) : []) ?? [];
   const mappingError = variantMappingError(selected, product, target.variantMappings, verified);
   if (mappingError && !target.defer) throw new Error(mappingError);
+  // Deferring Master completion must not create an empty listing relationship.
+  assertListingDataComplete(selected);
   const savedDraft = 'productId' in target && target.completion && target.defer ? applyMasterCompletion(product, [], target.completion) : undefined;
   // Listing-owned details are local drafts, never Master fields or provider snapshots.
   for (const source of selected) {

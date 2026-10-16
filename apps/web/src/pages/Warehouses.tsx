@@ -33,6 +33,12 @@ export default function Warehouses() {
 function WarehouseWorkspace({ noDataDemo }: { noDataDemo: boolean }) {
   const [params, setParams] = useSearchParams();
   const warehouseId = params.get('warehouse') ?? '';
+  const stockFilter = ['low', 'empty', 'available', 'untracked', 'partial', 'atp', 'no-atp', 'held', 'unknown-atp'].includes(params.get('stock') ?? '') ? params.get('stock')! : 'all';
+  const setStockFilter = (value: string) => setParams(current => {
+    const next = new URLSearchParams(current);
+    if (value === 'all') next.delete('stock'); else next.set('stock', value);
+    return next;
+  });
   const selectWarehouse = (id: string) => setParams(current => { const next = new URLSearchParams(current); if (id) next.set('warehouse', id); else next.delete('warehouse'); return next; });
   const [warehouses, setWarehouses] = useState(warehouseLocations);
   const [products, setProducts] = useState(() => noDataDemo ? [] : getProducts());
@@ -75,7 +81,7 @@ function WarehouseWorkspace({ noDataDemo }: { noDataDemo: boolean }) {
       actions={showEmpty ? undefined : <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setHistoryOpen(true)}><ArrowRightLeft className="size-4" />Stock activity</Button><Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Add warehouse</Button></div>}
     />
     {result && <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2 text-sm"><p className="min-w-0 flex-1">{result}</p>{recentId && <Button size="sm" variant="ghost" onClick={() => setHistoryOpen(true)}>View activity</Button>}<Button size="icon" variant="ghost" className="size-8" aria-label="Dismiss result" onClick={() => setResult('')}><X className="size-4" /></Button></div>}
-    {showEmpty ? <WarehouseEmptyState onAddWarehouse={() => setCreateOpen(true)} /> : <MyWarehouses warehouseId={warehouseId} onSelectWarehouse={selectWarehouse} onAddStock={setAddStockWarehouse} onLinkShops={setLinkWarehouse} onTransferStock={setTransferTarget} positions={positions} onAdjustStock={setAdjustmentTarget} warehouses={warehouses} products={products} initialSearch={params.get('sku') ?? ''} />}
+    {showEmpty ? <WarehouseEmptyState onAddWarehouse={() => setCreateOpen(true)} /> : <MyWarehouses stockFilter={stockFilter} onStockFilterChange={setStockFilter} warehouseId={warehouseId} onSelectWarehouse={selectWarehouse} onAddStock={setAddStockWarehouse} onLinkShops={setLinkWarehouse} onTransferStock={setTransferTarget} positions={positions} onAdjustStock={setAdjustmentTarget} warehouses={warehouses} products={products} initialSearch={params.get('sku') ?? ''} />}
     {!showEmpty && <StockActivityDrawer open={historyOpen} onOpenChange={setHistoryOpen} products={products} warehouses={warehouses} recentId={recentId} onPrepareDestination={(productId, id, sku) => { setHistoryOpen(false); setReturnToHistory(true); const product = products.find(item => item.id === productId); setAdjustmentTarget({ product, warehouse: warehouses.find(item => item.id === id), sku, initializeLocation: true }); }} onReceive={(productId, id) => { const record = receiveWarehouseTransfer(productId, id); finish(id, `Received ${record.quantity} units at ${warehouses.find(w => w.id === record.toWarehouseId)?.name}. Warehouse stock updated; marketplace quantities unchanged.`); }} onNewAction={action => {
       setHistoryOpen(false); setReturnToHistory(true);
       if (action === 'transfer') setTransferTarget({ warehouse: warehouses.find(item => item.id === warehouseId) });

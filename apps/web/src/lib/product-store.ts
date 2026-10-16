@@ -9,6 +9,8 @@ import { withProductActivity, type ProductActivity } from './product-activity';
 import { getCatalogImportItems } from './catalog-import-store';
 import { recoverListingShopSnapshots } from './listing-shop-data';
 import { completeWarehouseListingDemo } from './warehouse-listing-demo';
+import { getStoredMasterReadiness } from './product-master-readiness';
+import { completeLinkedListingDemo } from './linked-listing-demo';
 // Shared product store — singleton in-memory for local mockup
 // Replaces Supabase queries
 // AUTO-SEEDS on first import
@@ -32,6 +34,8 @@ export type StockTransferRecord = {
 
 export interface Sku {
   id: string;
+  /** Stable attribute keys, independent of translated display names and option order. */
+  option_values?: Record<string, string>;
   sku_code: string;
   variation_name: string;
   weight_g: number;
@@ -141,6 +145,8 @@ export interface ListingDraftValues {
 }
 
 export interface ShopListingSnapshot {
+  /** Explicit sample data must never be presented as a provider receipt. */
+  origin?: 'prototype' | 'provider';
   requirements?: import('./listing-requirements').ListingRequirements;
   mapping_fields?: import('./listing-field-mapping').ImportedMappingField[];
   channel: ChannelListing['channel'];
@@ -284,6 +290,8 @@ export interface Product {
    *  TODO: Extend to support 13 data types: string, number, integer, boolean, enum, date,
    *        datetime, money, measurement, object, array, asset_ref, commerce_entity_ref. */
   specifications?: Array<{ attributeKey?: string; name: string; value: string }>;
+  /** Product-local attribute choices; never mutate shared category definitions. */
+  attribute_setup?: { attributes: import('./product-catalog-settings-store').CatalogAttribute[]; excludedKeys: string[] };
   // Inventory (raw stock per warehouse — ATS computed by Inventory tower)
 
   inventory_adjustments?: Array<{ id: string; warehouseId: string; sku: string; before: number | null; after: number; reason: string; createdAt: string; kind?: 'opening' | 'receipt' | 'adjustment' | 'availability' }>;
@@ -755,7 +763,27 @@ const DEFAULT_PRODUCTS = [...ADDITIONAL_IMPORT_TEST_PRODUCTS, ...IMPORTED_DEMO_P
   .map(product => product.id === 'prod_001' ? { ...product, channels: [...product.channels, { channel: 'shopee' as const, external_id: 'SHP-9012281', status: 'active' as const, listing_url: null, last_synced_at: '2026-09-28T08:38:00Z' }], import_result: 'matched' as const, import_source: 'Shopee · Prime Beauty Official', import_issues: [], updated_at: '2026-09-28T08:38:00Z' } : product)
   .map(withDemoLocales)
   .map(product => completeActiveProductDemo(product))
-  .map(completeWarehouseListingDemo);
+  .map(completeWarehouseListingDemo)
+  .concat({
+    ...SEED_PRODUCTS[3],
+    id: 'prod_demo_variant_stock',
+    name: '[Demo] Art Print — Variant stock setup',
+    sku_code: 'DEMO-ART-STOCK',
+    gtin: '', asin: '', mpn: '',
+    has_variants: true,
+    product_type: 'variant',
+    status: 'draft',
+    channels: [],
+    channel_overrides: {},
+    specifications: [{ attributeKey: 'material', name: 'Material', value: 'Paper' }],
+    variant_options: [{ attributeKey: 'color', name: 'Color', values: ['White', 'Black'] }],
+    inventory: { wh_crjp: 30 },
+    inventory_adjustments: [],
+    skus: [
+      { id: 'sku_demo_stock_white', sku_code: 'DEMO-ART-WHITE', variation_name: 'White', weight_g: 150, units_per_carton: 50, status: 'active', price: 1980, image_url: IMG('B0G5Y7YCDD'), stock_by_location: { wh_crjp: 20 } },
+      { id: 'sku_demo_stock_black', sku_code: 'DEMO-ART-BLACK', variation_name: 'Black', weight_g: 150, units_per_carton: 50, status: 'active', price: 1980, image_url: IMG('B0G5Y7YCDD'), stock_by_location: { wh_crjp: 10 } },
+    ],
+  } as Product);
 
 // Singleton store backed by localStorage so prototype-created Product Masters
 // survive reloads and direct navigation to their detail/edit routes.
@@ -817,6 +845,21 @@ function normalizeStoredProduct(product: Product): Product {
     meta_title: typeof product.meta_title === 'string' ? product.meta_title : '',
     meta_description: typeof product.meta_description === 'string' ? product.meta_description : '',
     specifications,
+    attribute_setup: product.attribute_setup && typeof product.attribute_setup === 'object' ? {
+      attributes: Array.isArray(product.attribute_setup.attributes) ? product.attribute_setup.attributes
+        .filter(attribute => attribute && typeof attribute.key === 'string' && typeof attribute.name === 'string')
+        .map(attribute => ({
+          ...attribute, id: typeof attribute.id === 'string' ? attribute.id : attribute.key,
+          type: typeof attribute.type === 'string' ? attribute.type : 'Text',
+          options: typeof attribute.options === 'string' ? attribute.options : '',
+          unit: typeof attribute.unit === 'string' ? attribute.unit : '',
+          validation: typeof attribute.validation === 'string' ? attribute.validation : '',
+          description: typeof attribute.description === 'string' ? attribute.description : '',
+          categories: Number(attribute.categories) || 0, isLocalizable: Boolean(attribute.isLocalizable),
+          status: 'Active' as const, source: attribute.source === 'imported' ? 'imported' as const : 'internal' as const,
+        })) : [],
+      excludedKeys: Array.isArray(product.attribute_setup.excludedKeys) ? product.attribute_setup.excludedKeys.filter(key => typeof key === 'string') : [],
+    } : undefined,
     field_mappings: product.field_mappings && typeof product.field_mappings === 'object' && !Array.isArray(product.field_mappings) ? structuredClone(product.field_mappings) : undefined,
     inventory_adjustments: Array.isArray(product.inventory_adjustments) ? product.inventory_adjustments : [],
     inventory_transfers: Array.isArray(product.inventory_transfers) ? product.inventory_transfers : [],
@@ -852,6 +895,7 @@ function activateValidatedImport(product: Product): Product {
   const importPassed = product.import_result === 'ready' || product.import_result === 'published';
   if (!importPassed || product.import_issues?.length || product.status === 'archived' || product.import_activation_paused) return product;
   if (product.status === 'published' && product.import_result === 'published') return product;
+  if (!getStoredMasterReadiness(product).ready) return product;
 
   const now = new Date().toISOString();
   const revisions = product.revisions ?? [];
@@ -1049,10 +1093,34 @@ function completeStoredWarehouseListings(products: Product[]): Product[] {
   } catch { return products; }
 }
 
-const loadedProducts = completeStoredWarehouseListings(loadStoredProducts());
+function completeStoredListingData(products: Product[]): Product[] {
+  const key = 'primeos-linked-listing-data-v1';
+  if (typeof window !== 'undefined' && window.localStorage.getItem(key) === '1') return products;
+  const completed = products.map(completeLinkedListingDemo);
+  if (typeof window === 'undefined') return completed;
+  try {
+    const changed = completed.filter((product, index) => product !== products[index]);
+    const stored = JSON.parse(window.localStorage.getItem(PRODUCT_STORAGE_KEY) ?? 'null') as Product[] | null;
+    if (changed.length) {
+      const changedIds = new Set(changed.map(product => product.id));
+      window.localStorage.setItem('primeos-linked-listing-data-backup-v1', JSON.stringify((stored ?? products).filter(product => changedIds.has(product.id))));
+      window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(stored ? stored.map(product => {
+        const next = changed.find(item => item.id === product.id);
+        return next ? { ...product, channels: next.channels } : product;
+      }) : completed));
+    }
+    window.localStorage.setItem(key, '1');
+    return completed;
+  } catch { return products; }
+}
+
+const loadedProducts = completeStoredListingData(completeStoredWarehouseListings(loadStoredProducts()));
 const activatedProducts = loadedProducts.map(activateValidatedImport);
 let _products: Product[] = completeStoredActiveDemo(activatedProducts);
 let categoryReferencesPersisted = false;
+function notifyProductChanges() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('primeos:products-changed'));
+}
 if (activatedProducts.some((product, index) => product !== loadedProducts[index])) persistProducts();
 
 export function getProducts(): Product[] {
@@ -1077,6 +1145,7 @@ export function addProduct(p: Product, options?: { requirePersistence?: boolean 
   if (options?.requirePersistence && typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
   if (!options?.requirePersistence) persistProducts();
+  notifyProductChanges();
 }
 
 export function updateProduct(id: string, p: Partial<Product> & { id: string }, options?: { requirePersistence?: boolean }): void {
@@ -1085,6 +1154,7 @@ export function updateProduct(id: string, p: Partial<Product> & { id: string }, 
   if (options?.requirePersistence && typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
   if (!options?.requirePersistence) persistProducts();
+  notifyProductChanges();
 }
 
 /** Save one inventory operation, including multiple SKU counts, atomically. */
@@ -1098,6 +1168,7 @@ export function commitWarehouseProducts(updates: Product[]): void {
   });
   if (typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
+  notifyProductChanges();
 }
 
 /** Commit several listing relationships in one write, before exposing any live-state change. */
@@ -1109,6 +1180,10 @@ export function updateProductLinksAtomically(updates: Array<Pick<Product, 'id' |
   if (options?.activateMasters && _products.some(product => byId.has(product.id) && product.status === 'archived')) {
     throw new Error('Archived products must be restored before confirming listing links.');
   }
+  if (options?.activateMasters) {
+    const incomplete = _products.find(product => byId.has(product.id) && !getStoredMasterReadiness(product).ready);
+    if (incomplete) throw new Error(`Complete required details before activating: ${getStoredMasterReadiness(incomplete).missing.join('; ')}.`);
+  }
   const now = new Date().toISOString();
   const next = _products.map(product => {
     const update = byId.get(product.id);
@@ -1116,6 +1191,7 @@ export function updateProductLinksAtomically(updates: Array<Pick<Product, 'id' |
   });
   if (typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
+  notifyProductChanges();
 }
 
 /** A reviewed reassignment and an optional new Master must succeed or fail together. */
@@ -1131,6 +1207,7 @@ export function commitListingReviewProducts(updates: Product[], created?: Produc
   // Preserve the caller's explicit lifecycle decision; never infer status from completeness.
   if (typeof window !== 'undefined') window.localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(next));
   _products = next;
+  notifyProductChanges();
 }
 
 export function deleteProduct(id: string, options?: { requirePersistence?: boolean }): void {
@@ -1152,6 +1229,7 @@ export function deleteProduct(id: string, options?: { requirePersistence?: boole
     }
   }
   persistProducts();
+  notifyProductChanges();
 }
 
 export function getProductById(id: string): Product | undefined {

@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PrimeClientReportsPage } from './PrimeClientReportsPage';
 import { PrimeGrowthOSPage } from './PrimeGrowthOSPage';
-import { fetchGrowthOsSnapshot } from '@/lib/prime/growth-os';
+import { fallbackGrowthOsSnapshot, fetchGrowthOsSnapshot } from '@/lib/prime/growth-os';
 import { defaultHomePath, rememberOverviewDemoMode } from '@/components/seller-onboarding/demo-state';
 
 vi.mock('@/lib/prime/growth-os', async (importOriginal) => ({
@@ -58,4 +58,25 @@ describe('Overview no-data demos', () => {
     expect(screen.getByText('₫4.82B')).toBeVisible();
     expect(defaultHomePath()).toBe('/overview');
   });
+});
+
+it('opens each Home action in its current business screen with a distinct filter', async () => {
+  vi.mocked(fetchGrowthOsSnapshot).mockResolvedValue(fallbackGrowthOsSnapshot);
+  mount(<PrimeGrowthOSPage />, '/admin/dashboard');
+  const targets = [
+    ['Pending Confirmation', '/orders?status=pending'],
+    ['Ready to Pack', '/orders?status=ready&orderStage=preparing'],
+    ['Delivery Exceptions', '/orders?view=fulfillment&status=shipping&orderStage=failed'],
+    ['Returned Orders', '/orders?view=returns&status=returns&orderStage=received'],
+    ['Low Stock Items', '/warehouses?stock=low'],
+    ['Out of Stock', '/warehouses?stock=empty'],
+    ['Unlinked Contacts', '/inbox/guests?linked=unlinked'],
+    ['Unassigned Conversations', '/inbox/conversation?assignee=unassigned'],
+    ['Switch to PrimeWeb workspace', '/builder/sites'],
+    ['Switch to POS workspace', '/pos/register'],
+    ['Reconnect', '/sales-channels/connected-channels'],
+  ];
+  for (const [label, href] of targets) {
+    expect(await screen.findByRole('link', { name: new RegExp(label) })).toHaveAttribute('href', href);
+  }
 });

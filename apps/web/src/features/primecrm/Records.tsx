@@ -67,7 +67,13 @@ export function Guests() {
   const { state } = useCrm();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState('');
-  const [linked, setLinked] = useState('all');
+  const linked = ['linked', 'unlinked'].includes(params.get('linked') ?? '') ? params.get('linked')! : 'all';
+  const setLinked = (value: string) => setParams(current => {
+    const next = new URLSearchParams(current);
+    next.delete('guest');
+    if (value === 'all') next.delete('linked'); else next.set('linked', value);
+    return next;
+  });
   const selected = state.guests.find(guest => guest.id === params.get('guest'));
   const rows = state.guests.filter(guest => `${guest.name} ${guest.channel} ${guest.phone} ${guest.email}`.toLowerCase().includes(query.toLowerCase()) && (linked === 'all' || Boolean(guest.customerId) === (linked === 'linked')));
   return <div className="space-y-5 p-4 md:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Contacts / Guests</h2><p className="mt-1 text-sm text-muted-foreground">People who have contacted your channels, including those who have not purchased.</p></div><MainLink to="/customers">Main customer directory</MainLink></div>

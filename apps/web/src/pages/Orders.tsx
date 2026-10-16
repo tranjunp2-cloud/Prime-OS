@@ -9,7 +9,7 @@ import { OrderShippingLabelsDialog } from '@/components/orders/OrderShippingLabe
 import { OrderNavigation } from '@/components/orders/OrderNavigation';
 import { OrderReviewFilter } from '@/components/orders/OrderReviewFilter';
 import { OrderLifecycleBadge } from '@/components/orders/OrderLifecycleBadge';
-import { workQueues, matchesOrderQueue, hasReturnHistory, getQueueFilters, matchesQueueFilter, type OrderQueue } from '@/lib/order-work-queues';
+import { workQueues, orderQueue, matchesOrderQueue, hasReturnHistory, getQueueFilters, matchesQueueFilter, type OrderQueue } from '@/lib/order-work-queues';
 import { ChannelLogo } from '@/components/channels/ChannelLogo';
 import { HandlingTypeBadge } from '@/components/orders/HandlingTypeBadge';
 import { printPackingSlips } from '@/lib/order-print';
@@ -21,6 +21,7 @@ import {
   Ellipsis,
   Search,
   ShoppingBag,
+  TriangleAlert,
   X,
 } from 'lucide-react';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
@@ -32,7 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { EmptyState } from '@/components/system/EmptyState';
 import { cn } from '@/lib/utils';
-import { ordersApi, orderRow, orderLabels, orderStockStatusLabel, exportOrders, getOrderAttentionReasons, type OrderRecord } from '@/lib/orders-api';
+import { ordersApi, orderRow, orderLabels, orderStockStatusLabel, exportOrders, getOrderAttention, type OrderRecord } from '@/lib/orders-api';
 import { ManualOrderDialog } from '@/components/orders/ManualOrderDialog';
 import { OrderWorkspaceDetail } from '@/components/orders/OrderWorkspaceDetail';
 import { PosOrderReceipt } from '@/features/primepos/ui';
@@ -124,7 +125,9 @@ export default function Orders() {
   const viewParam = params.get(workflowParam);
   const view: OrderView = viewParam === 'fulfillment' || viewParam === 'returns' ? viewParam : 'all';
   const statusParam = params.get('status');
-  const status: StatusFilter = statusParam === 'draft' || statusDefinitions.some(item => item.key === statusParam) ? statusParam as StatusFilter : 'all';
+  // Old To ship links open their specific stage, or Preparing when no stage was selected.
+  const status: StatusFilter = statusParam === 'ready' ? (params.get('orderStage') === 'pickup' ? 'pickup' : 'preparing')
+    : statusParam === 'draft' || statusDefinitions.some(item => item.key === statusParam) ? statusParam as StatusFilter : 'all';
   const subStatus = getQueueFilters(status).some(item => item.key !== 'review' && item.key === params.get('orderStage')) ? params.get('orderStage')! : 'all';
   // Keep links from the former review sub-tab working while allowing review + stage filters.
   const reviewOnly = params.get('needsReview') === 'true' || params.get('orderStage') === 'review';
@@ -132,7 +135,17 @@ export default function Orders() {
   const setReviewOnly = (active: boolean) => { const next = new URLSearchParams(params); if (next.get('orderStage') === 'review') next.delete('orderStage'); if (active) next.set('needsReview', 'true'); else next.delete('needsReview'); setParams(next, { replace: true }); };
   const [heldOnly,setHeldOnly] = useState(false);
   const [search, setSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState(() => params.get('orderStage') === 'awaiting-payment' ? 'awaiting-payment' : 'all');
+  useEffect(() => {
+    const legacyPayment = params.get('orderStage') === 'awaiting-payment';
+    if (statusParam !== 'ready' && !legacyPayment) return;
+    const next = new URLSearchParams(params);
+    if (statusParam === 'ready') next.set('status', status);
+    if (params.get('orderStage') === 'review') next.set('needsReview', 'true');
+    if (legacyPayment) setPaymentFilter('awaiting-payment');
+    next.delete('orderStage');
+    setParams(next, { replace: true });
+  }, [params, setParams, status, statusParam]);
   const [channel, setChannel] = useState('all');
   const [activeView, setActiveView] = useState<ActiveQueue>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -148,7 +161,7 @@ export default function Orders() {
       : hasReturnHistory(order));
     const matchesView = !activeView || (activeView === 'Assigned to me' ? Boolean(currentUserName) && order.assignee === currentUserName : activeView === 'SLA at risk' ? (order.slaRisk || (orderDeadline(order) !== null && orderDeadline(order)! <= now + 86400000)) : activeView === 'Sync errors' ? order.syncError : activeView === 'Ready for pickup' ? order.readyForPickup : activeView === 'Pickup overdue' ? order.pickupOverdue : order.reservation === 'Allocation failed');
     return matchesSearch && matchesWorkspaceView && matchesView
-      && (paymentFilter === 'all' || order.paymentState === paymentFilter)
+      && (paymentFilter === 'all' || (paymentFilter === 'awaiting-payment' ? matchesQueueFilter(order, 'awaiting-payment') : order.paymentState === paymentFilter))
       && (channel === 'all' || order.store === channel)
       && (canonical === 'all' || order.canonicalStatus === canonical)
       && (settlementFilter === 'all' || order.operations?.settlement?.status === settlementFilter)
@@ -164,7 +177,7 @@ export default function Orders() {
   const draftCount = orders.filter(order => order.canonicalStatus === 'draft').length;
   const stageTotals = orders.filter(order => matchesOrderQueue(order, status));
   const stageOrders = scoped.filter(order => matchesOrderQueue(order, status));
-  const subFilters = getQueueFilters(status).filter(item => item.key !== 'review').map(item => ({ ...item, count: stageTotals.filter(order => matchesQueueFilter(order, item.key)).length }));
+  const subFilters = getQueueFilters(status).filter(item => item.key !== 'review');
   const reviewCount = stageTotals.filter(order => matchesQueueFilter(order, 'review')).length;
   const filtered = stageOrders.filter(order => matchesQueueFilter(order, subStatus) && (!reviewOnly || matchesQueueFilter(order, 'review'))).sort((a, b) => sort === 'deadline' ? ((orderDeadline(a) ?? Infinity) - (orderDeadline(b) ?? Infinity)) || a.orderedAt.localeCompare(b.orderedAt) : sort === 'oldest' ? a.orderedAt.localeCompare(b.orderedAt) : b.orderedAt.localeCompare(a.orderedAt));
   useEffect(() => { setPage(0); setSelected([]); }, [activeView, channel, search, paymentFilter, subStatus, reviewOnly, heldOnly, status, view, canonical, settlementFilter, warehouseFilter, carrierFilter, tagFilter, notesFilter, dateFrom, dateTo, sort, actionFilter]);
@@ -189,17 +202,6 @@ export default function Orders() {
   };
   const toggleOrder = (id: string) => setSelected((value) => value.includes(id) ? value.filter((item) => item !== id) : [...value, id]);
 
-  const setToolbarStatus = (value: string) => {
-    setCanonical('all');
-    const next = new URLSearchParams(params);
-    next.delete('orderStage');
-    next.delete('needsReview');
-    if (value === 'preparing' || value === 'pickup') { next.set('status', 'ready'); next.set('orderStage', value); }
-    else if (value === 'all') next.delete('status');
-    else next.set('status', value);
-    setParams(next, {replace: true});
-  };
-  const toolbarStatus = status === 'ready' && ['preparing', 'pickup'].includes(subStatus) ? subStatus : status;
   const selectedOrders = records.filter(order => selected.includes(order.id));
   const confirmCount = selectedOrders.filter(order => !batchBlocker(order, 'confirm', canWrite)).length;
   const printCount = selectedOrders.filter(order => !batchBlocker(order, 'print', canWrite)).length;
@@ -220,7 +222,7 @@ export default function Orders() {
     const byId = new Map(records.map(order => [order.id, order]));
     setLabelOrders(filtered.map(order => byId.get(order.id)!));
   };
-  const resetDetailedFilters = () => { setPaymentFilter('all'); setHeldOnly(false); setCanonical('all'); setSettlementFilter('all'); setWarehouseFilter('all'); setCarrierFilter('all'); setDateFrom(''); setDateTo(''); setTagFilter(''); setNotesFilter(''); setActiveView(null); const next = new URLSearchParams(params); next.delete(workflowParam); setParams(next, { replace: true }); };
+  const resetDetailedFilters = () => { setPaymentFilter('all'); setHeldOnly(false); setCanonical('all'); setSettlementFilter('all'); setWarehouseFilter('all'); setCarrierFilter('all'); setDateFrom(''); setDateTo(''); setTagFilter(''); setNotesFilter(''); setActiveView(null); const next = new URLSearchParams(params); next.delete(workflowParam); next.delete('orderStage'); if (reviewOnly) next.set('needsReview', 'true'); setParams(next, { replace: true }); };
   const resetFilterState = () => {
     setActionFilter('all'); setActiveView(null); setPaymentFilter('all'); setHeldOnly(false); setChannel('all'); setSearch(''); setCanonical('all'); setSettlementFilter('all'); setWarehouseFilter('all'); setCarrierFilter('all'); setDateFrom(''); setDateTo(''); setTagFilter(''); setNotesFilter('');
   };
@@ -243,7 +245,8 @@ export default function Orders() {
     search && { label: `Search: ${search}`, clear: () => setSearch('') },
     channel !== 'all' && { label: `Shop: ${channel}`, clear: () => setChannel('all') },
     actionFilter !== 'all' && { label: actionFilterLabels[actionFilter], clear: () => setActionFilter('all') },
-    paymentFilter !== 'all' && { label: `Payment: ${paymentFilter}`, clear: () => setPaymentFilter('all') },
+    subStatus !== 'all' && { label: subFilters.find(item => item.key === subStatus)!.label, clear: () => setSubStatus('all') },
+    paymentFilter !== 'all' && { label: `Payment: ${paymentFilter === 'awaiting-payment' ? 'Awaiting payment' : paymentFilter}`, clear: () => setPaymentFilter('all') },
     heldOnly && { label: 'On hold', clear: () => setHeldOnly(false) },
     canonical !== 'all' && { label: `Status: ${orderLabels[canonical as keyof typeof orderLabels]}`, clear: () => setCanonical('all') },
     settlementFilter !== 'all' && { label: `Settlement: ${settlementFilter === 'settled' ? 'Received' : 'Estimated'}`, clear: () => setSettlementFilter('all') },
@@ -256,7 +259,7 @@ export default function Orders() {
     activeView && { label: activeView === 'SLA at risk' ? 'Ship-by deadline at risk' : activeView, clear: () => setActiveView(null) },
     view !== 'all' && { label: view === 'returns' ? 'Return history' : 'Packing & shipping', clear: () => setWorkflowView('all') },
   ].filter((chip): chip is { label: string; clear: () => void } => Boolean(chip));
-  const detailedCount = [canonical !== 'all', settlementFilter !== 'all', warehouseFilter !== 'all', carrierFilter !== 'all', Boolean(dateFrom), Boolean(dateTo), Boolean(tagFilter), Boolean(notesFilter), Boolean(activeView), view !== 'all', heldOnly].filter(Boolean).length;
+  const detailedCount = [subStatus !== 'all', canonical !== 'all', settlementFilter !== 'all', warehouseFilter !== 'all', carrierFilter !== 'all', Boolean(dateFrom), Boolean(dateTo), Boolean(tagFilter), Boolean(notesFilter), Boolean(activeView), view !== 'all', heldOnly].filter(Boolean).length;
 
   return <div className="min-w-0 space-y-4 p-4 pb-28 md:p-6">
     <WorkspacePageHeader title={pageCopy.title} description={pageCopy.description} icon={pageCopy.icon} className="[&>div:first-child]:pb-4" titleAccessory={(
@@ -294,17 +297,14 @@ export default function Orders() {
       <OrderReviewFilter count={reviewCount} active={reviewOnly} loaded={hasLoaded} onChange={setReviewOnly} />
     </div>
     {status === 'draft' && <div className="flex flex-wrap items-center gap-2 text-sm"><strong>Draft orders</strong><span className="text-muted-foreground">Not submitted yet. Drafts are kept separate from All.</span><Button variant="ghost" size="sm" onClick={() => setLifecycleStatus('all')}>Back to all orders</Button></div>}
-    {status !== 'ready' && subFilters.length > 0 && <div role="group" aria-label="Order stage filters" className="flex flex-wrap items-center gap-2">
-      {[{ key: 'all', label: 'All stages', count: stageTotals.length }, ...subFilters].map(item => <button key={item.key} type="button" aria-pressed={subStatus === item.key} onClick={() => setSubStatus(item.key)} className={cn('inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring', subStatus === item.key ? 'border-primary/30 bg-primary/10 font-medium text-primary' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>{item.label}{' '}<span className="text-xs tabular-nums">{hasLoaded ? item.count : '—'}</span></button>)}
-    </div>}
     {status === 'delivered' && <p className="text-xs text-muted-foreground">Delivered to the customer. Waiting for the order to be completed.</p>}
     {status === 'completed' && <p className="text-xs text-muted-foreground">Completed orders. Settlement is tracked separately in the payment details.</p>}
 
     <div className="min-w-0 space-y-3">
       <OrderToolbar search={search} onSearch={setSearch} open={filtersOpen} onOpenChange={setFiltersOpen} detailedCount={detailedCount}
-        status={{label: 'Order status', active: toolbarStatus !== 'all', control: <select aria-label="Order status" className="h-11 max-w-full rounded-md border bg-background px-3 text-sm" value={toolbarStatus} onChange={event => setToolbarStatus(event.target.value)}><option value="all">All order statuses</option><option value="pending">Awaiting confirmation</option><option value="ready">To ship · All stages</option><option value="preparing">Preparing</option><option value="pickup">Ready to ship</option><option value="shipping">Shipping</option><option value="delivered">Delivered</option><option value="completed">Completed</option><option value="returns">Returns &amp; refunds</option><option value="cancelled">Cancelled</option><option value="draft">Draft orders</option></select>}}
+        status={{label: 'Order status', active: status !== 'all', control: <select aria-label="Order status" className="h-11 max-w-full rounded-md border bg-background px-3 text-sm" value={status} onChange={event => setLifecycleStatus(event.target.value as StatusFilter)}>{statusDefinitions.map(item => <option key={item.key} value={item.key}>{item.key === 'all' ? 'All order statuses' : item.label}</option>)}<option value="draft">Draft orders</option></select>}}
         shop={{label: 'Shop', active: channel !== 'all', control: <select aria-label="Filter by shop" className="h-11 max-w-full rounded-md border bg-background px-3 text-sm" value={channel} onChange={event => setChannel(event.target.value)}><option value="all">All shops</option>{[...new Set(orders.map(order => order.store))].map(store => <option key={store}>{store}</option>)}</select>}}
-        payment={{label: 'Payment', active: paymentFilter !== 'all', control: <select aria-label="Payment status" className="h-11 max-w-full rounded-md border bg-background px-3 text-sm" value={paymentFilter} onChange={event => setPaymentFilter(event.target.value)}><option value="all">All payments</option>{[...new Set(['Unpaid', 'Paid', 'Refunded', ...orders.map(order => order.paymentState)])].map(state => <option key={state}>{state}</option>)}</select>}}
+        payment={{label: 'Payment', active: paymentFilter !== 'all', control: <select aria-label="Payment status" className="h-11 max-w-full rounded-md border bg-background px-3 text-sm" value={paymentFilter} onChange={event => setPaymentFilter(event.target.value)}><option value="all">All payments</option><option value="awaiting-payment">Awaiting payment (non-COD)</option>{[...new Set(['Unpaid', 'Paid', 'Refunded', ...orders.map(order => order.paymentState)])].map(state => <option key={state}>{state}</option>)}</select>}}
         action={{label: 'Available actions', active: actionFilter !== 'all', control: <select aria-label="Available actions" className="h-11 max-w-full rounded-md border bg-background px-3 text-sm" value={actionFilter} onChange={event => setActionFilter(event.target.value as ActionFilter)}>{Object.entries(actionFilterLabels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select>}}
         tools={<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="size-11 shrink-0 p-0" aria-label="Order table tools" title="Table tools"><Ellipsis aria-hidden="true" className="size-4"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-60">
           <DropdownMenuItem className="min-h-10" onSelect={() => setColumnsOpen(true)}>Columns</DropdownMenuItem>
@@ -313,6 +313,7 @@ export default function Orders() {
         </DropdownMenuContent></DropdownMenu>}
         advancedFilters={<div className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {subFilters.length > 0 && <label className="grid gap-1 text-sm">{status === 'shipping' ? 'Delivery status' : 'Return / refund status'}<select className="h-10 rounded-md border bg-background px-2" value={subStatus} onChange={event => setSubStatus(event.target.value)}><option value="all">All</option>{subFilters.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>}
             <label className="grid gap-1 text-sm">Warehouse / Branch<select className="h-10 rounded-md border bg-background px-2" value={warehouseFilter} onChange={event => setWarehouseFilter(event.target.value)}><option value="all">All warehouses</option>{warehouses.map(warehouse => <option key={warehouse}>{warehouse}</option>)}</select></label>
             <label className="grid gap-1 text-sm">Carrier<select className="h-10 rounded-md border bg-background px-2" value={carrierFilter} onChange={event => setCarrierFilter(event.target.value)}><option value="all">All carriers</option>{[...new Set(orders.map(order => order.carrier))].map(carrier => <option key={carrier}>{carrier}</option>)}</select></label>
             <label className="grid gap-1 text-sm">From date<Input type="date" value={dateFrom} max={dateTo || undefined} onChange={event => setDateFrom(event.target.value)} /></label>
@@ -344,26 +345,34 @@ export default function Orders() {
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="max-h-[65vh] overflow-auto">
             <table aria-label="Orders" className="w-full min-w-[1080px] text-left text-sm">
-              <thead className="sticky top-0 z-10 border-b bg-card"><tr>
+              {/* Opaque cells cover scrolling rows despite the shared translucent thead surface. */}
+              <thead className="sticky top-0 z-10 border-b bg-card [&>tr>th]:bg-card [&>tr>th]:shadow-[inset_0_-1px_0_hsl(var(--border))]"><tr>
                 <th scope="col" className="w-10 px-3 py-3"><Checkbox checked={allPageSelected ? true : visible.some(order => selected.includes(order.id)) ? "indeterminate" : false} onCheckedChange={() => setSelected(ids => allPageSelected ? ids.filter(id => !visible.some(order => order.id === id)) : [...new Set([...ids, ...visible.map(order => order.id)])])} aria-label="Select orders on this page" /></th>
                 {headers.map((header) => <th scope="col" key={header} hidden={hiddenColumns.includes(header)} className={cn('whitespace-nowrap px-3 py-3 text-xs font-medium text-muted-foreground', header === 'TOTAL / PAYMENT' && 'text-right')}><span className="inline-flex items-center gap-1">{header === 'FULFILLMENT' ? 'FULFILLMENT / DELIVERY' : header === 'STATUS' ? 'ORDER STATUS' : header === 'PROCESSING DEADLINE' ? 'SHIP BY' : header}{(header === 'FULFILLMENT TYPE' || header === 'STATUS') && <OrderColumnHelp column={header}/>}</span></th>)}<th scope="col" className="px-3 py-3 text-xs font-medium text-muted-foreground">NEXT ACTION</th>
               </tr></thead>
               <tbody className="divide-y divide-border">{visible.map((order) => {
-                const reasons = getOrderAttentionReasons(order);
+                const attention = getOrderAttention(order);
+                const reviewAction = attention.find(issue => issue.reviewAction)?.reviewAction;
+                const primaryQueue = orderQueue(order);
+                const statusLabel = statusDefinitions.find(item => item.key === primaryQueue)?.label || order.status;
                 const deadline = orderDeadline(order);
                 const overdue = deadline !== null ? deadline < Date.now() : /breached|overdue/i.test(order.sla);
                 const nextAction = orderNextAction(order);
+                const processNextAction = !reviewAction && primaryQueue !== 'returns' && Boolean(canWrite && nextAction && !nextAction.blocker);
+                const actionLabel = reviewAction || (primaryQueue === 'returns' ? 'View return / refund' : processNextAction ? nextAction!.label : nextAction?.blocker && order.source !== 'demo' ? 'Review issue' : 'View order');
                 const shipment = order.shipments[0];
                 return <tr key={order.id} onClick={() => setDetail(order.id)} className="cursor-pointer align-top transition-colors hover:bg-muted/50 focus-within:bg-muted/50">
                   <td className="px-3 py-4" onClick={(event) => event.stopPropagation()}><Checkbox checked={selected.includes(order.id)} onCheckedChange={() => toggleOrder(order.id)} aria-label={`Select ${order.id}`} /></td>
                   <td hidden={hiddenColumns.includes('ORDER')} className="min-w-[205px] px-3 py-3">
-                    <button type="button" onClick={() => setDetail(order.id)} className="min-h-7 whitespace-nowrap font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline focus-visible:outline-primary">{order.orderKey}</button>
+                    <div className="flex items-center gap-1"><button type="button" onClick={() => setDetail(order.id)} className="min-h-7 whitespace-nowrap font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline focus-visible:outline-primary">{order.orderKey}</button>
+                      {attention.length > 0 && <TooltipProvider delayDuration={150}><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`Needs review: ${order.orderKey}`} onClick={event => { event.stopPropagation(); setDetail(order.id); }} className="inline-flex size-8 shrink-0 items-center justify-center rounded text-amber-700 hover:bg-amber-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring dark:text-amber-300"><TriangleAlert aria-hidden="true" className="size-4" /></button></TooltipTrigger><TooltipContent>Needs review. Open the order to view details.</TooltipContent></Tooltip></TooltipProvider>}
+                    </div>
                     <p className="text-xs text-muted-foreground">{new Date(order.orderedAt).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}{order.source === 'demo' && <span className="ml-2">· Sample</span>}</p>
                   </td>
                   <td hidden={hiddenColumns.includes('CUSTOMER')} className="min-w-[170px] px-3 py-3"><p className="font-medium leading-7">{order.customer}</p><p className="text-xs text-muted-foreground">{order.phone || 'Phone not provided'}</p></td>
                   <td hidden={hiddenColumns.includes('SALES CHANNEL')} className="min-w-[120px] px-3 py-4"><StoreIdentity store={order.store} /></td>
                   <td hidden={hiddenColumns.includes('FULFILLMENT TYPE')} className="min-w-[155px] px-3 py-3"><HandlingTypeBadge order={order} /></td>
-                  <td hidden={hiddenColumns.includes('STATUS')} className="min-w-[165px] px-3 py-3"><OrderLifecycleBadge status={order.status} />{order.canonicalStatus === 'partially_shipped' && <p className="mt-1 text-xs text-muted-foreground">Partially shipped</p>}{reasons.length > 0 && <p className="mt-1 max-w-52 text-xs leading-5 text-amber-700 dark:text-amber-300">{reasons.join(' · ')}</p>}{order.shipments.some(shipment=>shipment.deliveryOutcome==='failed') && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Failed delivery · Awaiting retry</p>}{order.returnRequests.length > 0 && <p className="mt-1 text-xs text-violet-700 dark:text-violet-300">Return · {order.returnRequests[order.returnRequests.length - 1].status}</p>}</td>
+                  <td hidden={hiddenColumns.includes('STATUS')} className="min-w-[165px] px-3 py-3"><OrderLifecycleBadge status={statusLabel} /></td>
                   <td hidden={hiddenColumns.includes('PROCESSING DEADLINE')} className="min-w-[135px] px-3 py-4"><span className={cn('text-xs', overdue ? 'text-rose-700 dark:text-rose-300' : deadline !== null && deadline < Date.now() + 86400000 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>{deadlineLabel(order)}</span></td>
                   <td hidden={hiddenColumns.includes('TOTAL / PAYMENT')} className="min-w-[135px] px-3 py-3 text-right"><p className="whitespace-nowrap font-semibold leading-7 tabular-nums">{order.total}</p><p className={cn('text-xs', order.paymentState === 'Paid' ? 'text-emerald-700 dark:text-emerald-400' : order.paymentState === 'Refunded' ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground')}>{order.paymentState}</p></td>
                   <td hidden={hiddenColumns.includes('FULFILLMENT')} className="min-w-[195px] max-w-64 px-3 py-3">
@@ -372,7 +381,7 @@ export default function Orders() {
                     {order.shipments.length > 1 && <p className="mt-1 text-xs text-muted-foreground">+{order.shipments.length - 1} more shipment(s)</p>}
                   </td>
                   <td hidden={hiddenColumns.includes('ASSIGNEE')} className="px-3 py-4">{order.assignee}</td>
-                  <td className="px-3 py-3" onClick={event => event.stopPropagation()}><Button size="sm" variant="outline" onClick={() => setDetail(order.id, Boolean(canWrite && nextAction && !nextAction.blocker))}>{canWrite && nextAction && !nextAction.blocker ? nextAction.label : nextAction?.blocker && order.source !== 'demo' ? 'Review issue' : 'View order'}</Button></td>
+                  <td className="px-3 py-3" onClick={event => event.stopPropagation()}><Button size="sm" variant="outline" onClick={() => setDetail(order.id, processNextAction)}>{actionLabel}</Button></td>
                 </tr>;
               })}</tbody>
             </table>

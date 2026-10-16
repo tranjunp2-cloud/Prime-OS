@@ -1,6 +1,11 @@
 .root { container: product-structure / inline-size; }
-.options { display: grid; gap: .75rem; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .5rem 1rem; }
+.controls { grid-column: 1 / -1; min-width: 0; }
+.status { grid-column: 2; grid-row: 1; text-align: right; }
+.options { display: flex; flex-wrap: wrap; gap: .5rem; }
 
-@container product-structure (min-width: 32rem) {
-  .options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container product-structure (min-width: 40rem) {
+  .layout { grid-template-columns: 9rem minmax(0, 1fr) auto; }
+  .controls { grid-column: 2; grid-row: 1; }
+  .status { grid-column: 3; }
 }

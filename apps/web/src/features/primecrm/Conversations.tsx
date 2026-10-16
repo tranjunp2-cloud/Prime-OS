@@ -22,7 +22,13 @@ export function Conversations() {
   const [channel, setChannel] = useState('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [tag, setTag] = useState('all');
-  const [assignee, setAssignee] = useState('all');
+  const assignee = ['mine', 'unassigned'].includes(params.get('assignee') ?? '') ? params.get('assignee')! : 'all';
+  const setAssignee = (value: string) => setParams(current => {
+    const next = new URLSearchParams(current);
+    next.delete('conversation');
+    if (value === 'all') next.delete('assignee'); else next.set('assignee', value);
+    return next;
+  });
   const [type, setType] = useState('all');
   const [page, setPage] = useState('all');
   const [status, setStatus] = useState('open');
@@ -44,7 +50,7 @@ export function Conversations() {
     const next = new URLSearchParams(params); next.set('conversation', conversation.id); setParams(next);
     update(current => ({ ...current, conversations: current.conversations.map(item => item.id === conversation.id ? { ...item, unread: false } : item) }));
   }
-  function changeFilters(change: () => void) { change(); const next = new URLSearchParams(params); next.delete('conversation'); setParams(next, { replace: true }); }
+  function changeFilters(change: () => void, clearAssignee = false) { change(); const next = new URLSearchParams(params); next.delete('conversation'); if (clearAssignee) next.delete('assignee'); setParams(next, { replace: true }); }
   function patchConversation(patch: Partial<Conversation>, action?: string) {
     if (!active) return;
     update(current => {
@@ -69,10 +75,10 @@ export function Conversations() {
           {filterSummary.length > 0 && <p className="break-words text-xs text-muted-foreground" aria-label="Active filters">{filterSummary.join(' · ')}</p>}
           <div id="crm-conversation-filters" hidden={!filtersOpen} className="space-y-3">
           <div className="grid grid-cols-2 gap-2"><Field label="Type"><select className={fieldClass} value={type} onChange={event => changeFilters(() => setType(event.target.value))}><option value="all">All</option><option value="chat">Chats</option><option value="comment">Comments</option></select></Field><Field label="Status"><select className={fieldClass} value={status} onChange={event => changeFilters(() => setStatus(event.target.value))}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></Field></div>
-          <Field label="Assignee"><select className={fieldClass} value={assignee} onChange={event => changeFilters(() => setAssignee(event.target.value))}><option value="all">Everyone</option><option value="mine">Assigned to me</option><option value="unassigned">Unassigned</option></select></Field>
+          <Field label="Assignee"><select className={fieldClass} value={assignee} onChange={event => setAssignee(event.target.value)}><option value="all">Everyone</option><option value="mine">Assigned to me</option><option value="unassigned">Unassigned</option></select></Field>
           <Field label="Tag"><select className={fieldClass} value={tag} onChange={event => changeFilters(() => setTag(event.target.value))}><option value="all">All tags</option>{state.tags.map(name => <option key={name}>{name}</option>)}</select></Field>
           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={unread} onChange={event => changeFilters(() => setUnread(event.target.checked))} />Unread only</label>
-          <Button variant="ghost" onClick={() => changeFilters(() => { setType('all'); setStatus('all'); setUnread(false); setTag('all'); setAssignee('all'); })}>Clear filters</Button>
+          <Button variant="ghost" onClick={() => changeFilters(() => { setType('all'); setStatus('all'); setUnread(false); setTag('all'); }, true)}>Clear filters</Button>
           </div>
         </div>
         {visible.map(conversation => { const contact = state.guests.find(item => item.id === conversation.guestId); return <button key={conversation.id} onClick={() => select(conversation)} aria-pressed={active?.id === conversation.id} className={`block w-full border-b p-4 text-left hover:bg-muted focus-visible:ring-2 ${active?.id === conversation.id ? 'bg-primary/10' : ''}`}><span className="flex justify-between gap-2 font-medium">{contact?.name}{conversation.unread && <span className="text-xs text-primary">Unread</span>}</span><span className="mt-1 block text-xs text-muted-foreground">{contact?.channel} · {conversation.page} · {conversation.type}</span><span className="mt-2 block truncate text-sm text-muted-foreground">{conversation.messages.at(-1)?.text}</span><span className="mt-2 block text-xs text-muted-foreground">{conversation.assignedTo || 'Unassigned'} · {conversation.status}</span></button>; })}

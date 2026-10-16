@@ -23,6 +23,24 @@ beforeEach(async () => {
 afterEach(() => window.localStorage.clear());
 
 describe('automatic activation after a successful import', () => {
+  it.each([
+    { images: [] },
+    { images: [' ', ''] },
+    { inventory: {} },
+    { inventory: { unknown: 10 } },
+  ])('does not bypass image or warehouse requirements on a validated import: %j', async missing => {
+    const input = { ...readyProduct, id: 'required-import-data', has_variants: false, skus: [], inventory: { wh_crjp: 0 }, images: ['/cover.jpg'], import_result: 'ready' as const, ...missing };
+    const { store, product } = await loadStored(input);
+    expect(product.status).toBe('draft');
+    store.updateProduct(input.id, { id: input.id, images: ['/cover.jpg'], inventory: { wh_crjp: 0 } });
+    expect(store.getProductById(input.id)?.status).toBe('published');
+  });
+
+  it('keeps an existing active Master active without manufacturing a warehouse or image', async () => {
+    const { product } = await loadStored({ ...readyProduct, id: 'existing-active-missing', status: 'published', import_result: 'published', images: [], inventory: {}, skus: [] });
+    expect(product).toMatchObject({ status: 'published', images: [], inventory: {} });
+  });
+
   it.each(['ready', 'published'] as const)('activates and persists a validated %s import without changing its listings', async import_result => {
     const input: Product = {
       ...readyProduct,

@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
-import { completeListingDetails } from '@/test/fixtures/complete-listing-details';
+import { applyListingSection, chooseListingGroup, completeListingDetails, confirmListingSave, editListingSection } from '@/test/fixtures/complete-listing-details';
 import Products from './Products';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
 import { commitListingReviewProducts } from '@/lib/product-store';
@@ -38,6 +38,105 @@ function Path() { const location = useLocation(); return <output data-testid="pa
 function mount() { render(<MemoryRouter initialEntries={['/products/master-catalog']}><Path /><Products /></MemoryRouter>); }
 
 describe('Product catalog listing inbox', () => {
+  it.each(['footer', 'escape', 'selected-escape'])('closes from %s without saving or confirming untouched listings', source => {
+    const productsBefore = structuredClone(getProducts());
+    const listingsBefore = structuredClone(getCatalogImportItems({ requireConfirmation: true }));
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
+    const footer = screen.getByRole('group', { name: 'Listing review footer' });
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    expect(within(footer).getByRole('button', { name: 'Close', exact: true })).not.toHaveClass('bg-primary');
+    expect(screen.getAllByRole('button', { name: 'Close', exact: true })).toHaveLength(1);
+    if (source === 'selected-escape') {
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+      expect(screen.queryByRole('button', { name: 'Close', exact: true })).not.toBeInTheDocument();
+    }
+    if (source === 'footer') fireEvent.click(within(footer).getByRole('button', { name: 'Close', exact: true }));
+    else fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Review shop listings' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Review & link (2)' })).toBeVisible();
+    expect(getProducts()).toEqual(productsBefore);
+    expect(getCatalogImportItems({ requireConfirmation: true })).toEqual(listingsBefore);
+  });
+
+  it('protects unsaved field edits when closing and never saves them on dismissal', () => {
+    const productsBefore = structuredClone(getProducts());
+    const listingsBefore = structuredClone(getCatalogImportItems({ requireConfirmation: true }));
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Choose Master' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Create new Master' }));
+    editListingSection('Product essentials');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Product name/ }), { target: { value: 'Unsaved listing review title' } });
+    applyListingSection();
+    expect(screen.queryByRole('button', { name: 'Close', exact: true })).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    expect(screen.getByRole('alertdialog', { name: 'Discard unsaved details?' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByRole('table', { name: 'Product identity comparison' })).toHaveTextContent('Unsaved listing review title');
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard & close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(getProducts()).toEqual(productsBefore);
+    expect(getCatalogImportItems({ requireConfirmation: true })).toEqual(listingsBefore);
+  });
+
+  it('replaces Close with selected actions in the drawer footer, not inside the table', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
+    const footer = screen.getByRole('group', { name: 'Listing review footer' });
+    const queue = screen.getByRole('region', { name: 'Listings waiting for confirmation' });
+    expect(within(footer).getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+    expect(queue).not.toContainElement(footer);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Select listing INBOX-a/ }));
+    expect(within(footer).getByText('1 selected')).toBeVisible();
+    expect(within(footer).getByRole('button', { name: 'Create one Master' })).toBeEnabled();
+    expect(within(footer).getByRole('button', { name: 'Link to one Master' })).toBeEnabled();
+    expect(within(screen.getByRole('group', { name: 'Listing review footer' })).queryByRole('button', { name: 'Close', exact: true })).not.toBeInTheDocument();
+    expect(within(queue).queryByRole('group', { name: 'Selected listing actions' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('group', { name: 'Selected listing actions' })).toHaveLength(1);
+    screen.getAllByRole('button', { name: 'Choose Master' }).forEach(button => expect(button).toBeDisabled());
+
+    fireEvent.click(within(footer).getByRole('button', { name: 'Clear selection' }));
+    await waitFor(() => expect(within(footer).getByRole('button', { name: 'Close', exact: true })).toHaveFocus());
+    expect(screen.queryByRole('group', { name: 'Selected listing actions' })).not.toBeInTheDocument();
+    screen.getAllByRole('button', { name: 'Choose Master' }).forEach(button => expect(button).toBeEnabled());
+    expect(getCatalogImportItems({ requireConfirmation: true }).every(item => !item.confirmed)).toBe(true);
+  });
+
+  it('keeps hidden selections in the footer and restores Close after deselecting all', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search shop listings' }), { target: { value: 'not-in-this-queue' } });
+    const footer = within(screen.getByRole('group', { name: 'Listing review footer' }));
+    expect(footer.getByText('2 selected')).toBeVisible();
+    expect(footer.getByText('2 outside this view')).toBeVisible();
+    expect(footer.getByRole('button', { name: 'Link to one Master' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    expect(footer.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+    expect(footer.queryByRole('button', { name: 'Link to one Master' })).not.toBeInTheDocument();
+  });
+
+  it('restores the direct Link action and focus when returning from selected review', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
+    const review = within(screen.getByRole('group', { name: 'Listing review footer' })).getByRole('button', { name: 'Link to one Master' });
+    review.focus();
+    fireEvent.click(review);
+    expect(screen.getByRole('dialog', { name: 'Find a Product Master' })).toBeVisible();
+    expect(screen.queryByRole('group', { name: 'Listing review footer' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to listings' }));
+    const footer = within(screen.getByRole('group', { name: 'Listing review footer' }));
+    expect(footer.getByText('2 selected')).toBeVisible();
+    await waitFor(() => expect(footer.getByRole('button', { name: 'Link to one Master' })).toHaveFocus());
+    expect(within(screen.getByRole('group', { name: 'Listing review footer' })).queryByRole('button', { name: 'Close', exact: true })).not.toBeInTheDocument();
+  });
+
   it('keeps the help CTA in the drawer header without a duplicate row above the table', async () => {
     localStorage.setItem('prime-listing-review-guide-dismissed-v1', '1');
     mount();
@@ -101,7 +200,7 @@ describe('Product catalog listing inbox', () => {
     reviewButton.focus();
     fireEvent.click(reviewButton);
     expect(screen.getByRole('dialog', { name: 'Review shop listings' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Listing review footer' })).getByRole('button', { name: 'Close', exact: true }));
     expect(screen.getByRole('textbox', { name: 'Search products' })).toHaveValue('Brush');
     expect(screen.getByRole('button', { name: /^Active\s*\d+$/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('region', { name: 'Shop listings to review' })).toBeVisible();
@@ -115,19 +214,19 @@ describe('Product catalog listing inbox', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
     expect(screen.getByRole('columnheader', { name: 'Product Master' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Create one Master' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Link to one Master' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Review selected listings' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Create one Master' }));
+    chooseListingGroup('Create one Master');
     const dialog = within(screen.getByRole('dialog', { name: 'Create one Master' }));
     expect(dialog.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     fireEvent.click(dialog.getByRole('checkbox', { name: /I checked/ }));
 
-    completeListingDetails(); fireEvent.click(screen.getByRole('button', { name: 'Create, activate & link' }));
+    completeListingDetails(); confirmListingSave('Create, activate & link');
     expect(screen.getByRole('dialog', { name: 'Review shop listings' })).toBeVisible();
     expect(screen.getByText('All listings reviewed')).toBeVisible();
     expect(screen.getByRole('button', { name: 'View updated Master' })).toBeVisible();
     expect(screen.getByTestId('path')).toHaveTextContent('/products/master-catalog');
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Listing review footer' })).getByRole('button', { name: 'Close', exact: true }));
     expect(await screen.findByRole('link', { name: 'Open Product Master details for Inbox test brush' })).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Shop listings to review' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Review & link|Listings to link/ })).not.toBeInTheDocument();
@@ -157,14 +256,14 @@ describe('Product catalog listing inbox', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Review & link (2)' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select visible shop listings' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create one Master' }));
+    chooseListingGroup('Create one Master');
     fireEvent.click(screen.getByRole('checkbox', { name: /I checked/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft & link' }));
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Save draft & link' }));
     expect(screen.getByText('0 unlinked · 2 linked reviews unfinished')).toBeVisible();
     expect(screen.queryByText('All listings reviewed')).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Linked listings to finish' })).toHaveTextContent('2 reviews unfinished');
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Listing review footer' })).getByRole('button', { name: 'Close', exact: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue review (2)' }));
     const progress = within(screen.getByRole('region', { name: 'Linked listings to finish' }));
     fireEvent.click(progress.getAllByRole('button', { name: 'Continue review' })[0]);

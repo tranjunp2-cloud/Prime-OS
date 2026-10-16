@@ -102,10 +102,11 @@ describe('Complete and activate a Master in listing review', () => {
   });
   it('preserves legacy duplicate identities but rejects new duplicate SKU codes', () => {
     addProduct({ ...master, id: 'legacy-duplicate' });
-    expect(() => assertMasterComplete(master, [source])).not.toThrow();
-    expect(() => assertMasterComplete({ ...master, id: 'new-duplicate' }, [source])).toThrow(/SKU already exists/);
+    const complete = { ...master, inventory: { wh_crjp: 0 } };
+    expect(() => assertMasterComplete(complete, [source])).not.toThrow();
+    expect(() => assertMasterComplete({ ...complete, id: 'new-duplicate' }, [source])).toThrow(/SKU already exists/);
   });
-  it('creates an Active variant Master only with real child SKUs, valid prices/options and complete mappings', () => {
+  it('keeps a new variant Master Draft until warehouse assignment, without copying shop stock', () => {
     const attribute = getProductCatalogSettings().attributes.find(item => item.status === 'Active'
       && ['Single select', 'Multi-select'].includes(item.type) && item.options.split(',').filter(Boolean).length >= 2)!;
     const values = attribute.options.split(',').slice(0, 2).map(value => value.trim());
@@ -115,14 +116,17 @@ describe('Complete and activate a Master in listing review', () => {
     saveCatalogImportItems([variantSource]);
     const completion = completionFields({ ...master, variant_options: [{ attributeKey: attribute.key, name: attribute.name, values }], skus: childSkus });
     const target = { name: 'Variant Master', sku: 'COMPLETE-VARIANTS', sourceId: source.id, productType: 'variant' as const, completion };
-    expect(() => confirmListingIntake([source.id], target)).toThrow(/variant-SKU matching/);
+    expect(() => confirmListingIntake([source.id], target)).toThrow(/Assign at least 1 warehouse/);
     const mappings = { [source.id]: childSkus.map((sku, index) => ({ shop_sku: `SHOP-${index}`, master_sku_id: sku.id })) };
-    const { productId } = confirmListingIntake([source.id], { ...target, variantMappings: mappings });
+    const { productId } = confirmListingIntake([source.id], { ...target, defer: true, variantMappings: mappings });
     const created = getProductById(productId)!;
-    expect(created.status).toBe('published');
-    expect(getStoredMasterReadiness(created).ready).toBe(true);
+    expect(created.status).toBe('draft');
+    expect(getStoredMasterReadiness(created).ready).toBe(false);
     expect(created.inventory).toEqual({});
     expect(created.skus.every(sku => sku.stock === undefined && sku.stock_by_location === undefined)).toBe(true);
-    expect(created.channels[0].variant_mappings).toEqual(mappings[source.id]);
+    expect(created.channels[0].variant_mappings).toBeUndefined();
+    expect(created.channels[0].review_pending?.sku_mapping_pending).toBe(false);
+    expect(created.channels[0].review_pending?.draft_mappings).toEqual(mappings[source.id]);
+    expect(created.channels[0].review_pending?.issues).toContain('Assign at least 1 warehouse');
   });
 });

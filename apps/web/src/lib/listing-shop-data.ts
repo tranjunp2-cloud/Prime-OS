@@ -96,6 +96,7 @@ function ownProvenance(product: Product, listing: ChannelListing) {
 }
 
 export interface ListingShopData {
+  origin?: ShopListingSnapshot['origin'];
   requirements?: ShopListingSnapshot['requirements'];
   shop?: string;
   sku?: string;
@@ -130,6 +131,7 @@ export function resolveListingShopData(product: Product, listing: ChannelListing
     ?? recordedListingPrice(provenance?.price, provenance?.currency);
   const savedPrice = savedListingPrice(override);
   return {
+    origin: snapshot?.origin,
     requirements: snapshot?.requirements,
     shop: listing.store_name || snapshot?.store_name || provenance?.store,
     sku: listing.shop_sku || snapshot?.shop_sku || override?.listing_sku || provenance?.shop_sku,
@@ -144,7 +146,7 @@ export function resolveListingShopData(product: Product, listing: ChannelListing
     variantCount: snapshot?.variant_count,
     listingUrl: snapshot?.listing_url || listing.listing_url || source?.listingUrl,
     identifiers: snapshot?.identifiers,
-    price: shopPrice ? { ...shopPrice, origin: 'shop' } : savedPrice,
+    price: shopPrice ? { ...shopPrice, origin: snapshot?.origin === 'prototype' ? 'demo' : 'shop' } : savedPrice,
     stock: validNumber(snapshot?.stock) ? snapshot.stock : validNumber(listing.reported_stock) ? listing.reported_stock : undefined,
     retrievedAt: validDate(snapshot?.retrieved_at),
     // Only a persisted snapshot has a meaningful local capture time during a read.

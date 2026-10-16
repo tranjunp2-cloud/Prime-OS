@@ -1,6 +1,7 @@
 import type { ChannelListing, ListingDraftValues, ShopListingSnapshot } from './product-store';
 import { withCatalogSkuDemo } from './catalog-import-sku-demo';
 import type { ImportedMappingField } from './listing-field-mapping';
+import { importedListingDataReadiness } from './listing-data-readiness';
 
 export type ImportMatchStatus = 'matched' | 'suggested' | 'unmatched' | 'conflict' | 'ignored';
 export type ImportResolution = 'link' | 'create' | 'later' | 'ignore';
@@ -109,6 +110,7 @@ export function getCatalogImportItems(options: { requireConfirmation?: boolean }
     // and never replace a user's chosen Master with an older suggestion.
     if (options.requireConfirmation || item.confirmed) return { ...item };
     const safeCandidate = Boolean(item.suggestedProductId)
+      && importedListingDataReadiness(item).ready
       && (item.status === 'matched' || item.status === 'suggested')
       && item.confidence >= AUTO_SYNC_THRESHOLD
       && item.resolution !== 'ignore'

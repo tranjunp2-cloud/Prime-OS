@@ -56,7 +56,7 @@ describe('Catalog lifecycle views', () => {
     expect(isMasterReadyToPublish({ ...product, status: 'archived' })).toBe(false);
     expect(isMasterReadyToPublish({ ...product, import_result: 'needs_review' })).toBe(true);
     expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: ['/one.jpg'] })).toBe(true);
-    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: [] })).toBe(true);
+    expect(isMasterReadyToPublish({ ...product, import_result: 'ready', images: [] })).toBe(false);
   });
 
   it('does not classify a manually-published Master as imported', () => {
@@ -85,8 +85,8 @@ describe('Shared Master readiness', () => {
     expect(editor.some(check => check.id === 'channels')).toBe(false);
   });
 
-  it('requires visible description text, with no global image or character-count gate', () => {
-    const incomplete = { ...product, import_result: 'ready' as const, images: [], description: '<p title="'.padEnd(150, 'x') + '">Short</p>' };
+  it('requires visible description text without a character-count gate', () => {
+    const incomplete = { ...product, import_result: 'ready' as const, description: '<p title="'.padEnd(150, 'x') + '">Short</p>' };
     expect(getStoredMasterReadiness(incomplete).ready).toBe(true);
     expect(getStoredMasterReadiness({ ...incomplete, description: '<p>&nbsp;</p>' }).missing).toEqual(['Add a product description']);
   });

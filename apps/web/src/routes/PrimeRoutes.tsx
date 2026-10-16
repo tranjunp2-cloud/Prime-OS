@@ -26,7 +26,10 @@ import InvoiceManagement from "@/pages/InvoiceManagement";
 import PromotionsManagement from "@/pages/PromotionsManagement";
 import PrimeWebWorkspace from "@/features/primeweb/PrimeWebWorkspace";
 import PosWorkspace from "@/features/primepos/PosWorkspace";
-import MainPosControl from "@/features/primepos/MainPosControl";
+import LegacyPosRedirect from "@/features/primepos/LegacyPosRedirect";
+import StoreStockPage from "@/features/primepos/StoreStockPage";
+import PosShiftReviewPage from "@/features/primepos/PosShiftReviewPage";
+import { ModuleSectionNav } from "@/features/primepos/MainModulePage";
 import ScheduledTasksPage from "@/pages/ScheduledTasks";
 import FinanceOps from "@/pages/FinanceOps";
 import PrimeAiWorkspacePage from "@/pages/prime/PrimeAiWorkspacePage";
@@ -100,7 +103,8 @@ export function PrimeRoutes() {
     <Route path="/pos/*" element={<PosWorkspace />} />
     <Route path="/workspaces/primeweb" element={<Navigate to="/builder/sites" replace />} />
     <Route path="/workspaces/pos" element={<Navigate to="/pos/register" replace />} />
-    <Route path="/client-reports" element={<PrimeClientReportsPage />} />
+    <Route path="/client-reports" element={<><ModuleSectionNav label="Analytics sections" items={[["Overview", "/client-reports"], ["POS shift review", "/client-reports/pos-shifts"]]} /><PrimeClientReportsPage /></>} />
+    <Route path="/client-reports/pos-shifts" element={<><ModuleSectionNav label="Analytics sections" items={[["Overview", "/client-reports"], ["POS shift review", "/client-reports/pos-shifts"]]} /><PosShiftReviewPage /></>} />
     <Route path="/prime-ai" element={<PrimeAiWorkspacePage />} />
     <Route path="/reports" element={<Navigate to="/client-reports" replace />} />
     <Route path="/account" element={<Navigate to="/settings/team-access?tab=my-account" replace />} />
@@ -113,7 +117,8 @@ export function PrimeRoutes() {
     <Route path="/promotions" element={<Navigate to="/promotions/discount-codes" replace />} />
     <Route path="/promotions/*" element={<PromotionsManagement />} />
     <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
-    <Route path="/settings/stores" element={<MainPosControl />} />
+    <Route path="/settings/stores" element={<LegacyPosRedirect />} />
+    <Route path="/settings/stores/policies" element={<LegacyPosRedirect />} />
     <Route path="/settings/channels" element={<Navigate to="/sales-channels/connected-channels" replace />} />
     <Route path="/settings/payments-pos" element={<Navigate to="/settings/payments" replace />} />
     <Route path="/settings/shipping" element={<Navigate to="/settings/shipping-delivery" replace />} />
@@ -194,6 +199,7 @@ export function PrimeRoutes() {
     <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
     <Route path="/products" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/master-catalog" element={<Products />} />
+    <Route path="/products/pos-assortment" element={<LegacyPosRedirect />} />
     <Route path="/products/catalog-imports" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/channel-listings" element={<Navigate to="/products/master-catalog" replace />} />
     <Route path="/products/categories" element={<ProductCategories />} />
@@ -205,7 +211,8 @@ export function PrimeRoutes() {
     <Route path="/products/:id/channel-listings/new" element={<ProductChannelManagementRedirect />} />
     <Route path="/products/:productId/channels/:channelKey" element={<ProductChannelManagementRedirect />} />
     <Route path="/products/:id" element={<ProductMasterDetailRedirect />} />
-    <Route path="/warehouses" element={<Warehouses />} />
+    <Route path="/warehouses" element={<><ModuleSectionNav label="Warehouse sections" items={[["All locations", "/warehouses"], ["Store stock & purchasing", "/warehouses/store-stock"]]} /><Warehouses /></>} />
+    <Route path="/warehouses/store-stock" element={<><ModuleSectionNav label="Warehouse sections" items={[["All locations", "/warehouses"], ["Store stock & purchasing", "/warehouses/store-stock"]]} /><StoreStockPage /></>} />
     <Route path="/docs" element={<Docs />} />
     <Route path="/warehouse/mapping" element={<WarehouseOverviewRedirect />} />
     <Route path="/warehouse/stock" element={<WarehouseOverviewRedirect />} />

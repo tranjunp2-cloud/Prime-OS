@@ -1,8 +1,10 @@
 import type { Product } from './product-store';
 import { getAttributesForCategory, getProductCatalogSettings, type ProductCatalogSettings } from './product-catalog-settings-store';
 import type { Specification } from './category-schema';
+import { getMasterMediaReadiness } from './product-master-media';
+import { getWarehouses } from './warehouse-store';
 
-export interface VariantGroup { id: string; name: string; values: string[] }
+export interface VariantGroup { id: string; attributeKey?: string; name: string; values: string[] }
 export interface VariantItem {
   id?: string;
   key: string;
@@ -12,6 +14,7 @@ export interface VariantItem {
   stock_by_location: Record<string, string>;
   selected: boolean;
   image_url: string;
+  option_values?: Record<string, string>;
 }
 
 export function hydrateExistingVariants(product: Product | null): { groups: VariantGroup[]; items: VariantItem[] } {
@@ -32,6 +35,7 @@ export function hydrateExistingVariants(product: Product | null): { groups: Vari
     });
   const groups = canonicalOptions.slice(0, 2).map((option, index) => ({
     id: `existing-option-${index + 1}`,
+    attributeKey: option.attributeKey,
     name: option.name,
     values: [...option.values],
   }));
@@ -54,6 +58,7 @@ export function hydrateExistingVariants(product: Product | null): { groups: Vari
     ),
     selected: sku.status === 'active',
     image_url: sku.image_url ?? '',
+    option_values: sku.option_values ?? Object.fromEntries(groups.map((group, optionIndex) => [group.attributeKey || group.name.toLowerCase(), parsed[index][optionIndex] ?? ''])),
   }));
   return { groups, items };
 }
@@ -97,14 +102,21 @@ export interface MasterReadinessCheck { id: string; label: string; done: boolean
 export function getMasterReadinessChecks(input: MasterReadinessInput, _settings?: ProductCatalogSettings): MasterReadinessCheck[] {
   const selected = input.variantItems.filter(item => item.selected);
   const positive = (value: NumericInput) => Number.isFinite(Number(value)) && Number(value) > 0;
-  const codes = [input.sku_code, ...(input.has_variants ? selected.map(item => item.sku_code) : [])].map(code => code.trim().toUpperCase());
+  // A family code is not an extra sellable SKU. A converted single can retain its code and ID.
+  const codes = (input.has_variants ? selected.map(item => item.sku_code) : [input.sku_code]).map(code => code.trim().toUpperCase());
+  const warehouses = new Set(getWarehouses().filter(warehouse => warehouse.status === 'active').map(warehouse => warehouse.id));
+  const hasWarehouse = (inventory: Record<string, NumericInput>) => Object.entries(inventory).some(([id, quantity]) =>
+    warehouses.has(id) && String(quantity).trim() !== '' && Number.isFinite(Number(quantity)) && Number(quantity) >= 0);
   return [
     { id: 'identity', label: 'Add a product title', done: Boolean(input.name.trim()) },
     { id: 'sku', label: input.has_variants ? 'Complete unique Master and variant SKUs' : 'Add a Master SKU',
-      done: codes.every(Boolean) && new Set(codes).size === codes.length && (!input.has_variants || selected.length > 0) },
+      done: Boolean(input.sku_code.trim()) && codes.every(Boolean) && new Set(codes).size === codes.length && (!input.has_variants || selected.length > 0) },
     { id: 'content', label: 'Add a product description', done: Boolean(richTextPlainText(input.description)) },
+    { id: 'media', label: 'Add at least 1 product image', done: getMasterMediaReadiness(input.images).ready },
     { id: 'price', label: input.has_variants ? 'Configure variant prices' : 'Configure base price',
       done: input.has_variants ? selected.length > 0 && selected.every(item => positive(item.price)) : positive(input.retail_price) },
+    { id: 'inventory', label: 'Assign at least 1 warehouse',
+      done: input.has_variants ? selected.some(item => hasWarehouse(item.stock_by_location)) : hasWarehouse(input.inventory) },
   ];
 }
 

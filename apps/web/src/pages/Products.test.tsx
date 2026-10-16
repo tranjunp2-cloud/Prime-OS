@@ -46,7 +46,7 @@ describe('Product Master list default tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review listings', exact: true }));
     expect(screen.getByRole('region', { name: 'Listings waiting for confirmation' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Start your product catalog' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Listing review footer' })).getByRole('button', { name: 'Close', exact: true }));
     expect(screen.getByRole('heading', { name: 'Start your product catalog' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'With data' }));
     expect(screen.queryByRole('heading', { name: 'Start your product catalog' })).not.toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('Product Master list default tab', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Review & link/ }));
     expect(screen.getByRole('region', { name: 'Listings waiting for confirmation' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Listing review footer' })).getByRole('button', { name: 'Close', exact: true }));
     expect(screen.getByRole('button', { name: /^All\s*\d+$/ })).toHaveAttribute('aria-pressed', 'true');
   });
   it('switches header demo modes repeatedly, resets filters, and keeps saved products intact', async () => {
@@ -192,38 +192,40 @@ describe('SKU discovery from Product Master list', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows a plain variant-count link and no redundant SKU-count link for single products', async () => {
+  it('shows a variant-count disclosure and no redundant SKU-count link for single products', async () => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>);
-    const variantLink = await screen.findByRole('link', { name: `Manage 2 variants for ${variant.name}` });
+    const variantLink = await screen.findByRole('button', { name: `Show 2 variants for ${variant.name}` });
     const singleRow = screen.getByRole('link', { name: `Open Product Master details for ${single.name}` }).closest('tr')!;
     expect(within(singleRow).getByText(single.sku_code)).toBeVisible();
     expect(within(singleRow).queryByRole('link', { name: /^Manage/ })).not.toBeInTheDocument();
     expect(within(singleRow).queryByText('1 SKU')).not.toBeInTheDocument();
     expect(variantLink).toHaveTextContent('2 variants');
-    expect(variantLink).toHaveAttribute('href', `/products/${variantId}/edit?section=commerce`);
-    expect(variantLink).toHaveClass('underline');
+    expect(variantLink).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(variantLink);
+    expect(screen.getByRole('region', { name: `Variant stock for ${variant.name}` })).toBeVisible();
   });
 
-  it('keeps a setup link with an accurate count for an empty variant product', async () => {
+  it('keeps an accurate count and setup action for an empty variant product', async () => {
     updateProduct(variantId, { id: variantId, skus: [] });
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>);
-    expect(await screen.findByRole('link', { name: `Manage 0 variants for ${variant.name}` })).toHaveTextContent('0 variants');
+    fireEvent.click(await screen.findByRole('button', { name: `Show 0 variants for ${variant.name}` }));
+    expect(screen.getByRole('link', { name: 'Manage variants' })).toHaveAttribute('href', `/products/${variantId}/edit?section=setup&setupSection=sales`);
   });
 
   it('uses the singular label when a variant product has one variant', async () => {
     updateProduct(variantId, { id: variantId, skus: variant.skus.slice(0, 1) });
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>);
-    expect(await screen.findByRole('link', { name: `Manage 1 variant for ${variant.name}` })).toHaveTextContent('1 variant');
+    expect(await screen.findByRole('button', { name: `Show 1 variant for ${variant.name}` })).toHaveTextContent('1 variant');
   });
 
   it('finds the parent once by a child SKU, ignores case and spacing, and preserves Master searches', async () => {
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Products /></MemoryRouter>);
-    await screen.findByRole('link', { name: `Manage 2 variants for ${variant.name}` });
+    await screen.findByRole('button', { name: `Show 2 variants for ${variant.name}` });
     const search = screen.getByRole('textbox', { name: 'Search products' });
     for (const query of ['  child-only-blue  ', 'ONLY-RED', 'CHILD-ONLY', 'PARENT-DISCOVERY', variant.name]) {
       fireEvent.change(search, { target: { value: query } });
       expect(screen.getAllByRole('link', { name: /^Open Product Master details for/ })).toHaveLength(1);
-      expect(screen.getByRole('link', { name: `Manage 2 variants for ${variant.name}` })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `Show 2 variants for ${variant.name}` })).toBeInTheDocument();
     }
     fireEvent.change(search, { target: { value: 'no-such-discovery-sku' } });
     expect(screen.getByText('No products match this view')).toBeInTheDocument();
@@ -231,25 +233,24 @@ describe('SKU discovery from Product Master list', () => {
     expect(screen.getByRole('link', { name: `Open Product Master details for ${single.name}` })).toBeInTheDocument();
   });
 
-  it.each(['single', 'variant'] as const)('opens Pricing & Inventory for a %s product', async kind => {
+  it.each(['single', 'variant'] as const)('opens Product setup for a %s product', async kind => {
     const product = kind === 'single' ? single : variant;
     function Path() { const location = useLocation(); return <output data-testid="sku-path">{location.pathname}{location.search}</output>; }
     render(<MemoryRouter initialEntries={['/products/master-catalog']}><Path /><Routes><Route path="/products/master-catalog" element={<Products />} /><Route path="/products/:id/edit" element={<ProductCreatePage />} /></Routes></MemoryRouter>);
     if (kind === 'variant') {
-      fireEvent.click(await screen.findByRole('link', { name: `Manage 2 variants for ${product.name}` }));
+      fireEvent.click(await screen.findByRole('button', { name: `Show 2 variants for ${product.name}` }));
+      fireEvent.click(screen.getByRole('link', { name: 'Manage variants' }));
     } else {
       fireEvent.click(await screen.findByRole('link', { name: `Open Product Master details for ${product.name}` }));
-      fireEvent.click(screen.getByRole('button', { name: /^Pricing & Inventory/ }));
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Product editor workspaces' })).getByRole('button', { name: 'Product setup' }));
     }
-    expect(screen.getByTestId('sku-path')).toHaveTextContent(`/products/${product.id}/edit?section=commerce`);
-    expect(screen.getByRole('button', { name: /^Pricing & Inventory/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { name: 'Pricing & Inventory' })).toBeVisible();
+    expect(screen.getByTestId('sku-path')).toHaveTextContent(`/products/${product.id}/edit?section=setup`);
+    expect(within(screen.getByRole('navigation', { name: 'Product editor workspaces' })).getByRole('button', { name: 'Product setup' })).toHaveAttribute('aria-current', 'page');
     if (kind === 'variant') {
-      expect(screen.getByRole('heading', { name: 'Variants' })).toBeVisible();
       expect(screen.getByRole('table', { name: 'Variant pricing matrix' })).toBeVisible();
       expect(screen.getByDisplayValue('CHILD-ONLY-BLUE')).toBeVisible();
     } else {
-      expect(screen.getByText('SINGLE-DISCOVERY', { selector: 'span.break-all' })).toBeVisible();
+      expect(screen.getByDisplayValue('SINGLE-DISCOVERY')).toBeVisible();
       expect(screen.queryByRole('table', { name: 'Variant pricing matrix' })).not.toBeInTheDocument();
     }
   });

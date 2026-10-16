@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ListingMasterReview } from './ListingMasterReview';
 import { readyMasterFields } from '@/test/fixtures/listing-master';
-import { editListingSection, applyListingSection, completeListingDetails, loadMasterImages, confirmListingSave } from '@/test/fixtures/complete-listing-details';
+import { editListingSection, applyListingSection, completeListingDetails, loadMasterImages } from '@/test/fixtures/complete-listing-details';
 import { addProduct, deleteProduct, getProductById, getProducts, type Product } from '@/lib/product-store';
 import { getCatalogImportItems, saveCatalogImportItems, type CatalogImportItem } from '@/lib/catalog-import-store';
 import { getProductCatalogSettings } from '@/lib/product-catalog-settings-store';
@@ -37,17 +37,22 @@ function mount(mode: 'existing' | 'new' = 'existing') {
   return { onSaved, onBack, onDirtyChange };
 }
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+function confirmDraftLink() {
+  click('Save draft & link');
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Save draft & link' }));
+}
 const masterCell = (field: string) => within(screen.getByRole('rowheader', { name: new RegExp('^' + field) }).closest('tr')!).getAllByRole('cell').at(-1)!;
 describe('Required details inside the listing drawer', () => {
-  it('activates from core fields while leaving missing channel requirements on the listing', () => {
+  it('keeps a Master without image and warehouse as Draft while retaining separate channel requirements', () => {
     source = { ...source, image: '', images: [], description: 'A short, valid description.', channelCategory: 'Paper',
       requirements: { channel: 'amazon', category: 'Paper', revision: 'test-v1', origin: 'prototype', fields: [{ key: 'channel_settings.attribute_material', label: 'Material', kind: 'text' }] } };
     const { onSaved } = mount('new');
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
     expect(screen.getByRole('region', { name: 'Listing sync readiness' })).toHaveTextContent('Missing: Material. Only this listing’s sync is blocked.');
-    confirmListingSave('Create, activate & link');
+    confirmDraftLink();
     const saved = getProductById(onSaved.mock.calls[0][0].productId)!;
-    expect(saved).toMatchObject({ status: 'published', category: '', images: [] });
+    expect(saved).toMatchObject({ status: 'draft', category: '', images: [] });
     expect(saved.channels[0].master_data_sync?.enabled).not.toBe(true);
   });
   it('completes channel fields inline without changing Master attributes or the shop snapshot', () => {
@@ -58,7 +63,7 @@ describe('Required details inside the listing drawer', () => {
     fireEvent.click(readiness.getByRole('button', { name: 'Complete' }));
     fireEvent.change(readiness.getByLabelText('Material *'), { target: { value: 'Cotton paper' } });
     expect(readiness.getByText('Data ready after confirmation')).toBeVisible();
-    confirmListingSave('Create, activate & link');
+    confirmDraftLink();
     const saved = getProductById(onSaved.mock.calls[0][0].productId)!;
     expect(saved.channels[0].local_draft?.values.channel_settings?.attribute_material).toBe('Cotton paper');
     expect(saved.channels[0].shop_snapshot?.channel_settings).toBeUndefined();
@@ -68,17 +73,18 @@ describe('Required details inside the listing drawer', () => {
     const { onSaved } = mount('new');
     completeListingDetails();
     const before = structuredClone(getProducts());
-    click('Create, activate & link');
-    const summary = within(screen.getByRole('dialog', { name: 'Review before saving' }));
-    expect(summary.getByRole('list', { name: 'Links to save' })).toHaveTextContent(source.title);
-    expect(summary.getByText(/Nothing is published to shops/)).toBeVisible();
+    click('Save draft & link');
+    const summary = within(screen.getByRole('alertdialog', { name: 'Save a draft Master and link these listings?' }));
+    expect(summary.getByText(/The new Master stays Draft/)).toBeVisible();
+    expect(summary.getByText(/No shop data is changed/)).toBeVisible();
     expect(onSaved).not.toHaveBeenCalled();
     expect(getProducts()).toEqual(before);
-    fireEvent.click(summary.getByRole('button', { name: 'Back to review' }));
-    expect(screen.queryByRole('dialog', { name: 'Review before saving' })).not.toBeInTheDocument();
+    fireEvent.click(summary.getByRole('button', { name: 'Keep reviewing' }));
+    expect(screen.queryByRole('alertdialog', { name: 'Save a draft Master and link these listings?' })).not.toBeInTheDocument();
     expect(within(masterCell('Title')).getByText(source.title)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
-    confirmListingSave('Create, activate & link');
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
+    confirmDraftLink();
     expect(onSaved).toHaveBeenCalledOnce();
   });
   it('shows source-to-Master field rows, core fields first, with inline edits and visible missing data', () => {
@@ -178,12 +184,14 @@ describe('Required details inside the listing drawer', () => {
     mount('new');
     completeListingDetails();
     expect(masterCell('Description')).toHaveTextContent(readyMasterFields().description);
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
     click('Edit Master Images');
     fireEvent.error(screen.getByAltText('Master image 1'));
     expect(within(screen.getByRole('region', { name: 'Product images' })).getByRole('alert')).toHaveTextContent('Master activation is not blocked');
     applyListingSection();
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
     editListingSection('Description & images');
     expect(screen.getByLabelText('Product description *')).toHaveValue(readyMasterFields().description);
   });
@@ -199,29 +207,31 @@ describe('Required details inside the listing drawer', () => {
     click('Edit Master Description');
     await waitFor(() => expect(screen.getByLabelText('Product description *')).toHaveFocus());
   });
-  it('creates an Active Master with just one image automatically copied from the source listing', () => {
+  it('copies the source image but keeps a new Master Draft until a warehouse is assigned', () => {
     source = { ...source, images: [] };
     const { onSaved } = mount('new');
 
     expect(screen.queryByRole('textbox', { name: 'Product description *' })).not.toBeInTheDocument();
     completeListingDetails();
     expect(masterCell('Images')).toHaveTextContent('1 image');
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
-    confirmListingSave('Create, activate & link');
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
+    confirmDraftLink();
     expect(onSaved).toHaveBeenCalledOnce();
-    expect(getProductById(onSaved.mock.calls[0][0].productId)).toMatchObject({ status: 'published', images: [source.image] });
+    expect(getProductById(onSaved.mock.calls[0][0].productId)).toMatchObject({ status: 'draft', images: [source.image] });
   });
-  it('can activate without images after applying image edits', () => {
+  it('cannot activate without images after applying image edits', () => {
     source = { ...source, images: [] };
     const { onSaved } = mount('new');
     completeListingDetails();
     click('Edit Master Images');
     click('Remove image 1');
-    expect(screen.getByText('0 images · optional for activation · 9 max')).toBeVisible();
-    expect(screen.getByText(/Images are optional for Master activation/)).toBeVisible();
+    expect(screen.getByText('0 images · 1 required · 9 max')).toBeVisible();
+    expect(screen.getByText(/At least 1 product image is required to activate Master/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     applyListingSection();
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
     expect(onSaved).not.toHaveBeenCalled();
   });
   it('links an incomplete existing Draft without opening completion or copying images', () => {
@@ -240,7 +250,8 @@ describe('Required details inside the listing drawer', () => {
     expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('Master activation is not blocked');
     click('Remove image 4'); applyListingSection();
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
     expect(onDirtyChange).toHaveBeenLastCalledWith(true);
     click('Back to listings');
     expect(screen.getByRole('alertdialog', { name: 'Discard unsaved details?' })).toBeVisible();
@@ -256,7 +267,7 @@ describe('Required details inside the listing drawer', () => {
     const { onSaved } = mount('new');
     completeListingDetails();
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('Storage full'); });
-    confirmListingSave('Create, activate & link');
+    confirmDraftLink();
     expect(screen.getByRole('alert')).toHaveTextContent('Storage full');
     expect(masterCell('Description')).toHaveTextContent(readyMasterFields().description);
     expect(onSaved).not.toHaveBeenCalled();
@@ -283,13 +294,17 @@ describe('Required details inside the listing drawer', () => {
       fireEvent.change(select, { target: { value: option.value } });
     });
     loadMasterImages(); applyListingSection();
-    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeEnabled();
-    confirmListingSave('Create, activate & link');
+    expect(screen.getByRole('button', { name: 'Create, activate & link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeEnabled();
+    confirmDraftLink();
     expect(onSaved).toHaveBeenCalledOnce();
     const product = getProductById(onSaved.mock.calls[0][0].productId)!;
-    expect(product.status).toBe('published');
+    expect(product.status).toBe('draft');
     expect(product.skus).toHaveLength(2);
-    expect(product.channels[0].variant_mappings?.map(row => row.shop_sku)).toEqual(['SOURCE-0', 'SOURCE-1']);
+    expect(product.channels[0].variant_mappings).toBeUndefined();
+    expect(product.channels[0].review_pending?.sku_mapping_pending).toBe(false);
+    expect(product.channels[0].review_pending?.draft_mappings).toHaveLength(2);
+    expect(product.channels[0].review_pending?.issues).toContain('Assign at least 1 warehouse');
     expect(product.inventory).toEqual({});
   });
 });

@@ -11,6 +11,8 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/lib/i18n/I18nContext', () => ({ useI18n: () => ({ locale: 'en-US', t: (key: string) => key }) }));
 const id = 'category-safety-master';
 const seed = getProducts().find(product => !product.has_variants)!;
+const catalogSession = vi.hoisted(() => ({ role: 'admin' as 'admin' | 'user', canWrite: true }));
+vi.mock('@/contexts/AuthContext', () => ({ useOptionalAuth: () => ({ session: catalogSession }) }));
 let product: Product;
 
 async function mount() {
@@ -26,6 +28,7 @@ function chooseCategory(name: string) {
   return within(screen.getByRole('dialog', { name: 'Review category change' }));
 }
 beforeEach(() => {
+  catalogSession.role = 'admin'; catalogSession.canWrite = true;
   localStorage.removeItem('prime-product-catalog-settings-v2');
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   Element.prototype.scrollIntoView = vi.fn();
@@ -49,6 +52,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); deleteProduct(id); localStorage.removeItem('prime-product-catalog-settings-v2'); vi.restoreAllMocks(); });
 
 describe('Master category change review', () => {
+  it('edits and adds attribute values in place, persisting only this product after Save', async () => {
+    const settings = getProductCatalogSettings();
+    saveProductCatalogSettings({ ...settings, attributes: settings.attributes.map(attribute => attribute.key === 'material' ? { ...attribute, type: 'Multi-select', options: 'Cotton, Paper' } : attribute) });
+    const catalogBefore = JSON.stringify(getProductCatalogSettings());
+    await mount();
+    expect(screen.queryByRole('button', { name: 'Manage attribute setup' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Changes open in Catalog Setup/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Unsaved title stays here' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Material value' }));
+    fireEvent.change(screen.getByLabelText('New material value'), { target: { value: 'Bamboo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }));
+    expect(screen.getByRole('button', { name: 'Bamboo', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByDisplayValue('Unsaved title stays here')).toBeVisible();
+    expect(getProductById(id)?.specifications).toEqual(product.specifications);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
+    expect(getProductById(id)).toMatchObject({ name: 'Unsaved title stays here', has_variants: false, variant_options: [], channels: product.channels });
+    expect(getProductById(id)?.specifications).toContainEqual({ attributeKey: 'material', name: 'Material', value: 'Cotton, Bamboo' });
+    expect(JSON.stringify(getProductCatalogSettings())).toBe(catalogBefore);
+    cleanup(); await mount();
+    expect(screen.getByRole('button', { name: 'Bamboo', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('shows exact added, retained and missing fields; cancel leaves data untouched', async () => {
     await mount();
     const before = JSON.stringify(getProductById(id));
@@ -105,5 +130,105 @@ describe('Master category change review', () => {
     const dialog = within(screen.getByRole('dialog', { name: 'Select product category' }));
     expect(dialog.getByRole('button', { name: 'Confirm Category' })).toBeDisabled();
     expect(dialog.queryByText('Fashion')).not.toBeInTheDocument();
+  });
+
+  it('creates from an empty search, selects the new category and stages it only after review', async () => {
+    await mount();
+    fireEvent.change(screen.getByDisplayValue(product.name), { target: { value: 'Unsaved product title' } });
+    const savedBefore = JSON.stringify(getProductById(id));
+    fireEvent.click(document.getElementById('product-category-trigger')!);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search categories' }), { target: { value: 'Sketchbooks' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Sketchbooks”' }));
+    const creator = within(screen.getByRole('dialog', { name: 'Create product category' }));
+    expect(creator.getByLabelText(/Category name/)).toHaveValue('Sketchbooks');
+    expect(creator.getByLabelText(/Parent category/)).toHaveValue('tools');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    fireEvent.click(creator.getByText(/Add description/));
+    fireEvent.change(creator.getByLabelText('Description'), { target: { value: 'Drawing notebooks' } });
+    fireEvent.click(creator.getByRole('button', { name: 'Create & select' }));
+    const created = getProductCatalogSettings().categories.find(category => category.name === 'Sketchbooks')!;
+    expect(created).toMatchObject({ parentId: 'tools', description: 'Drawing notebooks', attributes: [] });
+    expect(JSON.stringify(getProductById(id))).toBe(savedBefore);
+    expect(screen.getByRole('status')).toHaveTextContent('shared catalog');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Category' }));
+    expect(screen.getByRole('dialog', { name: 'Review category change' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to draft' }));
+    expect(screen.getByDisplayValue('Unsaved product title')).toBeInTheDocument();
+    expect(document.getElementById('product-category-trigger')).toHaveTextContent('Sketchbooks');
+    expect(getProductById(id)?.categoryId).toBe('tools');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(getProductById(id)).toMatchObject({ categoryId: created.id, name: 'Unsaved product title', channels: product.channels, localized_content: product.localized_content });
+  });
+
+  it('back and cancel do not create a category or change the product draft', async () => {
+    await mount();
+    const before = JSON.stringify(getProductCatalogSettings());
+    fireEvent.click(document.getElementById('product-category-trigger')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Create category' }));
+    fireEvent.change(screen.getByLabelText(/Category name/), { target: { value: 'Not saved' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(JSON.stringify(getProductCatalogSettings())).toBe(before);
+    expect(document.getElementById('product-category-trigger')).toHaveTextContent('Tools');
+  });
+
+  it('keeps the shared category if product selection is cancelled after creation', async () => {
+    await mount();
+    fireEvent.click(document.getElementById('product-category-trigger')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Create category' }));
+    fireEvent.change(screen.getByLabelText(/Category name/), { target: { value: 'Shared category' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create & select' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(getProductCatalogSettings().categories.some(category => category.name === 'Shared category')).toBe(true);
+    expect(document.getElementById('product-category-trigger')).toHaveTextContent('Tools');
+    expect(getProductById(id)?.categoryId).toBe('tools');
+  });
+
+  it('rejects duplicate names inline and supports creating the first root category', async () => {
+    saveProductCatalogSettings({ ...getProductCatalogSettings(), categories: [] });
+    await mount();
+    fireEvent.click(document.getElementById('product-category-trigger')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Create your first category' }));
+    expect(screen.getByLabelText(/Parent category/)).toHaveValue('');
+    fireEvent.change(screen.getByLabelText(/Category name/), { target: { value: 'First category' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create & select' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create category' }));
+    fireEvent.change(screen.getByLabelText(/Parent category/), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Category name/), { target: { value: ' first category ' } });
+    fireEvent.blur(screen.getByLabelText(/Category name/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already exists');
+    expect(screen.getByRole('button', { name: 'Create & select' })).toBeDisabled();
+    expect(getProductCatalogSettings().categories).toHaveLength(1);
+  });
+
+  it('does not offer catalog creation to a product editor without admin access', async () => {
+    catalogSession.role = 'user';
+    await mount();
+    fireEvent.click(document.getElementById('product-category-trigger')!);
+    expect(screen.queryByRole('button', { name: 'Create category' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search categories' }), { target: { value: 'Nothing here' } });
+    expect(screen.getByText(/Ask an Admin/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Create “/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps form input and permits retry after a category persistence failure', async () => {
+    await mount();
+    fireEvent.click(document.getElementById('product-category-trigger')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Create category' }));
+    fireEvent.change(screen.getByLabelText(/Category name/), { target: { value: 'Retry category' } });
+    const write = Storage.prototype.setItem;
+    const failure = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (key === 'prime-product-catalog-settings-v2') throw new Error('Storage unavailable. Try again.');
+      write.call(this, key, value);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create & select' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Storage unavailable');
+    expect(screen.getByLabelText(/Category name/)).toHaveValue('Retry category');
+    expect(screen.getByRole('button', { name: 'Create & select' })).toBeEnabled();
+    expect(getProductCatalogSettings().categories.some(category => category.name === 'Retry category')).toBe(false);
+    failure.mockRestore();
+    fireEvent.click(screen.getByRole('button', { name: 'Create & select' }));
+    expect(screen.getByRole('dialog', { name: 'Select product category' })).toBeVisible();
+    expect(getProductCatalogSettings().categories.filter(category => category.name === 'Retry category')).toHaveLength(1);
   });
 });

@@ -42,6 +42,16 @@ const review = (count = 1) => fireEvent.click(screen.getByRole('button', { name:
 const acknowledge = () => fireEvent.click(screen.getByRole('checkbox', { name: /I checked that every/ }));
 
 describe('Link existing listings from a fixed Master', () => {
+  it('blocks confirmation of a mixed selection until each listing has complete source data', () => {
+    items[1] = { ...items[1], description: '', channelStock: NaN };
+    saveCatalogImportItems(items);
+    const { onLinked } = mount(); select(0); select(1); review(2); acknowledge();
+    expect(screen.getByRole('alert')).toHaveTextContent('Complete listing data before linking');
+    expect(screen.getByRole('alert')).toHaveTextContent('Description, Shop stock');
+    expect(screen.getByRole('button', { name: 'Link 2 listings' })).toBeDisabled();
+    expect(getProductById(master.id)?.channels).toEqual([]);
+    expect(onLinked).not.toHaveBeenCalled();
+  });
   it('starts unselected, focuses search and does not persist when selecting, reviewing or cancelling', () => {
     const before = JSON.stringify(getProducts()); const imports = JSON.stringify(getCatalogImportItems({ requireConfirmation: true }));
     const { onClose, onLinked } = mount();
@@ -125,7 +135,7 @@ describe('Link existing listings from a fixed Master', () => {
       { ...sku, id: 'master-small', sku_code: 'SMALL', variation_name: 'Small', status: 'active' },
       { ...sku, id: 'master-large', sku_code: 'LARGE', variation_name: 'Large', status: 'active' },
     ] });
-    items[0] = { ...items[0], variants: 2, variantItems: [{ sku: 'SHOP-S', label: 'Small' }, { sku: 'SHOP-L', label: 'Large' }] };
+    items[0] = { ...items[0], variants: 2, variantItems: [{ sku: 'SHOP-S', label: 'Small', price: { amount: 100, currency: 'JPY' }, stock: 0 }, { sku: 'SHOP-L', label: 'Large', price: { amount: 120, currency: 'JPY' }, stock: 5 }] };
     saveCatalogImportItems(items); mount(); select(0); review(); acknowledge();
     expect(screen.getByRole('button', { name: 'Link 1 listing' })).toBeDisabled();
     expect(screen.getByLabelText('Master SKU for shop SKU 1')).toHaveValue('master-small');

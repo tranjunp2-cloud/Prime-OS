@@ -239,3 +239,15 @@ it('shows actual order references and preserves unverified legacy holds without 
   expect(within(screen.getByRole('dialog')).queryByText('ORDER-TEST-1')).not.toBeInTheDocument();
   expect(within(screen.getByRole('dialog')).getByText(/Order references are unavailable for these 3 units/)).toBeVisible();
 });
+
+it('filters low stock separately from confirmed zero and excludes incomplete quantities', () => {
+  const onChange = vi.fn();
+  const view = render(<WarehouseStockTable products={products} warehouses={warehouses} positions={[]} warehouseId="north" onShowAll={() => {}} stockFilter="low" onStockFilterChange={onChange} />);
+  expect(screen.getByRole('button', { name: 'Expand Shirt' })).toBeVisible();
+  expect(screen.queryByText('Hat', { exact: true })).not.toBeInTheDocument();
+  view.rerender(<WarehouseStockTable products={products} warehouses={warehouses} positions={[]} warehouseId="north" onShowAll={() => {}} stockFilter="empty" onStockFilterChange={onChange} />);
+  expect(screen.getByText('Hat', { exact: true })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Expand Shirt' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(onChange).toHaveBeenCalledWith('all');
+});

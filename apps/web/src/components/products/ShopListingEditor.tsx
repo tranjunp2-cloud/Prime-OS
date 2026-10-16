@@ -176,7 +176,7 @@ export function ShopListingEditor({ product, listing, channelLabel, shopLabel, o
   return <Sheet open onOpenChange={open => { if (!open) leave(); }}>
     <SheetContent className={`${styles.sheet} flex h-dvh w-full flex-col gap-0 p-0 sm:max-w-3xl motion-reduce:animate-none [&>button:last-child]:size-11 [&>button:last-child]:right-2 [&>button:last-child]:top-2`} onCloseAutoFocus={event => { event.preventDefault(); restoreFocus(); }}>
       <SheetHeader className={`${styles.header} shrink-0 space-y-3 border-b px-5 py-4 text-left sm:px-6`}>
-        <SheetTitle className="pr-10 text-base">Manage listing</SheetTitle>
+        <SheetTitle className="flex flex-wrap items-center gap-2 pr-10 text-base">Manage listing{details.hasDemo && <span className="rounded border px-2 py-0.5 text-xs font-normal text-muted-foreground">Demo data · Not live shop values</span>}</SheetTitle>
         <section aria-label="Listing summary" className="flex min-w-0 items-start gap-3">
           {form.images[0] ? <ListingImage key={form.images[0]} src={form.images[0]} index={0} summary /> : <div role="img" className="grid size-16 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground" aria-label="No recorded listing image"><ImageOff className="size-6" aria-hidden="true" /></div>}
           <div className="min-w-0 flex-1 space-y-1">

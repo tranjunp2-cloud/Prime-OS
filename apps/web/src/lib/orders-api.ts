@@ -97,20 +97,30 @@ export function exportOrders(records: OrderRecord[]) {
   const a = document.createElement('a'); a.href = url; a.download = 'orders.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
-/** Exception signals are independent of the normal order lifecycle. */
-export function getOrderAttentionReasons(order: OrderRecord): string[] {
-  const reasons: string[] = [];
-  if (order.hold?.active) reasons.push(`On hold: ${order.hold.reason}`);
-  if (order.shipments.some(s=>s.deliveryOutcome==='failed')) reasons.push('Failed delivery');
+export interface OrderAttention { code: string; reason: string; reviewAction?: string }
+
+/** Attention can require a review or simply flag urgency without blocking the next step. */
+export function getOrderAttention(order: OrderRecord): OrderAttention[] {
+  const issues: OrderAttention[] = [];
+  const add = (code: string, reason: string, reviewAction?: string) => issues.push({code, reason, reviewAction});
+  if (order.hold?.active) add('hold', `On hold: ${order.hold.reason}`, 'Review hold');
+  if (order.shipments.some(s=>s.deliveryOutcome==='failed')) add('delivery', 'Failed delivery', 'Review delivery');
   const active = !['draft', 'closed', 'canceled'].includes(order.canonicalStatus);
-  if (active && order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) reasons.push('Payment evidence to review');
-  if (active && order.reservation === 'Allocation failed') reasons.push('Allocation failed');
-  if (active && order.reservation === 'Reservation expired') reasons.push('Stock reservation expired');
-  if (active && order.pickupOverdue) reasons.push('Pickup overdue');
-  if (active && /breached|overdue/i.test(order.sla || '') && !order.pickupOverdue) reasons.push('Processing overdue');
-  if (order.syncError) reasons.push('Channel sync failed');
-  if (order.exceptions.some((issue) => issue.status === 'open')) reasons.push('Open exception');
-  return reasons;
+  if (active && order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) add('payment', 'Payment evidence to review', 'Review payment');
+  if (active && order.reservation === 'Allocation failed') add('stock', 'Allocation failed', 'Review stock');
+  if (active && order.reservation === 'Reservation expired') add('stock-expired', 'Stock reservation expired', 'Review stock');
+  if (active && order.pickupOverdue) add('pickup', 'Pickup overdue');
+  if (active && /breached|overdue/i.test(order.sla || '') && !order.pickupOverdue) add('overdue', 'Processing overdue');
+  if (order.syncError) add('sync', 'Channel sync failed', 'Review sync issue');
+  if (order.returnRequests.some(request => request.status.toLowerCase() === 'requested')) add('return-request', 'Return request awaiting review', 'Review return');
+  if (order.returnRequests.some(request => ['received', 'awaiting_inspection'].includes(request.status.toLowerCase()))) add('return-inspection', 'Returned items awaiting inspection', 'Review return');
+  if (order.canonicalStatus === 'canceled' && order.payment.state === 'Paid') add('refund', 'Cancelled order with payment received', 'Review refund');
+  if (order.exceptions.some((issue) => issue.status === 'open')) add('exception', 'Open exception', 'Review issue');
+  return issues;
+}
+
+export function getOrderAttentionReasons(order: OrderRecord): string[] {
+  return getOrderAttention(order).map(issue => issue.reason);
 }
 
 export function orderHandlingLabel(order: OrderRecord) { return order.metadata.handlingType === 'self' ? 'Seller fulfilled' : order.metadata.handlingType === 'marketplace' ? 'Marketplace fulfilled' : 'Not specified'; }

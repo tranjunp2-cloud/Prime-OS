@@ -59,5 +59,5 @@ export function listingEditorData(product: Product, listing: ChannelListing) {
   return { recorded, values, sources, metadata, demoMetadata,
     listingId: listing.external_id || demoMetadata?.listingId,
     fulfillment: syncListingOverride(product, listing)?.fulfillment || demoMetadata?.fulfillment,
-    hasDemo: Boolean(demoMetadata) || Object.values(sources).includes('demo'), hasMasterPreview: Object.values(sources).includes('master') };
+    hasDemo: rawMetadata.origin === 'prototype' || Boolean(demoMetadata) || Object.values(sources).includes('demo'), hasMasterPreview: Object.values(sources).includes('master') };
 }

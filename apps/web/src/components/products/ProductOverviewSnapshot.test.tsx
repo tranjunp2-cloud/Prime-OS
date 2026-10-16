@@ -1,42 +1,33 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductOverviewSnapshot } from './ProductOverviewSnapshot';
 
 afterEach(cleanup);
 const props: React.ComponentProps<typeof ProductOverviewSnapshot> = {
-  name: 'Precision brush set', images: ['/main.jpg', '/side.jpg', '/pack.jpg'], imageAltTexts: ['Brushes in a case', 'Brush tips', 'Packaging'],
-  brand: 'Da Vinci', category: 'Art Supplies', productStructure: '4 variants', stock: '12', price: '4,900 JPY', listingCount: 5, channelCount: 3,
+  name: 'Precision brush set', sku: 'BRUSH-12', category: 'Art Supplies', brand: 'Prime', description: 'A set of twelve artist brushes in a travel case.',
+  hasVariants: false, variantCount: 0, images: ['/main.jpg', '/side.jpg'], imageAltTexts: ['Brushes in a case', 'Brush tips'],
+  stock: '12', price: '4,900 JPY', listingCount: 5, channelCount: 3,
   imported: true, source: 'Amazon · Prime Beauty US', translations: [{ locale: 'ja-JP', label: '日本語', status: 'complete' }, { locale: 'vi-VN', label: 'Tiếng Việt', status: 'partial' }, { locale: 'th-TH', label: 'ไทย', status: 'missing' }],
-  onCommerce: vi.fn(), onListings: vi.fn(), onProductData: vi.fn(), onSelectLocale: vi.fn(),
+  onCommerce: vi.fn(), onProductData: vi.fn(), onListings: vi.fn(), onSelectLocale: vi.fn(),
 };
 function mount(overrides: Partial<typeof props> = {}) { return render(<ProductOverviewSnapshot {...props} {...overrides} />); }
 
 describe('ProductOverviewSnapshot', () => {
-  it('keeps the product image, identity, operational metrics and supporting context visible', () => {
+  it('shows the main image, labeled identity, short description and operational metrics together', () => {
     mount();
-    expect(screen.getByRole('heading', { level: 2, name: props.name })).toBeVisible();
-    expect(screen.getByRole('region', { name: props.name })).toBeVisible();
-    expect(screen.queryByText('Product overview')).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Brushes in a case' })).toBeVisible();
-    expect(screen.getByText('3 images')).toBeVisible();
-    expect(screen.getByText('Da Vinci · Art Supplies')).toBeVisible();
-    expect(screen.getByText('4 variants')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'View Master stock' })).toHaveTextContent('12 units');
-    expect(screen.getByRole('button', { name: 'View base price' })).toHaveTextContent('4,900 JPY');
-    expect(screen.getByRole('button', { name: 'View linked listings' })).toHaveTextContent('5 · 3 channels');
-    expect(screen.getByRole('button', { name: 'Translations: 1 of 3 complete' })).toBeVisible();
-    expect(screen.getByText('Source: Amazon · Prime Beauty US')).toBeVisible();
-  });
-  it('updates the heading with the current product name and handles unnamed drafts', () => {
-    const { rerender } = mount();
-    const name = 'Traditional Japanese Precision Tailoring Set';
-    rerender(<ProductOverviewSnapshot {...props} name={name} />);
-    expect(screen.getByRole('heading', { level: 2, name })).toBeVisible();
-    expect(screen.queryByRole('heading', { name: props.name })).not.toBeInTheDocument();
-    rerender(<ProductOverviewSnapshot {...props} name="   " />);
-    expect(screen.getByRole('heading', { level: 2, name: 'Untitled Product Master' })).toBeVisible();
+    const summary = within(screen.getByRole('region', { name: 'Product summary' }));
+    expect(summary.queryByRole('heading')).not.toBeInTheDocument();
+    expect(summary.getByRole('img', { name: 'Brushes in a case' })).toHaveAttribute('src', '/main.jpg');
+    expect(summary.getByText('View 2 images')).toBeVisible();
+    for (const value of ['Master SKU', 'BRUSH-12', 'Category', 'Art Supplies', 'Brand', 'Prime', 'Product type', 'Single product', '1 sellable SKU', props.description]) {
+      expect(summary.getByText(value)).toBeVisible();
+    }
+    expect(summary.getByRole('button', { name: 'View Master stock' })).toHaveTextContent('12 units');
+    expect(summary.getByRole('button', { name: 'View base price' })).toHaveTextContent('4,900 JPY');
+    expect(summary.getByRole('button', { name: 'View linked listings' })).toHaveTextContent('5 listings · 3 channels');
+    expect(summary.getByRole('button', { name: 'Translations: 1 of 3 complete' })).toBeVisible();
   });
   it('keeps the three operational metrics connected to their workspaces', () => {
     const onCommerce = vi.fn();
@@ -48,50 +39,29 @@ describe('ProductOverviewSnapshot', () => {
     expect(onCommerce).toHaveBeenCalledTimes(2);
     expect(onListings).toHaveBeenCalledOnce();
   });
-  it('supports click and keyboard image navigation and restores focus without modifying media', async () => {
-    const before = JSON.stringify(props.images);
-    mount();
-    const trigger = screen.getByRole('button', { name: 'View product images (3)' });
-    trigger.focus();
-    fireEvent.click(trigger);
-    const gallery = screen.getByRole('dialog', { name: 'Product images' });
-    const view = within(gallery);
-    expect(view.getByRole('button', { name: 'Previous image' })).toBeDisabled();
-    fireEvent.keyDown(gallery, { key: 'ArrowRight' });
-    expect(view.getByRole('img', { name: 'Brush tips' })).toHaveAttribute('src', '/side.jpg');
-    expect(view.getByText('Image 2 of 3')).toBeVisible();
-    fireEvent.click(view.getByRole('button', { name: 'Show image 3' }));
-    expect(view.getByRole('button', { name: 'Next image' })).toBeDisabled();
-    fireEvent.keyDown(gallery, { key: 'ArrowLeft' });
-    expect(view.getByRole('button', { name: 'Show image 2' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.keyDown(gallery, { key: 'Escape' });
-    await waitFor(() => expect(trigger).toHaveFocus());
-    expect(JSON.stringify(props.images)).toBe(before);
-  });
-  it('handles a single image with no unnecessary thumbnails or enabled next action', () => {
-    mount({ images: ['/main.jpg'] });
-    fireEvent.click(screen.getByRole('button', { name: 'View product images (1)' }));
-    const gallery = within(screen.getByRole('dialog', { name: 'Product images' }));
-    expect(gallery.getByRole('button', { name: 'Next image' })).toBeDisabled();
-    expect(gallery.getByRole('button', { name: 'Previous image' })).toBeDisabled();
-    expect(gallery.queryByRole('group', { name: 'Image thumbnails' })).not.toBeInTheDocument();
-  });
-  it('does not turn blank image slots into gallery items or fabricate empty metadata', () => {
-    const onProductData = vi.fn();
-    mount({ images: [' ', ''], brand: '', category: '', source: '', translations: [], onProductData });
+  it('does not fabricate missing identity, media, inventory or source context', () => {
+    mount({ source: '', translations: [], sku: '', brand: '', category: '', description: '', images: [], stockRecorded: false });
+    expect(screen.getByText('Not assigned')).toBeVisible();
+    expect(screen.getAllByText('Not provided')).toHaveLength(3);
     expect(screen.getByText('No images')).toBeVisible();
-    expect(screen.queryByRole('button', { name: /View product images/ })).not.toBeInTheDocument();
-    expect(screen.getByText('Brand not set · Category not set')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'View Master stock' })).toHaveTextContent('Not recorded');
     expect(screen.getByText('Source: Not recorded')).toBeVisible();
     expect(screen.getByText('Primary language only')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'View product media — no images' }));
-    expect(onProductData).toHaveBeenCalledOnce();
   });
-  it('shows a fallback for a failed image without removing it from product data', () => {
-    mount();
-    fireEvent.error(screen.getByRole('img', { name: 'Brushes in a case' }));
-    expect(screen.getByRole('img', { name: /Brushes in a case — image unavailable/ })).toBeVisible();
-    expect(screen.getByText('3 images')).toBeVisible();
+  it('shows variants with a price range and missing-price note', () => {
+    mount({ hasVariants: true, variantCount: 3, price: '4,200–6,300 JPY', priceNote: '1 of 3 variant prices missing' });
+    expect(screen.getByText('3 variant SKUs')).toBeVisible();
+    const price = screen.getByRole('button', { name: 'View variant prices' });
+    expect(price).toHaveTextContent('4,200–6,300 JPY');
+    expect(price).toHaveTextContent('1 of 3 variant prices missing');
+    expect(screen.queryByRole('button', { name: 'View base price' })).not.toBeInTheDocument();
+  });
+  it('opens product data to see full details or add missing images', () => {
+    const onProductData = vi.fn();
+    mount({ images: [], onProductData });
+    fireEvent.click(screen.getByRole('button', { name: 'View product data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View product media — no images' }));
+    expect(onProductData).toHaveBeenCalledTimes(2);
   });
   it('exposes accurate language status and opens only the language the user selects', () => {
     const onSelectLocale = vi.fn();

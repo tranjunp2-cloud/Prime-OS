@@ -100,3 +100,23 @@ describe('Prime CRM workspace flows', () => {
     expect(screen.getByRole('button', { name: 'Add template' })).toBeDisabled();
   });
 });
+
+it('opens the unassigned queue from Home and lets the user clear it', () => {
+  mount('/inbox/conversation?assignee=unassigned');
+  expect(screen.getByLabelText('Active filters')).toHaveTextContent('Unassigned');
+  fireEvent.click(screen.getByRole('button', { name: 'Filters (2)' }));
+  expect(screen.getByLabelText('Assignee')).toHaveValue('unassigned');
+  fireEvent.change(screen.getByLabelText('Assignee'), { target: { value: 'mine' } });
+  expect(screen.getByLabelText('Assignee')).toHaveValue('mine');
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(screen.getByLabelText('Assignee')).toHaveValue('all');
+});
+
+it('opens unlinked contacts from Home and synchronizes its filter', () => {
+  mount('/inbox/guests?linked=unlinked');
+  expect(screen.getByLabelText('Customer link')).toHaveValue('unlinked');
+  const table = screen.getByRole('table');
+  expect(within(table).queryByText('Linked', { exact: true })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Customer link'), { target: { value: 'all' } });
+  expect(screen.getByLabelText('Customer link')).toHaveValue('all');
+});

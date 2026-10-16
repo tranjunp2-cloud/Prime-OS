@@ -14,6 +14,8 @@ export function OrderLifecycleBadge({ status }: { status: string }) {
             ? 'border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300'
             : status === orderStageLabels.completed
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-              : 'border-border bg-muted text-muted-foreground';
+              : status === 'Returns & refunds'
+                ? 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                : 'border-border bg-muted text-muted-foreground';
   return <span className={cn('inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold', tone)}>{status}</span>;
 }

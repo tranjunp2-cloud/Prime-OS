@@ -47,6 +47,15 @@ const skuSelect = (code: string, source: CatalogImportItem) => {
 };
 
 describe('Fast evidence-based Master review', () => {
+  it.each(['existing', 'new'] as const)('blocks incomplete source data in %s review, including save-and-link later', mode => {
+    const sources = listings.map((item, index) => index ? { ...item, description: '', channelStock: NaN } : item);
+    const { onSaved } = mount(sources, mode);
+    expect(screen.getByRole('alert')).toHaveTextContent('Complete listing data before linking');
+    expect(screen.getByRole('alert')).toHaveTextContent('Description, Shop stock');
+    expect(screen.getByRole('button', { name: mode === 'new' ? 'Save draft & link' : 'Link all & finish later' })).toBeDisabled();
+    expect(getProductById(target.id)?.channels).toEqual([]);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
   it('jumps to an identity issue in a hidden listing without marking the group reviewed', async () => {
     const sources = Array.from({ length: 5 }, (_, index) => ({ ...listings[0], id: `identity-${index}`, listingId: `identity-${index}`, storeName: `Identity shop ${index}`, brand: index === 4 ? 'Different brand' : target.brand }));
     const before = structuredClone(getProductById(target.id)!);

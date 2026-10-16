@@ -46,19 +46,19 @@ describe('Unified product activity history', () => {
     expect(dialog.getByText('Master activated')).toBeVisible();
     expect(dialog.queryByRole('button', { name: /Restore|Publish/ })).not.toBeInTheDocument();
   });
-  it('clearly labels and toggles demo events without changing product data', () => {
+  it('only displays recorded history without a demo toggle or generated demo events', () => {
     const product = fixture(); const before = JSON.stringify(product);
-    render(<ProductActivityHistory product={product} showDemoInitially />);
-    expect(screen.getAllByText('Demo', { exact: true })).toHaveLength(3);
-    expect(screen.getByText('Listing sync failed')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide demo events' }));
+    render(<ProductActivityHistory product={product} />);
+    expect(screen.queryByRole('button', { name: /demo events/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo', { exact: true })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(3);
     expect(screen.queryByText('Listing sync failed')).not.toBeInTheDocument();
     expect(JSON.stringify(product)).toBe(before);
   });
   it('shows a useful empty state instead of inventing historic events', () => {
     render(<ProductActivityHistory product={{ ...fixture(), activity: [], revisions: [] }} />);
     expect(screen.getByText('No activity in this view')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Show demo events' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /demo events/i })).not.toBeInTheDocument();
   });
   it('opens scoped listing activity from a channel entry point', () => {
     render(<ProductActivityHistory product={fixture()} initialListingChannel="lazada" />);

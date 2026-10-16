@@ -1,10 +1,11 @@
 import { getOrderAttentionReasons, isReadyToShip, orderStageLabels, type OrderRecord } from './orders-api';
 
-export type OrderQueue = 'all' | 'draft' | 'pending' | 'ready' | 'shipping' | 'delivered' | 'completed' | 'returns' | 'cancelled';
+export type OrderQueue = 'all' | 'draft' | 'pending' | 'preparing' | 'pickup' | 'shipping' | 'delivered' | 'completed' | 'returns' | 'cancelled';
 export const workQueues: { key: OrderQueue; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: orderStageLabels.confirmation },
-  { key: 'ready', label: 'To ship' },
+  { key: 'preparing', label: orderStageLabels.preparing },
+  { key: 'pickup', label: orderStageLabels.ready },
   { key: 'shipping', label: orderStageLabels.shipping },
   { key: 'delivered', label: orderStageLabels.delivered },
   { key: 'completed', label: orderStageLabels.completed },
@@ -28,7 +29,7 @@ export function orderQueue(order: OrderRecord): OrderQueue {
   if (hasActiveReturn(order) || /refunded/i.test(order.payment.state)
     || order.shipments.some(shipment => ['returning', 'returned'].includes(shipment.deliveryOutcome || ''))) return 'returns';
   if (order.canonicalStatus === 'created') return 'pending';
-  if (['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus)) return 'ready';
+  if (['acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus)) return isReadyToShip(order) ? 'pickup' : 'preparing';
   if (['partially_shipped', 'shipped'].includes(order.canonicalStatus)) return 'shipping';
   return order.canonicalStatus === 'delivered' ? 'delivered' : 'completed';
 }
@@ -38,8 +39,6 @@ export function matchesOrderQueue(order: OrderRecord, queue: OrderQueue) {
 }
 
 const queueFilters: Partial<Record<OrderQueue, { key: string; label: string }[]>> = {
-  pending: [{ key: 'awaiting-payment', label: 'Awaiting payment' }],
-  ready: [{ key: 'preparing', label: orderStageLabels.preparing }, { key: 'pickup', label: orderStageLabels.ready }],
   shipping: [{ key: 'transit', label: 'On the way' }, { key: 'failed', label: 'Delivery failed' }],
   returns: [{ key: 'requested', label: 'Return requested' }, { key: 'returning', label: 'On the way back' }, { key: 'received', label: 'Return received' }, { key: 'refunded', label: 'Refunded' }],
 };
@@ -50,15 +49,15 @@ export function getQueueFilters(queue: OrderQueue) {
 
 export function matchesQueueFilter(order: OrderRecord, filter: string) {
   switch (filter) {
-    case 'awaiting-payment': return order.payment.state === 'Unpaid' && order.payment.method !== 'COD';
+    case 'awaiting-payment': return !['draft', 'closed', 'canceled'].includes(order.canonicalStatus) && order.payment.state === 'Unpaid' && order.payment.method !== 'COD';
     case 'review': return getOrderAttentionReasons(order).length > 0;
-    case 'preparing': return orderQueue(order) === 'ready' && !isReadyToShip(order);
-    case 'pickup': return isReadyToShip(order);
+    case 'preparing': return orderQueue(order) === 'preparing';
+    case 'pickup': return orderQueue(order) === 'pickup';
     case 'failed': return order.shipments.some(shipment => shipment.deliveryOutcome === 'failed');
     case 'transit': return !order.shipments.some(shipment => shipment.deliveryOutcome === 'failed');
     case 'requested': return order.returnRequests.some(request => ['requested', 'authorized'].includes(request.status));
     case 'returning': return order.shipments.some(shipment => shipment.deliveryOutcome === 'returning');
-    case 'received': return order.returnRequests.some(request => ['received', 'inspected', 'disposed'].includes(request.status)) || order.shipments.some(shipment => shipment.deliveryOutcome === 'returned');
+    case 'received': return order.returnRequests.some(request => ['received', 'awaiting_inspection', 'inspected', 'disposed'].includes(request.status)) || order.shipments.some(shipment => shipment.deliveryOutcome === 'returned');
     case 'refunded': return /refunded/i.test(order.payment.state);
     default: return true;
   }

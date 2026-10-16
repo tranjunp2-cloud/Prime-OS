@@ -34,10 +34,8 @@ describe('empty workspace coverage', () => {
     ['/finance/fin-support', 'No financial assessment yet'],
     ['/crm/mdec', 'No business activity yet'],
     ['/ecom/commerce-surface', 'No commerce activity yet'],
-    ['/pos/register', 'No products available for checkout'],
-    ['/pos/shifts', 'No shifts yet'],
-    ['/pos/transactions', 'No transactions yet'],
-    ['/pos/returns', 'No purchases to return'],
+    ['/warehouses/store-stock', 'No store stock yet'],
+    ['/client-reports/pos-shifts', 'No shifts to review yet'],
     ['/products/existing-product/edit', 'No product selected'],
     ['/promotions/automatic', 'No automatic discounts data yet'],
     ['/promotions/flash-sale', 'No flash sales data yet'],
@@ -63,5 +61,10 @@ describe('empty workspace coverage', () => {
     expect(screen.getByRole('heading', { name: 'No receivables yet' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Collections' })).toHaveAttribute('aria-current', 'page');
     expect(childMounted).not.toHaveBeenCalled();
+  });
+  it.each(['/pos/setup', '/pos/products', '/pos/settings', '/pos/register', '/pos/shifts', '/pos/transactions', '/pos/returns', '/products/pos-assortment'])('allows POS setup, native empty states and legacy redirects at %s', path => {
+    mount(path);
+    expect(screen.getByText('Populated child')).toBeVisible();
+    expect(screen.queryByTestId('workspace-no-data')).not.toBeInTheDocument();
   });
 });

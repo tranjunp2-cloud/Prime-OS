@@ -23,15 +23,47 @@ describe('Shared Product readiness card', () => {
     fireEvent.click(card.getByRole('button', { name: 'Product data Complete required attributes: Material' }));
     expect(onSelectCheck).toHaveBeenCalledWith('attributes');
     fireEvent.click(card.getByRole('button', { name: 'View all readiness checks' }));
-    expect(onViewAll).toHaveBeenCalledOnce();
+    expect(onViewAll).not.toHaveBeenCalled();
+    const allChecks = card.getByRole('list', { name: 'All readiness checks' });
+    expect(within(allChecks).getAllByRole('listitem')).toHaveLength(7);
+    expect(within(allChecks).getAllByText('Complete', { exact: true })).toHaveLength(6);
+    expect(within(allChecks).getByText('Needs attention')).toBeVisible();
+    expect(card.queryByRole('list', { name: 'Missing readiness checks' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
-  it('disappears when requirements become complete and returns if a detail becomes missing', () => {
+  it('keeps a compact completed card in place and returns to the checklist for missing details', () => {
     const props = { isActive: true, onSelectCheck: vi.fn(), onViewAll: vi.fn() };
     const { rerender } = render(<ProductReadinessCard {...props} checks={checks} />);
     rerender(<ProductReadinessCard {...props} checks={checks.map(check => ({ ...check, done: true }))} />);
-    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Product readiness' })).toHaveAttribute('data-complete', 'true');
+    expect(screen.getByText('Master details complete')).toBeVisible();
+    expect(screen.getByText(/Channel readiness is checked separately/)).toBeVisible();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View all readiness checks' }));
+    const toggle = screen.getByRole('button', { name: 'Hide readiness checks' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const content = document.getElementById(toggle.getAttribute('aria-controls')!);
+    expect(content).toContainElement(screen.getByRole('list', { name: 'All readiness checks' }));
+    expect(screen.getAllByText('Complete', { exact: true })).toHaveLength(7);
+    expect(props.onViewAll).not.toHaveBeenCalled();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('View all readiness checks');
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
     rerender(<ProductReadinessCard {...props} checks={checks} />);
     expect(screen.getByText('Complete required attributes: Material')).toBeVisible();
+  });
+  it('keeps all checks live while expanded and preserves shortcuts without opening a drawer', () => {
+    const props = { isActive: false, onSelectCheck: vi.fn(), onViewAll: vi.fn() };
+    const { rerender } = render(<ProductReadinessCard {...props} checks={checks} />);
+    fireEvent.click(screen.getByRole('button', { name: 'View all readiness checks' }));
+    rerender(<ProductReadinessCard {...props} checks={checks.map(check => ({ ...check, done: true }))} />);
+    const allChecks = within(screen.getByRole('list', { name: 'All readiness checks' }));
+    expect(allChecks.queryByText('Needs attention')).not.toBeInTheDocument();
+    expect(allChecks.getAllByText('Complete', { exact: true })).toHaveLength(7);
+    fireEvent.click(allChecks.getByRole('button', { name: /Complete required attributes: Material/ }));
+    expect(props.onSelectCheck).toHaveBeenCalledWith('attributes');
+    expect(props.onViewAll).not.toHaveBeenCalled();
   });
   it('does not render an empty card when there are no requirements', () => {
     render(<ProductReadinessCard checks={[]} isActive={false} onSelectCheck={vi.fn()} onViewAll={vi.fn()} />);
@@ -53,12 +85,12 @@ describe('Shared Product readiness card', () => {
     rerender(<ProductReadinessCard {...props} expanded />);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
-  it('updates compact progress and hides the trigger once all requirements are complete', () => {
+  it('keeps the compact trigger available after all requirements are complete', () => {
     const props = { isActive: true, compact: true, onSelectCheck: vi.fn(), onViewAll: vi.fn() };
     const { rerender } = render(<ProductReadinessCard {...props} checks={checks} />);
     rerender(<ProductReadinessCard {...props} checks={checks.map(check => ({ ...check, done: false }))} />);
     expect(screen.getByRole('button', { name: 'Product readiness: 0 of 7 complete. View checks' })).toBeVisible();
     rerender(<ProductReadinessCard {...props} checks={checks.map(check => ({ ...check, done: true }))} />);
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Product readiness: 7 of 7 complete. View checks' })).toBeVisible();
   });
 });

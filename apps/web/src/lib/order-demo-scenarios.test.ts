@@ -2,7 +2,7 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {demoOrders} from '../../../../packages/order-workflow/demo-orders.js';
 import {batchBlocker, matchesActionFilter} from './order-bulk';
-import {matchesOrderQueue, workQueues} from './order-work-queues';
+import {matchesOrderQueue, orderQueue, workQueues} from './order-work-queues';
 import {runOrderPrototype} from './order-prototype';
 import {shippingLabelUrl} from './order-shipping-label';
 import type {OrderRecord} from './orders-api';
@@ -14,12 +14,15 @@ beforeEach(() => sessionStorage.clear());
 describe('Order demo scenarios', () => {
   it('covers every queue with stable identities, consistent totals and enough records to paginate', () => {
     const orders = examples();
-    expect(orders).toHaveLength(46);
-    expect(new Set(orders.map(order => order.id)).size).toBe(46);
+    expect(orders.length).toBeGreaterThan(40);
+    expect(new Set(orders.map(order => order.id)).size).toBe(orders.length);
     expect(orders.map(order => [order.id, order.orderedAt])).toEqual(examples().map(order => [order.id, order.orderedAt]));
-    expect(orders.filter(order => matchesOrderQueue(order, 'all'))).toHaveLength(43);
+    const submitted=orders.filter(order=>matchesOrderQueue(order,'all'));
+    expect(submitted).toHaveLength(orders.length-3);
     expect(orders.filter(order => matchesOrderQueue(order, 'draft'))).toHaveLength(3);
     for (const queue of workQueues) expect(orders.some(order => matchesOrderQueue(order, queue.key))).toBe(true);
+    const stageTotal=workQueues.filter(queue=>queue.key!=='all').reduce((total,queue)=>total+orders.filter(order=>matchesOrderQueue(order,queue.key)).length,0);
+    expect(stageTotal).toBe(submitted.length);
     for (const order of orders) {
       expect(order.source).toBe('demo');
       expect(order.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0)).toBe(order.totals.subtotal);
@@ -45,8 +48,13 @@ describe('Order demo scenarios', () => {
   });
 
   it('lets sellers advance seeded confirmation, handover and completion cases', () => {
-    expect(runOrderPrototype(scenario('CONFIRM-COD'), {action: 'transition', toStatus: 'acknowledged'}).canonicalStatus).toBe('acknowledged');
-    expect(runOrderPrototype(scenario('READY-LABEL'), {action: 'handover', reference: 'TEST-PICKUP', carrierAccepted: true}).canonicalStatus).toBe('shipped');
+    const confirmed=runOrderPrototype(scenario('CONFIRM-COD'), {action: 'transition', toStatus: 'acknowledged'});
+    expect(confirmed.canonicalStatus).toBe('acknowledged');
+    expect(orderQueue(confirmed)).toBe('preparing');
+    expect(orderQueue(scenario('READY-LABEL'))).toBe('pickup');
+    const handedOver=runOrderPrototype(scenario('READY-LABEL'), {action: 'handover', reference: 'TEST-PICKUP', carrierAccepted: true});
+    expect(handedOver.canonicalStatus).toBe('shipped');
+    expect(orderQueue(handedOver)).toBe('shipping');
     expect(runOrderPrototype(scenario('DELIVERED-PAID'), {action: 'transition', toStatus: 'closed'}).canonicalStatus).toBe('closed');
     expect(() => runOrderPrototype(scenario('DELIVERED-COD'), {action: 'transition', toStatus: 'closed'})).toThrow(/payment/i);
   });

@@ -1,7 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { availabilityReasons, type AvailabilitySummary } from '@/lib/warehouse-availability';
 import type { StockValue } from '@/lib/warehouse-stock-view';
@@ -14,20 +14,16 @@ export function InventoryAmount({ value, highlight = false }: { value: StockValu
   </span>;
 }
 
-export function StockGuide({ iconOnly = false }: { iconOnly?: boolean }) {
-  return <Popover><PopoverTrigger asChild><Button variant="ghost" size={iconOnly ? 'icon' : 'sm'} aria-label="Stock guide" title="Stock guide" className={cn('gap-1.5 text-xs', iconOnly && 'size-9 shrink-0')}><Info aria-hidden="true" className="size-4" />{!iconOnly && 'Stock guide'}</Button></PopoverTrigger>
-    <PopoverContent align="end" className="w-80 space-y-3 text-sm">
-      <p className="font-semibold">What can I sell now?</p>
-      <dl className="space-y-2 text-xs leading-5">
-        <div><dt className="font-semibold">In warehouse</dt><dd className="text-muted-foreground">The counted physical units, including stock held for existing orders.</dd></div>
-        <div><dt className="font-semibold">Held for orders</dt><dd className="text-muted-foreground">Unpaid holds, paid orders and stock allocated for fulfillment. Each hold is counted once.</dd></div>
-        <div><dt className="font-semibold">Other holds</dt><dd className="text-muted-foreground">Safety stock, campaign holds and damaged or quarantined stock.</dd></div>
-        <div><dt className="font-semibold">Available to sell (ATP)</dt><dd className="text-muted-foreground">In warehouse − Held for orders − Other holds, with a minimum of 0. Calculated for each SKU at each warehouse, then added together. Incoming stock is excluded until received.</dd></div>
-      </dl>
-      <p className="border-t pt-2 text-xs leading-5 text-muted-foreground">Totals use recorded quantities. — = Data unavailable; 0 = confirmed zero. ATP excludes marketplace-managed stock. Opening stock records the first count; Receive stock adds arriving units; Adjust stock corrects the physical count. ATP updates automatically when holds are known.</p>
-      <p className="text-xs leading-5 text-muted-foreground">Column totals include all filtered results, across every page. Expand a product to see its warehouses. Select a colored number for details; use Actions to adjust stock or manage holds. Listed on shows active listing channels across all shops. Shops using this warehouse matches each product’s listings to their configured stock source. Select a shop count to see connection and stock sync settings; published quantities are managed separately.</p>
-    </PopoverContent>
-  </Popover>;
+export function StockColumnTitle({ label, description, note, align = 'start' }: { label: string; description: string; note?: string; align?: 'start' | 'end' }) {
+  const [open, setOpen] = useState(false);
+  return <TooltipProvider delayDuration={200}><Tooltip open={open} onOpenChange={setOpen}>
+    <TooltipTrigger asChild><button type="button" aria-label={`${label} information`} onClick={() => setOpen(true)} className="inline-flex min-h-6 max-w-full cursor-help items-center gap-1 rounded text-inherit [text-align:inherit] font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <span>{label}</span><Info aria-hidden="true" className="size-3 shrink-0 opacity-60" />
+    </button></TooltipTrigger>
+    <TooltipContent side="top" align={align} sideOffset={8} className="max-w-80 space-y-2 text-left text-xs leading-5 motion-reduce:animate-none">
+      <p>{description}</p>{note && <p className="border-t pt-2 text-muted-foreground">{note}</p>}
+    </TooltipContent>
+  </Tooltip></TooltipProvider>;
 }
 
 export function AvailabilityMetrics({ summary }: { summary: AvailabilitySummary }) {

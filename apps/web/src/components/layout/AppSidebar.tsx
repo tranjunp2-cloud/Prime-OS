@@ -69,7 +69,6 @@ const mainNavigation: NavGroup[] = [
       { id: 'product-brands', label: 'Brands', href: '/products/brands', icon: Award },
     ] },
     { id: 'warehouse', label: 'Warehouses', href: '/warehouses', icon: Warehouse },
-    { id: 'stores-pos', label: 'Stores & POS', href: '/settings/stores', icon: MonitorSmartphone },
     { id: 'channels', label: 'Sales Channels', href: '/sales-channels/connected-channels', icon: Store },
   ] },
   { id: 'growth', label: 'Growth & Engagement', items: [
@@ -110,10 +109,12 @@ const primeWebNavigation: NavGroup[] = [
 
 const posNavigation: NavGroup[] = [{ id: 'pos', label: 'Point of Sale', items: [
   { id: 'fast-checkout', label: 'Sell', href: '/pos/register', icon: MonitorSmartphone },
+  { id: 'pos-products', label: 'Products', href: '/pos/products', icon: Package },
   { id: 'shift-management', label: 'Shifts & Cash', href: '/pos/shifts', icon: Store },
   { id: 'today-transactions', label: 'Transactions', href: '/pos/transactions', icon: ShoppingBag },
   { id: 'returns-refunds', label: 'Return / Refund', href: '/pos/returns', icon: Undo2 },
   { id: 'hardware-setup', label: 'Equipment', href: '/pos/hardware', icon: Settings2 },
+  { id: 'pos-settings', label: 'Settings', href: '/pos/settings', icon: Store },
 ] }];
 const cafeNavigation: NavGroup[] = [...posNavigation, { id: 'cafe', label: 'Restaurant & café', items: [
   { id: 'pos-tables', label: 'Tables & Orders', href: '/pos/tables', icon: LayoutGrid },
@@ -123,7 +124,7 @@ const cafeNavigation: NavGroup[] = [...posNavigation, { id: 'cafe', label: 'Rest
 function hrefIsActive(href: string | undefined, pathname: string, search: string) {
   if (!href) return false;
   const [hrefPath, hrefSearch = ''] = href.split('?');
-  const reservedProductRoutes = new Set(['master-catalog', 'catalog-imports', 'categories', 'attributes', 'brands', 'inventory', 'new']);
+  const reservedProductRoutes = new Set(['master-catalog', 'catalog-imports', 'pos-assortment', 'categories', 'attributes', 'brands', 'inventory', 'new']);
   const productSegments = pathname.split('/').filter(Boolean);
   const isProductEditorRoute = pathname === '/products/new'
     || (productSegments[0] === 'products' && productSegments.length >= 2 && !reservedProductRoutes.has(productSegments[1]) && (productSegments.length === 2 || (productSegments.length === 3 && productSegments[2] === 'edit')));

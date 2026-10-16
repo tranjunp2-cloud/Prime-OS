@@ -106,7 +106,7 @@ export function ProductSalesPerformance({ product, showDemoInitially = false, da
 
   return <TooltipProvider delayDuration={200}>
     <Card role="region" aria-labelledby={`${id}-title`} className={styles.card}>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b p-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b p-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2"><BarChart3 aria-hidden="true" className="size-4 text-primary" /><h2 id={`${id}-title`} className="text-sm font-semibold"><SalesMetricHelp label="Sales performance" description={SALES_HELP.overview} /></h2>{source.demo && <span className="rounded border border-dashed px-1.5 py-0.5 text-[11px] text-muted-foreground">Demo data</span>}</div>
           <p className="mt-1.5 text-xs text-muted-foreground">{dateRange} · UTC</p>
@@ -147,7 +147,7 @@ export function ProductSalesPerformance({ product, showDemoInitially = false, da
           </>}
         </div>}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-5 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-4 text-xs text-muted-foreground">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p>{completeShops}/{rows.length} {singleShop ? 'shop' : 'shops'} with complete period data{partial && <span className="text-amber-700 dark:text-amber-300"> · Partial coverage</span>}</p><p aria-label="Sales data freshness">{summary.updatedAt ? <>{source.demo ? 'Demo snapshot' : 'Updated'}: <time dateTime={summary.updatedAt}>{formatDate(summary.updatedAt, true)}</time></> : 'No complete sales sync recorded'}</p></div>
         <Popover><PopoverTrigger asChild><Button type="button" size="sm" variant="ghost" className="-mr-2 h-8 gap-1.5 text-xs text-muted-foreground"><Info aria-hidden="true" />How sales are counted</Button></PopoverTrigger>
           <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] space-y-3 text-xs leading-5" aria-label="Sales definitions and coverage">

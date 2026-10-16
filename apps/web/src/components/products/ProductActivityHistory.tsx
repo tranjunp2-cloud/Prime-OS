@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, ChevronDown, History, Package, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { ACTIVITY_CHANNEL_LABELS, demoProductActivity, getProductActivity, groupRoutineSyncActivity, type ProductActivity } from '@/lib/product-activity';
+import { ACTIVITY_CHANNEL_LABELS, getProductActivity, groupRoutineSyncActivity, type ProductActivity } from '@/lib/product-activity';
 import type { Product, ProductRevision } from '@/lib/product-store';
 import { cn } from '@/lib/utils';
 
@@ -12,17 +12,17 @@ const formatTime = (time: string) => new Date(time).toLocaleString('en-GB', {
 });
 type Scope = 'all' | 'master' | 'listing';
 
-export function ProductActivityHistory({ product, showDemoInitially = false, initialListingChannel, initialListingKey, initialRevisionId }: {
-  product: Product; showDemoInitially?: boolean; initialListingChannel?: string | null; initialListingKey?: string | null; initialRevisionId?: string | null;
+export function ProductActivityHistory({ product, header, initialListingChannel, initialListingKey, initialRevisionId }: {
+  header?: ReactNode;
+  product: Product; initialListingChannel?: string | null; initialListingKey?: string | null; initialRevisionId?: string | null;
 }) {
   const [scope, setScope] = useState<Scope>(initialListingChannel || initialListingKey ? 'listing' : 'all');
   const [listingKey, setListingKey] = useState(initialListingKey ?? 'all');
   const [shop, setShop] = useState('all');
-  const [showDemo, setShowDemo] = useState(showDemoInitially);
   const [limit, setLimit] = useState(20);
   const [version, setVersion] = useState<ProductRevision | null>(() => product.revisions?.find(revision => revision.id === initialRevisionId) ?? null);
-  const events = useMemo(() => [...getProductActivity(product), ...(showDemo ? demoProductActivity(product) : [])]
-    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), [product, showDemo]);
+  const events = useMemo(() => getProductActivity(product)
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), [product]);
   const shops = useMemo(() => [...new Map(events.filter(event => event.listing).map(event => {
     const listing = event.listing!;
     return [JSON.stringify([listing.channel, listing.shop]), `${ACTIVITY_CHANNEL_LABELS[listing.channel]} · ${listing.shop}`];
@@ -40,7 +40,8 @@ export function ProductActivityHistory({ product, showDemoInitially = false, ini
   }
 
   return <>
-    <Card>
+    <Card data-testid="product-activity-card">
+      {header}
       <CardContent className="p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
           <div role="group" aria-label="Activity scope" className="flex flex-wrap gap-1 rounded-lg bg-muted/40 p-1">
@@ -50,9 +51,6 @@ export function ProductActivityHistory({ product, showDemoInitially = false, ini
                 {label}
               </button>)}
           </div>
-          <Button type="button" variant="outline" size="sm" className="min-h-9" aria-pressed={showDemo} onClick={() => { setShowDemo(!showDemo); setLimit(20); }}>
-            {showDemo ? 'Hide demo events' : 'Show demo events'}
-          </Button>
           {scope === 'listing' && <div className="flex w-full flex-wrap items-center gap-2">
             {listingKey !== 'all' && <Button type="button" variant="ghost" size="sm" onClick={() => setListingKey('all')}>Selected listing · Clear filter</Button>}
             {channel !== 'all' && <Button type="button" variant="ghost" size="sm" onClick={() => setChannel('all')}>{ACTIVITY_CHANNEL_LABELS[channel as keyof typeof ACTIVITY_CHANNEL_LABELS] ?? channel} · Clear filter</Button>}
@@ -64,7 +62,7 @@ export function ProductActivityHistory({ product, showDemoInitially = false, ini
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2 text-xs text-muted-foreground">
           <p aria-live="polite">{filtered.length} events · Newest first</p>
-          <p>{showDemo ? 'Demo-labelled events are examples, not actual shop activity.' : 'Local prototype history · New saved changes are recorded here.'}</p>
+          <p>Local prototype history · New saved changes are recorded here.</p>
         </div>
         {filtered.length ? <ol aria-label="Product activity timeline" className="divide-y">
           {groups.slice(0, limit).map(event => {

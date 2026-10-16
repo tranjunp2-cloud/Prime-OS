@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { orderMoney, ordersApi, type OrderRecord } from '@/lib/orders-api';
+import { orderMoney, ordersApi, getOrderAttention, type OrderRecord } from '@/lib/orders-api';
 import { getOrderDetailFlow, getOrderDetailStatus, getOrderDetailSteps, getOrderDetailPermissions, getOrderActivity, type DetailTab } from '@/lib/order-detail-flow';
 import { printPackingSlips } from '@/lib/order-print';
 import { cn } from '@/lib/utils';
@@ -76,6 +76,17 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   const canHold = permissions.editable && !order.hold?.active && ['created', 'acknowledged', 'allocated', 'fulfillment_in_progress'].includes(order.canonicalStatus);
   const showMoreActions = canHold || permissions.cancel || showPackingSlipInMenu;
   const openExceptions = order.exceptions.filter((issue) => issue.status === 'open');
+  const attention = getOrderAttention(order);
+  const reviewDescriptions: Record<string, string> = {
+    stock: 'Not enough stock to reserve. Review the warehouse and item quantities.',
+    'stock-expired': 'The stock hold expired. Review stock before continuing.',
+    sync: 'Channel synchronization failed.',
+    pickup: 'Carrier pickup is overdue.',
+    delivery: 'Failed delivery. Review the shipment journey before arranging the next step.',
+    'return-request': 'Return request awaiting review. Check the request and customer evidence.',
+    'return-inspection': 'Returned items awaiting inspection. Check the received items before deciding the next step.',
+    refund: 'Payment was received. Review the refund separately from cancellation.',
+  };
   const history = getOrderActivity(order);
   // Read-only real orders still show the next step without enabling it.
   const actionPermissions = getOrderDetailPermissions(order, true);
@@ -194,12 +205,11 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
           <ShipDeadline order={order} />
           <SummaryField label="Dispatch warehouse"><span>{order.metadata.warehouse || 'Not assigned'}</span>{permissions.warehouse && <TextAction onClick={() => begin('warehouse', order.metadata.warehouse)}>Change warehouse</TextAction>}</SummaryField>
         </section>
-        {order.canonicalStatus === 'canceled' && order.payment.state === 'Paid' && <p role="alert" className="border-b px-4 py-2 text-sm text-amber-700 sm:px-6 dark:text-amber-300">Payment was received. Review the refund separately from cancellation.</p>}
 
         <div className="px-5 pb-6 sm:px-7">
           {success && <p role="status" className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
           {error && !action && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
-          {(order.hold?.active || openExceptions.length > 0 || order.syncError || ['Allocation failed', 'Reservation expired'].includes(order.reservation || '') || order.pickupOverdue) && <section ref={(node) => { sections.current.exceptions = node; }} role="alert" className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><h2 className="flex items-center gap-2 font-semibold"><CircleAlert className="size-4" />Needs review</h2>{order.hold?.active && <p className="mt-2">On hold: {order.hold.reason}</p>}{order.syncError && <p className="mt-2">Channel synchronization failed.</p>}{order.reservation === 'Allocation failed' && <p className="mt-2">Not enough stock to reserve. Review the warehouse and item quantities.</p>}{order.reservation === 'Reservation expired' && <p className="mt-2">The stock hold expired. Review stock before continuing.</p>}{order.pickupOverdue && <p className="mt-2">Carrier pickup is overdue.</p>}{openExceptions.map((issue) => <div key={issue.id} className="mt-2 flex items-center justify-between gap-3"><p>{issue.summary}</p>{permissions.editable && <Button variant="outline" size="sm" disabled={pending} onClick={() => void run({action:'resolve-exception',exceptionId:issue.id})}>Resolve</Button>}</div>)}</section>}
+          {attention.length > 0 && <section ref={(node) => { sections.current.exceptions = node; }} role="alert" aria-label="Order review details" className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><h2 className="flex items-center gap-2 font-semibold"><CircleAlert className="size-4" />Needs review</h2>{attention.filter(issue => issue.code !== 'exception').map(issue => <p key={issue.code} className="mt-2">{reviewDescriptions[issue.code] || issue.reason}</p>)}{openExceptions.map((issue) => <div key={issue.id} className="mt-2 flex items-center justify-between gap-3"><p>{issue.summary}</p>{permissions.editable && <Button variant="outline" size="sm" disabled={pending} onClick={() => void run({action:'resolve-exception',exceptionId:issue.id})}>Resolve</Button>}</div>)}</section>}
           <div className="mt-4">
               <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
                 <div className="min-w-0 space-y-4"><div ref={(node) => { sections.current.items = node; }}><Panel title={`Products (${order.lines.length})`} icon={<Box className="size-4" />}>

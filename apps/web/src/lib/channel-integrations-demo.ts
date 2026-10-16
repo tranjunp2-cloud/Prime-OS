@@ -46,8 +46,6 @@ export const demoConnectedChannels: ConnectedChannelRecord[] = [
   channel({ platform: 'rakuten', name: 'Rakuten', store_name: 'Prime Beauty JP', region: 'JP', type: 'Marketplace', status: 'CONNECTED', synced_listings: 416, warehouse: warehouses.crossBorder, sync_services: { price: true, stock: true, orders: true }, errors: 0 }),
   channel({ platform: 'primepos', name: 'PrimePOS', store_name: 'District 1 Flagship', region: 'VN', type: 'Retail POS', status: 'CONNECTED', synced_listings: 1240, warehouse: warehouses.districtOne, sync_services: { price: true, stock: true, orders: true }, errors: 0 }),
   channel({ platform: 'tiktok_shop', name: 'TikTok Shop', store_name: 'Prime Live Store', region: 'VN', type: 'Marketplace', status: 'SYNC_ERROR', synced_listings: 803, warehouse: null, sync_services: { price: true, stock: false, orders: true }, errors: 4, last_sync_at: '2026-10-13T04:05:00.000Z' }),
-  channel({ platform: 'shopify', name: 'Shopify', store_name: 'Prime Beauty Singapore', region: 'SG', type: 'E-Commerce/Web', status: 'INITIAL_SYNCING', synced_listings: 287, sync_progress: 36, warehouse: warehouses.crossBorder, sync_services: { price: true, stock: true, orders: true }, errors: 0, last_sync_at: '2026-10-13T05:58:00.000Z' }),
-  channel({ platform: 'woocommerce', name: 'WooCommerce', store_name: 'Prime Beauty Wholesale', region: 'VN', type: 'E-Commerce/Web', status: 'CONNECTED', synced_listings: 538, warehouse: warehouses.hanoi, sync_services: { price: true, stock: true, orders: false }, errors: 0 }),
 ];
 
 export function createDemoConnectedChannel(input: ConnectChannelPayload): ConnectedChannelRecord {

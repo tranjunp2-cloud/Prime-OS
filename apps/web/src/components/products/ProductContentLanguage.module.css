@@ -1,3 +1,8 @@
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) fit-content(50%);
+}
+
 .controls {
   display: flex;
   flex-direction: column;
@@ -5,11 +10,16 @@
   gap: .25rem;
   min-width: 0;
   max-width: 100%;
-  width: 17rem;
+  width: max-content;
 }
 
-.selector { display: flex; align-items: center; gap: .25rem; width: 100%; min-width: 0; }
+.selector { display: flex; align-items: center; width: fit-content; max-width: 100%; min-width: 0; }
 
 @container product-data-workspace (max-width: 35rem) {
-  .controls { width: 100%; align-items: flex-start; }
+  .header { grid-template-columns: minmax(0, 1fr); }
+  .controls { align-items: flex-start; }
+}
+
+@container product-data-workspace (max-width: 22.5rem) {
+  .prefix { display: none; }
 }

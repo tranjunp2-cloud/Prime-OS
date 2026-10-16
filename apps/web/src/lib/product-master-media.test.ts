@@ -12,11 +12,11 @@ describe('Product Master single-image minimum', () => {
     { images: ['/cover.jpg'], count: 1, ready: true },
     { images: ['', ' /cover.jpg ', ' '], count: 1, ready: true },
     { images: ['/cover.jpg', '/detail.jpg', '/detail.jpg'], count: 3, ready: true },
-  ])('checks media independently of Master activation for $images', ({ images, count, ready }) => {
+  ])('requires a populated image for Master activation for $images', ({ images, count, ready }) => {
     expect(getMasterMediaReadiness(images)).toEqual({ count, ready });
     const product = { ...getProducts()[0], ...readyMasterFields(), images, channels: [], channel_overrides: {} };
-    expect(getStoredMasterReadiness(product).checks.find(check => check.id === 'media')).toBeUndefined();
-    expect(getStoredMasterReadiness(product).ready).toBe(true);
+    expect(getStoredMasterReadiness(product).checks.find(check => check.id === 'media')?.done).toBe(ready);
+    expect(getStoredMasterReadiness(product).ready).toBe(ready);
     expect(product.images).toEqual(images);
   });
 

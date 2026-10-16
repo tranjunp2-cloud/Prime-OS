@@ -15,9 +15,9 @@ export function OrderReviewFilter({ count, active, loaded, onChange }: {
       Needs review <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-xs tabular-nums text-amber-700 dark:text-amber-300">{loaded ? count : '—'}</span><Info aria-hidden="true" className="size-3.5 shrink-0" />
     </Button></TooltipTrigger>
     <TooltipContent side="bottom" align="start" className="w-80 max-w-[calc(100vw-1.5rem)] space-y-2 whitespace-normal p-3 text-xs leading-relaxed">
-      <p>Orders needing attention: payment verification, stock issues, holds, overdue processing or pickup, failed deliveries, sync errors, or unresolved issues.</p>
+      <p>Orders needing attention: payment verification, stock issues, holds, overdue processing or pickup, failed deliveries, return requests, returned items awaiting inspection, cancelled orders with payment received, sync errors, or unresolved issues.</p>
       <p>Some warnings only flag urgency. Blocking issues must be resolved before the affected action can continue.</p>
-      <p className="text-muted-foreground">Each order is counted once within the current status tab. Turn this filter on or off to combine it with the selected stage and other filters.</p>
+      <p className="text-muted-foreground">Each order is counted once within the current status tab. Combine this with Filters. The warning icon beside an order opens its review details.</p>
     </TooltipContent>
   </Tooltip></TooltipProvider>;
 }

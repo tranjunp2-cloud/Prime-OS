@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CalendarClock, FileText, Globe2, Headphones, MessageSquare, MonitorSmartphone, Package, RadioTower, Sparkles, TicketPercent, WalletCards, type LucideIcon } from 'lucide-react';
+import { BarChart3, CalendarClock, FileText, Globe2, Headphones, MessageSquare, Package, RadioTower, Sparkles, TicketPercent, WalletCards, type LucideIcon } from 'lucide-react';
 import { useDemoDataMode } from '@/hooks/use-demo-data-mode';
 import { WorkspacePageHeader } from '@/components/system/WorkspacePageHeader';
 import { EmptyState } from '@/components/system/EmptyState';
@@ -22,6 +22,9 @@ const orders: [string, string] = ['View orders', '/orders'];
 // Explicitly registered data surfaces. Configuration forms, current-user access,
 // Help and Docs remain available; redirects are allowed to resolve normally.
 function emptyDemoScreen(pathname: string, params: URLSearchParams): EmptyScreen | undefined {
+  if (pathname.startsWith('/pos/') || pathname === '/products/pos-assortment') return undefined;
+  if (pathname === '/warehouses/store-stock') return { title: 'Store stock & purchasing', description: 'Manage stock and incoming shipments for your stores.', emptyTitle: 'No store stock yet', guidance: 'Prepare your stock locations and products before receiving your first shipment.', icon: Package, action: ['Go to Warehouses', '/warehouses'] };
+  if (pathname === '/client-reports/pos-shifts') return { title: 'POS shift review', description: 'Review cash counts and differences across stores.', emptyTitle: 'No shifts to review yet', guidance: 'Shift records appear after your team starts operating a register in Prime POS.', icon: BarChart3, action: ['Back to Analytics', '/client-reports'] };
   if (pathname === '/finance/ops') return {
     title: 'Finance Ops', description: 'Operational revenue, collections control, cash forecasting, and financial risk monitoring.',
     emptyTitle: ({ collections: 'No receivables yet', forecast: 'No cash flow history yet', risk: 'No financial activity to review' } as Record<string, string>)[params.get('view') ?? ''] ?? 'No financial activity yet',
@@ -37,13 +40,6 @@ function emptyDemoScreen(pathname: string, params: URLSearchParams): EmptyScreen
   if (pathname === '/finance/fin-support') return { title: 'Financial Support', description: 'Review business readiness and available financial support.', emptyTitle: 'No financial assessment yet', guidance: 'Sync your orders and payment history before reviewing funding readiness. No sample balances, risk scores or offers are shown.', icon: WalletCards, action: connect };
   if (pathname === '/crm/mdec') return { title: 'Business Growth', description: 'Review growth opportunities for your business.', emptyTitle: 'No business activity yet', guidance: 'Complete your business setup and connect your first channel to start building your growth overview.', icon: BarChart3, action: ['Set up business information', '/settings/general'] };
   if (pathname === '/ecom/commerce-surface') return { title: 'Commerce', description: 'Manage commerce activity across your channels.', emptyTitle: 'No commerce activity yet', guidance: 'Connect a sales channel and add products to start selling.', icon: Globe2, action: connect };
-  if (pathname.startsWith('/pos/')) {
-    const section = pathname.split('/')[2];
-    if (section === 'hardware') return undefined;
-    const labels: Record<string, [string, string]> = { register: ['Fast Checkout', 'No products available for checkout'], shifts: ['Shift Management', 'No shifts yet'], transactions: ['Today Transactions', 'No transactions yet'], returns: ['Return / Refund', 'No purchases to return'] };
-    const [title, emptyTitle] = labels[section] ?? ['Point of Sale', 'No POS activity yet'];
-    return { title, description: 'Operate your point of sale from a shared product and inventory catalog.', emptyTitle, guidance: 'Add products and prepare warehouse stock before making your first sale. Transactions and returns will appear after sales are recorded.', icon: MonitorSmartphone, action: ['Set up products', '/products/master-catalog'] };
-  }
   if (/^\/products\/[^/]+\/edit\/?$/.test(pathname)) return { title: 'Product details', description: 'Manage shared product information and channel listings.', emptyTitle: 'No product selected', guidance: 'The demo is showing an empty catalog. Create your first Product Master, or switch back to With data to inspect an existing product.', icon: Package, action: ['Go to Product Master', '/products/master-catalog'] };
   if (pathname.startsWith('/promotions/') && pathname !== '/promotions/discount-codes') {
     const titles: Record<string, string> = { automatic: 'Automatic Discounts', 'flash-sale': 'Flash Sales', loyalty: 'Loyalty & Membership', analytics: 'Promotion Analytics' };

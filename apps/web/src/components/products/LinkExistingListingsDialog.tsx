@@ -12,6 +12,7 @@ import { confirmListingIntake, listingOwner, snapshotListingMatch } from '@/lib/
 import { listingMatchEvidence } from '@/lib/listing-match-evidence';
 import { variantMappingError, type VariantMappings } from '@/lib/listing-master-completion';
 import { ACTIVITY_CHANNEL_LABELS } from '@/lib/product-activity';
+import { importedListingDataReadiness } from '@/lib/listing-data-readiness';
 import { ListingSkuMappings } from './ListingSkuMappings';
 import styles from './LinkExistingListingsDialog.module.css';
 
@@ -82,6 +83,7 @@ export function LinkExistingListingsDialog({ master, hasUnsavedMasterChanges, on
   const shops = [...new Map(pool.items.filter(item => channel === 'all' || item.channel === channel).map(item => [shopKey(item), item])).values()];
   const hiddenSelected = selected.filter(id => !visible.some(item => item.id === id)).length;
   const mappingError = review ? variantMappingError(review.listings, review.master, mappings, verifiedSingles) : '';
+  const incompleteListings = (review?.listings ?? []).filter(item => !importedListingDataReadiness(item).ready);
   const clearFilters = () => { setQuery(''); setChannel('all'); setShop('all'); setSelectedOnly(false); };
   const beginReview = () => {
     const fresh = readPool();
@@ -96,7 +98,7 @@ export function LinkExistingListingsDialog({ master, hasUnsavedMasterChanges, on
     setMappings({}); setVerifiedSingles([]); setAcknowledged(false); setError('');
   };
   const save = () => {
-    if (!review || mappingError || !acknowledged || saveLock.current) return;
+    if (!review || mappingError || incompleteListings.length || !acknowledged || saveLock.current) return;
     saveLock.current = true; setSaving(true); setError('');
     try {
       const result = confirmListingIntake(review.listings.map(item => item.id), {
@@ -163,6 +165,7 @@ export function LinkExistingListingsDialog({ master, hasUnsavedMasterChanges, on
               {variants ? <ListingSkuMappings product={review.master} sources={[item]} mappings={mappings} onChange={setMappings} /> : item.variants <= 1 ? <div className="flex flex-wrap items-center gap-2 border-t pt-3 text-xs"><span className="text-muted-foreground">SKU mapping</span><span className="break-all font-mono">{item.channelSku || 'Not recorded'}</span><ArrowRight className="size-3 shrink-0 text-muted-foreground" /><span className="break-all font-mono">{review.master.sku_code}</span></div> : <p className="text-sm text-amber-700 dark:text-amber-300">This listing has {item.variants} SKUs. It needs a variant Master; remove it from this selection.</p>}
             </section>;
           })}
+          {incompleteListings.length > 0 && <div role="alert" className="space-y-1 rounded-lg border border-destructive/30 p-3 text-sm"><p className="font-semibold text-destructive">Complete listing data before linking</p>{incompleteListings.map(item => <p key={item.id} className="text-xs">{item.storeName} · {item.channelSku || item.listingId}: {importedListingDataReadiness(item).missing.join(', ')}</p>)}<p className="text-xs text-muted-foreground">Re-import the complete listings from their shops, then refresh this selection.</p></div>}
           {mappingError && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">{mappingError}</p>}
           <label className="flex cursor-pointer items-start gap-2.5 text-sm leading-5"><Checkbox className="mt-0.5" checked={acknowledged} onCheckedChange={checked => setAcknowledged(checked === true)} /><span>I checked that every selected listing represents this product and the same pack size.</span></label>
         </div>}
@@ -172,7 +175,7 @@ export function LinkExistingListingsDialog({ master, hasUnsavedMasterChanges, on
         {!review && selected.length > 0 && !selectionValid && <p role="alert" className="text-sm text-destructive">Some selected listings are unavailable. Deselect them or clear the selection.</p>}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected{!review && hiddenSelected > 0 ? ` · ${hiddenSelected} outside filters` : ''}</span>{!review && selected.length > 0 && <Button variant="ghost" size="sm" onClick={() => { setSelected([]); setSelectedOnly(false); setError(''); }}>Clear selection</Button>}</div>
-          <div className="flex items-center gap-2"><Button variant="outline" disabled={saving} onClick={review ? back : onClose}>{review ? <><ArrowLeft className="size-4" />Back</> : 'Cancel'}</Button><Button disabled={saving || (review ? !acknowledged || Boolean(mappingError) : !selectionValid)} onClick={review ? save : beginReview}>{saving ? 'Linking…' : review ? `Link ${selected.length} listing${selected.length === 1 ? '' : 's'}` : `Review links${selected.length ? ` (${selected.length})` : ''}`}{!review && <ArrowRight className="size-4" />}</Button></div>
+          <div className="flex items-center gap-2"><Button variant="outline" disabled={saving} onClick={review ? back : onClose}>{review ? <><ArrowLeft className="size-4" />Back</> : 'Cancel'}</Button><Button disabled={saving || (review ? !acknowledged || Boolean(mappingError) || incompleteListings.length > 0 : !selectionValid)} onClick={review ? save : beginReview}>{saving ? 'Linking…' : review ? `Link ${selected.length} listing${selected.length === 1 ? '' : 's'}` : `Review links${selected.length ? ` (${selected.length})` : ''}`}{!review && <ArrowRight className="size-4" />}</Button></div>
         </div>
       </div>
     </DialogContent>

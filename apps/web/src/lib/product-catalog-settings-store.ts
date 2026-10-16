@@ -160,7 +160,7 @@ function buildDefaultCategories(): CatalogCategory[] {
     addNode({ id: branchId, name: parent, parentId: rootId, description: '', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
     addNode({
       id, name, parentId: branchId, description: '', status: 'Active', source: index > 12 ? 'imported' : 'internal',
-      attributes: keys.map((key, keyIndex) => ({ key, required: keyIndex < 2 })),
+      attributes: keys.map(key => ({ key, required: false })),
       mappings: mappedChannels({ webstore: 'mapped', shopee: index % 3 ? 'mapped' : 'needs_review', lazada: index % 2 ? 'needs_review' : 'mapped', amazon: index % 4 ? 'mapped' : 'needs_review' }),
     });
   });
@@ -170,7 +170,7 @@ function buildDefaultCategories(): CatalogCategory[] {
   const emergingBranchId = taxonomyId('branch', 'Office & Creative', 'Emerging Categories');
   addNode({ id: creativeRootId, name: 'Office & Creative', parentId: null, description: 'Office, stationery and creative product taxonomy.', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels() });
   addNode({ id: stationeryBranchId, name: 'Stationery', parentId: creativeRootId, description: 'Paper goods, notebooks and art materials.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: false }, { key: 'color', required: false }, { key: 'paper_size', required: false }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'needs_review', tiktok: 'needs_review', amazon: 'mapped', rakuten: 'needs_review' }) });
-  addNode({ id: 'art-supplies', name: 'Art Supplies', parentId: stationeryBranchId, description: 'Drawing, painting and craft supplies.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: true }, { key: 'color', required: false }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'mapped', tiktok: 'mapped', amazon: 'mapped', rakuten: 'mapped' }) });
+  addNode({ id: 'art-supplies', name: 'Art Supplies', parentId: stationeryBranchId, description: 'Drawing, painting and craft supplies.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: false }, { key: 'color', required: false }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'mapped', tiktok: 'mapped', amazon: 'mapped', rakuten: 'mapped' }) });
   addNode({ id: 'painting-accessories', name: 'Painting Accessories', parentId: stationeryBranchId, description: 'Brushes, palettes and painting tools linked to Product Masters.', status: 'Active', source: 'internal', attributes: [{ key: 'material', required: false }, { key: 'binding_type', required: false }, { key: 'paper_size', required: false }], mappings: mappedChannels({ webstore: 'mapped', shopee: 'mapped', lazada: 'mapped', tiktok: 'mapped', amazon: 'mapped', rakuten: 'mapped' }) });
   addNode({ id: emergingBranchId, name: 'Emerging Categories', parentId: creativeRootId, description: 'New categories awaiting catalog and channel setup.', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels({ webstore: 'needs_review' }) });
   addNode({ id: 'bamboo-crafts', name: 'Bamboo Crafts', parentId: emergingBranchId, description: 'Demo case: no Product Masters and no channel mappings.', status: 'Active', source: 'internal', attributes: [], mappings: mappedChannels({ webstore: 'needs_review' }) });
@@ -187,11 +187,28 @@ export const defaultCatalogAttributeGroups: CatalogAttributeGroup[] = [
   { id: 'product-content', name: 'Product content', description: 'Care instructions and customer-facing details', purpose: 'specification' },
 ];
 
-export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[]; attributeGroups?: CatalogAttributeGroup[]; taxonomyVersion?: number }
+export interface ProductCatalogSettings { categories: CatalogCategory[]; attributes: CatalogAttribute[]; brands: CatalogBrand[]; attributeGroups?: CatalogAttributeGroup[]; taxonomyVersion?: number; attributeRequirementsVersion?: number }
+
+/** Old demo seeds marked the first two attributes required without a catalog rule.
+ * Only migrate exact seed schemas; customized categories and all versioned saves
+ * retain their requirements. Legacy storage has no per-assignment provenance.
+ */
+function migrateSeedAttributeRequirements(categories: CatalogCategory[]): CatalogCategory[] {
+  return categories.map(category => {
+    const seed = defaultCatalogCategories.find(item => item.id === category.id);
+    const keys: readonly string[] | undefined = category.id === 'art-supplies' ? ['material'] : defs.find(([id]) => id === category.id)?.[4].slice(0, 2);
+    if (!seed || !keys?.length || category.name !== seed.name || category.parentId !== seed.parentId
+      || category.description !== seed.description || category.source !== seed.source || category.status !== seed.status
+      || category.attributes.length !== seed.attributes.length
+      || !seed.attributes.every(assignment => category.attributes.some(item => item.key === assignment.key && item.required === keys.includes(item.key)))) return category;
+    return { ...category, attributes: category.attributes.map(assignment => ({ ...assignment, required: false })) };
+  });
+}
 
 function defaults(): ProductCatalogSettings {
   return {
     taxonomyVersion: 1,
+    attributeRequirementsVersion: 1,
     categories: defaultCatalogCategories.map(category => ({ ...category, attributes: category.attributes.map(attribute => ({ ...attribute })), mappings: { ...category.mappings }, channelMappings: { ...category.channelMappings } })),
     attributes: defaultCatalogAttributes.map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })),
     brands: defaultCatalogBrands.map(brand => ({ ...brand, aliases: [...brand.aliases], mappings: { ...brand.mappings } })),
@@ -260,14 +277,15 @@ export function getProductCatalogSettings(): ProductCatalogSettings {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return defaults();
-    const parsed = { ...defaults(), taxonomyVersion: 0, ...JSON.parse(stored) } as Omit<ProductCatalogSettings, 'brands'> & { brands: StoredCatalogBrand[] };
+    const parsed = { ...defaults(), taxonomyVersion: 0, attributeRequirementsVersion: 0, ...JSON.parse(stored) } as Omit<ProductCatalogSettings, 'brands'> & { brands: StoredCatalogBrand[] };
     const categories = migrateLegacyCategories(parsed.categories);
-    return { ...parsed, taxonomyVersion: 1, brands: parsed.brands.map(restoreCatalogBrand), categories: parsed.taxonomyVersion ? categories : ensureDemoTaxonomy(categories), attributes: ensureDemoAttributes(parsed.attributes).map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })), attributeGroups: parsed.attributeGroups?.length ? parsed.attributeGroups : defaultCatalogAttributeGroups.map(group => ({ ...group })) };
+    const taxonomy = parsed.taxonomyVersion ? categories : ensureDemoTaxonomy(categories);
+    return { ...parsed, taxonomyVersion: 1, attributeRequirementsVersion: 1, brands: parsed.brands.map(restoreCatalogBrand), categories: parsed.attributeRequirementsVersion ? taxonomy : migrateSeedAttributeRequirements(taxonomy), attributes: ensureDemoAttributes(parsed.attributes).map(attribute => ({ ...attribute, groupId: inferredAttributeGroup(attribute) })), attributeGroups: parsed.attributeGroups?.length ? parsed.attributeGroups : defaultCatalogAttributeGroups.map(group => ({ ...group })) };
   } catch { return defaults(); }
 }
 
 export function saveProductCatalogSettings(settings: ProductCatalogSettings) {
-  if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, taxonomyVersion: 1 }));
+  if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, taxonomyVersion: 1, attributeRequirementsVersion: 1 }));
 }
 
 export function getActiveCatalogBrands() { return getProductCatalogSettings().brands.filter(item => item.status !== 'Inactive'); }

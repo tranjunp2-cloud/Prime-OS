@@ -9,7 +9,7 @@ import { getInventoryPositions, type InventoryPosition } from '@/lib/inventory-s
 import { activeChannels, canEditWarehouseStock, channelNames, recordedQuantity, stockAt, type StockValue } from '@/lib/warehouse-stock-view';
 import { canManageWarehouseHolds } from '@/lib/warehouse-holds';
 import { availabilityAt, summarizeAvailability, type AvailabilitySummary } from '@/lib/warehouse-availability';
-import { InventoryAmount, StockBreakdown, type StockBreakdownMode } from './StockAvailability';
+import { InventoryAmount, StockBreakdown, StockColumnTitle, type StockBreakdownMode } from './StockAvailability';
 import { ManageStockHoldsDialog } from './ManageStockHoldsDialog';
 import { StockRowActions } from './StockRowActions';
 import { getWarehouseById } from '@/lib/warehouse-store';
@@ -32,6 +32,13 @@ export function StockNumber({ value, compact = false }: { value: StockValue; com
 
 export type StockAdjustmentTarget = { product: Product; warehouse?: StockLocation; sku?: string; initializeLocation?: boolean; mode?: 'receive' | 'availability' };
 const noShops: ConnectedChannelRecord[] = [];
+const stockColumnDescriptions = {
+  Stock: 'Physical units recorded in this warehouse selection, including units held for orders and other reasons. Incoming units are added only after receipt.',
+  'For orders': 'Units reserved for unpaid or paid orders, or allocated for fulfillment. This is a unit count, not an order count. The system manages these holds; select a colored value to see order details.',
+  'Other holds': 'Units held as safety stock, reserved for campaigns, or damaged / quarantined. They stay in the physical stock count but cannot be sold. Use Manage holds to hold or release them.',
+  'Available (ATP)': 'Units available to sell: Stock − For orders − Other holds, with a minimum of 0 for each SKU at each warehouse. Incoming and marketplace-managed stock are excluded. Select a value to see the calculation.',
+} as const;
+const stockTotalNote = 'The total below includes recorded quantities for all filtered results, across every page. — means data is unavailable; 0 means confirmed zero.';
 
 type Props = {
   shops?: ConnectedChannelRecord[];
@@ -46,11 +53,16 @@ type Props = {
   warehouseId: string;
   onShowAll: () => void;
   initialSearch?: string;
+  stockFilter?: string;
+  onStockFilterChange?: (value: string) => void;
 };
-export function WarehouseStockTable({ products, warehouses, positions = getInventoryPositions(), warehouseId, onShowAll, onAdjustStock, onRecordOpeningStock, onViewWarehouse, onTransferStock, initialSearch = '', shops = noShops, shopLinksState = 'ready' }: Props) {
+export function WarehouseStockTable({ products, warehouses, positions = getInventoryPositions(), warehouseId, onShowAll, onAdjustStock, onRecordOpeningStock, onViewWarehouse, onTransferStock, initialSearch = '', stockFilter, onStockFilterChange, shops = noShops, shopLinksState = 'ready' }: Props) {
   const [query, setQuery] = useState(initialSearch);
   const [productId, setProductId] = useState(products.find(product => product.sku_code === initialSearch)?.id ?? '');
-  const [status, setStatus] = useState('all');
+  const [localStatus, setLocalStatus] = useState('all');
+  const status = stockFilter ?? localStatus;
+  const setStatus = (value: string) => { setLocalStatus(value); onStockFilterChange?.(value); };
+  useEffect(() => { setPage(1); setExpanded([]); }, [status]);
   const [channel, setChannel] = useState('all');
   const [shopFilter, setShopFilter] = useState('all');
   const [shopDetails, setShopDetails] = useState<{ productId: string; warehouseId: string; skuId?: string } | null>(null);
@@ -82,6 +94,7 @@ export function WarehouseStockTable({ products, warehouses, positions = getInven
   const matches = scopedProducts.filter(product => `${product.name} ${product.sku_code} ${product.skus.map(sku => sku.sku_code).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()));
   const stockMatches = (stock: AvailabilitySummary) => status === 'all'
     || (status === 'available' && stock.onHand.quantity !== null && stock.onHand.quantity > 0)
+    || (status === 'low' && !stock.onHand.incomplete && stock.onHand.quantity !== null && stock.onHand.quantity > 0 && stock.onHand.quantity <= 10)
     || (status === 'empty' && stock.onHand.quantity === 0 && !stock.onHand.incomplete)
     || (status === 'untracked' && stock.onHand.quantity === null)
     || (status === 'partial' && stock.onHand.incomplete)
@@ -175,7 +188,7 @@ export function WarehouseStockTable({ products, warehouses, positions = getInven
     <div className="space-y-2 border-b border-border px-4 py-2.5">
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-0 basis-48 grow"><label htmlFor="warehouse-product" className="sr-only">Product</label><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><Input id="warehouse-product" value={query} placeholder="Search product or SKU…" className="h-10 pl-9 pr-10" onChange={event => { setQuery(event.target.value); setProductId(''); setPage(1); }} />{query && <Button aria-label="Clear search" variant="ghost" size="icon" className="absolute right-1 top-0.5 size-9" onClick={() => { setQuery(''); setProductId(''); setPage(1); }}><X className="size-4" /></Button>}</div>
-        <select aria-label="Stock status" className={controlClass} value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}><option value="all">All statuses</option><option value="atp">Available to sell</option><option value="no-atp">No ATP available</option><option value="held">Held for orders</option><option value="unknown-atp">ATP data missing</option><option value="available">In warehouse</option><option value="empty">Out of stock</option><option value="untracked">Not recorded</option><option value="partial">Partial stock data</option></select>
+        <select aria-label="Stock status" className={controlClass} value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}><option value="all">All statuses</option><option value="atp">Available to sell</option><option value="no-atp">No ATP available</option><option value="held">Held for orders</option><option value="unknown-atp">ATP data missing</option><option value="available">In warehouse</option><option value="low">Low stock (1–10 units)</option><option value="empty">Out of stock</option><option value="untracked">Not recorded</option><option value="partial">Partial stock data</option></select>
         {shopScope ? <select aria-label="Shop using this warehouse" className={controlClass} disabled={shopLinksState !== 'ready'} value={effectiveShopFilter} onChange={event => { setShopFilter(event.target.value); setPage(1); }}><option value="all">{shopLinksState === 'loading' ? 'Loading shops…' : shopLinksState === 'error' ? 'Shops unavailable' : 'All shops using this warehouse'}</option>{filterShops.map(shop => <option key={shop.id} value={shop.id}>{shop.store_name} · {shop.name}</option>)}</select>
           : <select aria-label="Listing channel" className={controlClass} value={channel} onChange={event => { setChannel(event.target.value); setPage(1); }}><option value="all">All listing channels</option>{channels.map(key => <option key={key} value={key}>{channelNames[key] ?? key}</option>)}</select>}
         <select aria-label="Sort products" className={controlClass} value={sort} onChange={event => { setSort(event.target.value); setPage(1); }}><option value="name">Name A–Z</option><option value="atp-low">Lowest ATP first</option><option value="low">Lowest stock first</option><option value="high">Highest stock first</option></select>
@@ -187,15 +200,15 @@ export function WarehouseStockTable({ products, warehouses, positions = getInven
     {/* Keep the sticky header opaque over rows, overriding the shared translucent table header surface. */}
     <div className="max-h-[62vh] overflow-auto"><table className="w-full min-w-[860px] table-fixed text-left text-sm"><colgroup><col /><col className="w-[11%]" /><col className="w-[11%]" /><col className="w-[11%]" /><col className="w-[14%]" /><col className="w-[12%]" /><col className="w-[96px]" /></colgroup><thead className="sticky top-0 z-10 !bg-card text-xs text-muted-foreground">
       <tr>
-        <th scope="col" className="min-w-[220px] px-4 py-2.5 text-left align-top"><span className="block font-medium">{selectedProduct ? 'Warehouse / SKU' : 'Product / SKU'}</span><span aria-live="polite" className="mt-1 block text-sm font-semibold tabular-nums text-foreground">{rows.length} {resultLabel}</span></th>
+        <th scope="col" className="min-w-[220px] px-4 py-2.5 text-left align-top"><StockColumnTitle label={selectedProduct ? 'Warehouse / SKU' : 'Product / SKU'} description={selectedProduct ? 'Locations associated with the selected product. Expand a row to see variant SKUs. The count below shows all matching warehouses.' : 'Product Master items associated with the selected warehouses, even if no shop uses their stock yet. Expand a row for warehouse or variant details. The count below shows all matching products.'} /><span aria-live="polite" className="mt-1 block text-sm font-semibold tabular-nums text-foreground">{rows.length} {resultLabel}</span></th>
         {([
           ['Stock', totals.onHand],
           ['For orders', totals.held],
           ['Other holds', totals.unavailable],
           ['Available (ATP)', totals.atp],
-        ] as const).map(([label, value]) => <th key={label} scope="col" className={`px-3 py-2.5 text-right align-top ${label === 'Available (ATP)' ? 'bg-emerald-500/[0.03] text-emerald-700 dark:text-emerald-400' : ''}`} title={`${label}: total for all matching results`}><span className="block font-medium">{label}</span>{label === 'Available (ATP)' && scopedWarehouses.some(item => item.external) && <span className="block text-[10px] font-normal text-muted-foreground">Managed stock only</span>}<div className="mt-1 text-base text-foreground"><InventoryAmount value={value} highlight={label === 'Available (ATP)'} /></div></th>)}
-        <th scope="col" className="px-3 py-2.5 text-left align-top font-medium" title={shopScope ? "Shops with an active listing of this product and a confirmed stock source here. Select a cell to check sync settings." : "Channels with active product listings across all shops; independent of warehouse links."}>{shopScope ? 'Shops using this warehouse' : 'Listed on'}</th>
-        <th scope="col" className="sticky right-0 bg-card px-3 py-2.5 text-right align-top font-medium">Actions</th>
+        ] as const).map(([label, value]) => <th key={label} scope="col" className={`px-3 py-2.5 text-right align-top ${label === 'Available (ATP)' ? 'bg-emerald-500/[0.03] text-emerald-700 dark:text-emerald-400' : ''}`}><StockColumnTitle label={label} description={stockColumnDescriptions[label]} note={stockTotalNote} align="end" />{label === 'Available (ATP)' && scopedWarehouses.some(item => item.external) && <span className="block text-[10px] font-normal text-muted-foreground">Managed stock only</span>}<div className="mt-1 text-base text-foreground"><InventoryAmount value={value} highlight={label === 'Available (ATP)'} /></div></th>)}
+        <th scope="col" className="px-3 py-2.5 text-left align-top font-medium"><StockColumnTitle label={shopScope ? 'Shops using this warehouse' : 'Listed on'} description={shopScope ? 'Shops with an active listing of this product and a confirmed stock source in this warehouse. Select a shop count to see connection and stock sync settings. Quantities published to shops are managed separately.' : 'Sales channels with active listings of this product across all shops. These listings do not necessarily use stock from the same warehouse.'} /></th>
+        <th scope="col" className="sticky right-0 bg-card px-3 py-2.5 text-right align-top font-medium"><StockColumnTitle label="Actions" description="Open a row’s menu to receive, adjust or transfer stock, or manage holds. Available actions depend on the stock data and warehouse permissions. Hover over each menu item for its explanation." align="end" /></th>
       </tr>
     </thead><tbody>
       {displayed.map(row => {

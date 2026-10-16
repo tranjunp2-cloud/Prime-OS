@@ -6,24 +6,28 @@ import type { CatalogImportItem } from './catalog-import-store';
 import { getStoredMasterReadiness } from './product-master-readiness';
 import { listingSyncReadiness } from './listing-sync-readiness';
 import { masterSyncPlan } from './listing-master-sync';
+import { newListingMasterPreview } from './listing-master-completion';
 
 const source: CatalogImportItem = {
   id: 'required-a', listingId: 'required-a', channel: 'shopee', storeName: 'Shop A', title: 'Watercolor paper',
   description: 'Paper for watercolor.', channelSku: 'SHOP-A', channelStock: 1, channelCategory: 'Art paper',
-  variants: 1, image: '', price: 20, currency: 'USD', status: 'unmatched', confidence: 0, resolution: 'later',
+  variants: 1, image: '/shop.jpg', price: 20, currency: 'USD', status: 'unmatched', confidence: 0, resolution: 'later',
   requirements: { channel: 'shopee', category: 'Art paper', revision: 'test-v1', origin: 'prototype', fields: [{ key: 'channel_settings.attribute_material', label: 'Material', kind: 'text' }] },
 };
 function create(drafts?: Parameters<typeof confirmListingIntake>[1]['listingDrafts']) {
   const other: CatalogImportItem = { ...source, id: 'required-b', listingId: 'required-b', storeName: 'Shop B', channelSku: 'SHOP-B', channelSettings: { attribute_material: 'Paper' } };
   const catalog = createEmptyListingCatalog([source, other]);
-  confirmListingIntake([source.id, other.id], { name: source.title, sku: 'READINESS-MASTER', sourceId: source.id, copySourcePrice: true, listingDrafts: drafts }, catalog);
+  const master = { ...newListingMasterPreview(source, { name: source.title, sku: 'READINESS-MASTER', copySourcePrice: true }),
+    status: 'published' as const, images: ['/cover.jpg'], inventory: { wh_crjp: 0 } };
+  catalog.add(master);
+  confirmListingIntake([source.id, other.id], { productId: master.id, listingDrafts: drafts }, catalog);
   return { catalog, product: catalog.products()[0] };
 }
 describe('Independent Master and per-listing readiness', () => {
-  it('activates with only core data, retaining two links while only one listing is blocked', () => {
+  it('keeps Master readiness separate from the requirements of its two linked listings', () => {
     const { product } = create();
-    expect(product).toMatchObject({ status: 'published', category: '', images: [], pkg_weight: 0 });
-    expect(getStoredMasterReadiness(product).checks).toHaveLength(4);
+    expect(product).toMatchObject({ status: 'published', category: '', images: ['/cover.jpg'], inventory: { wh_crjp: 0 }, pkg_weight: 0 });
+    expect(getStoredMasterReadiness(product).checks).toHaveLength(6);
     expect(getStoredMasterReadiness(product).ready).toBe(true);
     expect(product.channels).toHaveLength(2);
     expect(listingSyncReadiness(product, product.channels[0])).toMatchObject({ ready: false, label: 'Missing channel details' });
@@ -54,7 +58,7 @@ describe('Independent Master and per-listing readiness', () => {
     const { product } = create();
     const link = { ...product.channels[1], shop_snapshot: { ...product.channels[1].shop_snapshot!, description: '', requirements: { ...source.requirements!, fields: [{ key: 'description' as const, label: 'Description', kind: 'text' as const }] } } };
     expect(listingSyncReadiness(product, link).ready).toBe(false);
-    expect(masterSyncPlan(product, link, { enabled: true, fields: ['content'] }).error).toBeUndefined();
+    expect(masterSyncPlan(product, link, { enabled: true, fields: ['content'] }).error).toContain('Missing listing data: Description');
   });
   it('keeps pending SKU matches distinct from complete channel fields', () => {
     const { product } = create();

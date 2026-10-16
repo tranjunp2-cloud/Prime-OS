@@ -14,6 +14,7 @@ import { savedListingCatalog, type ListingIntakeCatalog } from '@/lib/listing-in
 import { canCopyListingPrice, confirmListingIntake, intakeSku, pendingMappingReviews, snapshotListingMatch, snapshotListingSource, suggestedListingBrandId } from '@/lib/product-listing-intake';
 import { resolveSourceSkuMappings, sourceSkuDataError } from '@/lib/listing-sku-mapping';
 import { hydrateReviewSkuSources } from '@/lib/listing-review-source';
+import { importedListingDataReadiness } from '@/lib/listing-data-readiness';
 import { proposeListingReview } from '@/lib/listing-auto-proposal';
 import { listingMappingRecovery } from '@/lib/listing-mapping-recovery';
 import { pendingReviewFor, prepareReviewVariants, resolvedReviewMappings } from '@/lib/listing-review-progress';
@@ -149,15 +150,17 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const mappingError = comparisonMaster ? variantMappingError(comparisonSources, comparisonMaster, resolvedMappings, verifiedSingles) : '';
   const mappingRecovery = stage === 'compare' && !groupedComparison && comparisonMaster ? listingMappingRecovery(current, comparisonMaster, resolvedMappings, verifiedSingles) : null;
   const needsSkuReviewIds = groupedComparison && comparisonMaster ? sources.filter(source => listingMappingRecovery(source, comparisonMaster, resolvedMappings, verifiedSingles)).map(source => source.id) : [];
-  const canSave = mode === 'new' ? (sources.length === 1 || acknowledged) && (!unknownStructure || verifiedStructure) && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master) && !blocked && !mappingError && (!groupedComparison || acknowledged);
-  const canDefer = mode === 'new' ? Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master);
+  const missingListingData = sources.map(source => ({ source, ...importedListingDataReadiness(source) })).filter(item => !item.ready);
+  const sourceDataReady = missingListingData.length === 0;
+  const canSave = sourceDataReady && (mode === 'new' ? (sources.length === 1 || acknowledged) && (!unknownStructure || verifiedStructure) && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master) && !blocked && !mappingError && (!groupedComparison || acknowledged));
+  const canDefer = sourceDataReady && (mode === 'new' ? Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master));
   let completionError = '';
   if (editingDetails && reviewProduct) {
     try { assertMasterComplete(reviewProduct, sources, catalog.products()); }
     catch (reason) { completionError = reason instanceof Error ? reason.message : 'Complete required details.'; }
     completionError ||= variantMappingError(stage === 'compare' ? comparisonSources : sources, reviewProduct, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, reviewProduct, mappings[source.id])])), mode === 'new' && verifiedStructure ? sources.map(item => item.id) : verifiedSingles);
   }
-  const confirmationError = mode === 'new' && sources.length > 1 && !acknowledged ? 'Confirm that all selected listings represent the same product before activating.'
+  const confirmationError = !sourceDataReady ? 'Complete listing data before linking.' : mode === 'new' && sources.length > 1 && !acknowledged ? 'Confirm that all selected listings represent the same product before activating.'
     : mode === 'new' && unknownStructure && !verifiedStructure ? 'Check the source SKU structure and confirm the product type before activating.'
     : mode === 'existing' && (stage === 'complete' || groupedComparison) && sources.length > 1 && !acknowledged ? 'Confirm that you reviewed all selected listings before saving.' : '';
   // Consent permits saving the review, not bypassing data integrity or enabling sync.
@@ -165,11 +168,13 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const reviewingExistingGroup = mode === 'existing' && sources.length > 1 && (stage === 'compare' || stage === 'complete');
   const pendingSaveReason = reviewingExistingGroup ? completionError || mappingError || (blocked ? 'Verify the source SKU structure.' : '') : '';
   const savePendingReview = Boolean(pendingSaveReason);
-  const canSaveReviewedGroup = reviewingExistingGroup && acknowledged && Boolean(master) && (!editingDetails || mediaReady);
+  const canSaveReviewedGroup = sourceDataReady && reviewingExistingGroup && acknowledged && Boolean(master) && (!editingDetails || mediaReady);
   const primaryLabel = savePendingReview && editingDetails && master?.status !== 'published'
     ? alreadyLinkedHere ? 'Save review' : 'Save review & link'
     : editingDetails ? completeLabel : confirmLabel;
-  const completionFeedback = completionError.startsWith('Complete required details before activating:')
+  const completionFeedback = completionError.includes('Assign at least 1 warehouse')
+    ? `${completionError} Save a draft, then assign a warehouse in Product Master → Pricing & Inventory.`
+    : completionError.startsWith('Complete required details before activating:')
     ? stage === 'compare' ? `${completionError.replace('Complete required details before activating:', 'Complete these Master fields:')} Or save progress and finish later.`
       : stage === 'create' ? 'Complete the highlighted Master fields to activate, or save a draft.' : master?.status === 'published' ? 'Complete the highlighted sections before saving these changes, or save progress.' : 'Complete the highlighted sections to activate, or save a draft.'
     : completionError;
@@ -387,10 +392,11 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     </div>
     <div role="group" aria-label="Review actions" className={`max-h-[55dvh] shrink-0 overflow-y-auto border-t bg-background px-4 py-3 sm:px-6 ${editingDetails ? 'grid gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center' : 'space-y-3'}`}>
       {groupEditing && <p role="status" className="col-span-full text-xs text-muted-foreground">Apply or cancel your edits before {groupedComparison ? 'changing the group or saving' : 'saving this Master'}.</p>}
-      {mappingRecovery && !groupEditing && <p id={recoveryId} className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300">{mappingRecovery.title}. {groupedComparison ? 'You can view another listing or link all and finish later.' : 'You can link now and finish later.'}</p>}
-      {savePendingReview && !groupEditing && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300" role="note">{!acknowledged ? 'Confirm you reviewed the group to save.' : !mediaReady && editingDetails ? 'Wait for the image upload to finish.' : 'You can save now. Unresolved details will be kept in a review draft; affected mappings stay unavailable for sync.'}</p>}
+      {sourceDataReady && mappingRecovery && !groupEditing && <p id={recoveryId} className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300">{mappingRecovery.title}. {groupedComparison ? 'You can view another listing or link all and finish later.' : 'You can link now and finish later.'}</p>}
+      {sourceDataReady && savePendingReview && !groupEditing && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300" role="note">{!acknowledged ? 'Confirm you reviewed the group to save.' : !mediaReady && editingDetails ? 'Wait for the image upload to finish.' : 'You can save now. Unresolved details will be kept in a review draft; affected mappings stay unavailable for sync.'}</p>}
       {!savePendingReview && editingDetails && !groupEditing && (confirmationError || completionError || !mediaReady) && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300" role="status">{confirmationError || completionFeedback || 'Wait for the image upload to finish.'}</p>}
-      {!savePendingReview && groupedComparison && !groupEditing && (needsSkuReviewIds.length > 0 || !editingDetails && !acknowledged) && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300">{needsSkuReviewIds.length ? `SKU mapping needs review for ${needsSkuReviewIds.length} of ${sources.length} listings. Check the SKU rows in the table or link all and finish later.` : confirmationError}</p>}
+      {sourceDataReady && !savePendingReview && groupedComparison && !groupEditing && (needsSkuReviewIds.length > 0 || !editingDetails && !acknowledged) && <p className="col-span-full text-xs leading-5 text-amber-700 dark:text-amber-300">{needsSkuReviewIds.length ? `SKU mapping needs review for ${needsSkuReviewIds.length} of ${sources.length} listings. Check the SKU rows in the table or link all and finish later.` : confirmationError}</p>}
+      {!sourceDataReady && <div role="alert" className="col-span-full space-y-1 rounded-lg border border-destructive/30 p-3 text-sm"><p className="font-semibold text-destructive">Complete listing data before linking</p>{missingListingData.map(item => <p key={item.source.id} className="text-xs">{item.source.storeName} · {item.source.channelSku || item.source.listingId}: {item.missing.join(', ')}</p>)}<p className="text-xs text-muted-foreground">Re-import these listings from their shops, then reopen this review. Master values and local edits cannot replace missing shop data.</p></div>}
       {error && <p role="alert" className="col-span-full rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><Info className="mt-0.5 size-3.5 shrink-0" />{savePendingReview ? 'Links and review draft will be saved. Existing Master, shop data and stock stay unchanged; sync is not turned on.' : mode === 'new' ? 'Nothing is published; sync stays off.' : editingDetails ? 'Only reviewed Master changes and links are saved. Nothing is published; sync is unchanged.' : 'Link only. Master data, shop content, stock and sync stay unchanged.'}</p><span role="status">{groupedComparison ? `${sources.length} listings · ${acknowledged ? 'Group reviewed' : 'Review required'} · Changes not saved` : remainingCount !== undefined ? `${remainingCount} listing${remainingCount === 1 ? '' : 's'} left to review` : `${sources.length} listing${sources.length === 1 ? '' : 's'} selected`}</span></div>
       {(stage !== 'choose' || onSkip) && <div className="col-span-full flex flex-wrap items-center justify-end gap-2">

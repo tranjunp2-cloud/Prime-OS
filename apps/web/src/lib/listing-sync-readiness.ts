@@ -2,11 +2,14 @@ import type { CatalogImportItem } from './catalog-import-store';
 import type { ChannelListing, ListingDraftValues, Product } from './product-store';
 import { checkListingRequirements } from './listing-requirements';
 import { resolveListingShopData, snapshotShopListing } from './listing-shop-data';
+import { listingDataReadiness } from './listing-data-readiness';
 
 /** Uses only this listing's snapshot/local edits. Master data applies only to followed groups. */
 export function listingSyncReadiness(product: Product, listing: ChannelListing, items: readonly CatalogImportItem[] = [],
   preference = listing.master_data_sync, proposedValues?: ListingDraftValues) {
   const data = resolveListingShopData(product, listing, items);
+  const sourceData = listingDataReadiness(data, listing.external_id);
+  const incompleteSource = Boolean(listing.external_id && !listing.creation_config && !sourceData.ready);
   const saved = listing.local_draft?.values;
   const local = { ...saved, ...proposedValues, shipping: { ...saved?.shipping, ...proposedValues?.shipping }, channel_settings: { ...saved?.channel_settings, ...proposedValues?.channel_settings } };
   const values: ListingDraftValues = { ...data, ...local,
@@ -25,12 +28,13 @@ export function listingSyncReadiness(product: Product, listing: ChannelListing, 
       || new Set(rows.map(row => row.shop_sku)).size !== rows.length || new Set(rows.map(row => row.master_sku_id)).size !== rows.length
       || data.variants?.some(sku => !rows.some(row => row.shop_sku === sku.sku))));
   const reasons = [
+    ...(incompleteSource ? [sourceData.message] : []),
     ...(product.status !== 'published' ? ['Master is not Active'] : []),
     ...(mappingPending ? ['SKU mapping needs confirmation'] : []),
     ...(requirements.state !== 'complete' ? [requirements.message] : []),
   ];
-  return { requirements, values, mappingPending, reasons, ready: !reasons.length,
-    label: mappingPending ? 'Mapping unfinished' : requirements.state === 'blocked' ? 'Missing channel details'
+  return { requirements, values, mappingPending, reasons, sourceData, incompleteSource, ready: !reasons.length,
+    label: incompleteSource ? 'Listing data incomplete' : mappingPending ? 'Mapping unfinished' : requirements.state === 'blocked' ? 'Missing channel details'
       : requirements.state === 'unchecked' ? 'Requirements not checked' : product.status !== 'published' ? 'Master not Active' : 'Data ready' };
 }
 

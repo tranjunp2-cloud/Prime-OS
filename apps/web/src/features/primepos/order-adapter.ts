@@ -9,7 +9,7 @@ export function posDemoOrders(state: PosState = getPos()): OrderRecord[] {
     const refunded = Math.round(sale.refunds.reduce((n, r) => n + r.amount, 0) * 100) / 100;
     return {
       id: sale.id, orderKey: sale.number, requestKey: sale.id, source: 'pos-demo', version: 1 + sale.refunds.length,
-      canonicalStatus: 'closed', currencyCode: 'USD', orderedAt: sale.at,
+      canonicalStatus: 'closed', currencyCode: sale.currency || 'USD', orderedAt: sale.at,
       buyerSnapshot: { name: customer?.name ?? 'Walk-in customer', phone: customer?.phone ?? '', phoneCountry: 'VN', email: '' },
       shippingAddressSnapshot: { address: store.address, city: 'Ho Chi Minh City', country: 'VN', postalCode: '' },
       lines: sale.lines.map(line => ({id:line.productId,sku:line.sku,name:line.name,quantity:line.quantity,unitPrice:line.price,lineTotal:line.quantity*line.price})),
