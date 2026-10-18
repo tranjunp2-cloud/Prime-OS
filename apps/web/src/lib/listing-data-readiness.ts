@@ -3,6 +3,8 @@ import type { ListingShopData } from './listing-shop-data';
 import { recordedListingPrice, snapshotShopListing } from './listing-shop-data';
 
 const text = (value: unknown) => typeof value === 'string' && Boolean(value.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim());
+// Variant detail gaps can be finished after a deferred link; base listing data cannot.
+const SKU_DETAIL_FIELDS = ['SKU structure', 'Variant SKU details, prices & stock'];
 const stock = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && Number.isInteger(value);
 
 /** Linking requires the listing's own captured data, not Master fallbacks,
@@ -25,7 +27,10 @@ export function listingDataReadiness(data: ListingShopData, listingId?: string |
       || !recordedListingPrice(item.price?.amount, item.price?.currency) || !stock(item.stock))
       || new Set(variants.map(item => item.sku.trim().toUpperCase())).size !== variants.length) missing.push('Variant SKU details, prices & stock');
   }
-  return { ready: missing.length === 0, missing, message: missing.length ? `Missing listing data: ${missing.join(', ')}` : 'Listing data complete' };
+  const baseMissing = missing.filter(field => !SKU_DETAIL_FIELDS.includes(field));
+  return { ready: missing.length === 0, missing, message: missing.length ? `Missing listing data: ${missing.join(', ')}` : 'Listing data complete',
+    /** Enough to save a deferred link; SKU details then stay pending for orders and sync. */
+    baseReady: baseMissing.length === 0, baseMissing, skuMissing: missing.filter(field => SKU_DETAIL_FIELDS.includes(field)) };
 }
 
 export function importedListingDataReadiness(item: CatalogImportItem) {
@@ -36,9 +41,10 @@ export function importedListingDataReadiness(item: CatalogImportItem) {
     variantCount: snapshot.variant_count, variants: snapshot.variant_items }, snapshot.listing_id);
 }
 
-export function assertListingDataComplete(items: readonly CatalogImportItem[]) {
+export function assertListingDataComplete(items: readonly CatalogImportItem[], { allowIncompleteSkus = false } = {}) {
   for (const item of items) {
     const readiness = importedListingDataReadiness(item);
-    if (!readiness.ready) throw new Error(`${item.storeName || 'Unknown shop'} · ${item.channelSku || item.listingId || 'Unknown listing'}: ${readiness.message}. Re-import the complete listing from its shop before linking.`);
+    const missing = allowIncompleteSkus ? readiness.baseMissing : readiness.missing;
+    if (missing.length) throw new Error(`${item.storeName || 'Unknown shop'} · ${item.channelSku || item.listingId || 'Unknown listing'}: Missing listing data: ${missing.join(', ')}. Re-import the complete listing from its shop before linking.`);
   }
 }

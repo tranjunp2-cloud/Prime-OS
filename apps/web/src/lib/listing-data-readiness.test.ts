@@ -33,7 +33,7 @@ describe('Listing-owned data required before linking', () => {
     [{ title: ' ' }, 'Title'], [{ description: '<p>&nbsp;</p>' }, 'Description'], [{ image: '', images: [] }, 'Product image'],
     [{ channelCategory: '' }, 'Category'], [{ price: NaN }, 'Listing price & currency'],
     [{ currency: '' }, 'Listing price & currency'], [{ channelStock: undefined }, 'Shop stock'],
-    [{ channelStock: -1 }, 'Shop stock'], [{ channelStock: 1.5 }, 'Shop stock'], [{ variants: 0 }, 'SKU structure'],
+    [{ channelStock: -1 }, 'Shop stock'], [{ channelStock: 1.5 }, 'Shop stock'],
   ] as Array<[Partial<CatalogImportItem>, string]>)('rejects missing or invalid source data %j', (patch, field) => {
     const item = { ...source, ...patch };
     expect(importedListingDataReadiness(item)).toMatchObject({ ready: false, missing: expect.arrayContaining([field]) });
@@ -51,6 +51,21 @@ describe('Listing-owned data required before linking', () => {
       [variants[0], { ...variants[1], stock: undefined }], [variants[0], { ...variants[1], price: undefined }]]) {
       expect(importedListingDataReadiness({ ...source, variants: 2, variantItems: rows }).ready).toBe(false);
     }
+  });
+  it.each([
+    [{ variants: 0 }, 'SKU structure'],
+    [{ variants: 2, variantItems: [{ sku: 'RED', label: 'Red' }, { sku: 'BLUE', label: 'Blue' }] }, 'Variant SKU details, prices & stock'],
+  ] as Array<[Partial<CatalogImportItem>, string]>)('allows only a SKU-pending deferred link when SKU details are missing %j', (patch, field) => {
+    const item = { ...source, ...patch };
+    expect(importedListingDataReadiness(item)).toMatchObject({ ready: false, baseReady: true, skuMissing: [field] });
+    const { catalog, master } = setup(patch);
+    const before = catalog.products();
+    expect(() => confirmListingIntake([item.id], { productId: master.id }, catalog)).toThrow();
+    expect(catalog.products()).toEqual(before);
+    confirmListingIntake([item.id], { productId: master.id, defer: true }, catalog);
+    const link = catalog.products()[0].channels[0];
+    expect(link.variant_mappings).toBeUndefined();
+    expect(link.review_pending).toMatchObject({ sku_mapping_pending: true, issues: expect.arrayContaining(['Verify imported SKU details']) });
   });
   it('rejects a mixed batch atomically and does not create a Master from an incomplete listing', () => {
     const { catalog, master } = setup();

@@ -1,6 +1,7 @@
 import type { CatalogImportItem } from './catalog-import-store';
 import type { ChannelListing, Product } from './product-store';
 import { completionFields, completionReadiness, newListingMasterPreview, prepareMasterCompletion, reviewMasterSignature, variantMappingError, type VariantMappings } from './listing-master-completion';
+import { importedListingDataReadiness } from './listing-data-readiness';
 import { resolveSourceSkuMappings, sourceSkuDataError, sourceSkuItems, suggestSourceSkuMappings } from './listing-sku-mapping';
 
 export function pendingReviewFor(source: CatalogImportItem, product: Product) {
@@ -44,9 +45,9 @@ export function reviewProgressIssues(source: CatalogImportItem, product: Product
       return !row || !product.has_variants || !product.skus.some(sku => sku.id === row.master_sku_id && sku.status === 'active')
         || rows.filter(other => other.master_sku_id === row.master_sku_id).length !== 1;
     }).length;
-    issues.push(sourceSkuDataError(source) || source.variants === 0
+    issues.push(sourceSkuDataError(source) || source.variants === 0 || !importedListingDataReadiness(source).ready
       ? 'Verify imported SKU details' : `${unmatched || source.variants} SKU${(unmatched || source.variants) === 1 ? '' : 's'} need mapping`);
-  }
+  } else if (!importedListingDataReadiness(source).ready) issues.push('Verify imported SKU details');
   if (includeMaster) issues.push(...completionReadiness(product, [source]).missing);
   return issues.length ? issues : ['Review saved details and confirm'];
 }
@@ -55,7 +56,8 @@ export function savedReviewProgress(source: CatalogImportItem, master: Product, 
   return {
     issues: reviewProgressIssues(source, draft ?? master, mappings, verified, includeMaster),
     // Draft matches have not been confirmed against the persisted Master.
-    sku_mapping_pending: Boolean(variantMappingError([source], master, mappings, verified)) || Boolean(draft),
+    // Incomplete source SKU details keep the link out of orders, stock sources and price/stock sync.
+    sku_mapping_pending: Boolean(variantMappingError([source], master, mappings, verified)) || Boolean(draft) || !importedListingDataReadiness(source).ready,
     draft_mappings: mappings[source.id], verified_single: verified.includes(source.id),
     master_draft: draft ? completionFields(draft) : undefined,
     master_signature: draft ? reviewMasterSignature(master) : undefined,

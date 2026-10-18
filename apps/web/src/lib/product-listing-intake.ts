@@ -190,7 +190,8 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
   const mappingError = variantMappingError(selected, product, target.variantMappings, verified);
   if (mappingError && !target.defer) throw new Error(mappingError);
   // Deferring Master completion must not create an empty listing relationship.
-  assertListingDataComplete(selected);
+  // Missing SKU details may be finished later; the link then stays SKU-pending.
+  assertListingDataComplete(selected, { allowIncompleteSkus: Boolean(target.defer) });
   const savedDraft = 'productId' in target && target.completion && target.defer ? applyMasterCompletion(product, [], target.completion) : undefined;
   // Listing-owned details are local drafts, never Master fields or provider snapshots.
   for (const source of selected) {
