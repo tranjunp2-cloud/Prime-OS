@@ -37,12 +37,22 @@ const scenarios = [
   {key: 'RANK-SILVER', stage: 'closed', title: 'Customer rank demo — Silver qualifying purchase', unitPrice: 1250000, label: true, settled: true},
   {key: 'RANK-GOLD', stage: 'closed', title: 'Customer rank demo — Gold qualifying purchase', unitPrice: 6250000, label: true, settled: true},
   {key: 'RANK-VIP', stage: 'closed', title: 'Customer rank demo — VIP qualifying purchase', unitPrice: 12500000, label: true, settled: true},
+  // Shop listing lines resolve listing → Master SKU → warehouse → stock. They reuse existing
+  // non-draft Shopee buyers so customer counts and ranks stay unchanged.
+  {key: 'MAP-UNLINKED', stage: 'acknowledged', title: 'Shopee order with a listing not linked to a Product Master', store: 'Shopee', platform: 'shopee', storeName: 'Prime Beauty Official', buyerIndex: 5, lines: [
+    {sku: 'SHP-TEST2-MYTH-10', name: 'Japanese Mythical Creatures Art Print', listingId: 'SHP-TEST2-MYTH', shopSku: 'SHP-TEST2-MYTH-10', unitPrice: 180000},
+    {sku: 'SHP-CER-PAL-12', name: 'Ceramic Watercolor Mixing Palette 12 Well', listingId: 'SHP-9012326', shopSku: 'SHP-CER-PAL-12', unitPrice: 260000},
+  ]},
+  {key: 'MAP-STOCK', stage: 'acknowledged', title: 'Shopee order without stock at the shop warehouse', store: 'Shopee', platform: 'shopee', storeName: 'Prime Beauty Official', buyerIndex: 9, lines: [
+    {sku: 'CR-BSH-SET-12', name: 'Artist Precision Paint Brush Set 12 Pieces', listingId: 'SH-ARCH-001', shopSku: 'CR-BSH-SET-12', unitPrice: 340000},
+  ]},
 ];
 
 export function demoOrderScenarios(templates) {
   return scenarios.map((scenario, index) => {
     const order = structuredClone(templates[0]);
-    const example = templates[index % 8];
+    const buyerIndex = scenario.buyerIndex ?? index;
+    const example = templates[buyerIndex % 8];
     const id = `DEMO-${scenario.key}`;
     const at = new Date(Date.parse('2026-10-10T02:00:00Z') + index * 1800000).toISOString();
     const after = minutes => new Date(Date.parse(at) + minutes * 60000).toISOString();
@@ -56,9 +66,12 @@ export function demoOrderScenarios(templates) {
     const carrier = scenario.pickup ? 'Store pickup' : ['GHN', 'SPX Express', 'Viettel Post'][index % 3];
     const warehouse = scenario.pickup ? 'District 1 Branch' : index % 2 ? 'Hanoi Warehouse' : 'HCM Central Warehouse';
     const paymentState = scenario.payment || 'Paid';
-    const lines = order.lines.map((line, lineIndex) => {
+    // Listing lines carry no stock snapshot: their stock comes from the resolved Master SKU.
+    const sourceLines = scenario.lines?.map(line => ({...order.lines[0], imageUrl: undefined, variant: undefined, inventory: undefined, ...line})) ?? order.lines;
+    const lines = sourceLines.map((line, lineIndex) => {
       const quantity = lineIndex === 0 && !scenario.unitPrice ? 1 + index % 3 : 1;
-      const unitPrice = lineIndex === 0 ? scenario.unitPrice || 125000 : 240000;
+      const unitPrice = line.listingId ? line.unitPrice : lineIndex === 0 ? scenario.unitPrice || 125000 : 240000;
+      if (line.listingId) return {...line, id: `${id}-line-${lineIndex + 1}`, quantity, unitPrice, lineTotal: quantity * unitPrice};
       return {...line, id: `${id}-line-${lineIndex + 1}`, quantity, unitPrice, lineTotal: quantity * unitPrice,
         inventory: {...line.inventory, warehouse, checkedAt: at, onHand: scenario.stockFailure ? 0 : lineIndex === 0 ? 45 : 12, committed: scenario.stockFailure ? 0 : 3, reservedForOrder: !scenario.stockFailure && prepared && !shipped ? quantity : 0}};
     });
@@ -69,10 +82,10 @@ export function demoOrderScenarios(templates) {
     Object.assign(order, {
       id, orderKey: id, requestKey: `demo-${id}`, canonicalStatus: stage, orderedAt: at, version: 1, demoVersion: 4,
       // A shared buyer phone across three channels demonstrates grouping and separation.
-      buyerSnapshot: {...example.buyerSnapshot, phone: [28, 29, 30].includes(index) ? (index === 29 ? '+84 900 000 001' : '0900000001') : `090001${String(index + 1).padStart(4, '0')}`, email: `ordercase${index + 1}@example.com`},
+      buyerSnapshot: {...example.buyerSnapshot, phone: [28, 29, 30].includes(buyerIndex) ? (buyerIndex === 29 ? '+84 900 000 001' : '0900000001') : `090001${String(buyerIndex + 1).padStart(4, '0')}`, email: `ordercase${buyerIndex + 1}@example.com`},
       lines, totals: {subtotal, discount: 10000, shipping: scenario.pickup ? 0 : 20000, tax: 0, grandTotal: subtotal - 10000 + (scenario.pickup ? 0 : 20000)},
       payment: {state: paymentState, method: scenario.method || 'Card', reference: scenario.evidence ? `BANK-REVIEW-${index + 1}` : paymentState === 'Paid' || /refunded/i.test(paymentState) ? `DEMO-PAY-${scenario.key}` : '', ...(paymentState === 'Partially refunded' ? {refundedMerchandiseAmount: lines[0].unitPrice} : {})},
-      metadata: {...order.metadata, store, warehouse, handlingType: scenario.marketplace ? 'marketplace' : 'self', shippingMode: scenario.marketplace ? 'platform' : 'seller', assignee: index % 3 === 0 ? 'PrimeOS Admin' : example.metadata.assignee, tags: ['Demo cases', scenario.key], notes: `Test case: ${scenario.title}.`},
+      metadata: {...order.metadata, store, warehouse, ...(scenario.platform ? {platform: scenario.platform, storeName: scenario.storeName} : {}), handlingType: scenario.marketplace ? 'marketplace' : 'self', shippingMode: scenario.marketplace ? 'platform' : 'seller', assignee: index % 3 === 0 ? 'PrimeOS Admin' : example.metadata.assignee, tags: ['Demo cases', scenario.key], notes: `Test case: ${scenario.title}.`},
       reservation: scenario.stockFailure ? 'Allocation failed' : returned || stage === 'canceled' ? 'Released' : shipped ? 'Dispatched' : prepared ? 'Reserved' : 'Not reserved',
       needsPaymentVerification: Boolean(scenario.evidence), readyForPickup: stage === 'fulfillment_in_progress' && packed, pickupOverdue: Boolean(scenario.overdue), syncError: Boolean(scenario.sync),
       hold: scenario.hold ? {active: true, reason: scenario.hold, at, actor: 'Demo operator'} : undefined,

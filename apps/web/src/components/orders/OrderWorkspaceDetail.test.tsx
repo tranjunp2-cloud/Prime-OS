@@ -5,6 +5,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {OrderWorkspaceDetail} from './OrderWorkspaceDetail';
 import {getOrderDetailFlow, getOrderDetailStatus, getOrderDetailSteps, getOrderDetailPermissions} from '@/lib/order-detail-flow';
 import {ordersApi, type OrderRecord, type CanonicalStatus} from '@/lib/orders-api';
+import {listPrototypeOrders} from '@/lib/order-prototype-data';
 vi.mock('@/lib/orders-api', async (load) => ({...await load<typeof import('@/lib/orders-api')>(), ordersApi:{command:vi.fn()}}));
 const order: OrderRecord = { id: 'order-test', orderKey: 'MAN-TEST', requestKey: 'req-1', version: 1, source: 'manual', canonicalStatus: 'created', orderedAt: '2026-09-10T10:00:00Z', currencyCode: 'VND', buyerSnapshot: { name: 'Lan', phone: '0900123456', email: '' }, shippingAddressSnapshot: { address: '123 Le Loi', city: 'HCM', country: 'VN', postalCode: '' }, lines: [{ sku: 'SKU-A', name: 'Product A', quantity: 2, unitPrice: 50000, lineTotal: 100000 }], totals: { subtotal: 100000, grandTotal: 100000 }, payment: { state: 'Unpaid', method: 'COD', reference: '' }, metadata: { store: 'Manual', warehouse: 'HCM', assignee: 'Unassigned', notes: '', tags: [] }, transitions: [], shipments: [], returnRequests: [], exceptions: [], activity: [] };
 beforeEach(() => {vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });});
@@ -273,5 +274,16 @@ describe('Order detail workflows',()=>{
     expect(screen.queryByText('Dispatch complete')).not.toBeInTheDocument();
     expect(screen.getByText('Cancelled — fulfillment stopped.')).toBeVisible();
     expect(screen.queryByRole('list',{name:'Order lifecycle'})).not.toBeInTheDocument();
+  });
+  it('holds an order with an unlinked listing and opens the listing review from the item', () => {
+    const record = listPrototypeOrders().find(item => item.id === 'DEMO-MAP-UNLINKED')!;
+    mount(record);
+    expect(screen.getByRole('alert', {name:'Order review details'})).toHaveTextContent('The whole order waits until every item is resolved.');
+    const items = within(screen.getByRole('table', {name:'Order items'}));
+    expect(items.getAllByRole('note')).toHaveLength(1);
+    expect(items.getByRole('note')).toHaveTextContent('Needs product mapping · Listing SHP-CER-PAL-12 is not linked to a Product Master.');
+    fireEvent.click(items.getByRole('button', {name:'Map product'}));
+    expect(screen.getByRole('dialog', {name:'Review mapping'})).toHaveTextContent('Link this listing to a Product Master.');
+    expect(screen.getByRole('button', {name:'Back to order'})).toBeVisible();
   });
 });

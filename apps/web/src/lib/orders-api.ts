@@ -1,10 +1,11 @@
 import { createPrimeAuthHeaders, resolvePrimeBackendBase } from '@/lib/prime/backend-auth';
 import { restoreOrderPrototype, runOrderPrototype } from './order-prototype';
+import { orderMappingIssues } from './order-line-resolution';
 
 export type CanonicalStatus = 'draft' | 'created' | 'acknowledged' | 'allocated' | 'fulfillment_in_progress' | 'partially_shipped' | 'shipped' | 'delivered' | 'closed' | 'canceled';
 export type ShipmentTrackingStatus = 'created' | 'ready_for_pickup' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivery_failed' | 'delivered' | 'returning' | 'returned' | 'ready_for_collection' | 'collected';
 export interface ShipmentTrackingEvent { id: string; status: ShipmentTrackingStatus; occurredAt: string; location?: string; description?: string; source: 'carrier' | 'seller' | 'prototype' }
-export interface OrderLine { inventory?: { onHand: number; committed: number; reservedForOrder?: number; checkedAt: string; warehouse: string }; imageUrl?: string; variant?: string; id?: string; sku: string; name: string; quantity: number; unitPrice: number; lineTotal?: number }
+export interface OrderLine { /** Shop listing identity, used to resolve the Master SKU and warehouse. */ listingId?: string; shopSku?: string; inventory?: { onHand: number; committed: number; reservedForOrder?: number; checkedAt: string; warehouse: string }; imageUrl?: string; variant?: string; id?: string; sku: string; name: string; quantity: number; unitPrice: number; lineTotal?: number }
 export interface ManualOrderInput {
   orderKey: string; requestKey: string; canonicalStatus: 'draft' | 'created'; currencyCode: string;
   buyerSnapshot: { name: string; phone: string; email: string; phoneCountry?: string };
@@ -104,6 +105,7 @@ export function getOrderAttention(order: OrderRecord): OrderAttention[] {
   const issues: OrderAttention[] = [];
   const add = (code: string, reason: string, reviewAction?: string) => issues.push({code, reason, reviewAction});
   if (order.hold?.active) add('hold', `On hold: ${order.hold.reason}`, 'Review hold');
+  if (orderMappingIssues(order).length) add('product-mapping', 'Needs product mapping', 'Map products');
   if (order.shipments.some(s=>s.deliveryOutcome==='failed')) add('delivery', 'Failed delivery', 'Review delivery');
   const active = !['draft', 'closed', 'canceled'].includes(order.canonicalStatus);
   if (active && order.payment.state === 'Unpaid' && (order.needsPaymentVerification || order.payment.reference?.trim())) add('payment', 'Payment evidence to review', 'Review payment');

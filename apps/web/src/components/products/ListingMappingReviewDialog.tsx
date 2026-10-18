@@ -7,6 +7,7 @@ import { ListingMasterReview } from './ListingMasterReview';
 
 type Props = {
   listing: CatalogImportItem;
+  backLabel?: string;
   hasUnsavedMasterChanges: boolean;
   onClose: () => void;
   restoreFocus: () => void;
@@ -14,7 +15,7 @@ type Props = {
 };
 
 /** A contextual review of one existing relationship, separate from the import inbox. */
-export function ListingMappingReviewDialog({ listing, hasUnsavedMasterChanges, onClose, restoreFocus, onSaved }: Props) {
+export function ListingMappingReviewDialog({ listing, backLabel = 'Back to Channel listings', hasUnsavedMasterChanges, onClose, restoreFocus, onSaved }: Props) {
   const [dirty, setDirty] = useState(false);
   const [discard, setDiscard] = useState(false);
   return <>
@@ -22,10 +23,10 @@ export function ListingMappingReviewDialog({ listing, hasUnsavedMasterChanges, o
       <SheetContent className="flex w-full flex-col p-0 sm:max-w-[min(1120px,94vw)] motion-reduce:animate-none motion-reduce:transition-none" onCloseAutoFocus={event => { event.preventDefault(); restoreFocus(); }}>
         <SheetHeader className="shrink-0 border-b px-6 py-5 pr-14 text-left">
           <SheetTitle>Review mapping</SheetTitle>
-          <SheetDescription>{listing.storeName} · {listing.channelSku}. Confirm the current Master or move this listing to the correct one.</SheetDescription>
+          <SheetDescription>{listing.storeName} · {listing.channelSku}. {listing.existingLinkReview ? 'Confirm the current Master or move this listing to the correct one.' : 'Link this listing to a Product Master.'}</SheetDescription>
           {hasUnsavedMasterChanges && <p className="text-xs text-muted-foreground">Using saved Master data. Your unsaved Master edits stay in the editor.</p>}
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-hidden"><ListingMasterReview listings={[listing]} initialMode="existing" backLabel="Back to Channel listings" onBack={onClose} onDirtyChange={setDirty} onSaved={onSaved} /></div>
+        <div className="min-h-0 flex-1 overflow-hidden"><ListingMasterReview listings={[listing]} initialMode="existing" backLabel={backLabel} onBack={onClose} onDirtyChange={setDirty} onSaved={onSaved} /></div>
       </SheetContent>
     </Sheet>
     <AlertDialog open={discard} onOpenChange={setDiscard}>

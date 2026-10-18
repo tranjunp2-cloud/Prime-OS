@@ -32,38 +32,46 @@ export function listingStockWarehouseId(product: Product, listing: ChannelListin
   return id?.trim() ? locationId(id) : undefined;
 }
 
+/** Resolve one listing's stock source with the same exact-shop rules as warehouse views.
+ * Callers decide which listings qualify; an incoming order is evidence its listing is live.
+ */
+export function resolveListingStockSource(product: Product, listing: ChannelListing, shops: ConnectedChannelRecord[], imports: readonly CatalogImportItem[] = []): { confirmed: WarehouseListingSource } | { unconfirmed: UnconfirmedShopSource } {
+  const explicitSource = listing.master_data_sync?.inventory;
+  const followsDefault = !explicitSource || explicitSource.source === 'shop_default';
+  const warehouseId = listingStockWarehouseId(product, listing, explicitSource, shops, imports);
+  const data = resolveListingShopData(product, listing, imports);
+  const unknown = (reason: string, source = warehouseId) => ({ unconfirmed: { listing, shopName: data.shop, warehouseId: source, reason } });
+  if (!data.shop?.trim()) return unknown('The listing’s shop has not been identified.');
+  const candidates = shops.filter(shop => platformKey(shop.platform) === listing.channel && shopNameKey(shop.store_name) === shopNameKey(data.shop!));
+  if (candidates.length !== 1) return unknown(candidates.length ? 'More than one connection matches this shop. Its source needs confirmation.' : 'The listing’s shop could not be matched to a connection.');
+  const shop = candidates[0];
+  const legacy = product.channel_overrides?.[listing.channel === 'website' ? 'webstore' : listing.channel];
+  const ownsLegacy = legacy?.enabled && configuredListing(product.channels, listing.channel, legacy.listing_sku || '') === listing
+    && (!listing.store_name || !legacy.pricing_shop_label || listing.store_name === legacy.pricing_shop_label);
+  const ownConfig = listing.creation_config ?? (ownsLegacy ? legacy : undefined);
+  // Older source modes may represent dedicated or multiple warehouses. Never replace
+  // a saved listing choice with the shop default when its source is not resolved here.
+  if (!explicitSource && ownConfig?.warehouse?.trim()) return unknown('This listing has a saved stock source that needs confirmation.');
+  // A saved listing source overrides the shop default, including an unfinished source selection.
+  const source = followsDefault ? shop.warehouse?.id ? locationId(shop.warehouse.id) : undefined : warehouseId;
+  if (!source) return unknown('No stock source has been selected for this listing.');
+  if (listing.channel === 'amazon' && (explicitSource?.fulfillment ?? ownConfig?.fulfillment) === 'FBA') {
+    return unknown('Amazon manages this FBA listing’s stock; its warehouse source needs provider confirmation.', source);
+  }
+  if (listing.review_pending?.sku_mapping_pending) return unknown('Confirm this listing’s SKU mapping before assigning its stock source.', source);
+  const preference = listing.master_data_sync;
+  return { confirmed: { listing, shop, warehouseId: source, source: followsDefault ? 'shop' : 'listing',
+    stockSync: !preference ? 'not_configured' : preference.enabled && preference.fields.includes('inventory') && Boolean(warehouseId) ? 'enabled' : 'disabled' } };
+}
+
 /** Resolve an exact listing/shop relationship before applying warehouse scope.
  * A platform logo, matching SKU, or sole shop on a channel is never ownership evidence.
  */
 export function resolveProductShopSources(product: Product, shops: ConnectedChannelRecord[], imports: readonly CatalogImportItem[] = []): ProductShopSources {
   const result: ProductShopSources = { confirmed: [], unconfirmed: [] };
   for (const listing of product.channels.filter(item => item.status === 'active' && !item.publication_unconfirmed)) {
-    const explicitSource = listing.master_data_sync?.inventory;
-    const followsDefault = !explicitSource || explicitSource.source === 'shop_default';
-    const warehouseId = listingStockWarehouseId(product, listing, explicitSource, shops, imports);
-    const data = resolveListingShopData(product, listing, imports);
-    const unknown = (reason: string, source = warehouseId) => result.unconfirmed.push({ listing, shopName: data.shop, warehouseId: source, reason });
-    if (!data.shop?.trim()) { unknown('The listing’s shop has not been identified.'); continue; }
-    const candidates = shops.filter(shop => platformKey(shop.platform) === listing.channel && shopNameKey(shop.store_name) === shopNameKey(data.shop!));
-    if (candidates.length !== 1) { unknown(candidates.length ? 'More than one connection matches this shop. Its source needs confirmation.' : 'The listing’s shop could not be matched to a connection.'); continue; }
-    const shop = candidates[0];
-    const legacy = product.channel_overrides?.[listing.channel === 'website' ? 'webstore' : listing.channel];
-    const ownsLegacy = legacy?.enabled && configuredListing(product.channels, listing.channel, legacy.listing_sku || '') === listing
-      && (!listing.store_name || !legacy.pricing_shop_label || listing.store_name === legacy.pricing_shop_label);
-    const ownConfig = listing.creation_config ?? (ownsLegacy ? legacy : undefined);
-    // Older source modes may represent dedicated or multiple warehouses. Never replace
-    // a saved listing choice with the shop default when its source is not resolved here.
-    if (!explicitSource && ownConfig?.warehouse?.trim()) { unknown('This listing has a saved stock source that needs confirmation.'); continue; }
-    // A saved listing source overrides the shop default, including an unfinished source selection.
-    const source = followsDefault ? shop.warehouse?.id ? locationId(shop.warehouse.id) : undefined : warehouseId;
-    if (!source) { unknown('No stock source has been selected for this listing.'); continue; }
-    if (listing.channel === 'amazon' && (explicitSource?.fulfillment ?? ownConfig?.fulfillment) === 'FBA') {
-      unknown('Amazon manages this FBA listing’s stock; its warehouse source needs provider confirmation.', source); continue;
-    }
-    if (listing.review_pending?.sku_mapping_pending) { unknown('Confirm this listing’s SKU mapping before assigning its stock source.', source); continue; }
-    const preference = listing.master_data_sync;
-    result.confirmed.push({ listing, shop, warehouseId: source, source: followsDefault ? 'shop' : 'listing',
-      stockSync: !preference ? 'not_configured' : preference.enabled && preference.fields.includes('inventory') && Boolean(warehouseId) ? 'enabled' : 'disabled' });
+    const resolved = resolveListingStockSource(product, listing, shops, imports);
+    if ('confirmed' in resolved) result.confirmed.push(resolved.confirmed); else result.unconfirmed.push(resolved.unconfirmed);
   }
   return result;
 }

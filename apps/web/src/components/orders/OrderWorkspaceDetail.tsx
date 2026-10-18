@@ -5,6 +5,9 @@ import { confirmationBlocker, hasPrintedPackingSlip } from '@/lib/order-bulk';
 import { orderNextAction, paymentAllowsPreparation, type ProcessingAction } from '@/lib/order-processing';
 import { completionBlocker } from '@/lib/order-processing';
 import { prototypePreparation } from '@/lib/order-preparation';
+import { orderLineReviewListing, orderMappingIssues, type OrderLineGap } from '@/lib/order-line-resolution';
+import type { CatalogImportItem } from '@/lib/catalog-import-store';
+import { ListingMappingReviewDialog } from '@/components/products/ListingMappingReviewDialog';
 import { restartOrderPrototype } from '@/lib/order-prototype';
 import { OrderLifecycleBadge } from './OrderLifecycleBadge';
 import { hasActiveReturn } from '@/lib/order-work-queues';
@@ -63,6 +66,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [mappingReview, setMappingReview] = useState<CatalogImportItem | null>(null);
   const flow = getOrderDetailFlow(order);
   const permissions = getOrderDetailPermissions(order, canWrite);
   const hasPackingSlip = order.lines.length > 0 && order.metadata.handlingType === 'self';
@@ -78,6 +82,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
   const openExceptions = order.exceptions.filter((issue) => issue.status === 'open');
   const attention = getOrderAttention(order);
   const reviewDescriptions: Record<string, string> = {
+    'product-mapping': 'Some items cannot be matched to a Master SKU, warehouse and stock. The whole order waits until every item is resolved.',
     stock: 'Not enough stock to reserve. Review the warehouse and item quantities.',
     'stock-expired': 'The stock hold expired. Review stock before continuing.',
     sync: 'Channel synchronization failed.',
@@ -213,7 +218,7 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
           <div className="mt-4">
               <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
                 <div className="min-w-0 space-y-4"><div ref={(node) => { sections.current.items = node; }}><Panel title={`Products (${order.lines.length})`} icon={<Box className="size-4" />}>
-                  <Items order={order} />
+                  <Items order={order} onMap={setMappingReview} />
                   <section aria-label="Payment breakdown & settlement" ref={(node) => { sections.current.payment = node; }} className="mt-3 border-t pt-3">
                     <h3 className="text-sm font-semibold">Payment breakdown &amp; settlement</h3>
                     <div className="mt-3"><Totals order={order} compact />
@@ -249,6 +254,8 @@ export function OrderWorkspaceDetail({ order, canWrite, onClose, onUpdated, onEd
         </div>
       </div>
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}><SheetContent className="overflow-y-auto sm:max-w-lg"><SheetHeader><SheetTitle>Order activity</SheetTitle><SheetDescription>Recorded events for {order.orderKey}</SheetDescription></SheetHeader><ol className="mt-6 space-y-4">{history.map((event) => <li key={event.key} className="border-b pb-3"><p className="text-sm font-medium">{event.title}</p><p className="text-sm text-muted-foreground">{event.detail}</p><time className="text-xs text-muted-foreground">{formatDate(event.at)}</time></li>)}</ol>{!history.length && <p className="mt-4 text-sm text-muted-foreground">No activity recorded.</p>}</SheetContent></Sheet>
+      {mappingReview && <ListingMappingReviewDialog listing={mappingReview} hasUnsavedMasterChanges={false} backLabel="Back to order" onClose={() => setMappingReview(null)} restoreFocus={() => sections.current.items?.focus()}
+        onSaved={() => { setMappingReview(null); setSuccess('Product mapping saved. Order items were checked again.'); onUpdated({ ...order }); }} />}
       {processingAction && <OrderProcessingDialog order={order} action={processingAction} onClose={() => setProcessingAction(null)} onUpdated={updated => { onUpdated(updated); setSuccess('Order updated. Continue with the next step above.'); }} />}
       <Dialog open={action !== null} onOpenChange={(open) => !open && !pending && setAction(null)}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto">{action && <>
@@ -282,7 +289,13 @@ function Panel({ title, icon, action, children }: { title: string; icon?: ReactN
 }
 function Field({ label, value }: { label: string; value?: ReactNode }) { return <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3 py-1.5 text-sm"><span className="text-muted-foreground">{label}</span><span className="break-words text-right">{value || 'Not reported'}</span></div>; }
 function Totals({ order, compact = false }: { order: OrderRecord; compact?: boolean }) { return <dl className={cn('text-sm', compact ? 'space-y-1.5' : 'space-y-2.5')}>{(['subtotal', 'discount', 'shipping', 'tax', 'grandTotal'] as const).map((key) => <div key={key} className={cn('flex justify-between gap-3', key === 'grandTotal' && 'border-t pt-3 font-semibold')}><dt className={key === 'grandTotal' ? '' : 'text-muted-foreground'}>{{ subtotal: 'Subtotal', discount: 'Discount', shipping: 'Shipping fee', tax: 'Tax', grandTotal: 'Order total' }[key]}</dt><dd className="tabular-nums">{order.totals[key] == null ? 'Not reported' : `${key === 'discount' && order.totals[key]! > 0 ? '−' : ''}${orderMoney(order.totals[key]!, order.currencyCode)}`}</dd></div>)}{!compact && <div className="border-t pt-3"><p className="text-xs leading-5 text-muted-foreground">Discount is the combined amount reported by the source; shop and marketplace voucher allocation is not available.</p></div>}</dl>; }
-function Items({ order }: { order: OrderRecord }) {
+const mappingGapCopy: Record<OrderLineGap, { label: string; next: string }> = {
+  mapping: { label: 'Needs product mapping', next: 'Link the listing to a Product Master.' },
+  warehouse: { label: 'No stock source', next: 'Set the shop warehouse in Channel settings.' },
+  stock: { label: 'Not enough stock', next: 'Receive or adjust stock in that warehouse.' },
+};
+function Items({ order, onMap }: { order: OrderRecord; onMap?: (listing: CatalogImportItem) => void }) {
+  const mappingIssues = new Map(orderMappingIssues(order).map(issue => [issue.line, issue.resolution]));
   if (!order.lines.length) return <Empty icon={<Box className="size-6" />} title="Item details not available" detail="This record includes an order total but no product lines." />;
   return <div className="overflow-x-auto"><table aria-label="Order items" className="block w-full text-sm sm:table sm:min-w-[660px]">
     <thead className="hidden sm:table-header-group"><tr className="border-b text-xs text-muted-foreground"><th scope="col" className="pb-2 text-left font-medium">Product</th><th scope="col" className="px-3 pb-2 text-left font-medium">Inventory</th><th scope="col" className="px-3 pb-2 text-right font-medium">Qty</th><th scope="col" className="px-3 pb-2 text-right font-medium">Unit price</th><th scope="col" className="pb-2 pl-3 text-right font-medium">Amount</th></tr></thead>
@@ -293,7 +306,12 @@ function Items({ order }: { order: OrderRecord }) {
       return <tr key={line.id || index} className="grid grid-cols-3 gap-x-3 border-b py-3 align-middle last:border-0 sm:table-row sm:py-0">
         <td className="col-span-3 block w-full min-w-0 pb-2 sm:table-cell sm:min-w-[230px] sm:py-3 sm:pr-3"><div className="flex items-start gap-2.5">
           {line.imageUrl ? <img src={line.imageUrl} alt={line.name} className="size-11 shrink-0 rounded-md border object-cover" /> : <span className="flex size-11 shrink-0 items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">No image</span>}
-          <div className="min-w-0"><p className="break-words font-medium leading-5">{line.name}</p>{line.variant && <p className="mt-0.5 text-xs text-muted-foreground">{line.variant}</p>}<div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="break-all">{line.sku}</span><CopyValue value={line.sku} label="SKU" /></div></div>
+          <div className="min-w-0"><p className="break-words font-medium leading-5">{line.name}</p>{line.variant && <p className="mt-0.5 text-xs text-muted-foreground">{line.variant}</p>}<div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="break-all">{line.sku}</span><CopyValue value={line.sku} label="SKU" /></div>{(() => {
+            const issue = mappingIssues.get(line);
+            if (!issue || issue.status !== 'blocked') return null;
+            const review = issue.gap === 'mapping' && onMap ? orderLineReviewListing(order, line) : undefined;
+            return <div role="note" className="mt-1.5 space-y-1 text-xs leading-5 text-amber-700 dark:text-amber-300"><p><span className="font-medium">{mappingGapCopy[issue.gap].label}</span> · {issue.reason} {mappingGapCopy[issue.gap].next}</p>{review && <Button variant="outline" className="h-9 text-xs" onClick={() => onMap!(review)}>Map product</Button>}</div>;
+          })()}</div>
         </div></td>
         <td className="col-span-3 block pb-2 sm:table-cell sm:min-w-[140px] sm:px-3 sm:py-3">{stock ? <Popover><PopoverTrigger asChild><button type="button" aria-label={`Inventory details for ${line.sku}`} className="rounded-md px-2 py-1 text-left hover:bg-muted focus-visible:outline focus-visible:outline-primary"><span className={cn('block whitespace-nowrap text-xs font-medium', available !== null && !sufficient ? 'text-amber-700 dark:text-amber-300' : 'text-foreground')}>{available === null ? 'Availability not reported' : `${order.source === 'demo' ? 'Sample stock' : 'Available'} · ${available}`}</span><span className="mt-1 block whitespace-nowrap text-[11px] text-muted-foreground underline decoration-dotted underline-offset-4">Last stock check · {new Date(stock.checkedAt).toLocaleDateString('en-GB', {day:'2-digit', month:'short'})}</span></button></PopoverTrigger><PopoverContent align="start" className="w-80"><h3 className="text-sm font-semibold">Stock at last check</h3><p className="mt-1 break-words text-xs text-muted-foreground">{line.sku} · {stock.warehouse}</p><div className="mt-3 [&>div]:grid-cols-[minmax(0,1fr)_auto]"><Field label="On-hand" value={String(stock.onHand)} /><Field label="Committed" value={String(stock.committed)} /><Field label="Reserved for this order at last check" value={stock.reservedForOrder == null ? 'Not reported' : String(stock.reservedForOrder)} /><Field label="Available to this order" value={available === null ? 'Not reported' : String(available)} /></div><p className="mt-3 text-xs font-medium">{available === null ? 'Reservation data is missing for this check.' : sufficient ? 'Sufficient at last check' : 'Insufficient at last check'}</p><p className="mt-1 text-xs text-muted-foreground">Checked {formatDate(stock.checkedAt)}</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Committed includes stock reserved for this order. Available here = on-hand − committed + this order’s reservation. Stock may have changed since this check.</p></PopoverContent></Popover> : <span className="text-xs text-muted-foreground">Not checked</span>}</td>
         <td className="block tabular-nums sm:table-cell sm:px-3 sm:py-3 sm:text-right"><span className="mb-1 block text-xs text-muted-foreground sm:hidden">Qty</span>{line.quantity}</td>
