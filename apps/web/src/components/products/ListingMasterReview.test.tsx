@@ -814,7 +814,11 @@ describe('Fast evidence-based Master review', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Differences & missing data' }));
     expect(skuSelect(skus[0].sku_code, sources[0])).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Link all 2 listings' })).toBeDisabled();
-    click('Change Master for all'); compare();
+    click('Change Master for all');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('SKU mappings and SKU structure checks will be discarded');
+    click('Keep reviewing');
+    expect(screen.getByLabelText(`Shop SKU for ${skus[0].sku_code} · ${sources[0].storeName} · ${sources[0].channelSku}`)).toHaveValue('');
+    click('Change Master for all'); click('Discard & continue'); compare();
     expect(skuSelect(skus[0].sku_code, sources[0])).toHaveValue('SHOP-RED');
   });
   it('explains missing source data without blank inputs and reloads an updated imported snapshot', () => {

@@ -9,6 +9,7 @@ import { readyMasterFields } from '@/test/fixtures/listing-master';
 import { completeListingDetails, confirmListingSave, editListingSection, applyListingSection } from '@/test/fixtures/complete-listing-details';
 import { ProductListingIntake } from './ProductListingIntake';
 import { ListingMasterReview } from './ListingMasterReview';
+import { pendingMappingReviews } from '@/lib/product-listing-intake';
 
 afterEach(cleanup);
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
@@ -106,4 +107,35 @@ describe('Review progress recovery UI', () => {
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue('Unsaved reviewed name');
     expect(screen.getAllByLabelText('Master variant SKU').map(input => (input as HTMLInputElement).value)).toEqual(['BACK-RED', 'BACK-BLUE']);
   });
+  it('resumes the saved review when the same Master is chosen again', () => {
+    const { catalog, item, master } = completeVariantFixture('ui-resume');
+    render(<ListingMasterReview catalog={catalog} listings={[item]} initialMode="existing" onBack={vi.fn()} onSaved={vi.fn()} />);
+    click('Manage Master variants');
+    click('Back to review');
+    click('Link now, finish later'); click('Link & save progress');
+    cleanup();
+    const resumed = pendingMappingReviews(catalog.products(), catalog.listings()).filter(source => source.existingLinkReview?.productId === master.id);
+    render(<ListingMasterReview catalog={catalog} listings={resumed} initialMode="existing" onBack={vi.fn()} onSaved={vi.fn()} />);
+    const savedSkus = () => screen.getAllByLabelText('Master variant SKU').map(input => (input as HTMLInputElement).value);
+    expect(screen.getByRole('region', { name: 'Complete Product Master' })).toBeVisible();
+    expect(savedSkus()).toEqual(['RESUME-RED', 'RESUME-BLUE']);
+    click('Back to review');
+    click('Choose another Master'); click('Discard & continue');
+    click(`Compare with ${master.name}`);
+    expect(screen.getByRole('region', { name: 'Complete Product Master' })).toBeVisible();
+    expect(savedSkus()).toEqual(['RESUME-RED', 'RESUME-BLUE']);
+  });
 });
+
+/** A 2-SKU listing with the complete shop data required for linking. */
+function completeVariantFixture(id: string) {
+  const { source } = fixture();
+  const code = id.replace(/^ui-/, '').toUpperCase();
+  const variantItems = ['Red', 'Blue'].map((label, index) => ({ sku: `${code}-${label.toUpperCase()}`, label, price: { amount: 1200, currency: 'JPY' }, stock: 3 + index }));
+  const catalog = createEmptyListingCatalog([{ ...source, description: readyMasterFields().description, variants: 2, variantItems }]);
+  const master = { ...getProducts()[0], ...readyMasterFields(), id, sku_code: id.toUpperCase(), has_variants: false, product_type: 'single' as const, status: 'published' as const, channels: [], skus: [] };
+  catalog.add(master);
+  const item = { ...catalog.listings()[0], suggestedProductId: master.id };
+  catalog.saveListings([item]);
+  return { catalog, item, master };
+}

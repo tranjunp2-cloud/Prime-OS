@@ -54,6 +54,20 @@ function creationPreview(source: CatalogImportItem, products: Product[], previou
   return proposeListingReview({ ...preview, skus: [] }, [source, ...sources.filter(item => item.id !== source.id)], products);
 }
 
+/** Saved review progress for this Master, so reselecting it resumes instead of re-proposing. */
+function restoredReview(master: Product, sources: CatalogImportItem[]) {
+  const pending = sources.map(source => pendingReviewFor(source, master)).find(Boolean);
+  if (!pending) return null;
+  const draftCurrent = Boolean(pending.master_draft && pending.master_signature === reviewMasterSignature(master));
+  const completion: Product | null = draftCurrent ? { ...structuredClone(master), ...structuredClone(pending.master_draft) }
+    : master.status === 'draft' ? prepareReviewVariants(master, sources) : null;
+  const mappings: VariantMappings = Object.fromEntries(sources.flatMap(source => {
+    const progress = pendingReviewFor(source, master);
+    return progress?.draft_mappings ? [[source.id, structuredClone(progress.draft_mappings)]] : [];
+  }));
+  return { completion, mappings, verifiedSingles: sources.filter(source => pendingReviewFor(source, master)?.verified_single).map(source => source.id) };
+}
+
 function Photo({ src, name, onZoom, small = false }: { src?: string; name: string; onZoom?: (src: string, name: string) => void; small?: boolean }) {
   const [failedSrc, setFailedSrc] = useState<string>();
   const visible = src && failedSrc !== src;
@@ -71,9 +85,9 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     ? structuredClone(suggestedMasterForReview(sources, catalog.products())) : null);
   const pending = master && sources.map(source => pendingReviewFor(source, master)).find(Boolean);
   const savedDraftCurrent = Boolean(pending?.master_draft && master && pending.master_signature === reviewMasterSignature(master));
+  const [restoredInitial] = useState(() => master ? restoredReview(master, sources) : null);
   const [query, setQuery] = useState('');
   const [sourceIndex, setSourceIndex] = useState(0);
-  const [reviewedIds, setReviewedIds] = useState<string[]>([]);
   const [sourceId, setSourceId] = useState(sources[0]?.id || '');
   // Keep the creation proposal separate so visiting the existing-Master finder never discards it.
   const [creationProposal] = useState(() => creationPreview(sources[0], catalog.products(), undefined, sources.some(source => source.variants > 1), sources));
@@ -82,22 +96,17 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const [creationDirty, setCreationDirty] = useState(false);
   const [replacementSourceId, setReplacementSourceId] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
-  const [verifiedSingles, setVerifiedSingles] = useState<string[]>(() => master ? sources.filter(source => pendingReviewFor(source, master)?.verified_single).map(source => source.id) : []);
+  const [verifiedSingles, setVerifiedSingles] = useState<string[]>(() => restoredInitial?.verifiedSingles ?? []);
   const [verifiedStructure, setVerifiedStructure] = useState(false);
   const [error, setError] = useState('');
   const [reloadNotice, setReloadNotice] = useState('');
   const recoveryId = useId();
   const [initialProposal] = useState(() => master && !pending ? proposeListingReview(master, sources, catalog.products()) : null);
-  const [completion, setCompletion] = useState<Product | null>(() => master && pending
-    ? savedDraftCurrent ? { ...structuredClone(master), ...structuredClone(pending.master_draft) }
-      : master.status === 'draft' ? prepareReviewVariants(master, sources) : null
+  const [completion, setCompletion] = useState<Product | null>(() => restoredInitial ? restoredInitial.completion
       : initialProposal && master && reviewMasterSignature(initialProposal.product) !== reviewMasterSignature(master) ? initialProposal.product : null);
   const [completing, setCompleting] = useState(Boolean(pending && completion));
   const [mediaReady, setMediaReady] = useState(true);
-  const [existingMappings, setExistingMappings] = useState<VariantMappings>(() => initialProposal?.mappings ?? (master ? Object.fromEntries(sources.flatMap(source => {
-    const progress = pendingReviewFor(source, master);
-    return progress?.draft_mappings ? [[source.id, structuredClone(progress.draft_mappings)]] : [];
-  })) : {}));
+  const [existingMappings, setExistingMappings] = useState<VariantMappings>(() => initialProposal?.mappings ?? restoredInitial?.mappings ?? {});
   const [creationMappings, setCreationMappings] = useState<VariantMappings>(creationProposal.mappings);
   const [listingDrafts, setListingDrafts] = useState<Record<string, ListingDraftValues>>({});
   const mappings = mode === 'new' ? creationMappings : existingMappings;
@@ -110,6 +119,8 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [discardSkip, setDiscardSkip] = useState(false);
   const [replacementMasterMode, setReplacementMasterMode] = useState<'existing' | 'new' | null>(null);
+  // SKU pairs and structure checks are review edits too, even without a Master proposal.
+  const [skuReviewChanged, setSkuReviewChanged] = useState(false);
   useEffect(() => { onDirtyChange?.(dirty || groupDirty); }, [dirty, groupDirty, onDirtyChange]);
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
   const [zoom, setZoom] = useState<{ src: string; name: string } | null>(null);
@@ -180,7 +191,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     : completionError;
   const title = stage === 'complete' ? 'Complete Product Master' : stage === 'create' ? 'Create one Master' : stage === 'compare' ? 'Compare product details' : 'Find a Product Master';
   const openImage = (src: string, imageName: string) => setZoom({ src, name: imageName });
-  const resetReview = () => { setCompletion(null); setCompleting(false); setMediaReady(false); setExistingMappings({}); setReviewedIds([]); setVerifiedSingles([]); setVerifiedStructure(false); setError(''); setReloadNotice(''); };
+  const resetReview = () => { setSkuReviewChanged(false); setCompletion(null); setCompleting(false); setMediaReady(false); setExistingMappings({}); setVerifiedSingles([]); setVerifiedStructure(false); setError(''); setReloadNotice(''); };
   const chooseAnother = () => { setMode('existing'); setMaster(null); resetReview(); setAcknowledged(false); };
   const useExistingMaster = () => {
     // Return to the finder, not the queue or the previous suggested comparison.
@@ -192,7 +203,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     setSourceIndex(Math.max(0, sources.findIndex(item => item.id === sourceId)));
   };
   const changeDestination = (nextMode: 'existing' | 'new') => {
-    if (completion) { setReplacementMasterMode(nextMode); return; }
+    if (completion || skuReviewChanged) { setReplacementMasterMode(nextMode); return; }
     if (nextMode === 'existing') chooseAnother(); else createNewMaster();
   };
   const changeDraftSource = (id: string) => {
@@ -211,15 +222,21 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     setNewProduct(product); setCreationDirty(true); setAcknowledged(false); setDirty(true); setError('');
   };
   const compare = (product: Product) => {
-    const proposal = proposeListingReview(product, sources, catalog.products());
+    const restored = restoredReview(product, sources);
     setMaster(structuredClone(product)); resetReview(); setSourceIndex(0);
+    if (restored) {
+      setCompletion(restored.completion); setExistingMappings(restored.mappings); setVerifiedSingles(restored.verifiedSingles);
+      setCompleting(Boolean(restored.completion)); setMediaReady(true);
+      return;
+    }
+    const proposal = proposeListingReview(product, sources, catalog.products());
     setCompletion(reviewMasterSignature(proposal.product) === reviewMasterSignature(product) ? null : proposal.product);
     setExistingMappings(proposal.mappings); setMediaReady(true);
   };
   const completeHere = () => {
     if (!master) return;
     setCompletion(previous => previous && (previous.has_variants || !sources.some(source => source.variants > 1)) ? previous : prepareReviewVariants(previous ?? master, sources));
-    setReviewedIds([]); setAcknowledged(false);
+    setAcknowledged(false);
     setCompleting(true); setMediaReady(false); setError('');
   };
   const changeSource = (index: number) => {
@@ -247,7 +264,6 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       setCompletion(master && reviewMasterSignature(proposal.product) === reviewMasterSignature(master) ? null : proposal.product);
       setMappings(proposal.mappings); setMediaReady(true);
     } else setMappings(keptMappings);
-    setReviewedIds(value => value.filter(reviewed => reviewed !== id));
     setAcknowledged(false);
     setVerifiedSingles(value => value.filter(verified => verified !== id));
     setError('');
@@ -262,15 +278,6 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     }
     if (groupEditing || ((stage === 'compare' || !editingDetails) && !canSave) || saveLock.current || confirmationError) return;
     if (editingDetails && (!reviewProduct || completionError || !mediaReady || (mode === 'new' && !canSave))) return;
-    if (mode === 'existing' && !completing && !groupedComparison) {
-      const accepted = [...new Set([...reviewedIds, current.id])];
-      setReviewedIds(accepted);
-      if (sources.length > 1) setDirty(true);
-      if (accepted.length < sources.length) {
-        changeSource(sources.findIndex(item => !accepted.includes(item.id)));
-        return;
-      }
-    }
     if (!confirmedSummary && (sources.length > 1 || editingDetails)) { setSummaryOpen(true); return; }
     saveLock.current = true;
     try {
@@ -325,7 +332,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {stage !== 'complete' && existingLinks.length > 0 && <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><p className="font-medium">Review an existing link</p><p>{[...new Set(existingLinks.flatMap(item => item.existingLinkReview!.issues))].join(' · ')}</p><p className="text-muted-foreground">The current link is unchanged until you confirm. Choosing another Master or creating a new Master moves only the selected links; Master stock is not transferred.</p></div>}
 
       {sources.length > 1 && stage === 'choose' && <SelectedListingsOverview listings={sources} />}
-      {stage === 'compare' && master && <ListingMappingContext layout="matrix" destinationLabel={current.existingLinkReview?.productId === master.id ? 'Current Product Master' : isSuggestedMaster ? 'Suggested Product Master' : 'Selected Product Master'} disabled={groupEditing} listings={sources} activeIndex={sourceIndex} reviewedIds={reviewedIds} needsSkuReviewIds={needsSkuReviewIds} proposed={Boolean(completion)} master={comparisonMaster!} masterImage={<Photo src={comparisonMaster!.images[0]} name={comparisonMaster!.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={() => changeDestination('existing')} onCreateMaster={() => changeDestination('new')} />}
+      {stage === 'compare' && master && <ListingMappingContext layout="matrix" destinationLabel={current.existingLinkReview?.productId === master.id ? 'Current Product Master' : isSuggestedMaster ? 'Suggested Product Master' : 'Selected Product Master'} disabled={groupEditing} listings={sources} activeIndex={sourceIndex} reviewedIds={[]} needsSkuReviewIds={needsSkuReviewIds} proposed={Boolean(completion)} master={comparisonMaster!} masterImage={<Photo src={comparisonMaster!.images[0]} name={comparisonMaster!.name} onZoom={openImage} small />} onView={changeSource} onChangeMaster={() => changeDestination('existing')} onCreateMaster={() => changeDestination('new')} />}
 
       {current && (stage === 'choose' || stage === 'create') && sources.length === 1 && <div role="group" aria-label="Source listing" className="min-w-0 rounded-xl border bg-muted/20 p-3">{sourceCard(current)}</div>}
 
@@ -364,18 +371,18 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
         <div className="min-w-0">
           <ListingComparisonTable key={`${current.id}:${master.id}`} baseline={master} product={comparisonMaster!} current={current} sources={sources} onImagePreview={openImage}
             skuMatrix={{ mappings, verifiedSingles, onReload: reloadSource,
-              onVerify: (id, checked) => { setVerifiedSingles(ids => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id)); setAcknowledged(false); setDirty(true); setError(''); },
-              onMappingsChange: value => { setMappings(value); setAcknowledged(false); setDirty(true); setError(''); } }}
+              onVerify: (id, checked) => { setVerifiedSingles(ids => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id)); setSkuReviewChanged(true); setAcknowledged(false); setDirty(true); setError(''); },
+              onMappingsChange: value => { setMappings(value); setSkuReviewChanged(true); setAcknowledged(false); setDirty(true); setError(''); } }}
             onSetupSkus={completeHere} onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }}
-            onChange={next => { setCompletion(reviewMasterSignature(next) === reviewMasterSignature(master) ? null : next); setMediaReady(true); setReviewedIds([]); setAcknowledged(false); setDirty(true); setError(''); }} />
+            onChange={next => { setCompletion(reviewMasterSignature(next) === reviewMasterSignature(master) ? null : next); setMediaReady(true); setAcknowledged(false); setDirty(true); setError(''); }} />
         </div>
         {groupedComparison && <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm leading-6"><Checkbox className="mt-1 shrink-0" disabled={groupEditing} checked={acknowledged} onCheckedChange={checked => setAcknowledged(checked === true)} /><span>I reviewed all {sources.length} listings{sources.length > 4 ? ', including hidden columns,' : ''} and confirm they represent this product.</span></label>}
       </>}
       {reloadNotice && <p role="status" className="text-sm text-muted-foreground">{reloadNotice}</p>}
       {stage === 'complete' && completion && <>
         {mode === 'existing' && <div role="note" className="space-y-1 rounded-lg border bg-muted/20 p-3 text-xs leading-5"><p>Review proposed Master changes before saving. Shop-specific categories and values stay with each listing; nothing is sent to shops.</p>{master && !master.has_variants && completion.has_variants && <p className="font-medium">This changes the Master to a product with variants. Existing SKUs and warehouse stock are preserved, not split. Other linked listings may need SKU mapping before price or stock sync.</p>}</div>}
-        {mode === 'existing' && sources.filter(source => source.variants === 0).map(source => <label key={source.id} className="flex items-start gap-3 text-sm"><Checkbox checked={verifiedSingles.includes(source.id)} onCheckedChange={checked => { setVerifiedSingles(ids => checked === true ? [...ids, source.id] : ids.filter(id => id !== source.id)); setReviewedIds([]); setAcknowledged(false); }} />I checked the SKU structure for {source.storeName} · {source.channelSku}.</label>)}
-        <ListingMasterCompletion verifiedSingles={mode === 'new' && verifiedStructure ? sources.map(source => source.id) : verifiedSingles} readFirst onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }} product={completion} baseline={mode === 'existing' ? master ?? undefined : undefined} sources={sources} preservedSkuIds={mode === 'existing' ? master?.skus.map(sku => sku.id) : undefined} onChange={product => { setCompletion(product); setReviewedIds([]); setAcknowledged(false); setDirty(true); setError(''); }} mappings={mappings} onMappingsChange={value => { setMappings(value); setReviewedIds([]); setAcknowledged(false); setDirty(true); }} onMediaReady={setMediaReady} />
+        {mode === 'existing' && sources.filter(source => source.variants === 0).map(source => <label key={source.id} className="flex items-start gap-3 text-sm"><Checkbox checked={verifiedSingles.includes(source.id)} onCheckedChange={checked => { setVerifiedSingles(ids => checked === true ? [...ids, source.id] : ids.filter(id => id !== source.id)); setAcknowledged(false); }} />I checked the SKU structure for {source.storeName} · {source.channelSku}.</label>)}
+        <ListingMasterCompletion verifiedSingles={mode === 'new' && verifiedStructure ? sources.map(source => source.id) : verifiedSingles} readFirst onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }} product={completion} baseline={mode === 'existing' ? master ?? undefined : undefined} sources={sources} preservedSkuIds={mode === 'existing' ? master?.skus.map(sku => sku.id) : undefined} onChange={product => { setCompletion(product); setAcknowledged(false); setDirty(true); setError(''); }} mappings={mappings} onMappingsChange={value => { setMappings(value); setAcknowledged(false); setDirty(true); }} onMediaReady={setMediaReady} />
         {sources.length > 1 && mode === 'existing' && <label className="flex items-start gap-3 text-sm"><Checkbox checked={acknowledged} onCheckedChange={checked => setAcknowledged(checked === true)} />I reviewed all selected listings and confirm they represent this product.</label>}
       </>}
       {stage === 'create' && <div className="space-y-3">
@@ -402,12 +409,12 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {(stage !== 'choose' || onSkip) && <div className="col-span-full flex flex-wrap items-center justify-end gap-2">
         {onSkip && <Button variant="ghost" className="mr-auto h-11" disabled={groupEditing} onClick={() => { if (dirty || groupDirty) setDiscardSkip(true); else onSkip(); }}>Skip for now</Button>}
         {stage !== 'choose' && <><Button variant="outline" className="h-11 w-full sm:w-auto" disabled={!canDefer || groupEditing} onClick={() => setDeferOpen(true)}>{deferLabel}</Button>
-        <Button className="h-11 w-full sm:w-auto" aria-describedby={mappingRecovery && !groupEditing ? recoveryId : undefined} disabled={groupEditing || (savePendingReview ? !canSaveReviewedGroup : editingDetails ? !reviewProduct || Boolean(confirmationError || completionError) || !mediaReady || ((mode === 'new' || stage === 'compare') && !canSave) : !canSave)} onClick={() => save()}>{stage === 'compare' && !groupedComparison && sources.some(item => item.id !== current.id && !reviewedIds.includes(item.id)) ? 'Mark checked & next' : primaryLabel}<ArrowRight className="size-4" /></Button></>}
+        <Button className="h-11 w-full sm:w-auto" aria-describedby={mappingRecovery && !groupEditing ? recoveryId : undefined} disabled={groupEditing || (savePendingReview ? !canSaveReviewedGroup : editingDetails ? !reviewProduct || Boolean(confirmationError || completionError) || !mediaReady || ((mode === 'new' || stage === 'compare') && !canSave) : !canSave)} onClick={() => save()}>{primaryLabel}<ArrowRight className="size-4" /></Button></>}
       </div>}
     </div>
     {summaryOpen && (reviewProduct || master) && <ListingSaveSummary product={editingDetails ? reviewProduct! : master!} baseline={mode === 'existing' ? master ?? undefined : undefined} sources={sources} mappings={mappings} listingDrafts={listingDrafts} editing={editingDetails} creating={mode === 'new'} pendingReason={pendingSaveReason} confirmLabel={primaryLabel} onBack={() => setSummaryOpen(false)} onConfirm={() => save(true)} />}
     <AlertDialog open={discardSkip} onOpenChange={setDiscardSkip}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Skip without saving these edits?</AlertDialogTitle><AlertDialogDescription>This listing stays in the review queue. No link or Master change will be saved.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={() => { setDirty(false); onDirtyChange?.(false); onSkip?.(); }}>Discard edits & skip</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    <AlertDialog open={Boolean(replacementMasterMode)} onOpenChange={open => { if (!open) setReplacementMasterMode(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard changes for this Master?</AlertDialogTitle><AlertDialogDescription>Your proposed Master values and SKU mappings will be discarded when you change the destination. No Master or shop data has been saved.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={() => { if (replacementMasterMode === 'existing') chooseAnother(); else createNewMaster(); setReplacementMasterMode(null); }}>Discard & continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={Boolean(replacementMasterMode)} onOpenChange={open => { if (!open) setReplacementMasterMode(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard changes for this Master?</AlertDialogTitle><AlertDialogDescription>Your proposed Master values, SKU mappings and SKU structure checks will be discarded when you change the destination. No Master or shop data has been saved.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={() => { if (replacementMasterMode === 'existing') chooseAnother(); else createNewMaster(); setReplacementMasterMode(null); }}>Discard & continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={Boolean(replacementSourceId)} onOpenChange={open => { if (!open) setReplacementSourceId(''); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Replace the starting listing data?</AlertDialogTitle><AlertDialogDescription>This replaces your field edits, image choices and SKU mappings with data from the selected listing. Your internal category and Master SKU are kept. To change just one field, use Change source in the mapping table instead.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={() => changeDraftSource(replacementSourceId)}>Replace draft data</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={deferOpen} onOpenChange={setDeferOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{mode === 'new' ? 'Save a draft Master and link these listings?' : alreadyLinkedHere ? 'Save review progress for later?' : 'Link now and finish the review later?'}</AlertDialogTitle><AlertDialogDescription>{sources.length} listing{sources.length === 1 ? '' : 's'} {alreadyLinkedHere ? 'stay linked' : 'will be linked'} to {mode === 'new' ? draft.name : master?.name}. {mode === 'new' ? 'The new Master stays Draft.' : 'Existing Master details and status stay unchanged; your proposed edits are saved for review.'} Unconfirmed SKU mappings cannot be used for price or stock sync. No shop data is changed and sync is not turned on.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={saveForLater}>{mode === 'new' ? 'Save draft & link' : alreadyLinkedHere ? 'Save progress' : 'Link & save progress'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <Dialog open={Boolean(zoom)} onOpenChange={open => { if (!open) setZoom(null); }}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Product image</DialogTitle><DialogDescription>{zoom?.name}</DialogDescription></DialogHeader>{zoom && <img src={zoom.src} alt={zoom.name} className="max-h-[65vh] w-full object-contain" />}</DialogContent></Dialog>

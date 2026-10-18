@@ -89,7 +89,7 @@ describe('Listing editor source-aware presentation', () => {
   it('preserves custom images and edits, and never matches another imported shop or SKU', () => {
     const item = getCatalogImportItems({ requireConfirmation: true }).find(item => item.id === 'imp-008')!;
     const target: ChannelListing = { channel: item.channel, external_id: item.listingId, store_name: item.storeName, shop_sku: item.channelSku, status: 'active', listing_url: null, last_synced_at: null,
-      shop_snapshot: snapshotShopListing({ ...item, image: '/custom-palette.jpg', description: 'Custom source description' }) };
+      shop_snapshot: snapshotShopListing({ ...item, image: '/custom-palette.jpg', images: [], description: 'Custom source description' }) };
     const product = { ...fixture(), channels: [target] };
     const details = listingEditorData(product, target);
     expect(details.values.images).toEqual(['/custom-palette.jpg']);

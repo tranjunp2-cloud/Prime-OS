@@ -73,11 +73,11 @@ describe('catalog import demo scenarios', () => {
     const notebook = getCatalogImportItems({ requireConfirmation: true }).find(item => item.id === 'imp-009')!;
     const legacy = { ...notebook, variantItems: undefined, suggestedProductId: 'different-master', resolvedProductId: 'my-choice', confirmed: true };
     saveCatalogImportItems([legacy]);
-    const before = window.localStorage.getItem('prime-catalog-import-review-v12');
+    const before = window.localStorage.getItem('prime-catalog-import-review-v13');
     const [loaded] = getCatalogImportItems({ requireConfirmation: true });
     expect(loaded.variantItems).toEqual(notebook.variantItems);
     expect(loaded).toMatchObject({ suggestedProductId: 'different-master', resolvedProductId: 'my-choice', confirmed: true });
-    expect(window.localStorage.getItem('prime-catalog-import-review-v12')).toBe(before);
+    expect(window.localStorage.getItem('prime-catalog-import-review-v13')).toBe(before);
     saveCatalogImportItems([{ ...legacy, variantItems: [{ sku: 'USER-SKU', label: 'User snapshot' }] }]);
     expect(getCatalogImportItems({ requireConfirmation: true })[0].variantItems).toEqual([{ sku: 'USER-SKU', label: 'User snapshot' }]);
   });
@@ -86,11 +86,11 @@ describe('catalog import demo scenarios', () => {
     const original = getCatalogImportItems({ requireConfirmation: true }).find(item => item.id === 'imp-002')!;
     const legacy = { ...original, variantItems: undefined, resolution: 'ignore' as const, confirmed: true, resolvedProductId: 'user-chosen-master', price: 123 };
     saveCatalogImportItems([legacy]);
-    const saved = window.localStorage.getItem('prime-catalog-import-review-v12');
+    const saved = window.localStorage.getItem('prime-catalog-import-review-v13');
     const [loaded] = getCatalogImportItems({ requireConfirmation: true });
     expect(loaded).toMatchObject({ resolution: 'ignore', confirmed: true, resolvedProductId: 'user-chosen-master', price: 123 });
     expect(loaded.variantItems).toHaveLength(3);
-    expect(window.localStorage.getItem('prime-catalog-import-review-v12')).toBe(saved);
+    expect(window.localStorage.getItem('prime-catalog-import-review-v13')).toBe(saved);
   });
 
   it('does not overwrite supplied SKU data or enrich another shop, identity or variant count', () => {
