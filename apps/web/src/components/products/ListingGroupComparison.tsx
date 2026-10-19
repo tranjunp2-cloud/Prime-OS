@@ -122,7 +122,14 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
   const missingMaster = (row: Row) => Boolean(row.required && (!format(product, row.key) || row.key === 'retail_price' && hasVariants && (!product.skus.some(sku => sku.status === 'active') || product.skus.some(sku => sku.status === 'active' && !(sku.price! > 0)))));
   const different = (row: Row) => missingMaster(row) || sources.some(source => !sourceValue(row, source) || normal(sourceValue(row, source)) !== normal(format(product, row.key)));
   const fieldRows = rows.filter(row => !(creating ? ['retail_price'] : ['sku_code', 'structure', 'retail_price']).includes(row.key));
-  const displayedRows = fieldRows.filter(row => !differencesOnly || row.key === editingKey || different(row) || format(product, row.key) !== format(baseline, row.key));
+  // Fields empty in every listing and the Master are completed later in Product Master.
+  // Activation-required fields and the open editor always stay visible.
+  // A pack-size clue in a title is identity evidence worth checking, though not field data.
+  const hasData = (row: Row) => [format(product, row.key), format(baseline, row.key), ...sources.map(source => sourceValue(row, source))].some(value => Boolean(value?.trim()))
+    || (row.key === 'pack_quantity' && [product.name, ...sources.map(source => source.title)].some(title => Boolean(packTitleHint(title))));
+  const dataRows = fieldRows.filter(row => row.required || row.key === editingKey || (creating && row.key === 'images') || hasData(row));
+  const emptyRows = fieldRows.filter(row => !dataRows.includes(row));
+  const displayedRows = dataRows.filter(row => !differencesOnly || row.key === editingKey || different(row) || format(product, row.key) !== format(baseline, row.key));
   const priceRow = rows.find(row => row.key === 'retail_price')!;
   const renderFieldRow = (row: Row) => {
           const value = format(product, row.key), previous = format(baseline, row.key);
@@ -211,6 +218,7 @@ export function ListingGroupComparison({ baseline, product, sources, rows, prefi
         <tbody>{displayedRows.filter(row => !row.required).map(renderFieldRow)}</tbody>
       </table>
       {!displayedRows.length && <p className="p-4 text-xs text-muted-foreground">No product field differences. SKU pairs remain visible for review.</p>}
+      {emptyRows.length > 0 && <p role="note" className="border-t p-3 text-xs leading-5 text-muted-foreground">{emptyRows.length} field{emptyRows.length === 1 ? '' : 's'} without data from the listings or Master {emptyRows.length === 1 ? 'is' : 'are'} hidden: {emptyRows.map(row => row.label).join(', ')}. Add {emptyRows.length === 1 ? 'it' : 'them'} later in Product Master.</p>}
     </div>
   </section></TooltipProvider>;
 }

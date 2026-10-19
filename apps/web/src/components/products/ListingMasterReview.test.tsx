@@ -229,6 +229,16 @@ describe('Fast evidence-based Master review', () => {
     expect(getProductById(target.id)?.channels).toEqual([]);
     expect(onSaved).not.toHaveBeenCalled();
   });
+  it('hides fields that neither the listings nor the Master provide, but keeps required ones', () => {
+    updateProduct(target.id, { id: target.id, model_number: undefined, mpn: undefined, description: '' });
+    mount([{ ...listings[0], modelNumber: undefined, mpn: undefined, description: '' }]);
+    const table = within(screen.getByRole('table'));
+    expect(table.queryByRole('rowheader', { name: /^Model/ })).not.toBeInTheDocument();
+    expect(table.queryByRole('rowheader', { name: /^Manufacturer part number/ })).not.toBeInTheDocument();
+    expect(table.getByRole('rowheader', { name: /^Description/ })).toHaveTextContent('Required');
+    expect(table.getByRole('rowheader', { name: /^Barcode/ })).toBeVisible();
+    expect(screen.getByText(/2 fields without data from the listings or Master are hidden: Model, Manufacturer part number\. Add them later in Product Master\./)).toBeVisible();
+  });
   it('edits a Master field directly in the comparison table and saves only after confirmation', () => {
     updateProduct(target.id, { id: target.id, status: 'published' });
     const before = structuredClone(getProductById(target.id)!);
