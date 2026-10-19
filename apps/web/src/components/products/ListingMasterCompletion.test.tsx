@@ -37,7 +37,13 @@ function mount(mode: 'existing' | 'new' = 'existing') {
   return { onSaved, onBack, onDirtyChange };
 }
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+/** New Masters need a stock warehouse; this fixture's shop has no default one. */
+function chooseStockWarehouse() {
+  const checkbox = screen.queryByRole('checkbox', { name: /CyberRecord Japan HQ/ });
+  if (checkbox && checkbox.getAttribute('aria-checked') !== 'true') fireEvent.click(checkbox);
+}
 function confirmDraftLink() {
+  chooseStockWarehouse();
   click('Save draft & link');
   fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Save draft & link' }));
 }
@@ -73,6 +79,7 @@ describe('Required details inside the listing drawer', () => {
     const { onSaved } = mount('new');
     completeListingDetails();
     const before = structuredClone(getProducts());
+    chooseStockWarehouse();
     click('Save draft & link');
     const summary = within(screen.getByRole('alertdialog', { name: 'Save a draft Master and link these listings?' }));
     expect(summary.getByText(/The new Master stays Draft/)).toBeVisible();

@@ -152,6 +152,9 @@ describe('Draft creation fields from a shop listing', () => {
     expect(row.getByRole('textbox', { name: /^Product name/ })).toHaveValue('M-12');
     expect(getProducts()).toHaveLength(ids.size);
     applyListingSection();
+    expect(screen.getByRole('button', { name: 'Save draft & link' })).toBeDisabled();
+    expect(screen.getByRole('group', { name: /Stock warehouse/ })).toHaveTextContent('Choose at least one warehouse');
+    fireEvent.click(screen.getByRole('checkbox', { name: /CyberRecord Japan HQ/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft & link' }));
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Save draft & link' }));
     const saved = getProductById(onSaved.mock.calls[0][0].productId)!;

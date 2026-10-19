@@ -39,11 +39,11 @@ const scenarios = [
   {key: 'RANK-VIP', stage: 'closed', title: 'Customer rank demo — VIP qualifying purchase', unitPrice: 12500000, label: true, settled: true},
   // Shop listing lines resolve listing → Master SKU → warehouse → stock. They reuse existing
   // non-draft Shopee buyers so customer counts and ranks stay unchanged.
-  {key: 'MAP-UNLINKED', stage: 'acknowledged', title: 'Shopee order with a listing not linked to a Product Master', store: 'Shopee', platform: 'shopee', storeName: 'Prime Beauty Official', buyerIndex: 5, lines: [
+  {key: 'MAP-UNLINKED', stage: 'acknowledged', title: 'Shopee order with a listing not linked to a Product Master', store: 'Shopee', platform: 'shopee', storeName: 'Prime Beauty Official', warehouse: 'Vietnam 3PL Partner', buyerIndex: 5, lines: [
     {sku: 'SHP-TEST2-MYTH-10', name: 'Japanese Mythical Creatures Art Print', listingId: 'SHP-TEST2-MYTH', shopSku: 'SHP-TEST2-MYTH-10', unitPrice: 180000},
     {sku: 'SHP-CER-PAL-12', name: 'Ceramic Watercolor Mixing Palette 12 Well', listingId: 'SHP-9012326', shopSku: 'SHP-CER-PAL-12', unitPrice: 260000},
   ]},
-  {key: 'MAP-STOCK', stage: 'acknowledged', title: 'Shopee order without stock at the shop warehouse', store: 'Shopee', platform: 'shopee', storeName: 'Prime Beauty Official', buyerIndex: 9, lines: [
+  {key: 'MAP-STOCK', stage: 'acknowledged', title: 'Shopee order without stock at the shop warehouse', store: 'Shopee', platform: 'shopee', storeName: 'Prime Beauty Official', warehouse: 'Vietnam 3PL Partner', buyerIndex: 9, lines: [
     {sku: 'CR-BSH-SET-12', name: 'Artist Precision Paint Brush Set 12 Pieces', listingId: 'SH-ARCH-001', shopSku: 'CR-BSH-SET-12', unitPrice: 340000},
   ]},
 ];
@@ -64,7 +64,8 @@ export function demoOrderScenarios(templates) {
     const returned = scenario.outcome === 'returned';
     const store = scenario.store || ['PrimeWeb', 'Shopee', 'TikTok Shop', 'Lazada'][index % 4];
     const carrier = scenario.pickup ? 'Store pickup' : ['GHN', 'SPX Express', 'Viettel Post'][index % 3];
-    const warehouse = scenario.pickup ? 'District 1 Branch' : index % 2 ? 'Hanoi Warehouse' : 'HCM Central Warehouse';
+    // Listing orders carry the resolved shop warehouse so Dispatch warehouse matches the stock-source warning.
+    const warehouse = scenario.warehouse ?? (scenario.pickup ? 'District 1 Branch' : index % 2 ? 'Hanoi Warehouse' : 'HCM Central Warehouse');
     const paymentState = scenario.payment || 'Paid';
     // Listing lines carry no stock snapshot: their stock comes from the resolved Master SKU.
     const sourceLines = scenario.lines?.map(line => ({...order.lines[0], imageUrl: undefined, variant: undefined, inventory: undefined, ...line})) ?? order.lines;

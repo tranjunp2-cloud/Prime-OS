@@ -9,6 +9,8 @@ import { suggestMasterSku } from './product-onboarding';
 import { getProductCatalogSettings } from './product-catalog-settings-store';
 import { snapshotShopListing } from './listing-shop-data';
 import { savedReviewProgress } from './listing-review-progress';
+import { assignableMasterWarehouses, withMasterWarehouses } from './listing-master-warehouses';
+import { prepareProductOpeningStock } from './product-opening-stock';
 import { assertListingDataComplete, importedListingDataReadiness } from './listing-data-readiness';
 
 import { applyMasterCompletion, assertMasterComplete, newListingMasterPreview, variantMappingError, type MasterCompletion, type VariantMappings } from './listing-master-completion';
@@ -18,6 +20,8 @@ export type CreateListingMasterInput = {
   name: string;
   sku: string;
   sourceId: string;
+  /** Stock warehouses for the new Master; orders cannot be fulfilled without one. */
+  warehouseIds?: string[];
   productType?: ProductType;
   categoryId?: string;
   brandId?: string;
@@ -178,6 +182,12 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
   }
   if (!('productId' in target)) {
     product = applyMasterCompletion(product, selected.filter(item => item.id === target.sourceId), target.completion, true);
+    // A new Master starts in its chosen warehouses with an opening count of 0. Activation
+    // checks the warehouse with the other required details; drafts are checked below.
+    const warehouseIds = [...new Set(target.warehouseIds ?? [])];
+    const assignable = new Set(assignableMasterWarehouses().map(warehouse => warehouse.id));
+    if (warehouseIds.some(id => !assignable.has(id))) throw new Error('Choose active warehouses whose stock you manage.');
+    if (warehouseIds.length) product = prepareProductOpeningStock(withMasterWarehouses(product, warehouseIds));
     if (!target.defer) { assertMasterComplete(product, selected, products); activateCompletedMaster(product); }
     else { product.status = 'draft'; product.import_activation_paused = true; }
   } else if (target.completion && !target.defer) {
@@ -192,6 +202,8 @@ export function confirmListingIntake(ids: string[], target: ExistingListingMaste
   // Deferring Master completion must not create an empty listing relationship.
   // Missing SKU details may be finished later; the link then stays SKU-pending.
   assertListingDataComplete(selected, { allowIncompleteSkus: Boolean(target.defer) });
+  // Drafts receive orders too, so a new Master always needs a stock warehouse.
+  if (!('productId' in target) && !target.warehouseIds?.length) throw new Error('Choose at least one stock warehouse for the new Master.');
   const savedDraft = 'productId' in target && target.completion && target.defer ? applyMasterCompletion(product, [], target.completion) : undefined;
   // Listing-owned details are local drafts, never Master fields or provider snapshots.
   for (const source of selected) {

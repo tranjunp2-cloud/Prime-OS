@@ -286,4 +286,14 @@ describe('Order detail workflows',()=>{
     expect(screen.getByRole('dialog', {name:'Review mapping'})).toHaveTextContent('Link this listing to a Product Master.');
     expect(screen.getByRole('button', {name:'Back to order'})).toBeVisible();
   });
+  it('matches the dispatch warehouse to the stock source and shows live inventory for a listing order', () => {
+    const record = listPrototypeOrders().find(item => item.id === 'DEMO-MAP-STOCK')!;
+    mount(record);
+    // Bug 1: Dispatch warehouse echoes the resolved shop warehouse, the same one the shortage warning names.
+    expect(screen.getByText('Dispatch warehouse').parentElement).toHaveTextContent('Vietnam 3PL Partner');
+    const items = within(screen.getByRole('table', {name:'Order items'}));
+    // Bug 2: the Inventory column reflects live stock instead of a permanent "Not checked".
+    expect(items.queryByText('Not checked')).not.toBeInTheDocument();
+    expect(items.getAllByText('Not enough stock')).toHaveLength(2);
+  });
 });

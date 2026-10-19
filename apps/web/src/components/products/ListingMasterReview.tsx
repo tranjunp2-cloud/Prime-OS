@@ -23,6 +23,7 @@ import { SelectedListingsOverview } from './SelectedListingsOverview';
 import { ListingMappingContext } from './ListingMappingContext';
 
 import { ListingMasterCompletion } from './ListingMasterCompletion';
+import { assignableMasterWarehouses, listingShopWarehouseIds, withMasterWarehouses } from '@/lib/listing-master-warehouses';
 import { ListingComparisonTable } from './ListingComparisonTable';
 import { ListingSaveSummary } from './ListingSaveSummary';
 import { ListingReviewHelp } from './ListingReviewHelp';
@@ -92,6 +93,8 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   // Keep the creation proposal separate so visiting the existing-Master finder never discards it.
   const [creationProposal] = useState(() => creationPreview(sources[0], catalog.products(), undefined, sources.some(source => source.variants > 1), sources));
   const [newProduct, setNewProduct] = useState(creationProposal.product);
+  // A new Master needs a stock warehouse for orders; default to where the listings' shops fulfil.
+  const [warehouseIds, setWarehouseIds] = useState(() => listingShopWarehouseIds(sources));
   const [creationBaseline, setCreationBaseline] = useState(creationProposal.product);
   const [creationDirty, setCreationDirty] = useState(false);
   const [replacementSourceId, setReplacementSourceId] = useState('');
@@ -115,6 +118,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const [groupEditing, setGroupEditing] = useState(false);
   const [groupDirty, setGroupDirty] = useState(false);
   const [discardBack, setDiscardBack] = useState(false);
+  const [removingSource, setRemovingSource] = useState<CatalogImportItem | null>(null);
   const [deferOpen, setDeferOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [discardSkip, setDiscardSkip] = useState(false);
@@ -131,7 +135,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const stage: IntakeStage = mode === 'new' ? 'create' : completing ? 'complete' : master ? 'compare' : 'choose';
   const editingDetails = stage === 'create' || stage === 'complete' || (stage === 'compare' && Boolean(completion));
   const groupedComparison = stage === 'compare' && sources.length > 1;
-  const reviewProduct = mode === 'new' ? newProduct : completion;
+  const reviewProduct = mode === 'new' ? withMasterWarehouses(newProduct, warehouseIds) : completion;
   const draft = { name: newProduct.name, sku: newProduct.sku_code, productType: newProduct.product_type, categoryId: newProduct.categoryId, brandId: newProduct.brandId, copySourcePrice: false };
   const isSuggestedMaster = Boolean(master && suggestedMasterForReview(sources, catalog.products())?.id === master.id);
   useEffect(() => {
@@ -165,15 +169,15 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
   const sourceDataReady = missingListingData.length === 0;
   // Base shop data is required for any link; SKU detail gaps only block a final link.
   const sourceBaseReady = missingListingData.every(item => item.baseReady);
-  const canSave = sourceDataReady && (mode === 'new' ? (sources.length === 1 || acknowledged) && (!unknownStructure || verifiedStructure) && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master) && !blocked && !mappingError && (!groupedComparison || acknowledged));
-  const canDefer = sourceBaseReady && (mode === 'new' ? Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master));
+  const canSave = sourceDataReady && (mode === 'new' ? warehouseIds.length > 0 && (sources.length === 1 || acknowledged) && (!unknownStructure || verifiedStructure) && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master) && !blocked && !mappingError && (!groupedComparison || acknowledged));
+  const canDefer = sourceBaseReady && (mode === 'new' ? warehouseIds.length > 0 && Boolean(draft.name.trim()) && Boolean(draft.sku.trim()) : Boolean(master));
   let completionError = '';
   if (editingDetails && reviewProduct) {
     try { assertMasterComplete(reviewProduct, sources, catalog.products()); }
     catch (reason) { completionError = reason instanceof Error ? reason.message : 'Complete required details.'; }
     completionError ||= variantMappingError(stage === 'compare' ? comparisonSources : sources, reviewProduct, Object.fromEntries(sources.map(source => [source.id, resolveSourceSkuMappings(source, reviewProduct, mappings[source.id])])), mode === 'new' && verifiedStructure ? sources.map(item => item.id) : verifiedSingles);
   }
-  const confirmationError = !sourceDataReady ? 'Complete listing data before linking.' : mode === 'new' && sources.length > 1 && !acknowledged ? 'Confirm that all selected listings represent the same product before activating.'
+  const confirmationError = !sourceDataReady ? 'Complete listing data before linking.' : mode === 'new' && !warehouseIds.length ? 'Choose at least one stock warehouse for the new Master.' : mode === 'new' && sources.length > 1 && !acknowledged ? 'Confirm that all selected listings represent the same product before activating.'
     : mode === 'new' && unknownStructure && !verifiedStructure ? 'Check the source SKU structure and confirm the product type before activating.'
     : mode === 'existing' && (stage === 'complete' || groupedComparison) && sources.length > 1 && !acknowledged ? 'Confirm that you reviewed all selected listings before saving.' : '';
   // Consent permits saving the review, not bypassing data integrity or enabling sync.
@@ -271,6 +275,23 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     setError('');
     setReloadNotice(sourceSkuDataError(latest) ? 'SKU details are still missing from the imported data. Sync this listing from its channel, then reload here.' : 'Listing data reloaded. Review the updated SKU matches.');
   };
+  // Split one listing out of the group: drop it locally and re-propose for the rest, keeping their progress.
+  // The removed listing is never linked here, so it returns to the queue to be reviewed on its own.
+  const removeSource = (id: string) => {
+    if (sources.length <= 1) return;
+    const nextSources = sources.filter(source => source.id !== id);
+    const keptMappings = Object.fromEntries(Object.entries(mappings).filter(([key]) => key !== id));
+    setSources(nextSources);
+    if (comparisonMaster) {
+      const proposal = proposeListingReview(comparisonMaster, nextSources, catalog.products(), keptMappings);
+      setCompletion(master && reviewMasterSignature(proposal.product) === reviewMasterSignature(master) ? null : proposal.product);
+      setMappings(proposal.mappings); setMediaReady(true);
+    } else setMappings(keptMappings);
+    setSourceIndex(index => Math.min(index, nextSources.length - 1));
+    setVerifiedSingles(value => value.filter(verified => verified !== id));
+    setAcknowledged(false); setDirty(true); setError(''); setReloadNotice('');
+    setRemovingSource(null);
+  };
   const save = (confirmedSummary = false) => {
     if (savePendingReview) {
       if (groupEditing || !canSaveReviewedGroup || saveLock.current) return;
@@ -283,7 +304,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     if (!confirmedSummary && (sources.length > 1 || editingDetails)) { setSummaryOpen(true); return; }
     saveLock.current = true;
     try {
-      const result = confirmListingIntake(sources.map(item => item.id), mode === 'new' ? { ...draft, listingDrafts, completion: completionFields(newProduct), variantMappings: newProduct.has_variants ? resolvedReviewMappings(sources, newProduct, mappings) : undefined, sourceId, verifiedSourceStructure: verifiedStructure, reviewedSources: sources.map(snapshotListingSource) } : { productId: master!.id, listingDrafts, completion: completion ? completionFields(completion) : undefined, activate: Boolean(completion) && master!.status !== 'published', variantMappings: completion ? resolvedReviewMappings(sources, completion, mappings) : resolvedMappings, verifiedSingleListingIds: verifiedSingles, reviewed: sources.map(item => snapshotListingMatch(item, master!)) }, catalog);
+      const result = confirmListingIntake(sources.map(item => item.id), mode === 'new' ? { ...draft, warehouseIds, listingDrafts, completion: completionFields(newProduct), variantMappings: newProduct.has_variants ? resolvedReviewMappings(sources, newProduct, mappings) : undefined, sourceId, verifiedSourceStructure: verifiedStructure, reviewedSources: sources.map(snapshotListingSource) } : { productId: master!.id, listingDrafts, completion: completion ? completionFields(completion) : undefined, activate: Boolean(completion) && master!.status !== 'published', variantMappings: completion ? resolvedReviewMappings(sources, completion, mappings) : resolvedMappings, verifiedSingleListingIds: verifiedSingles, reviewed: sources.map(item => snapshotListingMatch(item, master!)) }, catalog);
       setDirty(false); onDirtyChange?.(false);
       onSaved(result, mode === 'new');
     } catch (reason) {
@@ -298,7 +319,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       const candidate = reviewProduct ?? master!;
       const proposedMappings = resolvedReviewMappings(sources, candidate, mappings);
       const result = confirmListingIntake(sources.map(source => source.id), mode === 'new'
-        ? { ...draft, sourceId, listingDrafts, defer: true, completion: completionFields(candidate), variantMappings: proposedMappings, verifiedSourceStructure: verifiedStructure, reviewedSources: sources.map(snapshotListingSource) }
+        ? { ...draft, warehouseIds, sourceId, listingDrafts, defer: true, completion: completionFields(candidate), variantMappings: proposedMappings, verifiedSourceStructure: verifiedStructure, reviewedSources: sources.map(snapshotListingSource) }
         : { productId: master!.id, listingDrafts, defer: true, completion: completion ? completionFields(completion) : undefined, variantMappings: proposedMappings, verifiedSingleListingIds: verifiedSingles, reviewed: sources.map(source => snapshotListingMatch(source, master!)) }, catalog);
       setDirty(false); onDirtyChange?.(false); setDeferOpen(false); onSaved(result, mode === 'new');
     } catch (reason) { saveLock.current = false; setDeferOpen(false); setSummaryOpen(false); setError(reason instanceof Error ? reason.message : 'Could not save progress. Try again.'); }
@@ -323,12 +344,13 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
 
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     <h2 ref={heading} tabIndex={-1} className="sr-only">{title}</h2>
-    <div ref={scrollArea} data-listing-review-scroll className={`min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 sm:p-6 ${stage === 'choose' || stage === 'create' ? 'space-y-3' : 'space-y-4'}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="-ml-3 h-11" disabled={stage === 'complete' && groupEditing} onClick={() => {
-        if (stage === 'complete') { setCompleting(false); setError(''); }
-        else if (dirty || groupDirty) setDiscardBack(true);
-        else onBack();
-      }}><ArrowLeft className="size-4" />{stage === 'complete' ? 'Back to review' : backLabel}</Button>{stage === 'create' && catalog.products().some(product => product.status !== 'archived') && <Button variant="outline" className="h-11" disabled={groupEditing} onClick={useExistingMaster}><ArrowLeft className="size-4" />Use existing Master</Button>}</div>
+    {/* Back action lives in a fixed header so it stays reachable while the review body scrolls. */}
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 sm:px-6"><Button variant="ghost" className="-ml-3 h-11" disabled={stage === 'complete' && groupEditing} onClick={() => {
+      if (stage === 'complete') { setCompleting(false); setError(''); }
+      else if (dirty || groupDirty) setDiscardBack(true);
+      else onBack();
+    }}><ArrowLeft className="size-4" />{stage === 'complete' ? 'Back to review' : backLabel}</Button>{stage === 'create' && catalog.products().some(product => product.status !== 'archived') && <Button variant="outline" className="h-11" disabled={groupEditing} onClick={useExistingMaster}><ArrowLeft className="size-4" />Use existing Master</Button>}</header>
+    <div ref={scrollArea} data-listing-review-scroll className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain p-4 sm:p-6">
       {batchProgress && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 text-xs"><span className="font-medium">Reviewing listing {batchProgress.index} of {batchProgress.total}</span><span className="text-muted-foreground">Each listing links to its own selected Master</span></div>}
       {pending && <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p className="font-medium">Linked · review unfinished</p><p className="mt-1 text-xs text-muted-foreground">{pending.issues.join(' · ')}. Confirming does not turn on sync.</p>{pending.master_draft && !savedDraftCurrent && <p className="mt-2 text-xs">The Master changed since this draft was saved. Review the current values; the older draft will not overwrite them automatically.</p>}</div>}
       {stage !== 'complete' && existingLinks.length > 0 && <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5" role="note"><p className="font-medium">Review an existing link</p><p>{[...new Set(existingLinks.flatMap(item => item.existingLinkReview!.issues))].join(' · ')}</p><p className="text-muted-foreground">The current link is unchanged until you confirm. Choosing another Master or creating a new Master moves only the selected links; Master stock is not transferred.</p></div>}
@@ -372,6 +394,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       {stage === 'compare' && master && <>
         <div className="min-w-0">
           <ListingComparisonTable key={`${current.id}:${master.id}`} baseline={master} product={comparisonMaster!} current={current} sources={sources} onImagePreview={openImage}
+            onRemoveSource={sources.length > 1 ? id => setRemovingSource(sources.find(source => source.id === id) ?? null) : undefined}
             skuMatrix={{ mappings, verifiedSingles, onReload: reloadSource,
               onVerify: (id, checked) => { setVerifiedSingles(ids => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id)); setSkuReviewChanged(true); setAcknowledged(false); setDirty(true); setError(''); },
               onMappingsChange: value => { setMappings(value); setSkuReviewChanged(true); setAcknowledged(false); setDirty(true); setError(''); } }}
@@ -389,11 +412,16 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
       </>}
       {stage === 'create' && <div className="space-y-3">
         {sources.length > 1 && <div className="space-y-2"><div className="flex items-center gap-1"><Label htmlFor="intake-source">Starting data from</Label><ListingReviewHelp label="Starting listing data">This sets the starting data. In Edit, use Change source for an individual field to take a value from another selected listing. Replacing the starting listing resets the proposal after confirmation.</ListingReviewHelp></div><select id="intake-source" disabled={groupEditing} className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={sourceId} onChange={event => { if (creationDirty) setReplacementSourceId(event.target.value); else changeDraftSource(event.target.value); }}>{sources.map(item => <option key={item.id} value={item.id}>{item.storeName} · {item.channel} · {item.channelSku}</option>)}</select></div>}
-        <ListingComparisonTable creating key={sourceId} baseline={creationBaseline} product={newProduct} current={current} sources={sources} onChange={updateNewProduct}
+        <ListingComparisonTable creating key={sourceId} baseline={creationBaseline} product={reviewProduct!} current={current} sources={sources} onChange={updateNewProduct}
           onMediaReady={setMediaReady} onSetupSkus={() => {}} onEditingChange={(editing, changed) => { setGroupEditing(editing); setGroupDirty(changed); }}
           skuMatrix={{ mappings, verifiedSingles: verifiedStructure ? sources.map(source => source.id) : verifiedSingles, onReload: reloadSource,
             onVerify: (id, checked) => { const next = checked ? [...new Set([...verifiedSingles, id])] : verifiedSingles.filter(value => value !== id); setVerifiedSingles(next); setVerifiedStructure(sources.filter(source => source.variants === 0).every(source => next.includes(source.id))); setAcknowledged(false); setDirty(true); },
             onMappingsChange: value => { setMappings(value); setCreationDirty(true); setAcknowledged(false); setDirty(true); setError(''); } }} />
+        <fieldset className="space-y-2 rounded-lg border p-3"><legend className="px-1 text-sm font-medium">Stock warehouse <span aria-hidden="true" className="text-destructive">*</span></legend>
+          <p className="text-xs leading-5 text-muted-foreground">Orders for these listings take stock from here. The new Master starts with an opening count of 0; shop stock is not copied.</p>
+          <div className="flex flex-wrap gap-x-5">{assignableMasterWarehouses().map(warehouse => <label key={warehouse.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"><Checkbox disabled={groupEditing} checked={warehouseIds.includes(warehouse.id)} onCheckedChange={checked => { setWarehouseIds(ids => checked === true ? [...new Set([...ids, warehouse.id])] : ids.filter(id => id !== warehouse.id)); setDirty(true); setError(''); }} />{warehouse.name}{listingShopWarehouseIds(sources).includes(warehouse.id) && <span className="text-xs text-muted-foreground">· Shop warehouse</span>}</label>)}</div>
+          {!warehouseIds.length && <p className="text-xs text-amber-700 dark:text-amber-300">Choose at least one warehouse. Without one, orders for these listings cannot be fulfilled.</p>}
+        </fieldset>
         {unknownStructure && <label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><Checkbox className="mt-1 shrink-0" checked={verifiedStructure} onCheckedChange={checked => setVerifiedStructure(checked === true)} />Source structure is not recorded. I checked the shop listing(s) and selected the correct product structure above.</label>}
         {sources.length > 1 && <label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><Checkbox checked={acknowledged} onCheckedChange={checked => setAcknowledged(checked === true)} className="mt-1 shrink-0" />I checked that the selected listings represent this product, including model and pack size.</label>}
       </div>}
@@ -420,6 +448,7 @@ export function ListingMasterReview({ catalog = savedListingCatalog, listings, i
     <AlertDialog open={Boolean(replacementMasterMode)} onOpenChange={open => { if (!open) setReplacementMasterMode(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard changes for this Master?</AlertDialogTitle><AlertDialogDescription>Your proposed Master values, SKU mappings and SKU structure checks will be discarded when you change the destination. No Master or shop data has been saved.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={() => { if (replacementMasterMode === 'existing') chooseAnother(); else createNewMaster(); setReplacementMasterMode(null); }}>Discard & continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={Boolean(replacementSourceId)} onOpenChange={open => { if (!open) setReplacementSourceId(''); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Replace the starting listing data?</AlertDialogTitle><AlertDialogDescription>This replaces your field edits, image choices and SKU mappings with data from the selected listing. Your internal category and Master SKU are kept. To change just one field, use Change source in the mapping table instead.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={() => changeDraftSource(replacementSourceId)}>Replace draft data</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={deferOpen} onOpenChange={setDeferOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{mode === 'new' ? 'Save a draft Master and link these listings?' : alreadyLinkedHere ? 'Save review progress for later?' : 'Link now and finish the review later?'}</AlertDialogTitle><AlertDialogDescription>{sources.length} listing{sources.length === 1 ? '' : 's'} {alreadyLinkedHere ? 'stay linked' : 'will be linked'} to {mode === 'new' ? draft.name : master?.name}. {mode === 'new' ? 'The new Master stays Draft.' : 'Existing Master details and status stay unchanged; your proposed edits are saved for review.'} Unconfirmed SKU mappings cannot be used for price or stock sync. No shop data is changed and sync is not turned on.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={saveForLater}>{mode === 'new' ? 'Save draft & link' : alreadyLinkedHere ? 'Save progress' : 'Link & save progress'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={Boolean(removingSource)} onOpenChange={open => { if (!open) setRemovingSource(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Link this listing separately?</AlertDialogTitle><AlertDialogDescription>{removingSource?.storeName} · {removingSource?.channelSku} will be removed from this group and will not be linked to {master?.name}. It returns to the listings queue so you can link it to its own Master. Your review of the other {sources.length - 1} listing{sources.length - 1 === 1 ? '' : 's'} is kept. Nothing is saved yet.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep in group</AlertDialogCancel><AlertDialogAction onClick={() => removingSource && removeSource(removingSource.id)}>Remove from group</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <Dialog open={Boolean(zoom)} onOpenChange={open => { if (!open) setZoom(null); }}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Product image</DialogTitle><DialogDescription>{zoom?.name}</DialogDescription></DialogHeader>{zoom && <img src={zoom.src} alt={zoom.name} className="max-h-[65vh] w-full object-contain" />}</DialogContent></Dialog>
     <AlertDialog open={discardBack} onOpenChange={setDiscardBack}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard unsaved details?</AlertDialogTitle><AlertDialogDescription>Your Master and listing links have not changed. Go back without saving these edits?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={onBack}>Discard &amp; go back</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </section>;

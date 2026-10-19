@@ -23,10 +23,11 @@ type Props = {
   creating?: boolean;
   onMediaReady?: (ready: boolean) => void;
   onImagePreview?: (src: string, name: string) => void;
+  onRemoveSource?: (id: string) => void;
 };
 
 /** All comparisons stay visible. Row edits only update a proposal, never the stored Master. */
-export function ListingComparisonTable({ baseline, product, current, sources, onChange, onEditingChange, onSetupSkus, skuMatrix, creating = false, onMediaReady, onImagePreview }: Props) {
+export function ListingComparisonTable({ baseline, product, current, sources, onChange, onEditingChange, onSetupSkus, skuMatrix, creating = false, onMediaReady, onImagePreview, onRemoveSource }: Props) {
   const prefix = useId();
   const editorTrigger = useRef<HTMLElement | null>(null);
   const [editor, setEditor] = useState<{ key: string; product: Product; mappings?: VariantMappings; sourceId?: string; fieldKey?: string } | null>(null);
@@ -129,7 +130,7 @@ export function ListingComparisonTable({ baseline, product, current, sources, on
     <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">Proposal only · applies to this shared Master, not the source listing.</p><div className="flex gap-2"><Button variant="ghost" className="h-11" disabled={!mediaReady} onClick={() => close(false)}>Cancel edit</Button><Button className="h-11" disabled={!mediaReady} onClick={() => close(true)}>Apply to review</Button></div></div>
   </section>;
   return <ListingGroupComparison creating={creating} activationChecks={creating ? completionReadiness(product, sources).checks : undefined} baseline={baseline} product={product} sources={sources} rows={rows} format={format} text={text} prefix={prefix} editingKey={editor?.key} onEdit={openEditor} renderEditor={renderEditor} onSetupSkus={creating ? () => openEditor('structure') : onSetupSkus}
-    skuMatrix={skuMatrix} skuEditing={skuEditing} onSkuEditingChange={setSkuEditing} onChange={onChange} onImagePreview={onImagePreview}
+    skuMatrix={skuMatrix} skuEditing={skuEditing} onSkuEditingChange={setSkuEditing} onChange={onChange} onImagePreview={onImagePreview} onRemoveSource={onRemoveSource}
     onUse={(key, candidate, returnFocus) => {
       const target = targetFor(key), result = convertField(candidate, target, product.price_currency);
       if (result.error || (target.required && (target.kind === 'text' ? !richTextPlainText(String(result.value)) : !(Number(result.value) > 0)))) { openEditor(key, candidate.source, candidate, returnFocus); return; }

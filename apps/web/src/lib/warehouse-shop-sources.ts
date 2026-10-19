@@ -21,6 +21,11 @@ const locationId = (id: string) => DEMO_WAREHOUSE_ALIASES[id] ?? id;
 const platformKey = (key: string) => ({ tiktok_shop: 'tiktok', tiktokshop: 'tiktok', primeweb: 'website', webstore: 'website', woocommerce: 'website', shopify: 'website', primepos: 'pos', facebook: 'social', instagram: 'social' }[key] ?? key);
 const shopNameKey = (name: string) => name.trim().toLocaleLowerCase();
 
+/** Connections for an exact channel and shop name; never a sole shop on the channel. */
+export function shopsForListing(channel: string, storeName: string | undefined, shops: ConnectedChannelRecord[]) {
+  return storeName?.trim() ? shops.filter(shop => platformKey(shop.platform) === channel && shopNameKey(shop.store_name) === shopNameKey(storeName)) : [];
+}
+
 /** Exact shop identity is shared by previews, listing settings and warehouse rows. */
 export function resolveListingShop(product: Product, listing: ChannelListing, shops: ConnectedChannelRecord[], imports: readonly CatalogImportItem[] = []) {
   const data = resolveListingShopData(product, listing, imports);

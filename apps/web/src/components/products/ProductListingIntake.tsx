@@ -71,19 +71,21 @@ export function ProductListingIntake({ catalog = savedListingCatalog, onChanged,
   };
   if (mode) return <ListingMasterReview catalog={catalog} key={`${mode}:${reviewIds.join('|')}`} listings={reviewing} initialMode={mode} remainingCount={items.length} onBack={backToQueue} onStageChange={onStageChange} onDirtyChange={onDirtyChange} onSaved={(result, created) => {
     const product = catalog.products().find(item => item.id === result.productId)!;
-    const savedIds = reviewing.map(item => item.id);
+    const findLink = (item: CatalogImportItem) => product.channels.find(link => link.channel === item.channel && link.external_id === item.listingId && (!link.store_name || link.store_name === item.storeName));
+    // A listing split out of the group is never linked, so report only the ones that actually landed on this Master.
+    const linked = reviewing.filter(item => findLink(item));
     const nextReceipt: ListingReviewReceipt = {
-      pairs: reviewing.map(item => {
-        const link = product.channels.find(link => link.channel === item.channel && link.external_id === item.listingId && link.store_name === item.storeName);
+      pairs: linked.map(item => {
+        const link = findLink(item);
         return { channel: item.channel, listingId: item.listingId, listing: item.title, shop: item.storeName, masterId: product.id, master: product.name,
           readiness: link ? listingSyncReadiness(product, link, catalog.listings()) : undefined };
       }),
       deferred: result.deferred, reviewSaved: result.reviewSaved,
       masterState: created ? `New Master ${product.status === 'published' ? 'Active' : 'Draft'}.` : result.masterUpdated ? `Master changes saved; status ${product.status === 'published' ? 'Active' : 'Draft'}.` : `Master status and details unchanged (${product.status === 'published' ? 'Active' : 'Draft'}).`,
     };
-    setReceipt(nextReceipt); setSelected(current => current.filter(id => !savedIds.includes(id)));
+    setReceipt(nextReceipt); setSelected(current => current.filter(id => !reviewing.some(item => item.id === id)));
     onChanged([result.productId], created);
-    toast({ title: result.deferred ? 'Linked · Review unfinished' : `${reviewing.length} listing${reviewing.length === 1 ? '' : 's'} linked`, description: result.reviewSaved ? `${nextReceipt.masterState} Nothing published; sync was not turned on.` : 'Links saved, but review history could not be saved. Do not link again.' });
+    toast({ title: result.deferred ? 'Linked · Review unfinished' : `${linked.length} listing${linked.length === 1 ? '' : 's'} linked`, description: result.reviewSaved ? `${nextReceipt.masterState} Nothing published; sync was not turned on.` : 'Links saved, but review history could not be saved. Do not link again.' });
     backToQueue();
   }} />;
   const resumeReceipt = receipt?.deferred ? unfinished.filter(item => receipt.pairs.some(pair => pair.masterId === item.existingLinkReview?.productId && pair.channel === item.channel && pair.shop === item.storeName && pair.listingId === item.listingId)) : [];

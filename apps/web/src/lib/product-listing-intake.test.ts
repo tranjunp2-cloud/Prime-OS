@@ -52,13 +52,16 @@ describe('Explicit shop-listing intake', () => {
     expect(pendingShopListings()).toEqual([]);
     expect(getCatalogImportItems()[0].resolvedProductId).toBe(target.id);
   });
-  it('saves a new Master as Draft until a warehouse is assigned without summing shop stock', () => {
-    expect(() => confirmListingIntake(['a', 'b'], { name: 'Grouped product', sku: 'INTAKE-GROUP-TEST', completion: readyMasterFields(), sourceId: 'b' })).toThrow(/Assign at least 1 warehouse/);
-    const { productId } = confirmListingIntake(['a', 'b'], { defer: true, name: 'Grouped product', sku: 'INTAKE-GROUP-TEST', completion: readyMasterFields(), sourceId: 'b' });
-    expect(getProductById(productId)).toMatchObject({ name: 'Reviewed product', status: 'draft', inventory: {}, channel_overrides: {}, retail_price: 123 });
+  it('requires a stock warehouse for a new Master and starts it at an opening count of 0 without summing shop stock', () => {
+    const input = { name: 'Grouped product', sku: 'INTAKE-GROUP-TEST', completion: readyMasterFields(), sourceId: 'b' };
+    expect(() => confirmListingIntake(['a', 'b'], input)).toThrow(/Assign at least 1 warehouse/);
+    expect(() => confirmListingIntake(['a', 'b'], { ...input, defer: true })).toThrow('Choose at least one stock warehouse for the new Master.');
+    expect(() => confirmListingIntake(['a', 'b'], { ...input, defer: true, warehouseIds: ['wh_fbajp'] })).toThrow('Choose active warehouses whose stock you manage.');
+    expect(getProducts().some(product => product.sku_code === 'INTAKE-GROUP-TEST')).toBe(false);
+    const { productId } = confirmListingIntake(['a', 'b'], { ...input, defer: true, warehouseIds: ['wh_crjp'] });
+    expect(getProductById(productId)).toMatchObject({ name: 'Reviewed product', status: 'draft', inventory: { wh_crjp: 0 }, channel_overrides: {}, retail_price: 123 });
     expect(getProductById(productId)?.channels).toHaveLength(2);
-    expect(getProductById(productId)?.skus).toEqual([]);
-    expect(getStoredMasterReadiness(getProductById(productId)!).ready).toBe(false);
+    expect(getProductById(productId)?.inventory_adjustments).toEqual([expect.objectContaining({ warehouseId: 'wh_crjp', before: null, after: 0, reason: 'Opening stock' })]);
   });
   it.each(['draft', 'review', 'published'] as const)('preserves %s status without changing unrelated Masters', status => {
     updateProduct(target.id, { id: target.id, status, import_activation_paused: status !== 'published' });
@@ -68,7 +71,7 @@ describe('Explicit shop-listing intake', () => {
     expect(getProducts().filter(product => product.id !== target.id)).toEqual(unrelated);
   });
   it.each(['existing', 'new'] as const)('persists the correct lifecycle status for an %s Master after reload', async mode => {
-    const result = confirmListingIntake(['a'], mode === 'existing' ? { productId: target.id } : { defer: true, name: 'Persisted Draft Master', sku: 'INTAKE-PERSISTED', completion: readyMasterFields(), sourceId: 'a' });
+    const result = confirmListingIntake(['a'], mode === 'existing' ? { productId: target.id } : { defer: true, warehouseIds: ['wh_crjp'], name: 'Persisted Draft Master', sku: 'INTAKE-PERSISTED', completion: readyMasterFields(), sourceId: 'a' });
     saveCatalogImportItems([]);
     vi.resetModules();
     const reloaded = await import('./product-store');
@@ -82,14 +85,14 @@ describe('Explicit shop-listing intake', () => {
     const brand = settings.brands.find(item => item.status === 'Active')!;
     const source = { ...items[0], brand: 'Raw shop brand', price: 34, currency: 'USD', gtin: '0012345', mpn: 'BRUSH-12', modelNumber: 'MODEL-2026', packQuantity: 12, prod_weight: 250 };
     saveCatalogImportItems([source]);
-    const { productId } = confirmListingIntake(['a'], { defer: true, name: source.title, sku: 'INTAKE-IDENTITY', completion: readyMasterFields({ categoryId: category.id, retail_price: 34, price_currency: 'USD' }), sourceId: 'a', productType: 'single', categoryId: category.id, brandId: brand.id, copySourcePrice: true, reviewedSources: [snapshotListingSource(source)] });
+    const { productId } = confirmListingIntake(['a'], { defer: true, warehouseIds: ['wh_crjp'], name: source.title, sku: 'INTAKE-IDENTITY', completion: readyMasterFields({ categoryId: category.id, retail_price: 34, price_currency: 'USD' }), sourceId: 'a', productType: 'single', categoryId: category.id, brandId: brand.id, copySourcePrice: true, reviewedSources: [snapshotListingSource(source)] });
     expect(getProductById(productId)).toMatchObject({ categoryId: category.id, category: category.name, brandId: brand.id, brand: brand.name, product_type: 'single', has_variants: false, gtin: '0012345', mpn: 'BRUSH-12', model_number: 'MODEL-2026', pack_quantity: 12, prod_weight: 250, retail_price: 34, price_currency: 'USD', inventory: {}, status: 'draft' });
     expect(getProductById(productId)?.import_sources?.[0]).toMatchObject({ brand: 'Raw shop brand', price: 34, currency: 'USD' });
     expect(getProductById(productId)?.channels[0].publication_unconfirmed).toBe(true);
   });
   it('does not infer identifiers or pack quantity from the title, or use raw shop taxonomy as a Master category', () => {
     saveCatalogImportItems([{ ...items[0], title: 'Brush 12 pieces', brand: 'Unknown uncatalogued brand', channelCategory: 'Shop art brushes', price: 34, currency: 'USD' }]);
-    const { productId } = confirmListingIntake(['a'], { defer: true, name: 'Brush 12 pieces', sku: 'INTAKE-MISSING', completion: readyMasterFields(), sourceId: 'a' });
+    const { productId } = confirmListingIntake(['a'], { defer: true, warehouseIds: ['wh_crjp'], name: 'Brush 12 pieces', sku: 'INTAKE-MISSING', completion: readyMasterFields(), sourceId: 'a' });
     expect(getProductById(productId)).toMatchObject({ brand: '', gtin: '', mpn: '', model_number: '', retail_price: 123 });
     expect(getProductById(productId)?.pack_quantity).toBeUndefined();
   });
@@ -100,7 +103,7 @@ describe('Explicit shop-listing intake', () => {
     expect(suggestedListingBrandId(source)).toBe(brand.id);
     expect(suggestedListingBrandId({ ...source, brand: 'cb' })).toBe(brand.id);
     saveCatalogImportItems([source]);
-    const { productId } = confirmListingIntake(['a'], { defer: true, name: source.title, sku: 'INTAKE-NO-BRAND', completion: readyMasterFields(), sourceId: 'a', brandId: '' });
+    const { productId } = confirmListingIntake(['a'], { defer: true, warehouseIds: ['wh_crjp'], name: source.title, sku: 'INTAKE-NO-BRAND', completion: readyMasterFields(), sourceId: 'a', brandId: '' });
     expect(getProductById(productId)?.brand).toBe('');
     saveProductCatalogSettings({ ...settings, brands: [brand, { ...brand, id: 'other-brand' }] });
     expect(suggestedListingBrandId(source)).toBe('');
@@ -122,9 +125,9 @@ describe('Explicit shop-listing intake', () => {
   it('requires a valid imported listing price even when a replacement Master price is reviewed', () => {
     saveCatalogImportItems([{ ...items[0], price: -12, currency: '' }]);
     expect(() => confirmListingIntake(['a'], { name: 'Test product', sku: 'INTAKE-PRICE', completion: readyMasterFields(), sourceId: 'a', copySourcePrice: true })).toThrow(/valid price and currency/);
-    expect(() => confirmListingIntake(['a'], { defer: true, name: 'Test product', sku: 'INTAKE-PRICE', completion: readyMasterFields(), sourceId: 'a', copySourcePrice: false })).toThrow(/Missing listing data: Listing price & currency/);
+    expect(() => confirmListingIntake(['a'], { defer: true, warehouseIds: ['wh_crjp'], name: 'Test product', sku: 'INTAKE-PRICE', completion: readyMasterFields(), sourceId: 'a', copySourcePrice: false })).toThrow(/Missing listing data: Listing price & currency/);
     saveCatalogImportItems([items[0]]);
-    const { productId } = confirmListingIntake(['a'], { defer: true, name: 'Test product', sku: 'INTAKE-PRICE', completion: readyMasterFields(), sourceId: 'a', copySourcePrice: false });
+    const { productId } = confirmListingIntake(['a'], { defer: true, warehouseIds: ['wh_crjp'], name: 'Test product', sku: 'INTAKE-PRICE', completion: readyMasterFields(), sourceId: 'a', copySourcePrice: false });
     expect(getProductById(productId)?.retail_price).toBe(123);
   });
   it('blocks creation if any source changes after the data preview was opened', () => {
@@ -168,7 +171,7 @@ describe('Explicit shop-listing intake', () => {
   it('does not mutate products or confirm when required persistence fails', () => {
     const before = structuredClone(getProducts());
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage full'); });
-    expect(() => confirmListingIntake(['a'], { defer: true, name: 'Not saved', sku: 'UNSAVED-INTAKE', completion: readyMasterFields(), sourceId: 'a' })).toThrow('Storage full');
+    expect(() => confirmListingIntake(['a'], { defer: true, warehouseIds: ['wh_crjp'], name: 'Not saved', sku: 'UNSAVED-INTAKE', completion: readyMasterFields(), sourceId: 'a' })).toThrow('Storage full');
     expect(() => confirmListingIntake(['a'], { productId: target.id })).toThrow('Storage full');
     expect(getProducts()).toEqual(before);
     expect(getCatalogImportItems({ requireConfirmation: true })[0].confirmed).not.toBe(true);

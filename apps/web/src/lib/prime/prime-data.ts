@@ -949,7 +949,8 @@ function buildDemoFlows(): PrimeDemoFlow[] {
 }
 
 export function getPrimeSnapshot(): PrimeSnapshot {
-  const products = getProducts();
+  // Business-intelligence seeds read from the stable authored catalog; transient import demo/test fixtures (prod_import_*) must not shift the top products.
+  const products = getProducts().filter((product) => !product.id.startsWith('prod_import'));
   const orders = getOrders();
   const orderItems = allOrderItems(orders);
   const orderEvents = allOrderEvents(orders);

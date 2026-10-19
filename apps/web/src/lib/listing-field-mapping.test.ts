@@ -79,7 +79,7 @@ describe('Review field mapping', () => {
     const catalog = createEmptyListingCatalog([source]); const item = catalog.listings()[0];
     const field = importedFieldCandidates([item]).find(field => field.key === 'provider:package_mass')!;
     const proposal = writeMappedField(master, target('pkg_weight'), 300, mappingDecision(field, 300, 'source', '0.3 kg → 300 g'));
-    confirmListingIntake([item.id], { name: item.title, sku: 'FIELD-DRAFT', sourceId: item.id, defer: true, completion: completionFields(proposal), reviewedSources: [snapshotListingSource(item)] }, catalog);
+    confirmListingIntake([item.id], { name: item.title, sku: 'FIELD-DRAFT', sourceId: item.id, defer: true, warehouseIds: ['wh_crjp'], completion: completionFields(proposal), reviewedSources: [snapshotListingSource(item)] }, catalog);
     catalog.saveListings([]);
     const review = pendingMappingReviews(catalog.products(), [])[0];
     expect(review.mappingFields).toEqual(source.mappingFields);

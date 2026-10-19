@@ -1,11 +1,10 @@
 import { getCatalogImportItems, type CatalogImportItem } from './catalog-import-store';
 import type { ConnectedChannelRecord } from './channel-integrations-api';
-import { demoConnectedChannels } from './channel-integrations-demo';
 import { resolveListingShopData } from './listing-shop-data';
 import type { OrderLine, OrderRecord } from './orders-api';
 import { pendingMappingReviews } from './product-listing-intake';
 import { getProducts, type ChannelListing, type Product } from './product-store';
-import { readConnectedShops } from './shop-warehouse-settings';
+import { knownConnectedShops } from './shop-warehouse-settings';
 import { resolveListingStockSource } from './warehouse-shop-sources';
 import { getWarehouseById } from './warehouse-store';
 
@@ -27,10 +26,9 @@ const channelKey = (platform?: string) => {
 
 /** Prototype catalog state: saved Masters, the import queue and connected shops (demo shops until loaded). */
 export function orderCatalogContext(): OrderCatalogContext {
-  const connected = readConnectedShops();
   return {
     products: getProducts(),
-    shops: connected.status === 'ready' && connected.shops.length ? connected.shops : demoConnectedChannels,
+    shops: knownConnectedShops(),
     imports: getCatalogImportItems({ requireConfirmation: true }),
   };
 }

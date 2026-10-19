@@ -885,13 +885,25 @@ describe('Fast evidence-based Master review', () => {
     expect(screen.queryByRole('region', { name: 'Complete Product Master' })).not.toBeInTheDocument();
     expect(skuSelect('RED', sources[0])).toHaveValue('RED');
     click('Cancel');
-    click('Remove SKU proposal BLUE');
+    click('Remove SKU proposal BLUE'); click('Remove SKU');
     expect(screen.getByRole('rowheader', { name: /Needs matching/ }).closest('tr')).toHaveTextContent('BLUE');
     expect(screen.getByRole('rowgroup', { name: 'SKU & variants' })).toHaveTextContent('Proposed new SKU');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Differences & missing data' }));
     expect(screen.queryByRole('button', { name: 'Remove SKU proposal BLUE' })).not.toBeInTheDocument();
     expect(getProductById(target.id)).toEqual(before);
     expect(screen.getByRole('button', { name: 'Link all & finish later' })).toBeEnabled();
+  });
+  it('splits a listing out of the group, keeping the remaining listing in review', () => {
+    mount(listings);
+    expect(screen.getByRole('region', { name: 'Compare product details' })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /Shop a/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Shop b/ })).toBeInTheDocument();
+    click('Remove Shop a · COMPARE-12 from this group');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Link this listing separately?');
+    click('Remove from group');
+    expect(screen.queryByRole('columnheader', { name: /Shop a/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Shop b/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /from this group$/ })).not.toBeInTheDocument();
   });
   it('saves a reviewed unresolved group without collapsing multiple SKUs into a single Master', () => {
     const unknown = { ...listings[0], variants: 0, variantItems: [{ sku: 'RED', label: 'Red' }, { sku: 'BLUE', label: 'Blue' }] };

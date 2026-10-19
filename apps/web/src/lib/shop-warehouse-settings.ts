@@ -17,6 +17,8 @@ let pending: Promise<ConnectedChannelRecord[]> | undefined;
 let revision = 0;
 const listeners = new Set<() => void>();
 export const readConnectedShops = () => snapshot;
+/** Loaded connections, or the prototype's demo shops until they arrive. */
+export const knownConnectedShops = () => snapshot.status === 'ready' && snapshot.shops.length ? snapshot.shops : demoConnectedChannels;
 export function subscribeConnectedShops(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function publish(next: Snapshot) { snapshot = next; listeners.forEach(listener => listener()); }
 function isAuthenticationError(error: unknown) {
