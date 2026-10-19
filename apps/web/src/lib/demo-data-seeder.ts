@@ -38,6 +38,7 @@ import { getCatalogImportItems } from './catalog-import-store';
 import { orderHoldCounters, orderHoldsForPosition, orderHoldState } from './warehouse-order-holds';
 import { canEditWarehouseStock } from './warehouse-stock-view';
 import type { FulfillmentJob } from './fulfillment-store';
+import { demoConnectedChannels } from './channel-integrations-demo';
 import type { Listing } from './listing-store';
 import type { Order } from './oms-types';
 import type { ReturnStatus } from './return-store';
@@ -1046,7 +1047,8 @@ export function seedDemoData(_userId?: string, shops?: ConnectedChannelRecord[])
 
 async function runSeedDemoData(shops?: ConnectedChannelRecord[]): Promise<{ success: boolean }> {
   try {
-    demoShops = shops ?? await channelIntegrationsApi.channels().then(result => result.data).catch(() => []);
+    // Without a channels API (the prototype), seed against the demo shops so order holds reach their warehouses.
+    demoShops = shops ?? await channelIntegrationsApi.channels().then(result => result.data?.length ? result.data : demoConnectedChannels).catch(() => demoConnectedChannels);
     clearWarehouseStore();
     clearOrders();
     clearInventoryStore();
