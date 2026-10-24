@@ -71,7 +71,7 @@ export default function Auth() {
           <div>
             <div className="flex items-center gap-3">
               <span className="grid h-12 w-28 shrink-0 place-items-center overflow-hidden rounded-lg bg-white px-2 shadow-sm">
-                <img src="/product-logo.png" alt="Unifi Business" className="h-full w-full object-contain" />
+                <img src="/product-logo.png" alt="PrimeOS" className="h-full w-full object-contain" />
               </span>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
@@ -106,7 +106,7 @@ export default function Auth() {
           <div className="mb-10 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 lg:hidden">
               <span className="grid h-11 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white px-2 shadow-sm">
-                <img src="/product-logo.png" alt="Unifi Business" className="h-full w-full object-contain" />
+                <img src="/product-logo.png" alt="PrimeOS" className="h-full w-full object-contain" />
               </span>
               <span className="font-display text-lg font-semibold text-foreground">{authCopy.brandTitle}</span>
             </div>

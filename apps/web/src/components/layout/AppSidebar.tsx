@@ -269,7 +269,7 @@ export function AppSidebar() {
   return (
     <aside className={cn('app-sidebar-light flex h-full w-[var(--sidebar-width-compact)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200', collapsed ? 'md:w-[var(--sidebar-width-compact)]' : 'md:w-[var(--sidebar-width-expanded)]')} data-collapsed={collapsed}>
       <div className={cn('flex h-[var(--header-height)] shrink-0 items-center border-b border-sidebar-border px-2', collapsed ? 'justify-center' : 'justify-center md:justify-between md:px-4')}>
-        <span className={cn('flex h-12 w-[5.5rem] shrink-0 items-center justify-center', collapsed && 'md:hidden')}><img src="/product-logo.png" alt="Unifi Business" width="104" height="59" className="block h-auto max-h-full w-full object-contain" /></span>
+        <span className={cn('flex h-12 w-[7.5rem] shrink-0 items-center justify-center', collapsed && 'md:hidden')}><img src="/product-logo.png" alt="PrimeOS" width="907" height="261" className="block h-auto max-h-full w-full object-contain" /></span>
         <Tooltip><TooltipTrigger asChild><button type="button" onClick={toggleCollapsed} className="hidden size-11 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/65 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-zinc-800 md:flex" aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>{collapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}</button></TooltipTrigger><TooltipContent side="right">{collapsed ? 'Expand navigation' : 'Collapse navigation'}</TooltipContent></Tooltip>
       </div>
 
